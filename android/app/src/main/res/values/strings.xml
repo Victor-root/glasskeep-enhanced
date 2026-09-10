@@ -759,6 +759,7 @@
     <string name="native_register_back">Back to sign in</string>
 
     <string name="native_admin_title">Administration</string>
+    <string name="native_notes_admin_panel">Administration Panel</string>
     <string name="native_admin_tab_users">Users</string>
     <string name="native_admin_tab_branding">Branding</string>
     <string name="native_admin_tab_ai">Server AI</string>

@@ -78,6 +78,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
@@ -1412,28 +1414,25 @@ private fun HeaderMenu(
 ) {
     if (!expanded) return
     val configuration = LocalConfiguration.current
+    val popupOffset = with(LocalDensity.current) { IntOffset(0, (-14).dp.roundToPx()) }
     Popup(
         alignment = Alignment.TopEnd,
+        offset = popupOffset,
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
         Column(
             modifier = Modifier
-                .widthIn(max = (configuration.screenWidthDp * 0.95f).dp)
+                // The mobile web popover is a compact, right-aligned card;
+                // it does not turn into a near full-width dialog.
+                .widthIn(max = minOf(298.dp, (configuration.screenWidthDp - 26).dp))
                 .heightIn(max = (configuration.screenHeightDp * 0.72f).dp)
-                .clip(RoundedCornerShape(8.dp))
+                .shadow(6.dp, RoundedCornerShape(12.dp), clip = false)
+                .clip(RoundedCornerShape(12.dp))
                 .background(if (dark) Color(0xFF222222) else Color.White)
-                .border(1.dp, if (dark) DarkBorderColor else LightBorderColor, RoundedCornerShape(8.dp))
+                .border(1.dp, if (dark) DarkBorderColor else LightBorderColor, RoundedCornerShape(12.dp))
                 .verticalScroll(rememberScrollState()),
         ) {
-            if (showAdmin) {
-                HeaderMenuItem(
-                    label = stringResource(R.string.native_admin_title),
-                    iconTint = if (dark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
-                    dark = dark,
-                    onClick = onOpenAdmin,
-                ) { tint -> PeopleIcon(size = 20.dp, tint = tint) }
-            }
             HeaderMenuItem(
                 label = stringResource(R.string.native_settings_title),
                 iconTint = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
@@ -1472,6 +1471,14 @@ private fun HeaderMenu(
                 dark = dark,
                 onClick = onOpenQrScanner,
             ) { tint -> QrCodeIcon(size = 20.dp, tint = tint) }
+            if (showAdmin) {
+                HeaderMenuItem(
+                    label = stringResource(R.string.native_notes_admin_panel),
+                    iconTint = if (dark) Color(0xFFF87171) else Color(0xFFDC2626),
+                    dark = dark,
+                    onClick = onOpenAdmin,
+                ) { tint -> ShieldLockIcon(size = 20.dp, tint = tint) }
+            }
             // The whole row is red on the web, glyph and label alike.
             val signOutColor = if (dark) Color(0xFFF87171) else Color(0xFFDC2626)
             if (showLockInstance) {

@@ -748,6 +748,7 @@
     <string name="native_register_back">Retour à la connexion</string>
 
     <string name="native_admin_title">Administration</string>
+    <string name="native_notes_admin_panel">Panneau d’administration</string>
     <string name="native_admin_tab_users">Utilisateurs</string>
     <string name="native_admin_tab_branding">Apparence</string>
     <string name="native_admin_tab_ai">IA serveur</string>
