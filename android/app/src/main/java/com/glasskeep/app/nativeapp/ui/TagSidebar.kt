@@ -33,7 +33,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -44,16 +47,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
-import com.glasskeep.app.ui.DarkCardBg
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
-import com.glasskeep.app.ui.LightCardBg
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import com.glasskeep.app.ui.Indigo
 
 private val SidebarActiveGradient = Brush.linearGradient(listOf(Color(0xFF6366f1), Color(0xFF7c3aed)))
-private val SidebarActiveShadowTint = Color(0xFF7C3AED)
 
 /** The two entries that are not folders but lenses over the notes
  *  already loaded: only those carrying an image, and only those carrying
@@ -73,6 +73,7 @@ internal const val SidebarReminders = "__REMINDERS__"
 fun TagSidebar(
     open: Boolean,
     dark: Boolean,
+    themeId: String?,
     tags: List<Pair<String, Int>>,
     activeTag: String?,
     activeTags: Set<String>,
@@ -104,7 +105,9 @@ fun TagSidebar(
     ) {
         val titleColor = if (dark) DarkTitleColor else LightTitleColor
         val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
-        val panelBg = if (dark) DarkCardBg else LightCardBg
+        // Mobile web keeps this an opaque --gk-statusbar surface, rather
+        // than the generic white card background.
+        val panelBg = WorkspaceTheme.statusBarColor(themeId, dark)
         val closeLabel = stringResource(R.string.native_common_close)
 
         Column(
@@ -117,7 +120,8 @@ fun TagSidebar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .height(76.dp)
+                    .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -137,9 +141,9 @@ fun TagSidebar(
                             indication = null,
                             role = Role.Button,
                         ) { onClose() }
-                        .padding(6.dp),
+                        .padding(8.dp),
                 ) {
-                    CloseIcon(size = 20.dp, tint = titleColor)
+                    CloseIcon(size = 24.dp, tint = titleColor)
                 }
             }
 
@@ -178,7 +182,7 @@ fun TagSidebar(
                 }
                 SidebarNavItem(
                     icon = { tint -> NotesIcon(size = 20.dp, tint = tint) },
-                    label = stringResource(R.string.native_header_notes_label),
+                    label = stringResource(R.string.native_sidebar_notes_all),
                     active = activeTag == null && activeTags.isEmpty(),
                     titleColor = titleColor,
                     onClick = onSelectNotes,
@@ -191,15 +195,15 @@ fun TagSidebar(
                     titleColor = titleColor,
                     onClick = onSelectImages,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
                 SidebarNavItem(
                     icon = { tint -> ArchiveIcon(size = 20.dp, tint = tint) },
-                    label = stringResource(R.string.native_archived_title),
+                    label = stringResource(R.string.native_sidebar_archived_notes),
                     active = false,
                     titleColor = titleColor,
                     onClick = onOpenArchived,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
                 SidebarNavItem(
                     icon = { tint -> SidebarRemindersIcon(size = 20.dp, tint = tint) },
                     label = stringResource(R.string.native_sidebar_reminders),
@@ -207,7 +211,7 @@ fun TagSidebar(
                     titleColor = titleColor,
                     onClick = onSelectReminders,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
                 SidebarNavItem(
                     icon = { tint -> TrashIcon(size = 20.dp, tint = tint) },
                     label = stringResource(R.string.native_trash_title),
@@ -267,8 +271,17 @@ private fun SidebarNavItem(
             .then(
                 if (active) {
                     Modifier
-                        .shadow(elevation = 2.dp, shape = shape, ambientColor = SidebarActiveShadowTint.copy(alpha = 0.55f), spotColor = SidebarActiveShadowTint.copy(alpha = 0.55f))
-                        .background(SidebarActiveGradient)
+                        // The web's gradient pill is inset by 8px while the
+                        // icon/text stay aligned with every normal row.
+                        .drawBehind {
+                            val inset = 8.dp.toPx()
+                            drawRoundRect(
+                                brush = SidebarActiveGradient,
+                                topLeft = Offset(inset, 0f),
+                                size = Size(size.width - inset * 2f, size.height),
+                                cornerRadius = CornerRadius(6.dp.toPx()),
+                            )
+                        }
                 } else {
                     Modifier
                 },
@@ -288,7 +301,7 @@ private fun SidebarNavItem(
             label,
             color = if (active) Color.White else titleColor,
             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-            fontSize = 14.sp,
+            fontSize = 16.sp,
             maxLines = 1,
             modifier = Modifier.weight(1f),
         )

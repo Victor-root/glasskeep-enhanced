@@ -61,6 +61,8 @@
     <string name="native_settings_passkeys_delete_confirm_title">Remove this passkey?</string>
     <string name="native_settings_passkeys_delete_confirm_body">This passkey can no longer be used to sign in. If it could unlock the encrypted instance, that authorisation will be revoked too.</string>
     <string name="native_header_notes_label">Notes</string>
+    <string name="native_sidebar_notes_all">Notes (All)</string>
+    <string name="native_sidebar_archived_notes">Archived Notes</string>
     <string name="native_notes_refresh">Refresh</string>
     <string name="native_notes_empty">No notes yet.</string>
     <string name="native_note_detail_edited_prefix">Edited: %1$s</string>

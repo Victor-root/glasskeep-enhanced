@@ -794,6 +794,7 @@ fun NativeNotesListScreen(
         TagSidebar(
             open = sidebarOpen,
             dark = dark,
+            themeId = themeId,
             tags = tagCounts,
             activeTag = activeTagFilter,
             activeTags = activeTagFilters,
