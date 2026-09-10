@@ -443,6 +443,8 @@
     <string name="native_note_detail_image_previous">Précédent</string>
     <string name="native_note_detail_image_next">Suivant</string>
     <string name="native_richtext_format">Mise en forme</string>
+    <string name="native_richtext_copy">Copier</string>
+    <string name="native_richtext_copied">Copié</string>
     <string name="native_richtext_paragraph">Paragraphe</string>
     <string name="native_richtext_heading_level">Titre %1$d</string>
     <string name="native_richtext_clear_formatting">Supprimer la mise en forme</string>

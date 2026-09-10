@@ -448,6 +448,8 @@
     <string name="native_note_detail_image_previous">Previous</string>
     <string name="native_note_detail_image_next">Next</string>
     <string name="native_richtext_format">Formatting</string>
+    <string name="native_richtext_copy">Copy</string>
+    <string name="native_richtext_copied">Copied</string>
     <string name="native_richtext_paragraph">Paragraph</string>
     <string name="native_richtext_heading_level">Heading %1$d</string>
     <string name="native_richtext_clear_formatting">Clear formatting</string>

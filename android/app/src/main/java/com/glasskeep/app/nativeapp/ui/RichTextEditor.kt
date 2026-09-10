@@ -3,6 +3,7 @@ package com.glasskeep.app.nativeapp.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -33,14 +35,18 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -51,11 +57,13 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
+import kotlinx.coroutines.delay
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
@@ -310,7 +318,18 @@ fun RichTextReader(
                         )
                         .padding(horizontal = (0.85f * RemPx).dp, vertical = (0.6f * RemPx).dp),
                 ) {
-                    Text(annotatedTextFor(block, style, dark), style = style)
+                    Text(annotatedTextFor(block, style, dark), style = style, modifier = Modifier.fillMaxWidth())
+                    // ModalFooter's read-mode renderer (useModalState.js)
+                    // always shows this button for a fenced block - no
+                    // tap-to-arm needed, unlike inline code. Card previews
+                    // (compact) never show it: nobody copies from a preview.
+                    if (!compact) {
+                        CodeCopyButton(
+                            text = block.text,
+                            dark = dark,
+                            modifier = Modifier.align(Alignment.TopEnd),
+                        )
+                    }
                 }
                 RichBlockKind.QUOTE -> {
                     val bar = if (dark) Color(0xFFA5B4FC) else Indigo.copy(alpha = 0.85f)
@@ -329,7 +348,12 @@ fun RichTextReader(
                                 bottom = (0.9f * RemPx).dp,
                             ),
                     ) {
-                        Text(annotatedTextFor(block, style, dark), style = style.copy(fontStyle = FontStyle.Italic))
+                        ReaderInlineText(
+                            block = block,
+                            style = style.copy(fontStyle = FontStyle.Italic),
+                            dark = dark,
+                            enableInlineCopy = !compact,
+                        )
                     }
                 }
                 else -> Row(
@@ -345,9 +369,108 @@ fun RichTextReader(
                         numberedPosition = numberedPositions[block.id],
                         onToggleChecked = {},
                     )
-                    Text(annotatedTextFor(block, style, dark), style = style, modifier = Modifier.weight(1f))
+                    ReaderInlineText(
+                        block = block,
+                        style = style,
+                        dark = dark,
+                        enableInlineCopy = !compact,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
+        }
+    }
+}
+
+/**
+ * `.code-copy-btn` (globalCSS.js / useModalState.js's view-mode renderer):
+ * always visible next to a rendered fenced code block, no tap needed
+ * (unlike inline code, which arms on tap - see [ReaderInlineText]).
+ */
+@Composable
+private fun CodeCopyButton(text: String, dark: Boolean, modifier: Modifier = Modifier) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(1200)
+            copied = false
+        }
+    }
+    Box(
+        modifier = modifier
+            .padding(6.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (dark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.08f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) {
+                clipboard.setText(AnnotatedString(text))
+                copied = true
+            }
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        Text(
+            stringResource(if (copied) R.string.native_richtext_copied else R.string.native_richtext_copy),
+            color = if (dark) Color.White.copy(alpha = 0.85f) else Color.Black.copy(alpha = 0.6f),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+/**
+ * A read-mode paragraph/heading/quote's text, with the same tap-to-arm
+ * copy affordance EditExtras.js gives inline `<code>` in the editor and
+ * attachReadModeInlineCopy gives the view-mode renderer: tapping an
+ * inline code span shows a small "Copier" chip right after it without
+ * doing anything else (view mode has no caret to place); tapping the
+ * same span again dismisses it. Blocks with no CODE mark skip all of
+ * this and render as a plain Text, same as before.
+ */
+@Composable
+private fun ReaderInlineText(
+    block: RichBlock,
+    style: TextStyle,
+    dark: Boolean,
+    enableInlineCopy: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val annotated = annotatedTextFor(block, style, dark)
+    val codeMarks = remember(block) { block.marks.filter { it.type == RichMarkType.CODE } }
+    if (!enableInlineCopy || codeMarks.isEmpty()) {
+        Text(annotated, style = style, modifier = modifier)
+        return
+    }
+    var armed by remember(block.id) { mutableStateOf<RichMark?>(null) }
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    Box(modifier) {
+        Text(
+            annotated,
+            style = style,
+            onTextLayout = { layout = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .pointerInput(block.id, codeMarks) {
+                    detectTapGestures { position ->
+                        val offset = layout?.getOffsetForPosition(position) ?: return@detectTapGestures
+                        val hit = codeMarks.firstOrNull { offset >= it.start && offset < it.end }
+                        armed = if (hit != null && hit == armed) null else hit
+                    }
+                },
+        )
+        armed?.let { mark ->
+            val start = mark.start.coerceIn(0, block.text.length)
+            val end = mark.end.coerceIn(start, block.text.length)
+            if (end <= start) return@let
+            val box = layout?.getBoundingBox(end - 1) ?: return@let
+            CodeCopyButton(
+                text = block.text.substring(start, end),
+                dark = dark,
+                modifier = Modifier.offset { IntOffset(box.right.toInt(), box.top.toInt()) },
+            )
         }
     }
 }
@@ -553,6 +676,20 @@ private fun RichCodeBlock(
     onSelectionChanged: (TextRange) -> Unit,
     onTextEdited: (newText: String, newMarks: List<RichMark>, newSelection: TextRange) -> Unit,
 ) {
+    // EditExtras.js's own two-tap gesture: the first tap on an unfocused
+    // fenced block arms a "Copier" button without moving the caret or
+    // opening the keyboard; a second tap dismisses it and lets the field
+    // focus normally. Native has no hover state to fall back to (this is
+    // touch-only), so this local `armed` flag is the whole affordance -
+    // an invisible overlay eats the first tap while unarmed, then gets
+    // removed so the second tap reaches the field underneath directly.
+    var armed by remember(block.id) { mutableStateOf(false) }
+    LaunchedEffect(armed) {
+        if (armed) {
+            delay(5000)
+            armed = false
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -573,13 +710,28 @@ private fun RichCodeBlock(
             focusRequester = focusRequester,
             pendingMarks = pendingMarks,
             onConsumePending = onConsumePending,
-            onFocusGained = onFocusGained,
+            onFocusGained = { selection -> armed = false; onFocusGained(selection) },
             onFocusLost = onFocusLost,
             onSelectionChanged = onSelectionChanged,
             onTextEdited = onTextEdited,
             onEnter = null,
             modifier = Modifier.fillMaxWidth(),
         )
+        if (armed) {
+            CodeCopyButton(
+                text = block.text,
+                dark = dark,
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .pointerInput(block.id) {
+                        detectTapGestures { armed = true }
+                    },
+            )
+        }
     }
 }
 
