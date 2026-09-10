@@ -63,7 +63,9 @@ internal fun AddImageMenu(
     // Same box the footer's kebab menu uses (NoteDetailScreen's own
     // FooterPopover call), since the web says this menu mirrors it.
     FooterPopover(
-        width = 220.dp,
+        // No fixed width: hugs its widest row (IntrinsicSize.Max in
+        // FooterPopover) instead of a flat 220dp, same as the kebab menu.
+        minWidth = 180.dp,
         gap = 8.dp,
         cornerRadius = 8.dp,
         elevation = 10.dp,
@@ -77,7 +79,7 @@ internal fun AddImageMenu(
                 tint = if (dark) MenuBlueDark else MenuBlueLight,
                 dark = dark,
                 onClick = { onAddImage(); onDismiss() },
-            ) { tint -> AddImageIcon(size = 16.dp, tint = tint) }
+            ) { tint -> AddImageIcon(size = 18.dp, tint = tint) }
             AddImageMenuRow(
                 label = stringResource(
                     if (hasIcon) R.string.native_replace_logo else R.string.native_add_logo,
@@ -85,7 +87,7 @@ internal fun AddImageMenu(
                 tint = if (dark) MenuVioletDark else MenuVioletLight,
                 dark = dark,
                 onClick = { onAddIcon(); onDismiss() },
-            ) { tint -> LogoIcon(size = 16.dp, tint = tint) }
+            ) { tint -> LogoIcon(size = 18.dp, tint = tint) }
             if (hasIcon) {
                 Box(
                     Modifier
@@ -98,12 +100,15 @@ internal fun AddImageMenu(
                     tint = if (dark) MenuRedDark else MenuRedLight,
                     dark = dark,
                     onClick = { onRemoveIcon(); onDismiss() },
-                ) { tint -> TrashIcon(size = 16.dp, tint = tint) }
+                ) { tint -> TrashIcon(size = 18.dp, tint = tint) }
             }
         }
     }
 }
 
+/** Same sizing as the note kebab's own PopoverMenuItem (GkControls.kt):
+ *  14/11dp padding, 10dp gap, 15sp text - scaled a step past the web's
+ *  own 12/8px/14px so a real phone doesn't risk tapping the wrong row. */
 @Composable
 private fun AddImageMenuRow(
     label: String,
@@ -120,12 +125,12 @@ private fun AddImageMenuRow(
                 indication = null,
                 role = Role.Button,
             ) { onClick() }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         icon(tint)
-        Text(label, color = tint, fontSize = 14.sp)
+        Text(label, color = tint, fontSize = 15.sp)
     }
 }
 
