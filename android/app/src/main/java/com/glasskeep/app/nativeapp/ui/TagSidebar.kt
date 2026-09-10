@@ -37,7 +37,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -52,8 +51,6 @@ import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import com.glasskeep.app.ui.Indigo
-
-private val SidebarActiveGradient = Brush.linearGradient(listOf(Color(0xFF6366f1), Color(0xFF7c3aed)))
 
 /** The two entries that are not folders but lenses over the notes
  *  already loaded: only those carrying an image, and only those carrying
@@ -108,6 +105,10 @@ fun TagSidebar(
         // Mobile web keeps this an opaque --gk-statusbar surface, rather
         // than the generic white card background.
         val panelBg = WorkspaceTheme.statusBarColor(themeId, dark)
+        // --gk-chrome-grad-from/to drive .gk-side-item--active on the web.
+        // They belong to the selected workspace theme, not to GlassKeep's
+        // violet default.
+        val activeGradient = WorkspaceTheme.accentGradient(themeId)
         val closeLabel = stringResource(R.string.native_common_close)
 
         Column(
@@ -185,6 +186,7 @@ fun TagSidebar(
                     label = stringResource(R.string.native_sidebar_notes_all),
                     active = activeTag == null && activeTags.isEmpty(),
                     titleColor = titleColor,
+                    activeGradient = activeGradient,
                     onClick = onSelectNotes,
                 )
                 Spacer(Modifier.height(4.dp))
@@ -193,6 +195,7 @@ fun TagSidebar(
                     label = stringResource(R.string.native_sidebar_all_images),
                     active = activeTag == SidebarAllImages,
                     titleColor = titleColor,
+                    activeGradient = activeGradient,
                     onClick = onSelectImages,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -201,6 +204,7 @@ fun TagSidebar(
                     label = stringResource(R.string.native_sidebar_archived_notes),
                     active = false,
                     titleColor = titleColor,
+                    activeGradient = activeGradient,
                     onClick = onOpenArchived,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -209,6 +213,7 @@ fun TagSidebar(
                     label = stringResource(R.string.native_sidebar_reminders),
                     active = activeTag == SidebarReminders,
                     titleColor = titleColor,
+                    activeGradient = activeGradient,
                     onClick = onSelectReminders,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -217,6 +222,7 @@ fun TagSidebar(
                     label = stringResource(R.string.native_trash_title),
                     active = false,
                     titleColor = titleColor,
+                    activeGradient = activeGradient,
                     onClick = onOpenTrash,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -236,6 +242,7 @@ fun TagSidebar(
                             count = count,
                             active = activeTags.any { it.equals(tag, ignoreCase = true) },
                             titleColor = titleColor,
+                            activeGradient = activeGradient,
                             subtextColor = subtextColor,
                             onClick = { onSelectTag(tag, false) },
                             onLongClick = { onSelectTag(tag, true) },
@@ -257,6 +264,7 @@ private fun SidebarNavItem(
     label: String,
     active: Boolean,
     titleColor: Color,
+    activeGradient: androidx.compose.ui.graphics.Brush,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     count: Int? = null,
@@ -276,7 +284,7 @@ private fun SidebarNavItem(
                         .drawBehind {
                             val inset = 8.dp.toPx()
                             drawRoundRect(
-                                brush = SidebarActiveGradient,
+                                brush = activeGradient,
                                 topLeft = Offset(inset, 0f),
                                 size = Size(size.width - inset * 2f, size.height),
                                 cornerRadius = CornerRadius(6.dp.toPx()),
