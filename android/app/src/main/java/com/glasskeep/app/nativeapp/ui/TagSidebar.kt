@@ -36,7 +36,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -279,14 +278,15 @@ private fun SidebarNavItem(
             .then(
                 if (active) {
                     Modifier
-                        // The web's gradient pill is inset by 8px while the
-                        // icon/text stay aligned with every normal row.
+                        // TagSidebar.jsx paints the active background over
+                        // the full usable nav-row width (`nav p-2` is the
+                        // only outer inset). Keeping a second inner inset
+                        // made the colour stop too close to the icon.
                         .drawBehind {
-                            val inset = 8.dp.toPx()
                             drawRoundRect(
                                 brush = activeGradient,
-                                topLeft = Offset(inset, 0f),
-                                size = Size(size.width - inset * 2f, size.height),
+                                topLeft = Offset.Zero,
+                                size = size,
                                 cornerRadius = CornerRadius(6.dp.toPx()),
                             )
                         }
