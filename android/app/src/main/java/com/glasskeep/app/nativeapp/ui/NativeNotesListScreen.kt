@@ -177,7 +177,11 @@ fun NativeNotesListScreen(
     var refreshing by remember { mutableStateOf(false) }
     var creatingNote by remember { mutableStateOf(false) }
     var fabOpen by remember { mutableStateOf(false) }
-    LaunchedEffect(fabOpen) { container.scrimActive.value = fabOpen }
+    LaunchedEffect(fabOpen) {
+        NativeDebug.d("NativeNotesListScreen: fabOpen=$fabOpen, writing scrimActive")
+        container.scrimActive.value = fabOpen
+        NativeDebug.d("NativeNotesListScreen: scrimActive now ${container.scrimActive.value}")
+    }
     DisposableEffect(Unit) { onDispose { container.scrimActive.value = false } }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var searchOpen by remember { mutableStateOf(false) }
