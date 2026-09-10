@@ -38,6 +38,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -56,7 +57,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -478,11 +478,21 @@ private fun ReaderInlineText(
             val end = mark.end.coerceIn(start, block.text.length)
             if (end <= start) return@let
             val box = layout?.getBoundingBox(end - 1) ?: return@let
-            CodeCopyButton(
-                text = block.text.substring(start, end),
-                dark = dark,
-                modifier = Modifier.offset { IntOffset(box.right.toInt(), box.top.toInt()) },
-            )
+            // positionInlineCopyForCurrent's own placement: right after the
+            // code with a small gap, vertically centred on its line - not
+            // just pinned to the top of the last character's box, which
+            // (combined with the button's own internal padding pushing its
+            // visible pill further down-right again) is what made it read
+            // as misaligned against the code.
+            Layout(content = { CodeCopyButton(text = block.text.substring(start, end), dark = dark) }) { measurables, constraints ->
+                val placeable = measurables.first().measure(constraints)
+                val gapPx = 4.dp.roundToPx()
+                val x = box.right.toInt() + gapPx
+                val y = (box.top + (box.bottom - box.top) / 2f - placeable.height / 2f).toInt()
+                layout(placeable.width, placeable.height) {
+                    placeable.place(x, y)
+                }
+            }
         }
     }
 }
