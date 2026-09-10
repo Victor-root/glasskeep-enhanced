@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.content.ClipData
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,12 +41,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
@@ -62,7 +64,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
-import kotlinx.coroutines.delay
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
@@ -75,6 +76,8 @@ import com.glasskeep.app.nativeapp.data.TypographyProfile
 import com.glasskeep.app.nativeapp.data.isHeading
 import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.Indigo
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 
 /** `1rem` in the web's own root font size, the unit every ported measure
@@ -388,7 +391,8 @@ fun RichTextReader(
  */
 @Composable
 private fun CodeCopyButton(text: String, dark: Boolean, modifier: Modifier = Modifier) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) {
         if (copied) {
@@ -406,7 +410,7 @@ private fun CodeCopyButton(text: String, dark: Boolean, modifier: Modifier = Mod
                 indication = null,
                 role = Role.Button,
             ) {
-                clipboard.setText(AnnotatedString(text))
+                scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("code", text))) }
                 copied = true
             }
             .padding(horizontal = 8.dp, vertical = 4.dp),
