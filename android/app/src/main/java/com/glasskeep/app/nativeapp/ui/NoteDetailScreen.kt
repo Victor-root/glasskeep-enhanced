@@ -3185,12 +3185,14 @@ private fun NoteModalFooter(
                 .fillMaxWidth()
                 .background(if (dark) Color.Black.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.04f))
                 .navigationBarsPadding()
-                .padding(horizontal = 4.dp, vertical = 6.dp),
-            // ModalFooter.jsx spreads its buttons into two clusters - color/
-            // image/tags/undo/redo/format on the left, collaborate/trash/
-            // kebab/mode-toggle on the right - held apart by one flex-1
-            // spacer between them, not spaced evenly across the whole bar.
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                .padding(vertical = 6.dp),
+            // ModalFooter.jsx's desktop layout splits into two clusters
+            // held apart by a flex-1 spacer, but its own mobile media query
+            // (globalCSS.js:1863-1890, max-width: 1023px) hides that spacer
+            // and switches .modal-footer-inner to justify-content:
+            // space-evenly across every icon - which is what a phone
+            // actually renders, so that's what this matches.
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (showColorButton) {
@@ -3277,10 +3279,6 @@ private fun NoteModalFooter(
                     TextColorIcon(size = 20.dp, tint = formatColor)
                 }
             }
-            // ModalFooter.jsx's own flex-1 spacer: everything before this
-            // point is the left cluster, everything after is pinned to the
-            // right edge instead of spreading evenly across the whole bar.
-            Spacer(Modifier.weight(1f))
             if (showCollaborateButton) {
                 FooterIconButton(
                     contentDescription = stringResource(R.string.native_collaborators_title),
@@ -3317,12 +3315,15 @@ private fun NoteModalFooter(
                         if (viewMode) R.string.native_note_detail_switch_to_edit
                         else R.string.native_note_detail_switch_to_view
                     ),
+                    // .modal-footer-btn--mode (globalCSS.js:1918-1923): always
+                    // filled with this gradient, not just on an active state.
+                    backgroundBrush = ModeButtonGradient,
                     onClick = onModeClick,
                 ) {
                     if (viewMode) {
-                        PencilFilledIcon(size = 18.dp, tint = iconColor)
+                        PencilFilledIcon(size = 18.dp, tint = Color.White)
                     } else {
-                        EyeFilledIcon(size = 18.dp, tint = iconColor)
+                        EyeFilledIcon(size = 18.dp, tint = Color.White)
                     }
                 }
             }
@@ -3332,10 +3333,11 @@ private fun NoteModalFooter(
                         if (drawingCanvasMode) R.string.native_drawing_exit_mode
                         else R.string.native_drawing_enter_mode
                     ),
+                    backgroundBrush = ModeButtonGradient,
                     onClick = onDrawModeClick,
                 ) {
-                    if (drawingCanvasMode) EyeFilledIcon(size = 18.dp, tint = iconColor)
-                    else PencilFilledIcon(size = 18.dp, tint = iconColor)
+                    if (drawingCanvasMode) EyeFilledIcon(size = 18.dp, tint = Color.White)
+                    else PencilFilledIcon(size = 18.dp, tint = Color.White)
                 }
             }
         }
@@ -3483,6 +3485,12 @@ private fun FormatSheet(
     }
 }
 
+/** .modal-footer-btn--mode's fixed indigo-to-violet fill (globalCSS.js:1919),
+ *  90deg left-to-right - shared by the text view/edit toggle and the two
+ *  drawing-mode buttons, all three always filled rather than only on an
+ *  active state. */
+private val ModeButtonGradient = Brush.linearGradient(listOf(Color(0xFF6366F1), Color(0xFF7C3AED)))
+
 /** One 34dp round button of the footer bar, with the optional counter
  *  badge the web pins to its top-right corner (16dp, 10sp bold, filled
  *  with the workspace theme's own gradient). */
@@ -3493,6 +3501,7 @@ private fun FooterIconButton(
     badgeCount: Int = 0,
     badgeGradient: Brush? = null,
     background: Color = Color.Transparent,
+    backgroundBrush: Brush? = null,
     enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -3506,7 +3515,7 @@ private fun FooterIconButton(
                 .graphicsLayer { scaleX = scale; scaleY = scale }
                 .alpha(if (enabled) 1f else 0.5f)
                 .clip(CircleShape)
-                .background(background)
+                .then(if (backgroundBrush != null) Modifier.background(backgroundBrush) else Modifier.background(background))
                 .semantics { this.contentDescription = contentDescription }
                 .gkTooltip(contentDescription)
                 .clickable(
