@@ -415,6 +415,10 @@ private fun CodeCopyButton(text: String, dark: Boolean, modifier: Modifier = Mod
             stringResource(if (copied) R.string.native_richtext_copied else R.string.native_richtext_copy),
             color = if (dark) Color.White.copy(alpha = 0.85f) else Color.Black.copy(alpha = 0.6f),
             fontSize = 11.sp,
+            // Text() without one inherits LocalTextStyle's line height
+            // as-is instead of scaling it to 11.sp, leaving the glyphs
+            // sitting off-centre in this tightly-padded box.
+            lineHeight = 13.sp,
             fontWeight = FontWeight.Medium,
         )
     }
@@ -445,6 +449,15 @@ private fun ReaderInlineText(
     }
     var armed by remember(block.id) { mutableStateOf<RichMark?>(null) }
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    // EditExtras.js's MOBILE_ARM_AUTO_HIDE_MS: a tap-armed copy button
+    // (there's no hover state on a touch device to hide it on) doesn't
+    // stay up forever - it clears itself after 5s of inactivity.
+    LaunchedEffect(armed) {
+        if (armed != null) {
+            delay(5000)
+            armed = null
+        }
+    }
     Box(modifier) {
         Text(
             annotated,
