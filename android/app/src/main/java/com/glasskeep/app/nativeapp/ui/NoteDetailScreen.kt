@@ -75,6 +75,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -88,6 +89,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -3485,10 +3487,23 @@ private fun FormatSheet(
     val maxHeight = remember(configuration.screenHeightDp) {
         minOf(configuration.screenHeightDp * 0.58f, 460f).dp
     }
+    // The web's own cap (globalCSS.js: `.mobile-fmt-sheet.is-open {
+    // max-height: min(58vh, 460px) }`) is a ceiling, not a fixed target -
+    // the sheet is a flex column that only grows as tall as its content
+    // actually needs, scrolling past the cap rather than always claiming
+    // it. Animating straight to maxHeight (as this used to) left a dead
+    // gap under a toolbar shorter than the cap (the common case: SIMPLE
+    // mode, or ADVANCED with few groups visible). naturalContentHeightPx
+    // is measured by an invisible zero-size probe below that lays out
+    // `content()` at this sheet's real width but with no height
+    // constraint, so open state can target min(natural height, cap)
+    // instead of always the cap.
+    var naturalContentHeightPx by remember { mutableStateOf(0) }
+    val openHeight = with(density) { naturalContentHeightPx.toDp() }.coerceAtMost(maxHeight)
     val easing = remember { CubicBezierEasing(0.32f, 0.72f, 0f, 1f) }
     var dragHeight by remember { mutableStateOf<Dp?>(null) }
     val animatedHeight by animateDpAsState(
-        targetValue = if (open) maxHeight else 0.dp,
+        targetValue = if (open) openHeight else 0.dp,
         animationSpec = tween(durationMillis = 320, easing = easing),
         label = "formatSheetHeight",
     )
@@ -3546,8 +3561,14 @@ private fun FormatSheet(
                             onDragStart = {
                                 grabberPressed = true
                                 dragged = 0f
-                                base = maxHeight
-                                dragHeight = maxHeight
+                                // The height the sheet is actually showing
+                                // right now (open height, capped to
+                                // content, not the theoretical ceiling),
+                                // so a shorter toolbar's grabber doesn't
+                                // travel through empty space before it
+                                // starts visibly shrinking anything.
+                                base = animatedHeight
+                                dragHeight = animatedHeight
                             },
                             onVerticalDrag = { change, delta ->
                                 change.consume()
@@ -3584,6 +3605,21 @@ private fun FormatSheet(
             ) {
                 content()
             }
+        }
+        // Invisible zero-size probe: lays out a second copy of `content()`
+        // at this sheet's real width but with no height constraint, purely
+        // to read its natural height into naturalContentHeightPx above.
+        // verticalScroll() on the visible copy always measures its child
+        // at full natural height too, but reports back whatever height ITS
+        // OWN parent constrains it to (the very value this is computing),
+        // so that copy can't be reused to measure itself.
+        Layout(
+            content = { Box(Modifier.fillMaxWidth()) { content() } },
+            modifier = Modifier.fillMaxWidth(),
+        ) { measurables, constraints ->
+            val placeable = measurables.first().measure(Constraints(maxWidth = constraints.maxWidth))
+            naturalContentHeightPx = placeable.height
+            layout(0, 0) {}
         }
         // The ::before shadow band under the top edge.
         Box(
