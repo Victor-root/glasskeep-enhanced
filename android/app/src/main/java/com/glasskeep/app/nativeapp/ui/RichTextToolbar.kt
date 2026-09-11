@@ -560,6 +560,11 @@ fun RichFormatToolbar(
                         fixedTint = IndentTint,
                         onClick = { focusedBlock?.let { actions.shiftIndent(it.id, 1) } },
                     ) { tint -> IndentIncreaseIcon(size = 20.dp, tint = tint) }
+                    // Web's own row order (RichTextToolbar.jsx: row1 ends on
+                    // Indent, row2 is align-left/center/right/justify THEN
+                    // Outdent last) - Outdent sits after the align group,
+                    // not next to Indent.
+                    alignButtons(true)
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_outdent),
                         active = false,
@@ -569,7 +574,6 @@ fun RichFormatToolbar(
                         fixedTint = OutdentTint,
                         onClick = { focusedBlock?.let { actions.shiftIndent(it.id, -1) } },
                     ) { tint -> IndentDecreaseIcon(size = 20.dp, tint = tint) }
-                    alignButtons(true)
                 }
                 RichToolbarGroup(divider = divider, last = false) {
                     RichToolbarButton(
