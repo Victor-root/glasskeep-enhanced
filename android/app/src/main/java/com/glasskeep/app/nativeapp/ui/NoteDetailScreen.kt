@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp.ui
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -52,6 +53,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -89,6 +91,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.ImageCompression
@@ -1593,6 +1596,9 @@ fun NoteDetailScreen(
     /** Header and system back both flush the complete live editor state,
      *  including changes still inside a debounce or checklist row focus. */
     fun goBack() {
+        if (BuildConfig.DEBUG) {
+            Log.d("GKBack", "goBack() invoked - showFormatSheet=$showFormatSheet noteAiOpen=$noteAiOpen showReminderPicker=$showReminderPicker", Throwable("GKBack trace"))
+        }
         scope.launch {
             // Never let a flush/enqueue failure strand the user on this
             // screen with no way out and no explanation - leaving must
@@ -1629,14 +1635,51 @@ fun NoteDetailScreen(
     // BackHandler exactly when that overlay opens/closes, so the two
     // notes' callbacks interleave in real chronological order (same
     // mechanism the colour/tag popups already get for free from Popup).
+    // Scroll-reset-style investigation for the reported "back while the
+    // format sheet is open exits the note instead of just closing it" bug:
+    // this branch selection LOOKS structurally identical to the noteAiOpen/
+    // showReminderPicker cases above it (same if/else mounting pattern,
+    // documented as already working for those), so rather than guess at a
+    // fix, log which branch is actually mounted on every recomposition and
+    // which BackHandler actually fires. Tag "GKBack" (distinct from
+    // "GKNative"/"GKScroll") - reproduce (open the format sheet, press
+    // system back) and filter logcat on it.
+    if (BuildConfig.DEBUG) {
+        SideEffect {
+            Log.d(
+                "GKBack",
+                "branch recomposed: noteAiOpen=$noteAiOpen showReminderPicker=$showReminderPicker showFormatSheet=$showFormatSheet " +
+                    "-> mounting ${
+                        when {
+                            noteAiOpen -> "noteAiOpen"
+                            showReminderPicker -> "showReminderPicker"
+                            showFormatSheet -> "showFormatSheet"
+                            else -> "else(goBack)"
+                        }
+                    } handler",
+            )
+        }
+    }
     if (noteAiOpen) {
-        BackHandler { noteAiOpen = false }
+        BackHandler {
+            if (BuildConfig.DEBUG) Log.d("GKBack", "noteAiOpen handler fired")
+            noteAiOpen = false
+        }
     } else if (showReminderPicker) {
-        BackHandler { showReminderPicker = false }
+        BackHandler {
+            if (BuildConfig.DEBUG) Log.d("GKBack", "showReminderPicker handler fired")
+            showReminderPicker = false
+        }
     } else if (showFormatSheet) {
-        BackHandler { showFormatSheet = false }
+        BackHandler {
+            if (BuildConfig.DEBUG) Log.d("GKBack", "showFormatSheet handler fired")
+            showFormatSheet = false
+        }
     } else {
-        BackHandler(onBack = ::goBack)
+        BackHandler {
+            if (BuildConfig.DEBUG) Log.d("GKBack", "else(goBack) handler fired")
+            goBack()
+        }
     }
 
     // The open note is painted in its own color, edge to edge: no card, no
