@@ -84,6 +84,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -276,6 +277,12 @@ fun NoteDetailScreen(
     var richBlocks by remember { mutableStateOf<List<RichBlock>?>(null) }
     val richFocusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
     var pendingRichFocus by remember { mutableStateOf<String?>(null) }
+    // One-shot cursor-position override for mergeRichBlockWithPrevious:
+    // the merged block keeps its existing id, so its RichTextBlockField
+    // is not freshly created (that's what TextRange.Zero on first
+    // composition is for) - this is read once by that exact block's own
+    // safety-net LaunchedEffect and removed.
+    val pendingRichSelections = remember { mutableStateMapOf<String, TextRange>() }
     var showConvertConfirm by remember { mutableStateOf(false) }
     // readModeEnabled decides which face a text note opens on; the
     // footer toggle flips it for this note only (ModalFooter.jsx:860).
@@ -811,6 +818,48 @@ fun NoteDetailScreen(
         val blocks = richBlocks ?: return
         if (blocks.size <= 1) return
         richBlocks = blocks.filterNot { it.id == id }
+    }
+
+    /** Best-effort backspace-at-start-of-block, mirroring ProseMirror's
+     *  joinBackward in reverse of splitRichBlock above: [id]'s text is
+     *  appended to the end of the PREVIOUS block, which keeps its own
+     *  kind/align/indent (the "whichever block absorbs text keeps its own
+     *  identity" convention, same spirit as splitRichBlock's "continues"
+     *  check), and [id] is dropped. Reuses the previous block's own id
+     *  rather than minting a new one, so pendingRichSelections can place
+     *  the caret at the join point once that field's safety-net
+     *  LaunchedEffect picks it up (see RichTextEditor.kt). Never touches
+     *  the first block (nothing precedes it) or a code block on either
+     *  side (raw code text merging into/from formatted text either
+     *  direction doesn't make sense - same exclusion as splitRichBlock).
+     *  A divider has no text to merge into, so backspacing right after
+     *  one removes the divider instead of trying to join through it. */
+    fun mergeRichBlockWithPrevious(id: String) {
+        val blocks = richBlocks ?: return
+        val idx = blocks.indexOfFirst { it.id == id }
+        if (idx <= 0) return
+        val current = blocks[idx]
+        if (current.kind == RichBlockKind.CODE_BLOCK) return
+        val prev = blocks[idx - 1]
+        val updated = blocks.toMutableList()
+        if (prev.kind == RichBlockKind.DIVIDER) {
+            updated.removeAt(idx - 1)
+            richBlocks = updated
+            pendingRichFocus = current.id
+            return
+        }
+        if (prev.kind == RichBlockKind.CODE_BLOCK) return
+        val joinAt = prev.text.length
+        val merged = prev.copy(
+            text = prev.text + current.text,
+            marks = (prev.marks + current.marks.map { it.copy(start = it.start + joinAt, end = it.end + joinAt) })
+                .sortedBy { it.start },
+        )
+        updated[idx - 1] = merged
+        updated.removeAt(idx)
+        richBlocks = updated
+        pendingRichFocus = merged.id
+        pendingRichSelections[merged.id] = TextRange(joinAt)
     }
 
     fun addRichBlockAtEnd() {
@@ -1941,6 +1990,9 @@ fun NoteDetailScreen(
                                             onToggleChecked = { id -> toggleRichChecked(id) },
                                             onRemoveBlock = { id -> removeRichBlock(id) },
                                             onAddBlock = { addRichBlockAtEnd() },
+                                            onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
+                                            pendingSelectionFor = { id -> pendingRichSelections[id] },
+                                            onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
                                         )
                                     }
                                     if (richBlocks.orEmpty().any { it.text.isNotBlank() }) Spacer(Modifier.height(14.dp))
@@ -2026,6 +2078,9 @@ fun NoteDetailScreen(
                                     onToggleChecked = { id -> toggleRichChecked(id) },
                                     onRemoveBlock = { id -> removeRichBlock(id) },
                                     onAddBlock = { addRichBlockAtEnd() },
+                                    onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
+                                    pendingSelectionFor = { id -> pendingRichSelections[id] },
+                                    onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
                                 )
                             } else {
                                 if (!edit.bodyEditable) {

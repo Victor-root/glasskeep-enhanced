@@ -40,6 +40,11 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.ClipEntry
@@ -158,18 +163,27 @@ internal fun RichEditorState.safeSelectionIn(block: RichBlock?): TextRange =
  * composable at all (NoteDetailScreen keeps its existing
  * plain-text/notice fallback for those).
  *
+ * Backspace-at-the-start-of-a-block now merges it into the previous one
+ * (mergeRichBlockWithPrevious in NoteDetailScreen.kt), via
+ * Modifier.onPreviewKeyEvent on each block's own field - but this is
+ * best-effort, not a replacement for the explicit remove/add-paragraph
+ * affordances still on every row: a soft keyboard's backspace on an
+ * empty/start position isn't reliably delivered as a real KeyEvent by
+ * every IME (some deliver a raw InputConnection delete command instead,
+ * which never reaches onPreviewKeyEvent at all), same reasoning as the
+ * checklist editor. Where it fires it fires correctly; where the IME
+ * swallows it, the X/+ buttons are still there so nothing is ever
+ * unreachable.
+ *
  * Deliberately not ported from the web editor, same "disclosed, not
  * silently dropped" rule as every other milestone in this app:
- * Backspace-at-the-start-of-a-block merging it into the previous one (a
- * soft keyboard's backspace on an empty/start position isn't reliably
- * delivered as a real key event by every IME, same reasoning as the
- * checklist editor), tap-to-open a link while editing (tapping just
- * places the cursor, same as any other text; use the Link button with the
- * cursor inside it to edit or remove one instead), and the four
- * decorative underline variants: Compose's TextDecoration has exactly one
- * underline with no style and no separate colour, so a double/dotted/
- * dashed/wavy underline and its colour are stored, listed and round-
- * tripped faithfully but painted as a plain underline here.
+ * tap-to-open a link while editing (tapping just places the cursor, same
+ * as any other text; use the Link button with the cursor inside it to
+ * edit or remove one instead), and the four decorative underline
+ * variants: Compose's TextDecoration has exactly one underline with no
+ * style and no separate colour, so a double/dotted/dashed/wavy underline
+ * and its colour are stored, listed and round-tripped faithfully but
+ * painted as a plain underline here.
  */
 @Composable
 fun RichTextEditor(
@@ -187,6 +201,9 @@ fun RichTextEditor(
     onToggleChecked: (id: String) -> Unit,
     onRemoveBlock: (id: String) -> Unit,
     onAddBlock: () -> Unit,
+    onMergeWithPrevious: (id: String) -> Unit,
+    pendingSelectionFor: (id: String) -> TextRange? = { null },
+    onPendingSelectionConsumed: (id: String) -> Unit = {},
 ) {
     // The web numbers ordered lists with its own `gk-ol` counter, reset by
     // a paragraph, a heading, a quote, a bullet/task list or a rule, but
@@ -246,6 +263,9 @@ fun RichTextEditor(
                 onEnter = { position -> onEnter(block.id, position) },
                 onToggleChecked = { onToggleChecked(block.id) },
                 onRemove = { onRemoveBlock(block.id) },
+                onMerge = { onMergeWithPrevious(block.id) },
+                pendingSelection = pendingSelectionFor(block.id),
+                onPendingSelectionConsumed = { onPendingSelectionConsumed(block.id) },
             )
         }
         Row(
@@ -534,6 +554,9 @@ private fun RichBlockRow(
     onEnter: (position: Int) -> Unit,
     onToggleChecked: () -> Unit,
     onRemove: () -> Unit,
+    onMerge: () -> Unit,
+    pendingSelection: TextRange?,
+    onPendingSelectionConsumed: () -> Unit,
 ) {
     val style = richBlockTextStyle(block, typography, taskStrike, dark, titleColor)
     val indent = (block.indent * IndentStepEm * style.fontSize.value).dp
@@ -572,6 +595,9 @@ private fun RichBlockRow(
                     onSelectionChanged = onSelectionChanged,
                     onTextEdited = onTextEdited,
                     onEnter = onEnter,
+                    onMerge = onMerge,
+                    pendingSelection = pendingSelection,
+                    onPendingSelectionConsumed = onPendingSelectionConsumed,
                 )
                 else -> Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
                     RichBlockPrefix(
@@ -593,6 +619,9 @@ private fun RichBlockRow(
                         onSelectionChanged = onSelectionChanged,
                         onTextEdited = onTextEdited,
                         onEnter = onEnter,
+                        onMerge = onMerge,
+                        pendingSelection = pendingSelection,
+                        onPendingSelectionConsumed = onPendingSelectionConsumed,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -630,6 +659,9 @@ private fun RichTextBlockField(
     onSelectionChanged: (TextRange) -> Unit,
     onTextEdited: (newText: String, newMarks: List<RichMark>, newSelection: TextRange) -> Unit,
     onEnter: ((position: Int) -> Unit)?,
+    onMerge: (() -> Unit)?,
+    pendingSelection: TextRange?,
+    onPendingSelectionConsumed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Cursor at the start on first composition, not at the end: a freshly
@@ -641,10 +673,22 @@ private fun RichTextBlockField(
     }
     // Safety net for changes that didn't originate in this row's own
     // onValueChange (a toolbar mark toggle, a split/merge): rebuild the
-    // styled value from the model, keeping whatever selection still fits.
-    LaunchedEffect(block.text, block.marks, style) {
+    // styled value from the model, keeping whatever selection still fits -
+    // UNLESS mergeRichBlockWithPrevious (NoteDetailScreen.kt) left an
+    // explicit pendingSelection for this exact block id, in which case
+    // that wins once: this id just absorbed another block's text and the
+    // caret belongs at the join point, not wherever it happened to sit in
+    // THIS block before the merge.
+    LaunchedEffect(block.text, block.marks, style, pendingSelection) {
         val rebuilt = annotatedTextFor(block, style, dark)
-        if (fieldValue.annotatedString.text != rebuilt.text || fieldValue.annotatedString.spanStyles != rebuilt.spanStyles) {
+        val pending = pendingSelection
+        if (pending != null) {
+            fieldValue = TextFieldValue(
+                rebuilt,
+                TextRange(pending.start.coerceIn(0, rebuilt.length), pending.end.coerceIn(0, rebuilt.length)),
+            )
+            onPendingSelectionConsumed()
+        } else if (fieldValue.annotatedString.text != rebuilt.text || fieldValue.annotatedString.spanStyles != rebuilt.spanStyles) {
             fieldValue = TextFieldValue(
                 rebuilt,
                 TextRange(
@@ -686,7 +730,28 @@ private fun RichTextBlockField(
         cursorBrush = SolidColor(Indigo),
         modifier = modifier
             .focusRequester(focusRequester)
-            .onFocusChanged { focus -> if (focus.isFocused) onFocusGained(fieldValue.selection) else onFocusLost() },
+            .onFocusChanged { focus -> if (focus.isFocused) onFocusGained(fieldValue.selection) else onFocusLost() }
+            // Best-effort backspace-merge (see RichTextEditor's own doc
+            // comment): only reachable when the IME actually dispatches a
+            // real KeyEvent for Backspace, which not every soft keyboard
+            // does at an empty/start position - the X/+ buttons stay as
+            // the reliable fallback for when it doesn't.
+            .then(
+                if (onMerge != null) {
+                    Modifier.onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.Backspace &&
+                            fieldValue.selection.collapsed && fieldValue.selection.start == 0
+                        ) {
+                            onMerge()
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            ),
     )
 }
 
@@ -757,6 +822,12 @@ private fun RichCodeBlock(
             onSelectionChanged = onSelectionChanged,
             onTextEdited = onTextEdited,
             onEnter = null,
+            // A code block's content is raw text, not something another
+            // block's formatted text should ever get appended into (or
+            // vice versa) - same exclusion as onEnter above.
+            onMerge = null,
+            pendingSelection = null,
+            onPendingSelectionConsumed = {},
             modifier = Modifier.fillMaxWidth(),
         )
         if (armed) {
@@ -794,6 +865,9 @@ private fun RichQuoteBlock(
     onSelectionChanged: (TextRange) -> Unit,
     onTextEdited: (newText: String, newMarks: List<RichMark>, newSelection: TextRange) -> Unit,
     onEnter: (position: Int) -> Unit,
+    onMerge: () -> Unit,
+    pendingSelection: TextRange?,
+    onPendingSelectionConsumed: () -> Unit,
 ) {
     val bar = if (dark) Color(0xFFA5B4FC) else Indigo.copy(alpha = 0.85f)
     val wash = if (dark) Color(0xFFA5B4FC).copy(alpha = 0.13f) else Indigo.copy(alpha = 0.07f)
@@ -826,6 +900,9 @@ private fun RichQuoteBlock(
             onSelectionChanged = onSelectionChanged,
             onTextEdited = onTextEdited,
             onEnter = onEnter,
+            onMerge = onMerge,
+            pendingSelection = pendingSelection,
+            onPendingSelectionConsumed = onPendingSelectionConsumed,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
