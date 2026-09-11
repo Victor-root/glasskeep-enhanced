@@ -3507,6 +3507,15 @@ private fun FormatSheet(
         animationSpec = tween(durationMillis = 320, easing = easing),
         label = "formatSheetHeight",
     )
+    if (BuildConfig.DEBUG) {
+        SideEffect {
+            Log.d(
+                "GKSheet",
+                "open=$open maxHeight=$maxHeight naturalContentHeightPx=$naturalContentHeightPx " +
+                    "openHeight=$openHeight animatedHeight=$animatedHeight dragHeight=$dragHeight",
+            )
+        }
+    }
     val alpha by animateFloatAsState(
         targetValue = if (open) 1f else 0f,
         animationSpec = tween(durationMillis = 220, easing = easing),
