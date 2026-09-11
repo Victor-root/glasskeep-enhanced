@@ -547,7 +547,23 @@ fun RichFormatToolbar(
                         onClick = { toggle(RichMarkType.SUPERSCRIPT) },
                     ) { tint -> SuperscriptIcon(size = 20.dp, tint = tint) }
                 }
-                RichToolbarGroup(divider = divider, last = false) {
+                RichToolbarGroup(
+                    divider = divider,
+                    last = false,
+                    // The DOM order (RichTextToolbar.jsx) is actually lists+
+                    // Indent, THEN align x4, THEN Outdent - but the mobile
+                    // sheet's own CSS (globalCSS.js:1749-1775) explicitly
+                    // reorders Outdent up next to Indent with `order:` and
+                    // forces a hard line break before the align group with
+                    // a zero-height 100%-width spacer, "so that single flat
+                    // wrapping line reads better as: row 1 -> lists +
+                    // Increase/Decrease indent together, row 2 -> the four
+                    // alignment buttons". A single auto-wrapping FlowRow
+                    // can't reproduce a GUARANTEED break (it only wraps if
+                    // it happens to run out of width), so this group is two
+                    // explicit rows instead, mirroring that forced split.
+                    secondRow = { alignButtons(true) },
+                ) {
                     bulletButton()
                     numberedButton()
                     taskButton()
@@ -560,11 +576,6 @@ fun RichFormatToolbar(
                         fixedTint = IndentTint,
                         onClick = { focusedBlock?.let { actions.shiftIndent(it.id, 1) } },
                     ) { tint -> IndentIncreaseIcon(size = 20.dp, tint = tint) }
-                    // Web's own row order (RichTextToolbar.jsx: row1 ends on
-                    // Indent, row2 is align-left/center/right/justify THEN
-                    // Outdent last) - Outdent sits after the align group,
-                    // not next to Indent.
-                    alignButtons(true)
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_outdent),
                         active = false,
@@ -608,7 +619,11 @@ fun RichFormatToolbar(
                         label = stringResource(R.string.native_richtext_paragraph),
                         fontSize = 12.5.sp,
                         block = typography.p,
-                        active = focusedBlock?.kind == RichBlockKind.PARAGRAPH,
+                        // BlockStyleButtons.jsx: `current = headingLevel ? h${level} : "p"` -
+                        // Paragraphe reads active for ANY non-heading block
+                        // (a bullet/numbered/task item, a quote...), not
+                        // only the literal RichBlockKind.PARAGRAPH.
+                        active = focusedBlock != null && (1..5).none { focusedBlock.kind == headingKindFor(it) },
                         enabled = enabled,
                         dark = dark,
                         titleColor = titleColor,
@@ -643,17 +658,34 @@ private val IndentTint = Color(0xFF10B981)
 private val OutdentTint = Color(0xFFF59E0B)
 
 /** One `.rt-sg`: a centred wrapping row with 4px gaps, 6px of padding
- *  above and below, and a hairline underneath unless it is the last. */
+ *  above and below, and a hairline underneath unless it is the last.
+ *  [secondRow], when given, renders as its own forced-separate wrapping
+ *  row below [content] - for the one group (paragraph/list) whose mobile
+ *  CSS guarantees a hard line break at a fixed point instead of only
+ *  wrapping when it runs out of width (globalCSS.js:1749-1775). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun RichToolbarGroup(divider: Color, last: Boolean, content: @Composable FlowRowScope.() -> Unit) {
+private fun RichToolbarGroup(
+    divider: Color,
+    last: Boolean,
+    secondRow: (@Composable FlowRowScope.() -> Unit)? = null,
+    content: @Composable FlowRowScope.() -> Unit,
+) {
     Column(Modifier.fillMaxWidth()) {
         FlowRow(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = if (secondRow != null) 0.dp else 6.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
             verticalArrangement = Arrangement.spacedBy(4.dp),
             content = content,
         )
+        if (secondRow != null) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                content = secondRow,
+            )
+        }
         if (!last) Box(Modifier.fillMaxWidth().height(1.dp).background(divider))
     }
 }
