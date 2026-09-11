@@ -957,6 +957,16 @@ private fun RichLinkButton(
             "www",
             color = if (active) (if (dark) RtActiveTextDark else RtActiveTextLight) else titleColor,
             fontSize = 12.48.sp,
+            // Without one, Text() inherits LocalTextStyle's much taller
+            // default line height instead of scaling to 12.48.sp, which
+            // shifts where the glyphs actually sit inside this Column's
+            // Center arrangement - throwing off the drawBehind underline
+            // bar above, positioned at a fixed distance from the button's
+            // bottom edge (same fixed-offset trick as .rt-btn--link::after
+            // in globalCSS.js:3287-3298) so it needs the text where it
+            // expects it, or the bar cuts straight through the letters
+            // instead of sitting under them.
+            lineHeight = 14.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 0.02.em,
         )
