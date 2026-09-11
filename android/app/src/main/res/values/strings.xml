@@ -460,8 +460,6 @@
     <string name="native_richtext_underline">Underline</string>
     <string name="native_richtext_strikethrough">Strikethrough</string>
     <string name="native_richtext_link">Link</string>
-    <string name="native_richtext_remove_block">Remove this block</string>
-    <string name="native_richtext_add_block">Add a paragraph</string>
     <string name="native_richtext_link_title">Link</string>
     <string name="native_richtext_link_placeholder">https://example.com</string>
     <string name="native_richtext_link_apply">Apply</string>

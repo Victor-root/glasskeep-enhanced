@@ -811,15 +811,6 @@ fun NoteDetailScreen(
         pendingRichFocus = newBlock.id
     }
 
-    /** Explicit remove button, mirrors removeChecklistItem; refuses to drop
-     *  the last remaining block, same "a doc always has at least one
-     *  paragraph" invariant RichDoc.encode falls back to on an empty list. */
-    fun removeRichBlock(id: String) {
-        val blocks = richBlocks ?: return
-        if (blocks.size <= 1) return
-        richBlocks = blocks.filterNot { it.id == id }
-    }
-
     /** Best-effort backspace-at-start-of-block, mirroring ProseMirror's
      *  joinBackward in reverse of splitRichBlock above: [id]'s text is
      *  appended to the end of the PREVIOUS block, which keeps its own
@@ -860,13 +851,6 @@ fun NoteDetailScreen(
         richBlocks = updated
         pendingRichFocus = merged.id
         pendingRichSelections[merged.id] = TextRange(joinAt)
-    }
-
-    fun addRichBlockAtEnd() {
-        val blocks = richBlocks ?: return
-        val newBlock = RichDoc.newBlock()
-        richBlocks = blocks + newBlock
-        pendingRichFocus = newBlock.id
     }
 
     // Bundled once: the formatting bar takes one actions object rather than
@@ -1983,13 +1967,10 @@ fun NoteDetailScreen(
                                             dark = dark,
                                             noteColor = currentNote.color,
                                             titleColor = titleColor,
-                                            subtextColor = subtextColor,
                                             focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
                                             onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
                                             onEnter = { id, position -> splitRichBlock(id, position) },
                                             onToggleChecked = { id -> toggleRichChecked(id) },
-                                            onRemoveBlock = { id -> removeRichBlock(id) },
-                                            onAddBlock = { addRichBlockAtEnd() },
                                             onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
                                             pendingSelectionFor = { id -> pendingRichSelections[id] },
                                             onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
@@ -2071,13 +2052,10 @@ fun NoteDetailScreen(
                                     dark = dark,
                                     noteColor = currentNote.color,
                                     titleColor = titleColor,
-                                    subtextColor = subtextColor,
                                     focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
                                     onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
                                     onEnter = { id, position -> splitRichBlock(id, position) },
                                     onToggleChecked = { id -> toggleRichChecked(id) },
-                                    onRemoveBlock = { id -> removeRichBlock(id) },
-                                    onAddBlock = { addRichBlockAtEnd() },
                                     onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
                                     pendingSelectionFor = { id -> pendingRichSelections[id] },
                                     onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },

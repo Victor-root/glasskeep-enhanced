@@ -153,27 +153,25 @@ internal fun RichEditorState.safeSelectionIn(block: RichBlock?): TextRange =
     } ?: TextRange.Zero
 
 /**
- * The native rich-text editor's body: one row per block plus a trailing
- * "add paragraph" row. Its formatting bar is a separate composable
- * ([RichFormatToolbar]) because the web puts it in a bottom sheet at the
- * foot of the modal, not above the text. Only ever rendered for a doc
- * RichDoc.parse approved, everything it can represent is editable here,
- * there is no separate read-only-preview fallback the way sectioned
- * checklists have one, a doc outside this vocabulary never reaches this
- * composable at all (NoteDetailScreen keeps its existing
- * plain-text/notice fallback for those).
+ * The native rich-text editor's body: one row per block. Its formatting
+ * bar is a separate composable ([RichFormatToolbar]) because the web puts
+ * it in a bottom sheet at the foot of the modal, not above the text. Only
+ * ever rendered for a doc RichDoc.parse approved, everything it can
+ * represent is editable here, there is no separate read-only-preview
+ * fallback the way sectioned checklists have one, a doc outside this
+ * vocabulary never reaches this composable at all (NoteDetailScreen keeps
+ * its existing plain-text/notice fallback for those).
  *
- * Backspace-at-the-start-of-a-block now merges it into the previous one
- * (mergeRichBlockWithPrevious in NoteDetailScreen.kt), via
- * Modifier.onPreviewKeyEvent on each block's own field - but this is
- * best-effort, not a replacement for the explicit remove/add-paragraph
- * affordances still on every row: a soft keyboard's backspace on an
- * empty/start position isn't reliably delivered as a real KeyEvent by
- * every IME (some deliver a raw InputConnection delete command instead,
- * which never reaches onPreviewKeyEvent at all), same reasoning as the
- * checklist editor. Where it fires it fires correctly; where the IME
- * swallows it, the X/+ buttons are still there so nothing is ever
- * unreachable.
+ * Backspace at the start of a block merges it into the previous one
+ * (mergeRichBlockWithPrevious in NoteDetailScreen.kt) via
+ * Modifier.onPreviewKeyEvent on each block's own field, and Enter at the
+ * end of the last block starts a new one the same way it splits any
+ * other block mid-text - so, like any other text editor, there is no
+ * separate add/remove-paragraph UI here; typing and deleting normally is
+ * how a block count changes. An earlier version of this screen had an
+ * explicit "+"/"x" per row as a safety net for IMEs that don't reliably
+ * deliver a real KeyEvent for backspace on an empty/start position - now
+ * removed since backspace-merge has since been confirmed working.
  *
  * Deliberately not ported from the web editor, same "disclosed, not
  * silently dropped" rule as every other milestone in this app:
@@ -194,13 +192,10 @@ fun RichTextEditor(
     dark: Boolean,
     noteColor: String?,
     titleColor: Color,
-    subtextColor: Color,
     focusRequesterFor: (id: String) -> FocusRequester,
     onTextEdited: (id: String, newText: String, newMarks: List<RichMark>) -> Unit,
     onEnter: (id: String, atPosition: Int) -> Unit,
     onToggleChecked: (id: String) -> Unit,
-    onRemoveBlock: (id: String) -> Unit,
-    onAddBlock: () -> Unit,
     onMergeWithPrevious: (id: String) -> Unit,
     pendingSelectionFor: (id: String) -> TextRange? = { null },
     onPendingSelectionConsumed: (id: String) -> Unit = {},
@@ -234,7 +229,6 @@ fun RichTextEditor(
                 dark = dark,
                 noteColor = noteColor,
                 titleColor = titleColor,
-                subtextColor = subtextColor,
                 numberedPosition = numberedPositions[block.id],
                 focusRequester = focusRequesterFor(block.id),
                 pendingMarks = if (state.focusedId == block.id) state.pendingMarks else emptyList(),
@@ -262,31 +256,9 @@ fun RichTextEditor(
                 },
                 onEnter = { position -> onEnter(block.id, position) },
                 onToggleChecked = { onToggleChecked(block.id) },
-                onRemove = { onRemoveBlock(block.id) },
                 onMerge = { onMergeWithPrevious(block.id) },
                 pendingSelection = pendingSelectionFor(block.id),
                 onPendingSelectionConsumed = { onPendingSelectionConsumed(block.id) },
-            )
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) { onAddBlock() }
-                .padding(vertical = 8.dp),
-        ) {
-            PlusIcon(size = 16.dp, tint = Indigo)
-            Spacer(Modifier.width(10.dp))
-            Text(
-                stringResource(R.string.native_richtext_add_block),
-                color = Indigo,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
             )
         }
     }
@@ -542,7 +514,6 @@ private fun RichBlockRow(
     dark: Boolean,
     noteColor: String?,
     titleColor: Color,
-    subtextColor: Color,
     numberedPosition: Int?,
     focusRequester: FocusRequester,
     pendingMarks: List<PendingMark>,
@@ -553,7 +524,6 @@ private fun RichBlockRow(
     onTextEdited: (newText: String, newMarks: List<RichMark>, newSelection: TextRange) -> Unit,
     onEnter: (position: Int) -> Unit,
     onToggleChecked: () -> Unit,
-    onRemove: () -> Unit,
     onMerge: () -> Unit,
     pendingSelection: TextRange?,
     onPendingSelectionConsumed: () -> Unit,
@@ -561,29 +531,51 @@ private fun RichBlockRow(
     val style = richBlockTextStyle(block, typography, taskStrike, dark, titleColor)
     val indent = (block.indent * IndentStepEm * style.fontSize.value).dp
 
-    Row(
-        verticalAlignment = Alignment.Top,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = indent, top = 3.dp, bottom = 3.dp),
     ) {
-        Box(Modifier.weight(1f)) {
-            when (block.kind) {
-                RichBlockKind.DIVIDER -> RichDividerBlock(dark)
-                RichBlockKind.CODE_BLOCK -> RichCodeBlock(
+        when (block.kind) {
+            RichBlockKind.DIVIDER -> RichDividerBlock(dark)
+            RichBlockKind.CODE_BLOCK -> RichCodeBlock(
+                block = block,
+                style = style,
+                dark = dark,
+                noteColor = noteColor,
+                focusRequester = focusRequester,
+                pendingMarks = pendingMarks,
+                onConsumePending = onConsumePending,
+                onFocusGained = onFocusGained,
+                onFocusLost = onFocusLost,
+                onSelectionChanged = onSelectionChanged,
+                onTextEdited = onTextEdited,
+            )
+            RichBlockKind.QUOTE -> RichQuoteBlock(
+                block = block,
+                style = style,
+                dark = dark,
+                focusRequester = focusRequester,
+                pendingMarks = pendingMarks,
+                onConsumePending = onConsumePending,
+                onFocusGained = onFocusGained,
+                onFocusLost = onFocusLost,
+                onSelectionChanged = onSelectionChanged,
+                onTextEdited = onTextEdited,
+                onEnter = onEnter,
+                onMerge = onMerge,
+                pendingSelection = pendingSelection,
+                onPendingSelectionConsumed = onPendingSelectionConsumed,
+            )
+            else -> Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+                RichBlockPrefix(
                     block = block,
                     style = style,
                     dark = dark,
-                    noteColor = noteColor,
-                    focusRequester = focusRequester,
-                    pendingMarks = pendingMarks,
-                    onConsumePending = onConsumePending,
-                    onFocusGained = onFocusGained,
-                    onFocusLost = onFocusLost,
-                    onSelectionChanged = onSelectionChanged,
-                    onTextEdited = onTextEdited,
+                    numberedPosition = numberedPosition,
+                    onToggleChecked = onToggleChecked,
                 )
-                RichBlockKind.QUOTE -> RichQuoteBlock(
+                RichTextBlockField(
                     block = block,
                     style = style,
                     dark = dark,
@@ -598,48 +590,9 @@ private fun RichBlockRow(
                     onMerge = onMerge,
                     pendingSelection = pendingSelection,
                     onPendingSelectionConsumed = onPendingSelectionConsumed,
+                    modifier = Modifier.weight(1f),
                 )
-                else -> Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
-                    RichBlockPrefix(
-                        block = block,
-                        style = style,
-                        dark = dark,
-                        numberedPosition = numberedPosition,
-                        onToggleChecked = onToggleChecked,
-                    )
-                    RichTextBlockField(
-                        block = block,
-                        style = style,
-                        dark = dark,
-                        focusRequester = focusRequester,
-                        pendingMarks = pendingMarks,
-                        onConsumePending = onConsumePending,
-                        onFocusGained = onFocusGained,
-                        onFocusLost = onFocusLost,
-                        onSelectionChanged = onSelectionChanged,
-                        onTextEdited = onTextEdited,
-                        onEnter = onEnter,
-                        onMerge = onMerge,
-                        pendingSelection = pendingSelection,
-                        onPendingSelectionConsumed = onPendingSelectionConsumed,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
             }
-        }
-        val removeLabel = stringResource(R.string.native_richtext_remove_block)
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .semantics { contentDescription = removeLabel }
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) { onRemove() }
-                .padding(6.dp),
-        ) {
-            CloseIcon(size = 15.dp, tint = subtextColor)
         }
     }
 }

@@ -455,8 +455,6 @@
     <string name="native_richtext_underline">Souligné</string>
     <string name="native_richtext_strikethrough">Barré</string>
     <string name="native_richtext_link">Lien</string>
-    <string name="native_richtext_remove_block">Retirer ce bloc</string>
-    <string name="native_richtext_add_block">Ajouter un paragraphe</string>
     <string name="native_richtext_link_title">Lien</string>
     <string name="native_richtext_link_placeholder">https://exemple.com</string>
     <string name="native_richtext_link_apply">Appliquer</string>
