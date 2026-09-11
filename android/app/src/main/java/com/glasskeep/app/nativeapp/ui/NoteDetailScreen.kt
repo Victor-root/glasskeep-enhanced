@@ -2059,6 +2059,7 @@ fun NoteDetailScreen(
                                 }
                             },
                             actions = richToolbarActions,
+                            typography = container.editorPrefs.typography.activeProfile,
                         )
                     }
                 }

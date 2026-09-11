@@ -45,8 +45,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -66,6 +68,8 @@ import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.RichMarkType
+import com.glasskeep.app.nativeapp.data.TypographyBlock
+import com.glasskeep.app.nativeapp.data.TypographyProfile
 import com.glasskeep.app.ui.Indigo
 
 /** editorToolbarMode: the user's saved choice between the phone default
@@ -117,6 +121,7 @@ fun RichFormatToolbar(
     taskStrike: Boolean,
     onTaskStrikeChange: (Boolean) -> Unit,
     actions: RichToolbarActions,
+    typography: TypographyProfile,
 ) {
     val focusedBlock = blocks.find { it.id == state.focusedId }
     val selection = state.safeSelectionIn(focusedBlock)
@@ -598,7 +603,7 @@ fun RichFormatToolbar(
                     RichStyleButton(
                         label = stringResource(R.string.native_richtext_paragraph),
                         fontSize = 12.5.sp,
-                        fontWeight = FontWeight.Normal,
+                        block = typography.p,
                         active = focusedBlock?.kind == RichBlockKind.PARAGRAPH,
                         enabled = enabled,
                         dark = dark,
@@ -610,7 +615,7 @@ fun RichFormatToolbar(
                         RichStyleButton(
                             label = String.format(stringResource(R.string.native_richtext_heading_level), level),
                             fontSize = headingSampleSize(level),
-                            fontWeight = FontWeight.SemiBold,
+                            block = typography.forKind(kind),
                             active = focusedBlock?.kind == kind,
                             enabled = enabled,
                             dark = dark,
@@ -923,12 +928,18 @@ private fun RichLinkButton(
 }
 
 /** `.rt-style-btn`: an 80x34 preview button whose own label is rendered
- *  in the style it applies. */
+ *  in the style it applies - the button IS its own preview, so it carries
+ *  the block's real weight/colour/italic/underline from the user's
+ *  typography profile (globalCSS.js:3464-3519), not a fixed look. Active
+ *  state still overrides just the colour for contrast against the
+ *  highlighted background (`.rt-style-btn.is-active .rt-style-btn-sample
+ *  { color: inherit; }`) - weight/italic/underline stay the block's own
+ *  even while active. */
 @Composable
 private fun RichStyleButton(
     label: String,
     fontSize: TextUnit,
-    fontWeight: FontWeight,
+    block: TypographyBlock,
     active: Boolean,
     enabled: Boolean,
     dark: Boolean,
@@ -959,9 +970,11 @@ private fun RichStyleButton(
     ) {
         Text(
             label,
-            color = if (active) (if (dark) RtActiveTextDark else RtActiveTextLight) else titleColor,
+            color = if (active) (if (dark) RtActiveTextDark else RtActiveTextLight) else (richColorOf(block.color, dark) ?: titleColor),
             fontSize = fontSize,
-            fontWeight = fontWeight,
+            fontWeight = FontWeight(block.weight),
+            fontStyle = if (block.italic) FontStyle.Italic else FontStyle.Normal,
+            textDecoration = if (block.underline) TextDecoration.Underline else TextDecoration.None,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
