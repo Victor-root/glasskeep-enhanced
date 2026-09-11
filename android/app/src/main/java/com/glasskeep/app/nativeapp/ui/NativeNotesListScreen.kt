@@ -72,6 +72,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
@@ -1528,6 +1529,13 @@ private fun HeaderMenu(
                     scaleY = scale
                     this.alpha = alpha
                     transformOrigin = TransformOrigin(1f, 0f)
+                    // Default Auto strategy offscreen-buffers this layer
+                    // while alpha < 1, which the .shadow() below renders
+                    // into wrong - a large flat blurry rectangle instead of
+                    // a soft drop shadow. ModulateAlpha folds alpha into
+                    // each draw call instead, keeping the shadow's normal
+                    // outline-based blur through the whole fade.
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
                 }
                 .shadow(6.dp, RoundedCornerShape(12.dp), clip = false)
                 .clip(RoundedCornerShape(12.dp))

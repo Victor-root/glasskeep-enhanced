@@ -55,6 +55,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -913,6 +914,13 @@ internal fun FooterPopover(
                 scaleY = scale
                 this.alpha = alpha
                 transformOrigin = TransformOrigin(0.5f, 1f)
+                // Default Auto strategy offscreen-buffers this layer while
+                // alpha < 1, which the child Column's own shadow (below)
+                // renders into wrong - a large flat blurry rectangle
+                // instead of a soft drop shadow. ModulateAlpha folds alpha
+                // into each draw call instead, so the shadow keeps its
+                // normal outline-based blur through the whole fade.
+                compositingStrategy = CompositingStrategy.ModulateAlpha
             },
         ) {
             Column(
