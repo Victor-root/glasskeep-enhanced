@@ -182,7 +182,25 @@ fun NativeNotesListScreen(
     val dark = LocalGkDark.current
     val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
-    val notes by repository.observeNotes().collectAsState(initial = emptyList())
+    // null (as opposed to an actually-empty list) means Room's cold Flow
+    // has not delivered its first emission to THIS collector yet - on
+    // every fresh composition (i.e. every return from a note, since this
+    // whole screen is a NavHost destination that gets torn down and
+    // rebuilt, see the DisposableEffect above) that first emission is not
+    // instant, so for a frame or several `notes` would otherwise read as
+    // empty even though the account has plenty of notes. That transient
+    // "empty" used to be indistinguishable from a genuinely empty account,
+    // which mattered because the scrollable list below measures at zero
+    // height during it and Compose's verticalScroll clamps notesScrollState
+    // down to that zero max - a clamp nothing later reverses once the real
+    // notes arrive, which is what was destroying the restored scroll
+    // position on every note visit (confirmed via the GKScroll log trail:
+    // value=14094 restored, then value=0 maxValue=0 with notes.size still
+    // 0, then real notes.size=209 with maxValue correctly 91694 but value
+    // stuck at 0). rawNotes == null gates the scrollable branch below so
+    // it never mounts against that transient zero.
+    val rawNotes by repository.observeNotes().collectAsState(initial = null)
+    val notes = rawNotes ?: emptyList()
     // The whole queue, for the header's cloud icon and its panel: the set
     // above is per-note, this one is per queued action, which is the
     // number the web's own badge shows.
@@ -814,7 +832,13 @@ fun NativeNotesListScreen(
                     )
                 }
             }
-            if (notes.isEmpty() && !refreshing && errorMessage == null) {
+            if (rawNotes == null) {
+                // Room hasn't answered this fresh collector yet (see the
+                // long comment on rawNotes above) - an empty Box here, not
+                // the scrollable list, so notesScrollState never measures
+                // against zero content and gets clamped to 0.
+                Box(Modifier.weight(1f).fillMaxWidth()) {}
+            } else if (notes.isEmpty() && !refreshing && errorMessage == null) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.native_notes_empty), color = subtextColor)
                 }
