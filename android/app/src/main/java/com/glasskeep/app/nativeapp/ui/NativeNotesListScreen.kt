@@ -202,6 +202,19 @@ fun NativeNotesListScreen(
         NativeDebug.d("NativeNotesListScreen: scrimActive now ${container.scrimActive.value}")
     }
     DisposableEffect(Unit) { onDispose { container.scrimActive.value = false } }
+    // Scroll-reset investigation: this whole composable is a NavHost
+    // destination, torn down while a note covers it and rebuilt fresh on
+    // return - confirm that's actually happening (and when) alongside the
+    // scroll-state logging near notesScrollState below. Own tag ("GKScroll"),
+    // kept apart from "GKNative" (colour/status-bar debugging) on request.
+    if (BuildConfig.DEBUG) {
+        val instanceId = remember {
+            System.identityHashCode(Any()).also { Log.d("GKScroll", "NativeNotesListScreen ENTER composition instance=$it") }
+        }
+        DisposableEffect(Unit) {
+            onDispose { Log.d("GKScroll", "NativeNotesListScreen LEAVE composition instance=$instanceId") }
+        }
+    }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var searchOpen by remember { mutableStateOf(false) }
     var notificationsOpen by remember { mutableStateOf(false) }
@@ -648,7 +661,12 @@ fun NativeNotesListScreen(
         }
     }
 
-    LaunchedEffect(serverUrl) { refresh() }
+    LaunchedEffect(serverUrl) {
+        if (BuildConfig.DEBUG) {
+            Log.d("GKScroll", "LaunchedEffect(serverUrl) firing refresh() - this restarts on every fresh composition, not just a real serverUrl change")
+        }
+        refresh()
+    }
 
     // The launcher shortcut, once: consumed straight away so coming back
     // to this screen later doesn't create a second note.
@@ -788,7 +806,12 @@ fun NativeNotesListScreen(
             val notesScrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
             SideEffect {
                 if (BuildConfig.DEBUG) {
-                    Log.d("GKScroll", "notesScrollState id=${System.identityHashCode(notesScrollState)} value=${notesScrollState.value}")
+                    Log.d(
+                        "GKScroll",
+                        "notesScrollState id=${System.identityHashCode(notesScrollState)} value=${notesScrollState.value} " +
+                            "maxValue=${notesScrollState.maxValue} notes.size=${notes.size} filteredNotes.size=${filteredNotes.size} " +
+                            "refreshing=$refreshing errorMessage=$errorMessage",
+                    )
                 }
             }
             if (notes.isEmpty() && !refreshing && errorMessage == null) {

@@ -848,14 +848,30 @@ internal fun FooterPopover(
     width: Dp? = null,
     minWidth: Dp = 0.dp,
     cornerRadius: Dp = 16.dp,
-    elevation: Dp = 24.dp,
+    // Was 24.dp: much heavier than every other popover shadow in the app
+    // (SettingsPopoverCard uses 12.dp) and, being inside a Popup with no
+    // buffer around it (see shadowPad below), had nowhere to blur into -
+    // together that read as one big, hard-edged, overly dark halo.
+    elevation: Dp = 12.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val density = LocalDensity.current
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    // Compose's Popup sizes its window tightly around its content, with no
+    // allowance for a shadow's blur to bleed past that content's own laid
+    // out bounds - so Modifier.shadow() inside a Popup, unlike inside a
+    // normal layout, gets a hard, uneven cut wherever the blur would have
+    // extended past the window edge. Different footer popovers sit at
+    // different screen positions, so each one lost a different amount to
+    // this - which is why they looked inconsistent with each other on top
+    // of each being cut. Padding the whole popup content (panel and arrow
+    // together) by more than the blur can reach reserves that room; the
+    // position math below shifts the window itself back by the same
+    // amount so the visible panel still lands exactly where it did.
+    val shadowPad = 16.dp
     var arrowLeft by remember { mutableStateOf(0.dp) }
     var panelWidth by remember { mutableStateOf(width ?: minWidth) }
-    val positionProvider = remember(density, width, gap) {
+    val positionProvider = remember(density, width, gap, shadowPad) {
         object : PopupPositionProvider {
             override fun calculatePosition(
                 anchorBounds: IntRect,
@@ -863,7 +879,9 @@ internal fun FooterPopover(
                 layoutDirection: LayoutDirection,
                 popupContentSize: IntSize,
             ): IntOffset {
-                val widthPx = width?.let { with(density) { it.roundToPx() } } ?: popupContentSize.width
+                val shadowPadPx = with(density) { shadowPad.roundToPx() }
+                val widthPx = width?.let { with(density) { it.roundToPx() } }
+                    ?: (popupContentSize.width - 2 * shadowPadPx)
                 val marginPx = with(density) { 8.dp.roundToPx() }
                 val gapPx = with(density) { gap.roundToPx() }
                 val left = minOf(anchorBounds.left, windowSize.width - widthPx - marginPx)
@@ -873,7 +891,10 @@ internal fun FooterPopover(
                 val halfArrowPx = with(density) { 6.dp.roundToPx() }
                 arrowLeft = with(density) { (anchorBounds.center.x - left - halfArrowPx).toDp() }
                 panelWidth = with(density) { widthPx.toDp() }
-                return IntOffset(left, anchorBounds.top - gapPx - popupContentSize.height)
+                return IntOffset(
+                    left - shadowPadPx,
+                    anchorBounds.top - gapPx - popupContentSize.height + shadowPadPx,
+                )
             }
         }
     }
@@ -898,7 +919,7 @@ internal fun FooterPopover(
             label = "popoverAlpha",
         )
         Column(
-            (if (width != null) {
+            Modifier.padding(shadowPad).then(if (width != null) {
                 Modifier.width(width)
             } else {
                 // No fixed width means "hug the widest row" (the note
