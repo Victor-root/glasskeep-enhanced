@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -17,6 +18,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -51,11 +53,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,6 +103,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
@@ -765,16 +770,27 @@ fun NativeNotesListScreen(
                 )
             }
 
-            // Hoisted above the empty/search-empty/list branches below on
-            // purpose: it used to live inline on the scrollable Column in
-            // the last of those branches, so if the list ever rendered the
-            // empty branch for even a single frame (e.g. a brief refetch
-            // right after returning from a note), Compose tore down that
-            // branch's group - ScrollState included - and the next return
-            // to the list branch started a fresh one at the top. Keeping
-            // it in a stable slot regardless of which branch is showing is
-            // what actually guarantees the scroll position survives.
-            val notesScrollState = rememberScrollState()
+            // Hoisted above the empty/search-empty/list branches below so a
+            // one-frame empty branch during a refetch doesn't tear the
+            // ScrollState down mid-visit. That alone wasn't enough to
+            // survive the real culprit: this whole screen is a NavHost
+            // destination, so opening a note pushes "notes/{id}" on top of
+            // it and "notes" leaves composition entirely while it's
+            // covered - a plain remember (what rememberScrollState uses)
+            // does not survive that, so every return from a note started a
+            // brand new ScrollState at 0. rememberSaveable's state, unlike
+            // plain remember, is captured/restored by NavHost's
+            // SaveableStateHolder across exactly that dispose/recompose
+            // cycle, which is what actually keeps the position. Tag
+            // "GKScroll" (distinct from "GKNative", used for the earlier
+            // status-bar-color debugging) - filter logcat on it to see
+            // whether this identity now survives a note visit.
+            val notesScrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
+            SideEffect {
+                if (BuildConfig.DEBUG) {
+                    Log.d("GKScroll", "notesScrollState id=${System.identityHashCode(notesScrollState)} value=${notesScrollState.value}")
+                }
+            }
             if (notes.isEmpty() && !refreshing && errorMessage == null) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.native_notes_empty), color = subtextColor)
