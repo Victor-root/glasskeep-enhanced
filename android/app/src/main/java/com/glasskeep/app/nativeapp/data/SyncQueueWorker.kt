@@ -1,6 +1,8 @@
 package com.glasskeep.app.nativeapp.data
 
 import android.content.Context
+import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -12,6 +14,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkRequest
 import androidx.work.WorkerParameters
+import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.local.AppDatabase
 import com.glasskeep.app.nativeapp.data.local.SyncQueueDatabase
@@ -57,16 +60,25 @@ import java.util.concurrent.TimeUnit
 class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        if (BuildConfig.DEBUG) Log.d("GKSync", "doWork() started, runAttemptCount=$runAttemptCount")
         val tokenStore = TokenStore(applicationContext)
         val serverUrl = tokenStore.serverUrl
         val token = tokenStore.token
         if (serverUrl.isNullOrBlank() || token.isNullOrBlank()) {
             NativeDebug.d("SyncQueueWorker: no session, skipping")
+            if (BuildConfig.DEBUG) Log.d("GKSync", "doWork() bailing: no session (serverUrl blank=${serverUrl.isNullOrBlank()}, token blank=${token.isNullOrBlank()})")
             return Result.success()
         }
 
         val queueDao = SyncQueueDatabase.get(applicationContext).syncQueueDao()
         val pending = queueDao.getPending()
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                "GKSync",
+                "doWork() pending=${pending.size} " +
+                    pending.joinToString { "[id=${it.queueId} type=${it.type} note=${it.noteId} attempts=${it.attempts} status=${it.status}]" },
+            )
+        }
         if (pending.isEmpty()) return Result.success()
 
         val repository = NotesRepository(
@@ -92,8 +104,12 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
             try {
                 applyItem(repository, item)
                 queueDao.delete(item.queueId)
+                if (BuildConfig.DEBUG) Log.d("GKSync", "item ${item.queueId} (${item.type}) note=${item.noteId} OK, deleted from queue")
             } catch (t: Throwable) {
                 NativeDebug.e("SyncQueueWorker: item ${item.queueId} (${item.type}) for note ${item.noteId} failed", t)
+                if (BuildConfig.DEBUG) {
+                    Log.d("GKSync", "item ${item.queueId} (${item.type}) note=${item.noteId} FAILED: ${t.javaClass.simpleName}: ${t.message}")
+                }
                 anyOutstanding = true
                 blockedNoteIds += item.noteId
                 val attempts = item.attempts + 1
@@ -105,6 +121,7 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
             }
             if (index < pending.lastIndex) delay(QUEUE_ITEM_DELAY_MS)
         }
+        if (BuildConfig.DEBUG) Log.d("GKSync", "doWork() finished: anyOutstanding=$anyOutstanding -> ${if (anyOutstanding) "Result.retry()" else "Result.success()"}")
         return if (anyOutstanding) Result.retry() else Result.success()
     }
 
@@ -187,6 +204,29 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
          *  milestone's own commit message, avoided here rather than
          *  reproduced from ReminderSyncWorker.syncNow()'s plain enqueue). */
         fun triggerNow(context: Context) {
+            if (BuildConfig.DEBUG) {
+                Log.d("GKSync", "triggerNow() called")
+                // KEEP means this call is a silent no-op if WorkManager still
+                // considers a previous request "enqueued" - including one
+                // stuck BLOCKED forever on setRequiredNetworkType(CONNECTED)
+                // never being satisfied (a VPN-only connection has tripped
+                // exactly this on some OEM skins). Logging what's already
+                // there, right before the KEEP-enqueue below, shows whether
+                // that's what's silently swallowing every trigger.
+                val existing = WorkManager.getInstance(context).getWorkInfosForUniqueWork(UNIQUE_ONE_TIME_WORK)
+                existing.addListener(
+                    {
+                        val infos = runCatching { existing.get() }.getOrElse { emptyList() }
+                        Log.d(
+                            "GKSync",
+                            "triggerNow(): existing WorkInfo for '$UNIQUE_ONE_TIME_WORK' = " +
+                                infos.joinToString { "id=${it.id} state=${it.state} runAttemptCount=${it.runAttemptCount}" }
+                                    .ifEmpty { "(none)" },
+                        )
+                    },
+                    ContextCompat.getMainExecutor(context),
+                )
+            }
             val request = OneTimeWorkRequestBuilder<SyncQueueWorker>()
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, WorkRequest.MIN_BACKOFF_MILLIS, TimeUnit.MILLISECONDS)
