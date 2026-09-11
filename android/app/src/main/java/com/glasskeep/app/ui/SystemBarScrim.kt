@@ -16,6 +16,7 @@ import com.glasskeep.app.BuildConfig
 // WorkspaceTheme.kt) instead of this fixed onboarding pair. Defaults to
 // null so onboarding itself, which the web's own theme system explicitly
 // never recolors either, is untouched.
+@Suppress("DEPRECATION") // window.statusBarColor/navigationBarColor: read back for the debug log below, no non-deprecated way to read the bar's actual current color.
 fun ComponentActivity.applyThemedSystemBars(dark: Boolean, overrideColorInt: Int? = null) {
     val bgColor = overrideColorInt ?: Color.parseColor(if (dark) "#1a1a1a" else "#f0e8ff")
     val style = if (dark) SystemBarStyle.dark(bgColor) else SystemBarStyle.light(bgColor, bgColor)
