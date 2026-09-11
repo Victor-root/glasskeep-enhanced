@@ -31,12 +31,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -1759,7 +1760,12 @@ fun NoteDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .imePadding(),
+                // The keyboard's own inset already reaches past where the
+                // nav bar sits once it's up, so padding for both
+                // separately (ime here, navigationBars down on the footer)
+                // stacked their heights and left a gap above the keyboard.
+                // union() takes whichever is taller instead of adding them.
+                .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
         ) {
             // Sticky icon bar (ModalHeader.jsx's own mobile half): back on
             // the left, pin then save on the right, 8dp/6dp padding, 32dp
@@ -3327,7 +3333,9 @@ private fun NoteModalFooter(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(if (dark) Color.Black.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.04f))
-                .navigationBarsPadding()
+                // The screen's own root Column already reserves space for
+                // the nav bar (or the keyboard, whichever is taller), so
+                // padding for the nav bar again here would double it up.
                 .padding(vertical = 6.dp),
             // ModalFooter.jsx's desktop layout splits into two clusters
             // held apart by a flex-1 spacer, but its own mobile media query
