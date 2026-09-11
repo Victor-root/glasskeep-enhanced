@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -73,6 +74,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
@@ -1494,6 +1496,21 @@ private fun HeaderMenu(
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
+        // Pops open with a quick fade + grow from the kebab button it
+        // hangs off (top-right) instead of snapping to full size on the
+        // first frame.
+        var visible by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { visible = true }
+        val scale by animateFloatAsState(
+            targetValue = if (visible) 1f else 0.9f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+            label = "headerMenuScale",
+        )
+        val alpha by animateFloatAsState(
+            targetValue = if (visible) 1f else 0f,
+            animationSpec = tween(120),
+            label = "headerMenuAlpha",
+        )
         Column(
             modifier = Modifier
                 // Hugs the widest row's own intrinsic width (NotesHeader.jsx's
@@ -1506,6 +1523,12 @@ private fun HeaderMenu(
                 // only a ceiling now, not the width itself.
                 .widthIn(max = minOf(298.dp, (configuration.screenWidthDp - 26).dp))
                 .heightIn(max = (configuration.screenHeightDp * 0.72f).dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    this.alpha = alpha
+                    transformOrigin = TransformOrigin(1f, 0f)
+                }
                 .shadow(6.dp, RoundedCornerShape(12.dp), clip = false)
                 .clip(RoundedCornerShape(12.dp))
                 .background(if (dark) Color(0xFF222222) else Color.White)

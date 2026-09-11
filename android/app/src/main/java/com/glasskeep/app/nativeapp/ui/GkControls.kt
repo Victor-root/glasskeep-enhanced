@@ -4,7 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -35,6 +37,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,7 +60,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -876,8 +881,23 @@ internal fun FooterPopover(
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
+        // Pops open with a quick fade + grow from the arrow's end (the
+        // anchor button it points at) instead of snapping to full size
+        // on the first frame.
+        var visible by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { visible = true }
+        val scale by animateFloatAsState(
+            targetValue = if (visible) 1f else 0.9f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+            label = "popoverScale",
+        )
+        val alpha by animateFloatAsState(
+            targetValue = if (visible) 1f else 0f,
+            animationSpec = tween(120),
+            label = "popoverAlpha",
+        )
         Column(
-            if (width != null) {
+            (if (width != null) {
                 Modifier.width(width)
             } else {
                 // No fixed width means "hug the widest row" (the note
@@ -888,6 +908,11 @@ internal fun FooterPopover(
                 // max keeps a very long label (a longer translation) from
                 // ever spanning edge to edge.
                 Modifier.width(IntrinsicSize.Max).widthIn(min = minWidth, max = screenWidth - 32.dp)
+            }).graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+                transformOrigin = TransformOrigin(0.5f, 1f)
             },
         ) {
             Column(
