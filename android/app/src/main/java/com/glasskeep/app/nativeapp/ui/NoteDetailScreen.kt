@@ -3350,7 +3350,15 @@ private fun NoteModalFooter(
                     badgeGradient = accentGradient,
                     onClick = onCollaborateClick,
                 ) {
-                    CollaborateIcon(size = 18.dp, tint = collaborateColor)
+                    // 20dp, not the 18dp most other mobile footer icons use
+                    // (mirrors ModalFooter.jsx's own footer button, bumped
+                    // from 18 to 20 for the same reason): this glyph's own
+                    // ink only fills about 60% of its 20-unit viewBox, so
+                    // at 18dp it reads visibly smaller than its neighbours
+                    // even though the box size matches. Sized up to match
+                    // the footer's bigger tier (trash/kebab/image) instead
+                    // of redrawing the glyph.
+                    CollaborateIcon(size = 20.dp, tint = collaborateColor)
                 }
             }
             if (showTrashButton) {
