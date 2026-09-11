@@ -1878,6 +1878,7 @@ fun NoteDetailScreen(
                                             taskStrike = container.editorPrefs.taskStrike,
                                             dark = dark,
                                             titleColor = titleColor,
+                                            noteColor = currentNote.color,
                                         )
                                     } else {
                                         RichTextEditor(
@@ -1886,6 +1887,7 @@ fun NoteDetailScreen(
                                             typography = container.editorPrefs.typography.activeProfile,
                                             taskStrike = container.editorPrefs.taskStrike,
                                             dark = dark,
+                                            noteColor = currentNote.color,
                                             titleColor = titleColor,
                                             subtextColor = subtextColor,
                                             focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
@@ -1961,6 +1963,7 @@ fun NoteDetailScreen(
                                     taskStrike = container.editorPrefs.taskStrike,
                                     dark = dark,
                                     titleColor = titleColor,
+                                    noteColor = currentNote.color,
                                 )
                             } else if (edit.isRichEditableType) {
                                 RichTextEditor(
@@ -1969,6 +1972,7 @@ fun NoteDetailScreen(
                                     typography = container.editorPrefs.typography.activeProfile,
                                     taskStrike = container.editorPrefs.taskStrike,
                                     dark = dark,
+                                    noteColor = currentNote.color,
                                     titleColor = titleColor,
                                     subtextColor = subtextColor,
                                     focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },

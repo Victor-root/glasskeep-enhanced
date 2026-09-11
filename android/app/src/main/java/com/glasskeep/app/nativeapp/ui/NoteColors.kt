@@ -142,6 +142,22 @@ private val DARK_MODAL: Map<String, Color> = mapOf(
     "mauve" to Color(0xFF644873),
 )
 
+/**
+ * noteColorBtn from NoteModal.jsx:657-659 - what `--note-color` is actually
+ * set to, i.e. the code-copy button's own background. NOT the same value
+ * as [noteModalBackground]: that one mixes 80% white into a light-mode
+ * note for readability, so it would render the button almost invisible
+ * against a pastel note. This is the note's raw swatch at full opacity -
+ * `solid(bgFor(colorKey, dark))` - so the button reads as a small solid
+ * tab of the note's actual color. A colorless note in light mode gets a
+ * fixed violet instead of solid white.
+ */
+fun codeCopyButtonColor(colorKey: String?, dark: Boolean): Color {
+    val key = colorKey?.trim()?.lowercase()
+    if (!dark && (key.isNullOrEmpty() || key == "default")) return Color(0xFFA78BFA)
+    return noteColorFor(key, dark).copy(alpha = 1f)
+}
+
 fun noteModalBackground(colorKey: String?, dark: Boolean): Color {
     val table = if (dark) DARK_MODAL else LIGHT_MODAL
     return table[colorKey?.trim()?.lowercase()] ?: table.getValue("default")

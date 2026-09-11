@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -177,6 +178,7 @@ fun RichTextEditor(
     typography: TypographyProfile,
     taskStrike: Boolean,
     dark: Boolean,
+    noteColor: String?,
     titleColor: Color,
     subtextColor: Color,
     focusRequesterFor: (id: String) -> FocusRequester,
@@ -213,6 +215,7 @@ fun RichTextEditor(
                 typography = typography,
                 taskStrike = taskStrike,
                 dark = dark,
+                noteColor = noteColor,
                 titleColor = titleColor,
                 subtextColor = subtextColor,
                 numberedPosition = numberedPositions[block.id],
@@ -285,6 +288,7 @@ fun RichTextReader(
     titleColor: Color,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    noteColor: String? = null,
 ) {
     val numberedPositions = remember(blocks) {
         val map = mutableMapOf<String, Int>()
@@ -328,6 +332,7 @@ fun RichTextReader(
                     if (!compact) {
                         CodeCopyButton(
                             text = block.text,
+                            noteColor = noteColor,
                             dark = dark,
                             modifier = Modifier.align(Alignment.TopEnd),
                         )
@@ -355,6 +360,7 @@ fun RichTextReader(
                             style = style.copy(fontStyle = FontStyle.Italic),
                             dark = dark,
                             enableInlineCopy = !compact,
+                            noteColor = noteColor,
                         )
                     }
                 }
@@ -376,6 +382,7 @@ fun RichTextReader(
                         style = style,
                         dark = dark,
                         enableInlineCopy = !compact,
+                        noteColor = noteColor,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -385,12 +392,15 @@ fun RichTextReader(
 }
 
 /**
- * `.code-copy-btn` (globalCSS.js / useModalState.js's view-mode renderer):
- * always visible next to a rendered fenced code block, no tap needed
- * (unlike inline code, which arms on tap - see [ReaderInlineText]).
+ * `.code-copy-btn` (globalCSS.js:1999-2015): always visible next to a
+ * rendered fenced code block, no tap needed (unlike inline code, which
+ * arms on tap - see [ReaderInlineText]). Filled with the note's own
+ * color ([codeCopyButtonColor], NOT [noteModalBackground] - the web's
+ * `--note-color` is the raw swatch, not the modal's white-mixed wash),
+ * white text in dark mode / near-black in light mode, matching size.
  */
 @Composable
-private fun CodeCopyButton(text: String, dark: Boolean, modifier: Modifier = Modifier) {
+private fun CodeCopyButton(text: String, noteColor: String?, dark: Boolean, modifier: Modifier = Modifier) {
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     var copied by remember { mutableStateOf(false) }
@@ -400,11 +410,13 @@ private fun CodeCopyButton(text: String, dark: Boolean, modifier: Modifier = Mod
             copied = false
         }
     }
+    val background = codeCopyButtonColor(noteColor, dark)
     Box(
         modifier = modifier
-            .padding(6.dp)
+            .padding(8.dp)
+            .shadow(2.dp, RoundedCornerShape(6.dp), clip = false)
             .clip(RoundedCornerShape(6.dp))
-            .background(if (dark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.08f))
+            .background(background)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -413,16 +425,16 @@ private fun CodeCopyButton(text: String, dark: Boolean, modifier: Modifier = Mod
                 scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("code", text))) }
                 copied = true
             }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 7.dp, vertical = 3.5.dp),
     ) {
         Text(
             stringResource(if (copied) R.string.native_richtext_copied else R.string.native_richtext_copy),
-            color = if (dark) Color.White.copy(alpha = 0.85f) else Color.Black.copy(alpha = 0.6f),
-            fontSize = 11.sp,
+            color = if (dark) Color.White else Color.Black.copy(alpha = 0.75f),
+            fontSize = 12.sp,
             // Text() without one inherits LocalTextStyle's line height
-            // as-is instead of scaling it to 11.sp, leaving the glyphs
+            // as-is instead of scaling it to 12.sp, leaving the glyphs
             // sitting off-centre in this tightly-padded box.
-            lineHeight = 13.sp,
+            lineHeight = 14.sp,
             fontWeight = FontWeight.Medium,
         )
     }
@@ -443,6 +455,7 @@ private fun ReaderInlineText(
     style: TextStyle,
     dark: Boolean,
     enableInlineCopy: Boolean,
+    noteColor: String?,
     modifier: Modifier = Modifier,
 ) {
     val annotated = annotatedTextFor(block, style, dark)
@@ -488,7 +501,7 @@ private fun ReaderInlineText(
             // (combined with the button's own internal padding pushing its
             // visible pill further down-right again) is what made it read
             // as misaligned against the code.
-            Layout(content = { CodeCopyButton(text = block.text.substring(start, end), dark = dark) }) { measurables, constraints ->
+            Layout(content = { CodeCopyButton(text = block.text.substring(start, end), noteColor = noteColor, dark = dark) }) { measurables, constraints ->
                 val placeable = measurables.first().measure(constraints)
                 val gapPx = 4.dp.roundToPx()
                 val x = box.right.toInt() + gapPx
@@ -507,6 +520,7 @@ private fun RichBlockRow(
     typography: TypographyProfile,
     taskStrike: Boolean,
     dark: Boolean,
+    noteColor: String?,
     titleColor: Color,
     subtextColor: Color,
     numberedPosition: Int?,
@@ -537,6 +551,7 @@ private fun RichBlockRow(
                     block = block,
                     style = style,
                     dark = dark,
+                    noteColor = noteColor,
                     focusRequester = focusRequester,
                     pendingMarks = pendingMarks,
                     onConsumePending = onConsumePending,
@@ -694,6 +709,7 @@ private fun RichCodeBlock(
     block: RichBlock,
     style: TextStyle,
     dark: Boolean,
+    noteColor: String?,
     focusRequester: FocusRequester,
     pendingMarks: List<PendingMark>,
     onConsumePending: () -> Unit,
@@ -746,6 +762,7 @@ private fun RichCodeBlock(
         if (armed) {
             CodeCopyButton(
                 text = block.text,
+                noteColor = noteColor,
                 dark = dark,
                 modifier = Modifier.align(Alignment.TopEnd),
             )
