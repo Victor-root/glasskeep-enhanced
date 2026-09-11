@@ -940,16 +940,6 @@ private fun RichLinkButton(
                 enabled = enabled,
                 role = Role.Button,
             ) { onClick() }
-            .drawBehind {
-                val width = with(density) { 39.dp.toPx() }
-                val height = with(density) { 1.5.dp.toPx() }
-                val bottom = with(density) { 7.dp.toPx() }
-                drawRect(
-                    color = Color(0xFF2563EB),
-                    topLeft = Offset(size.width / 2f - width * 0.45f, size.height - bottom - height),
-                    size = Size(width, height),
-                )
-            }
             .padding(start = 6.dp, end = 6.dp, bottom = 2.dp),
     ) {
         LinkIcon(size = 16.dp, tint = if (active) (if (dark) RtActiveTextDark else RtActiveTextLight) else titleColor)
@@ -957,18 +947,32 @@ private fun RichLinkButton(
             "www",
             color = if (active) (if (dark) RtActiveTextDark else RtActiveTextLight) else titleColor,
             fontSize = 12.48.sp,
-            // Without one, Text() inherits LocalTextStyle's much taller
-            // default line height instead of scaling to 12.48.sp, which
-            // shifts where the glyphs actually sit inside this Column's
-            // Center arrangement - throwing off the drawBehind underline
-            // bar above, positioned at a fixed distance from the button's
-            // bottom edge (same fixed-offset trick as .rt-btn--link::after
-            // in globalCSS.js:3287-3298) so it needs the text where it
-            // expects it, or the bar cuts straight through the letters
-            // instead of sitting under them.
             lineHeight = 14.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 0.02.em,
+            // The underline bar (globalCSS.js's .rt-btn--link::after,
+            // positioned a fixed distance from the whole BUTTON's bottom
+            // edge) kept ending up wrong here across two attempts at
+            // reproducing that fixed offset - it depends on exactly how
+            // tall Icon+Text measure out to inside the Column's Center
+            // arrangement, an assumption that was wrong both times.
+            // Attached directly to the Text's own drawBehind instead: its
+            // `size` is unambiguously this Text's own measured box, so the
+            // bar draws relative to what's actually there - just below the
+            // real glyphs, centered on the real text width - regardless of
+            // any font-metric assumption. drawBehind isn't clipped to its
+            // own node's bounds, so overflowing a couple px below the text
+            // paints fine (the Column's own clip is well outside this).
+            modifier = Modifier.drawBehind {
+                val width = with(density) { 39.dp.toPx() }
+                val barHeight = with(density) { 1.5.dp.toPx() }
+                val gap = with(density) { 2.dp.toPx() }
+                drawRect(
+                    color = Color(0xFF2563EB),
+                    topLeft = Offset(size.width / 2f - width / 2f, size.height + gap),
+                    size = Size(width, barHeight),
+                )
+            },
         )
     }
 }
