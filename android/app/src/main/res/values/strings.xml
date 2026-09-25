@@ -653,6 +653,8 @@
     <string name="native_collaborators_error">Couldn\'t load collaborators: %1$s</string>
     <string name="native_collaborators_owner">Owner</string>
     <string name="native_collaborators_can_write">Can edit</string>
+    <string name="native_access_read_only">Read-only</string>
+    <string name="native_read_only_set_by">%1$s set this note to read-only</string>
     <string name="native_collaborators_read_only">Read only</string>
     <string name="native_collaborators_add_action">Add a collaborator</string>
     <string name="native_collaborators_search_error">Couldn\'t load users: %1$s</string>

@@ -2374,6 +2374,16 @@ fun NoteDetailScreen(
                             container.editorPrefs.readModeEnabled,
                         viewMode = viewMode,
                         showDrawModeButton = edit.isDrawType && !isReadOnlyAccess,
+                        // ModalFooter.jsx's read-only pill names whoever set it.
+                        readOnlyTooltip = if (isReadOnlyAccess) {
+                            currentNote.collaborators.orEmpty().firstOrNull { it.isOwner }
+                                ?.let { owner -> owner.name.ifBlank { owner.email } }
+                                ?.takeIf { it.isNotBlank() }
+                                ?.let { stringResource(R.string.native_read_only_set_by, it) }
+                                ?: stringResource(R.string.native_access_read_only)
+                        } else {
+                            null
+                        },
                         drawingCanvasMode = drawingCanvasMode,
                         // The web keeps Collaborate and Trash in the footer for
                         // every type except a text note actually being edited
@@ -3601,6 +3611,7 @@ private fun NoteModalFooter(
     showModeButton: Boolean,
     viewMode: Boolean,
     showDrawModeButton: Boolean,
+    readOnlyTooltip: String?,
     drawingCanvasMode: Boolean,
     showCollaborateButton: Boolean,
     showTrashButton: Boolean,
@@ -3772,6 +3783,21 @@ private fun NoteModalFooter(
                     KebabIcon(size = 20.dp, tint = iconColor)
                 }
                 menu()
+            }
+            // A read-only share takes the mode buttons' place with an eye
+            // pill (ModalFooter.jsx:848-866).
+            if (readOnlyTooltip != null) {
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(WorkspaceTheme.accentSoftBg(themeId, dark))
+                        .border(1.dp, WorkspaceTheme.accentSoftBorder(themeId, dark), CircleShape)
+                        .semantics { contentDescription = readOnlyTooltip }
+                        .gkTooltip(readOnlyTooltip)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    TablerEyeIcon(size = 20.dp, tint = WorkspaceTheme.accent(themeId, dark))
+                }
             }
             // ModalFooter.jsx renders the view/edit toggle and the drawing
             // mode group after the kebab (and its popover/reminder picker),
