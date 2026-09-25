@@ -194,6 +194,7 @@ internal fun SyncStatusSheet(
     val shape = RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp)
 
     Box(Modifier.fillMaxSize()) {
+        if (open) Box(Modifier.fillMaxSize().dismissOnOutsideTouch(onDismiss))
         Column(
             modifier = Modifier
                 .fillMaxWidth()

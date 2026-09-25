@@ -182,6 +182,7 @@ fun NotificationCenter(
     val titleColor = if (dark) Color(0xFFF0F0F5) else Color(0xFF1D1D1F)
 
     Box(Modifier.fillMaxSize()) {
+        if (open) Box(Modifier.fillMaxSize().dismissOnOutsideTouch(onDismiss))
         Column(
             modifier = Modifier
                 .fillMaxWidth()

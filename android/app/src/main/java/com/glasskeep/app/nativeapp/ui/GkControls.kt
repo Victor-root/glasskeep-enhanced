@@ -5,8 +5,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -19,6 +19,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -79,6 +81,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -1364,6 +1367,20 @@ private fun Modifier.outsideRing(color: Color, shape: Shape): Modifier = drawBeh
 
 /** Lets a block spill past its parent's horizontal padding, the way the
  *  checklist deliberately does on a phone (`max-sm:-mx-4`). */
+/** The web's capturing outside-pointerdown on its top sheets: any touch
+ *  here closes the sheet and the whole gesture is swallowed, so nothing
+ *  underneath is activated. Put it behind the sheet itself. */
+internal fun Modifier.dismissOnOutsideTouch(onDismiss: () -> Unit): Modifier = pointerInput(onDismiss) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false).consume()
+        onDismiss()
+        do {
+            val event = awaitPointerEvent()
+            event.changes.forEach { it.consume() }
+        } while (event.changes.any { it.pressed })
+    }
+}
+
 internal fun Modifier.bleedHorizontally(amount: Dp): Modifier = layout { measurable, constraints ->
     val extra = amount.roundToPx() * 2
     val placeable = measurable.measure(
