@@ -1900,7 +1900,19 @@ fun NoteDetailScreen(
             // round buttons. There is deliberately no close cross: on a
             // phone the back arrow is the only way out.
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        // ModalHeader.jsx's draw-edit bar: 4px all round and a
+                        // bottom border (black 10% / white 15%).
+                        if (drawingCanvasMode) {
+                            Modifier
+                                .bottomHairline(if (dark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.10f))
+                                .padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = 5.dp)
+                        } else {
+                            Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                        },
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ModalIconButton(
@@ -1999,28 +2011,31 @@ fun NoteDetailScreen(
                             // ModalHeader.jsx does on a phone (and only there).
                             // Its 20dp side padding against the body's 24dp is
                             // the web's own deliberate 4px offset.
-                            NoteTitleField(
-                                value = titleText,
-                                enabled = !isNoteReadOnly &&
-                                    (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType),
-                                // The web drops the field entirely and prints the
-                                // title as text whenever the note shows its read
-                                // face (ModalHeader.jsx:265). Checklists are its
-                                // documented exception: their body stays
-                                // interactive, so their title does too.
-                                asText = (edit.isRichEditableType && viewMode) ||
-                                    (edit.isDrawType && !drawingCanvasMode && viewMode) ||
-                                    (isNoteReadOnly && !edit.isChecklistType),
-                                titleColor = titleColor,
-                                placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
-                                onValueChange = { raw ->
-                                    // Every incoming value gets its newlines
-                                    // flattened, same defensive sanitising as
-                                    // ModalHeader.jsx: a title is single-line
-                                    // everywhere else in the app.
-                                    titleText = raw.replace(TitleNewlines, " ")
-                                },
-                            )
+                            // Hidden while drawing (ModalHeader.jsx:263).
+                            if (!(edit.isDrawType && drawingCanvasMode)) {
+                                NoteTitleField(
+                                    value = titleText,
+                                    enabled = !isNoteReadOnly &&
+                                        (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType),
+                                    // The web drops the field entirely and prints the
+                                    // title as text whenever the note shows its read
+                                    // face (ModalHeader.jsx:265). Checklists are its
+                                    // documented exception: their body stays
+                                    // interactive, so their title does too.
+                                    asText = (edit.isRichEditableType && viewMode) ||
+                                        (edit.isDrawType && !drawingCanvasMode && viewMode) ||
+                                        (isNoteReadOnly && !edit.isChecklistType),
+                                    titleColor = titleColor,
+                                    placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
+                                    onValueChange = { raw ->
+                                        // Every incoming value gets its newlines
+                                        // flattened, same defensive sanitising as
+                                        // ModalHeader.jsx: a title is single-line
+                                        // everywhere else in the app.
+                                        titleText = raw.replace(TitleNewlines, " ")
+                                    },
+                                )
+                            }
 
                             if (edit.isTextType || edit.isChecklistType || (edit.isDrawType && !drawingCanvasMode)) {
                                 NoteImagesSection(
@@ -3726,35 +3741,41 @@ private fun NoteModalFooter(
             // ModalFooter.jsx renders the view/edit toggle and the drawing
             // mode group after the kebab (and its popover/reminder picker),
             // not before it.
-            if (showModeButton) {
-                FooterIconButton(
-                    contentDescription = stringResource(
-                        if (viewMode) R.string.native_note_detail_switch_to_edit
-                        else R.string.native_note_detail_switch_to_view
-                    ),
-                    // .modal-footer-btn--mode (globalCSS.js:1918-1923): always
-                    // filled with this gradient, not just on an active state.
-                    backgroundBrush = ModeButtonGradient,
-                    onClick = onModeClick,
-                ) {
-                    if (viewMode) {
-                        PencilFilledIcon(size = 16.dp, tint = Color.White)
-                    } else {
-                        EyeFilledIcon(size = 16.dp, tint = Color.White)
+            // The view/edit toggle and the drawing toggle are one footer
+            // slot, 8px apart (ModalFooter.jsx's `flex items-center gap-2`).
+            if (showModeButton || showDrawModeButton) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (showModeButton) {
+                        FooterIconButton(
+                            contentDescription = stringResource(
+                                if (viewMode) R.string.native_note_detail_switch_to_edit
+                                else R.string.native_note_detail_switch_to_view
+                            ),
+                            // .modal-footer-btn--mode (globalCSS.js:1918-1923): always
+                            // filled with this gradient, not just on an active state.
+                            backgroundBrush = ModeButtonGradient,
+                            onClick = onModeClick,
+                        ) {
+                            if (viewMode) {
+                                PencilFilledIcon(size = 16.dp, tint = Color.White)
+                            } else {
+                                EyeFilledIcon(size = 16.dp, tint = Color.White)
+                            }
+                        }
                     }
-                }
-            }
-            if (showDrawModeButton) {
-                FooterIconButton(
-                    contentDescription = stringResource(
-                        if (drawingCanvasMode) R.string.native_drawing_exit_mode
-                        else R.string.native_drawing_enter_mode
-                    ),
-                    backgroundBrush = ModeButtonGradient,
-                    onClick = onDrawModeClick,
-                ) {
-                    if (drawingCanvasMode) EyeFilledIcon(size = 16.dp, tint = Color.White)
-                    else PencilFilledIcon(size = 16.dp, tint = Color.White)
+                    if (showDrawModeButton) {
+                        FooterIconButton(
+                            contentDescription = stringResource(
+                                if (drawingCanvasMode) R.string.native_drawing_exit_mode
+                                else R.string.native_drawing_enter_mode
+                            ),
+                            backgroundBrush = ModeButtonGradient,
+                            onClick = onDrawModeClick,
+                        ) {
+                            if (drawingCanvasMode) EyeFilledIcon(size = 16.dp, tint = Color.White)
+                            else DrawWavesIcon(size = 16.dp, tint = Color.White)
+                        }
+                    }
                 }
             }
         }

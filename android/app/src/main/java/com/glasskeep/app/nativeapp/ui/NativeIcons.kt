@@ -1921,6 +1921,14 @@ fun AlertTriangleOutlineIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, ti
     modifier, size, tint, strokeWidth = 2f,
 )
 
+/** ModalFooter.jsx's "switch to draw mode" glyph: two stacked waves,
+ *  stroke 2.2. */
+@Composable
+fun DrawWavesIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 17c2-3 4-6 6-3s4 3 6 0 4-3 6 0 M3 10c2-3 4-6 6-3s4 3 6 0 4-3 6 0",
+    modifier, size, tint, strokeWidth = 2.2f,
+)
+
 // The rest of NotificationCard.jsx's SEMANTIC_ICONS, the outline Tabler
 // glyphs a notification names by key.
 
