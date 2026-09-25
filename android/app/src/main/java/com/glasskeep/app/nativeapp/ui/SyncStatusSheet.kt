@@ -289,6 +289,7 @@ internal fun SyncStatusSheet(
 
             TopSheetGrabber(
                 dark = dark,
+                separator = null,
                 onDrag = { dy -> dragOffset = (dragOffset + dy).coerceAtMost(0f) },
                 onDragEnd = {
                     val pulled = with(density) { (-dragOffset).toDp() }

@@ -45,9 +45,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -64,8 +74,10 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
@@ -191,14 +203,17 @@ fun NotificationCenter(
                 .graphicsLayer {
                     translationY = slide * size.height + dragOffset
                 }
+                .dropShadow(shape, Shadow(radius = 6.dp, color = if (dark) Color.Black.copy(alpha = 0.30f) else Color(0x120F172A), spread = (-1).dp, offset = DpOffset(0.dp, 4.dp)))
+                .dropShadow(shape, Shadow(radius = 28.dp, color = if (dark) Color.Black.copy(alpha = 0.50f) else Color(0x1F0F172A), spread = (-4).dp, offset = DpOffset(0.dp, 10.dp)))
                 .clip(shape)
-                .background(statusBar)
-                // The phone web sheet explicitly removes its top/side
-                // borders. A full Compose border left a visible seam between
-                // the Android status bar and this matching status-bar fill.
-                // The grabber keeps its own lower separator.
+                // Light: the phone sheet's --gk-statusbar fill. Dark: the
+                // later `html.dark .gk-notif-center` rule wins, a neutral
+                // grey under the statusbar-coloured header.
+                .background(if (dark) Color(0xF51C1C26) else statusBar)
+                .sheetEdges(shape, dark),
         ) {
             NotificationCenterHeader(
+                background = statusBar,
                 titleColor = titleColor,
                 dark = dark,
                 brandingLogo = container.branding.logo,
@@ -272,6 +287,7 @@ fun NotificationCenter(
 
             TopSheetGrabber(
                 dark = dark,
+                separator = if (dark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.06f),
                 onDrag = { dy -> dragOffset = (dragOffset + dy).coerceAtMost(0f) },
                 onDragEnd = {
                     val pulled = with(density) { (-dragOffset).toDp() }
@@ -283,10 +299,32 @@ fun NotificationCenter(
     }
 }
 
+/** The mobile sheet keeps only its bottom border (1px, following the
+ *  rounded corners) and the `inset 0 1px 0` highlight along its top. */
+private fun Modifier.sheetEdges(shape: Shape, dark: Boolean): Modifier = drawWithContent {
+    drawContent()
+    val stroke = 1.dp.toPx()
+    drawRect(
+        color = if (dark) Color.White.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.90f),
+        size = Size(size.width, stroke),
+    )
+    val outline = shape.createOutline(Size(size.width - stroke, size.height - stroke), layoutDirection, this)
+    clipRect(top = size.height / 2f) {
+        translate(stroke / 2f, stroke / 2f) {
+            drawOutline(
+                outline,
+                color = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f),
+                style = Stroke(width = stroke),
+            )
+        }
+    }
+}
+
 /** `.gk-notif-center__header`: brand on the left, Clear and the close
- *  glyph on the right, with the 6px gradient bleeding underneath. */
+ *  glyph on the right, with the 6px gradient bleeding over the list. */
 @Composable
 private fun NotificationCenterHeader(
+    background: Color,
     titleColor: Color,
     dark: Boolean,
     brandingLogo: String?,
@@ -294,87 +332,88 @@ private fun NotificationCenterHeader(
     onClear: () -> Unit,
     onClose: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth()) {
+    val fade = if (dark) Color.Black.copy(alpha = 0.20f) else Color(0xFF0F172A).copy(alpha = 0.05f)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .zIndex(1f)
+            .drawWithContent {
+                drawContent()
+                val fadeHeight = 6.dp.toPx()
+                drawRect(
+                    Brush.verticalGradient(listOf(fade, Color.Transparent), startY = size.height, endY = size.height + fadeHeight),
+                    topLeft = Offset(0f, size.height),
+                    size = Size(size.width, fadeHeight),
+                )
+            }
+            .background(background)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                val customLogo = brandingLogo?.let { rememberDecodedImage(it) }
-                if (customLogo != null) {
-                    Image(
-                        bitmap = customLogo,
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.size(24.dp),
-                    )
-                } else {
-                    Image(
-                        painter = painterResource(R.drawable.glasskeep_logo),
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)),
-                    )
-                }
-                Text(
-                    stringResource(R.string.native_notifications_title),
-                    color = titleColor,
-                    fontSize = 15.2.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
+            val customLogo = brandingLogo?.let { rememberDecodedImage(it) }
+            if (customLogo != null) {
+                Image(
+                    bitmap = customLogo,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(24.dp),
+                )
+            } else {
+                Image(
+                    painter = painterResource(R.drawable.glasskeep_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)),
                 )
             }
-            if (showClear) {
-                Text(
-                    stringResource(R.string.native_notifications_clear_all),
-                    color = titleColor,
-                    fontSize = 11.52.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .alpha(0.75f)
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onClear() }
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                )
-            }
-            val closeLabel = stringResource(R.string.native_common_close)
-            Box(
+            Text(
+                stringResource(R.string.native_notifications_title),
+                color = titleColor,
+                fontSize = 15.2.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+        }
+        if (showClear) {
+            Text(
+                stringResource(R.string.native_notifications_clear_all),
+                color = titleColor,
+                fontSize = 11.52.sp,
+                lineHeight = 17.28.sp,
+                fontWeight = FontWeight.Medium,
                 modifier = Modifier
-                    .size(26.dp)
-                    .alpha(0.55f)
-                    .clip(CircleShape)
-                    .semantics { contentDescription = closeLabel }
+                    .alpha(0.75f)
+                    .clip(RoundedCornerShape(6.dp))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         role = Role.Button,
-                    ) { onClose() },
-                contentAlignment = Alignment.Center,
-            ) {
-                CloseIcon(size = 20.dp, tint = titleColor)
-            }
+                    ) { onClear() }
+                    // 4px 8px plus the button's 1px transparent border.
+                    .padding(horizontal = 9.dp, vertical = 5.dp),
+            )
         }
+        val closeLabel = stringResource(R.string.native_common_close)
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            if (dark) Color.Black.copy(alpha = 0.20f) else Color(0xFF0F172A).copy(alpha = 0.05f),
-                            Color.Transparent,
-                        ),
-                    ),
-                ),
-        )
+                .size(26.dp)
+                .alpha(0.55f)
+                .clip(CircleShape)
+                .semantics { contentDescription = closeLabel }
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    role = Role.Button,
+                ) { onClose() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("\u2715", color = titleColor, fontSize = 13.sp, lineHeight = 13.sp)
+        }
     }
 }
 
@@ -384,6 +423,7 @@ private fun NotificationCenterHeader(
 @Composable
 internal fun TopSheetGrabber(
     dark: Boolean,
+    separator: Color?,
     onDrag: (Float) -> Unit,
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit,
@@ -393,6 +433,7 @@ internal fun TopSheetGrabber(
         modifier = Modifier
             .fillMaxWidth()
             .height(18.dp)
+            .then(if (separator != null) Modifier.topHairline(separator) else Modifier)
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
                     onDragStart = { pressed = true },
@@ -425,7 +466,8 @@ internal fun TopSheetGrabber(
 }
 
 /**
- * `.gk-notif-card--compact`: the LED-strip card, 2.5dp accent border over
+ * `.gk-notif-card--compact`: the LED-strip card, 2dp accent border (the
+ * CSS asks 2.5px, Chromium floors it) over
  * a tint of the same colour, its icon and timestamp in the accent, and a
  * swipe to the side that deletes it for good (the panel never renders the
  * X button on a phone, the swipe IS the delete).
@@ -479,10 +521,7 @@ private fun NotificationCard(
             TrashIcon(size = 22.dp, tint = Color.White, modifier = Modifier.align(Alignment.CenterEnd))
         }
 
-        Row(
-            // Centred on the card, except a card carrying Approve/Reject.
-            verticalAlignment = if (notification.type == "pending_user_registered") Alignment.Top else Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .graphicsLayer {
@@ -492,7 +531,7 @@ private fun NotificationCard(
                 .clip(shape)
                 .background(cardColor)
                 .background(variant.accent.copy(alpha = variant.tintAlpha))
-                .border(2.5.dp, variant.accent, shape)
+                .border(2.dp, variant.accent, shape)
                 .pointerInput(notification.id) {
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { change, delta ->
@@ -504,81 +543,84 @@ private fun NotificationCard(
                         },
                         onDragCancel = { offsetX = 0f },
                     )
-                }
-                .padding(horizontal = 12.dp, vertical = 9.dp),
+                },
         ) {
-            Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
-                NotificationIcon(notification, variant)
-            }
-            Column(Modifier.weight(1f)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            Row(
+                // Centred on the card, except a card carrying Approve/Reject.
+                verticalAlignment = if (notification.type == "pending_user_registered") Alignment.Top else Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                // The web's 9px 12px padding sits inside its 2px border.
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
+            ) {
+                Box(
+                    Modifier
+                        .padding(top = if (notification.type == "pending_user_registered") 1.dp else 0.dp)
+                        .size(26.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    NotificationIcon(notification, variant)
+                }
+                Column(Modifier.weight(1f)) {
                     Text(
                         notificationTitleText(LocalContext.current, notification, withFallback = true).orEmpty(),
                         color = textColor,
                         fontSize = 12.5.sp,
                         lineHeight = 16.25.sp,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.padding(end = 48.dp),
                     )
-                    Text(
-                        relativeTime(notification.createdAt),
-                        color = textColor.copy(alpha = 0.55f),
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
-                }
-                Spacer(Modifier.height(2.dp))
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        notificationMessageText(LocalContext.current, notification),
-                        color = textColor.copy(alpha = 0.88f),
-                        fontSize = 12.sp,
-                        lineHeight = 16.2.sp,
-                        modifier = Modifier.weight(1f),
-                    )
-                    val openLabel = notificationOpenLabelRes(notification.type)
-                    if (notification.noteId != null && openLabel != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            stringResource(openLabel),
-                            color = textColor,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(
-                                    if (dark) Color.White.copy(alpha = 0.13f) else Color.Black.copy(alpha = 0.07f),
-                                )
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    role = Role.Button,
-                                ) { onOpen() }
-                                .padding(horizontal = 14.dp, vertical = 5.dp),
+                            notificationMessageText(LocalContext.current, notification),
+                            color = textColor.copy(alpha = 0.88f),
+                            fontSize = 12.sp,
+                            lineHeight = 16.2.sp,
+                            modifier = Modifier.weight(1f),
                         )
+                        val openLabel = notificationOpenLabelRes(notification.type)
+                        if (notification.noteId != null && openLabel != null) {
+                            NotificationAction(
+                                label = stringResource(openLabel),
+                                primary = true,
+                                dark = dark,
+                                textColor = textColor,
+                                onClick = onOpen,
+                            )
+                        }
                     }
-                }
-                if (notification.type == "pending_user_registered" && onApprovePending != null && onRejectPending != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    ) {
-                        NotificationAction(
-                            label = stringResource(R.string.native_admin_approve),
-                            primary = true,
-                            dark = dark,
-                            textColor = textColor,
-                            onClick = onApprovePending,
-                        )
-                        NotificationAction(
-                            label = stringResource(R.string.native_admin_reject),
-                            primary = false,
-                            dark = dark,
-                            textColor = textColor,
-                            onClick = onRejectPending,
-                        )
+                    if (notification.type == "pending_user_registered" && onApprovePending != null && onRejectPending != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                        ) {
+                            NotificationAction(
+                                label = stringResource(R.string.native_admin_approve),
+                                primary = true,
+                                dark = dark,
+                                textColor = textColor,
+                                onClick = onApprovePending,
+                            )
+                            NotificationAction(
+                                label = stringResource(R.string.native_admin_reject),
+                                primary = false,
+                                dark = dark,
+                                textColor = textColor,
+                                onClick = onRejectPending,
+                            )
+                        }
                     }
                 }
             }
+            // `.gk-notif-card__time`: pinned 9px/14px inside the border, off
+            // the layout, over the title's 48px right padding.
+            Text(
+                relativeTime(notification.createdAt),
+                color = textColor.copy(alpha = 0.55f),
+                fontSize = 11.sp,
+                lineHeight = 16.5.sp,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 11.dp, end = 16.dp),
+            )
         }
     }
 }
