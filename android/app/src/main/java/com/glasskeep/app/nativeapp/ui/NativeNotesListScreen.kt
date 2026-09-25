@@ -427,8 +427,6 @@ fun NativeNotesListScreen(
     val archivedSuccessTemplate = stringResource(R.string.native_bulk_archived_success)
     val trashedSuccessTemplate = stringResource(R.string.native_bulk_trashed_success)
     val partialFailureTemplate = stringResource(R.string.native_bulk_partial_failure)
-    val trashConfirmTitle = stringResource(R.string.native_note_detail_trash_confirm_title)
-    val trashConfirmBodyText = stringResource(R.string.native_note_detail_trash_confirm_body)
     val trashLabel = stringResource(R.string.native_note_detail_move_to_trash)
     val archiveLabel = stringResource(R.string.native_note_detail_archive)
     val pinLabel = stringResource(R.string.native_note_detail_pin)
@@ -991,19 +989,18 @@ fun NativeNotesListScreen(
                     BulkActionButton(
                         label = sideBySideLabel,
                         tone = BulkTone.SLATE,
-                        icon = { EyeFilledIcon(size = 18.dp, tint = BulkTone.SLATE.foreground(dark)) },
+                        icon = { SideBySideIcon(size = 16.dp, tint = Color.White) },
                         enabled = !bulkActionRunning && selectedIds.size == 2,
+                        dimWhenDisabled = true,
+                        gradient = if (WorkspaceTheme.forId(themeId).id == WorkspaceTheme.DEFAULT_ID) {
+                            Brush.horizontalGradient(listOf(Color(0xFF4F39F6), Color(0xFF7008E7)))
+                        } else {
+                            WorkspaceTheme.accentGradient(themeId)
+                        },
                         onClick = {
                             val ids = selectedIds.toList()
                             if (ids.size == 2) onOpenSideBySide(ids[0], ids[1])
                         },
-                    ),
-                    BulkActionButton(
-                        label = archiveLabel,
-                        tone = BulkTone.BLUE,
-                        icon = { ArchiveIcon(size = 18.dp, tint = BulkTone.BLUE.foreground(dark)) },
-                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
-                        onClick = { bulkArchive() },
                     ),
                     BulkActionButton(
                         label = trashLabel,
@@ -1013,38 +1010,54 @@ fun NativeNotesListScreen(
                         onClick = { showBulkTrashConfirm = true },
                     ),
                     BulkActionButton(
-                        label = pinLabel,
-                        tone = BulkTone.AMBER,
-                        icon = { PinIcon(size = 18.dp, tint = BulkTone.AMBER.foreground(dark), filled = false) },
-                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
-                        onClick = { bulkPin() },
-                    ),
-                    BulkActionButton(
                         label = colorLabel,
                         tone = BulkTone.VIOLET,
-                        icon = { PaletteIcon(size = 18.dp) },
+                        icon = { Text("\uD83C\uDFA8", fontSize = 16.sp, lineHeight = 16.sp) },
                         enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
                         onClick = { showBulkColorPicker = true },
                     ),
                     BulkActionButton(
                         label = logoLabel,
                         tone = BulkTone.CYAN,
-                        icon = { LogoIcon(size = 18.dp, tint = BulkTone.CYAN.foreground(dark)) },
+                        icon = { BulkLogoIcon(size = 16.dp, tint = BulkTone.CYAN.foreground(dark)) },
                         enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
                         onClick = { openBulkLogoPicker() },
                     ),
                     BulkActionButton(
+                        label = pinLabel,
+                        tone = BulkTone.AMBER,
+                        icon = { PinIcon(size = 16.dp, tint = BulkTone.AMBER.foreground(dark), filled = false) },
+                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                        onClick = { bulkPin() },
+                    ),
+                    BulkActionButton(
+                        label = archiveLabel,
+                        tone = BulkTone.BLUE,
+                        icon = { ArchiveIcon(size = 16.dp, tint = if (dark) Color(0xFF7DD3FC) else Color(0xFF0284C7)) },
+                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                        menuColor = if (dark) Color(0xFF7DD3FC) else Color(0xFF0284C7),
+                        onClick = { bulkArchive() },
+                    ),
+                    BulkActionButton(
                         label = exportZipLabel,
                         tone = BulkTone.GREEN,
-                        icon = { DownloadIcon(size = 18.dp, tint = BulkTone.GREEN.foreground(dark)) },
+                        icon = { DownloadIcon(size = 20.dp, tint = if (dark) Color(0xFF4ADE80) else Color(0xFF16A34A)) },
                         enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                        menuColor = if (dark) Color(0xFF4ADE80) else Color(0xFF16A34A),
                         onClick = { bulkExportZip() },
                     ),
                     BulkActionButton(
                         label = if (allVisibleSelected) deselectAllLabel else selectAllLabel,
                         tone = BulkTone.SLATE,
-                        icon = { CheckSquareIcon(size = 18.dp, tint = BulkTone.SLATE.foreground(dark)) },
+                        icon = {
+                            SelectAllIcon(
+                                checked = allVisibleSelected,
+                                size = 16.dp,
+                                tint = if (dark) Color(0xFFCBD5E1) else Color(0xFF475569),
+                            )
+                        },
                         enabled = !bulkActionRunning && visibleIds.isNotEmpty(),
+                        menuColor = if (dark) Color(0xFFCBD5E1) else Color(0xFF475569),
                         onClick = { toggleSelectAllVisible() },
                     ),
                 ),
@@ -1210,11 +1223,17 @@ fun NativeNotesListScreen(
         )
 
         if (showBulkTrashConfirm) {
-            ConfirmActionDialog(
-                title = trashConfirmTitle,
-                body = trashConfirmBodyText,
+            GkConfirmDialog(
+                title = trashLabel,
+                message = stringResource(R.string.native_bulk_trash_confirm_message, selectedIds.size),
                 confirmLabel = trashLabel,
-                confirmColor = Color(0xFFdc2626),
+                cancelLabel = stringResource(R.string.native_dialog_cancel),
+                themeId = themeId,
+                dark = dark,
+                borderColor = if (dark) DarkBorderColor else LightBorderColor,
+                titleColor = titleColor,
+                subtextColor = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565),
+                variant = GkConfirmVariant.DANGER,
                 onConfirm = { bulkTrash() },
                 onDismiss = { showBulkTrashConfirm = false },
             )

@@ -1094,6 +1094,31 @@ private fun TablerIcon(pathData: String, modifier: Modifier, size: Dp, tint: Col
     }
 }
 
+/** MultiSelectToolbar.jsx's side-by-side glyph: two rounded panes. */
+@Composable
+fun SideBySideIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4.5 5h4a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1 -1.5 1.5h-4a1.5 1.5 0 0 1 -1.5 -1.5v-11a1.5 1.5 0 0 1 1.5 -1.5z " +
+        "M15.5 5h4a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1 -1.5 1.5h-4a1.5 1.5 0 0 1 -1.5 -1.5v-11a1.5 1.5 0 0 1 1.5 -1.5z",
+    modifier, size, tint, strokeWidth = 2.2f,
+)
+
+/** MultiSelectToolbar.jsx's select-all square, checked once everything
+ *  visible is selected. */
+@Composable
+fun SelectAllIcon(checked: Boolean, modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2z" + if (checked) " M9 12l2 2l4 -4" else "",
+    modifier, size, tint, strokeWidth = 2.2f,
+)
+
+/** MultiSelectToolbar.jsx's logo glyph: framed picture. */
+@Composable
+fun BulkLogoIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M6 3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3z " +
+        "M8.5 8.5m-1.7 0a1.7 1.7 0 1 0 3.4 0a1.7 1.7 0 1 0 -3.4 0 " +
+        "M21 15l-3.086 -3.086a2 2 0 0 0 -2.828 0l-9.086 9.086",
+    modifier, size, tint, strokeWidth = 2f,
+)
+
 @Composable
 fun ShieldLockIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
     "M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3 " +

@@ -7,12 +7,13 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -22,11 +23,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,17 +41,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
@@ -119,9 +126,9 @@ internal fun SelectionCheckbox(selected: Boolean, dark: Boolean, onToggle: () ->
     }
 }
 
-/** The seven opaque tints MultiSelectToolbar.jsx gives its buttons
- *  (:36-51): a border, a fill and a glyph colour per tone, in light and
- *  dark. Nothing here is translucent, the dock is opaque on purpose. */
+/** The seven tints MultiSelectToolbar.jsx gives its buttons (:36-51), as
+ *  the Tailwind v4 palette renders them: border, fill and glyph colour
+ *  per tone, in light and dark. */
 enum class BulkTone(
     private val lightBorder: Color,
     private val lightBg: Color,
@@ -130,13 +137,13 @@ enum class BulkTone(
     private val darkBg: Color,
     private val darkFg: Color,
 ) {
-    SLATE(Color(0xB3CBD5E1), Color(0xFFF1F5F9), Color(0xFF334155), Color(0x6664748B), Color(0xCC334155), Color(0xFFF1F5F9)),
-    VIOLET(Color(0xCCC4B5FD), Color(0xFFEDE9FE), Color(0xFF5B21B6), Color(0x66A78BFA), Color(0xA65B21B6), Color(0xFFEDE9FE)),
-    AMBER(Color(0xCCFCD34D), Color(0xFFFEF3C7), Color(0xFF92400E), Color(0x66FBBF24), Color(0x8C92400E), Color(0xFFFEF3C7)),
-    BLUE(Color(0xCC7DD3FC), Color(0xFFE0F2FE), Color(0xFF075985), Color(0x6638BDF8), Color(0x99075985), Color(0xFFE0F2FE)),
-    RED(Color(0xCCFDA4AF), Color(0xFFFFE4E6), Color(0xFFBE123C), Color(0x73FB7185), Color(0x8C881337), Color(0xFFFFE4E6)),
-    GREEN(Color(0xCC6EE7B7), Color(0xFFD1FAE5), Color(0xFF065F46), Color(0x6634D399), Color(0x8C065F46), Color(0xFFD1FAE5)),
-    CYAN(Color(0xCC67E8F9), Color(0xFFCFFAFE), Color(0xFF155E75), Color(0x6622D3EE), Color(0x8C155E75), Color(0xFFCFFAFE)),
+    SLATE(Color(0xB3CAD5E2), Color(0xFFF1F5F9), Color(0xFF314158), Color(0x6662748E), Color(0xCC314158), Color(0xFFF1F5F9)),
+    VIOLET(Color(0xCCC4B4FF), Color(0xFFEDE9FE), Color(0xFF5D0EC0), Color(0x66A884FF), Color(0xA65E0EC0), Color(0xFFEDE9FE)),
+    AMBER(Color(0xCCFFD22F), Color(0xFFFEF3C6), Color(0xFF973C00), Color(0x66FFB900), Color(0x8C973C00), Color(0xFFFEF3C6)),
+    BLUE(Color(0xCC73D4FF), Color(0xFFDFF2FE), Color(0xFF00598A), Color(0x6600BCFF), Color(0x9900598A), Color(0xFFDFF2FE)),
+    RED(Color(0xCCFFA1AE), Color(0xFFFFE4E6), Color(0xFFC70036), Color(0x73FF647E), Color(0x8C8A0737), Color(0xFFFFE4E6)),
+    GREEN(Color(0xCC5EE8B5), Color(0xFFD0FAE5), Color(0xFF006045), Color(0x6600D492), Color(0x8C006045), Color(0xFFD0FAE5)),
+    CYAN(Color(0xCC52EAFC), Color(0xFFCEFAFE), Color(0xFF005F78), Color(0x6600D2F2), Color(0x8C005F78), Color(0xFFCEFAFE)),
     ;
 
     fun border(dark: Boolean) = if (dark) darkBorder else lightBorder
@@ -152,6 +159,13 @@ data class BulkActionButton(
     val tone: BulkTone,
     val icon: @Composable () -> Unit,
     val enabled: Boolean = true,
+    /** Only the side-by-side button looks disabled on the web; the others
+     *  stay opaque and simply ignore taps while unusable. */
+    val dimWhenDisabled: Boolean = false,
+    /** Fill replacing the tone's (the side-by-side gradient). */
+    val gradient: Brush? = null,
+    /** Text colour of the entry once folded into the overflow menu. */
+    val menuColor: Color = Color.Unspecified,
     val onClick: () -> Unit,
 )
 
@@ -162,11 +176,9 @@ data class BulkActionButton(
  * 220ms and disappears instantly, which is exactly what the web does on a
  * phone (its exit animation is disabled under 700px).
  *
- * One deliberate difference, disclosed rather than silently dropped: the
- * web measures its own width and folds whatever overflows into a kebab
- * menu. Native keeps every action on the row and lets it scroll
- * sideways if a very narrow screen needs it. This keeps select-all, logo
- * and ZIP export directly reachable alongside the existing actions.
+ * Like the web, it keeps as many actions as its width budget allows
+ * (MultiSelectToolbar.jsx:415-447) and folds the rest, in order, into a
+ * kebab menu.
  *
  * [headerVisible] follows the notes header's auto-hide: the dock rises to
  * 8dp under the status bar while the header is away (globalCSS.js:966-981).
@@ -182,7 +194,7 @@ internal fun SelectionActionBar(
 ) {
     val closeLabel = stringResource(R.string.native_bulk_exit)
     val dividerColor = if (dark) Color(0xFFA78BFA).copy(alpha = 0.22f) else Color(0xFF7C3AED).copy(alpha = 0.22f)
-    val closeColor = if (dark) Color(0xFFEDE9FE) else Color(0xFF6D28D9)
+    val closeColor = if (dark) Color(0xFFEDE9FE) else Color(0xFF7008E7)
     val dockEasing = CubicBezierEasing(0.22f, 0.61f, 0.36f, 1f)
 
     var shown by remember { mutableStateOf(false) }
@@ -198,13 +210,20 @@ internal fun SelectionActionBar(
         label = "multiDockTop",
     )
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(top = top, start = 8.dp, end = 8.dp),
         contentAlignment = Alignment.TopCenter,
     ) {
+        // PAD 20, counter ~32, dividers 17 x 2, close 36, then 36 + 8 per
+        // button, 44 more for the kebab once anything overflows.
+        val budget = maxWidth - 20.dp - 32.dp - 34.dp - 36.dp
+        val fitAll = ((budget + 8.dp) / 44.dp).toInt()
+        val visibleCount = if (fitAll >= actions.size) actions.size else ((budget - 44.dp + 8.dp) / 44.dp).toInt().coerceAtLeast(0)
+        val shownActions = actions.take(visibleCount)
+        val overflow = actions.drop(visibleCount)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -236,7 +255,7 @@ internal fun SelectionActionBar(
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
                     .background(
-                        if (dark) Color(0xFF5B21B6).copy(alpha = 0.6f) else Color(0xFFDDD6FE).copy(alpha = 0.7f),
+                        if (dark) Color(0xFF5D0DC0).copy(alpha = 0.6f) else Color(0xFFDED7FF).copy(alpha = 0.7f),
                     )
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             ) {
@@ -244,38 +263,20 @@ internal fun SelectionActionBar(
                 // number alone (MultiSelectToolbar.jsx's hidden sm:inline).
                 Text(
                     selectedCount.toString(),
-                    color = if (dark) Color(0xFFF5F3FF) else Color(0xFF4C1D95),
+                    color = if (dark) Color(0xFFF5F3FF) else Color(0xFF4D179A),
                     fontSize = 14.sp,
+                    lineHeight = 20.sp,
                     fontWeight = FontWeight.SemiBold,
+                    style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"),
                 )
             }
             Box(Modifier.width(1.dp).height(24.dp).background(dividerColor))
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f, fill = false).horizontalScroll(rememberScrollState()),
             ) {
-                actions.forEach { action ->
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .alpha(if (action.enabled) 1f else 0.4f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(action.tone.background(dark))
-                            .border(1.dp, action.tone.border(dark), RoundedCornerShape(8.dp))
-                            .semantics { contentDescription = action.label }
-                            .gkTooltip(action.label)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                enabled = action.enabled,
-                                role = Role.Button,
-                            ) { action.onClick() },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        action.icon()
-                    }
-                }
+                shownActions.forEach { action -> DockActionButton(action, dark) }
+                if (overflow.isNotEmpty()) DockOverflowMenu(overflow, dark)
             }
             Box(Modifier.width(1.dp).height(24.dp).background(dividerColor))
             Box(
@@ -292,6 +293,95 @@ internal fun SelectionActionBar(
                 contentAlignment = Alignment.Center,
             ) {
                 CloseIcon(size = 24.dp, tint = closeColor)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DockActionButton(action: BulkActionButton, dark: Boolean) {
+    val shape = RoundedCornerShape(8.dp)
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .alpha(if (action.dimWhenDisabled && !action.enabled) 0.4f else 1f)
+            .clip(shape)
+            .then(
+                if (action.gradient != null) {
+                    Modifier.background(action.gradient)
+                } else {
+                    Modifier.background(action.tone.background(dark)).border(1.dp, action.tone.border(dark), shape)
+                },
+            )
+            .semantics { contentDescription = action.label }
+            .gkTooltip(action.label)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = action.enabled,
+                role = Role.Button,
+            ) { action.onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        action.icon()
+    }
+}
+
+/** The dock's kebab and its menu (globalCSS.js:917-940): right-aligned
+ *  under the button, 8dp below it. */
+@Composable
+private fun DockOverflowMenu(actions: List<BulkActionButton>, dark: Boolean) {
+    var open by remember { mutableStateOf(false) }
+    val label = stringResource(R.string.native_note_detail_more)
+    val kebabColor = if (dark) Color(0xFFDDD6FF) else Color(0xFF7008E7)
+    Box {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .semantics { contentDescription = label }
+                .gkTooltip(label)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    role = Role.Button,
+                ) { open = !open },
+            contentAlignment = Alignment.Center,
+        ) {
+            KebabIcon(size = 20.dp, tint = kebabColor)
+        }
+        if (open) {
+            val density = LocalDensity.current
+            Popup(
+                alignment = Alignment.TopEnd,
+                offset = with(density) { IntOffset(0, (36.dp + 8.dp).roundToPx()) },
+                onDismissRequest = { open = false },
+                properties = PopupProperties(focusable = true),
+            ) {
+                val shape = RoundedCornerShape(10.dp)
+                Column(
+                    modifier = Modifier
+                        .widthIn(min = 200.dp)
+                        .width(IntrinsicSize.Max)
+                        .shadow(16.dp, shape, ambientColor = Color(0x330F172A), spotColor = Color(0x330F172A))
+                        .clip(shape)
+                        .background(if (dark) Color(0xFF222222) else Color.White)
+                        .border(1.dp, if (dark) Color.White.copy(alpha = 0.08f) else Color(0x4DD1D5DB), shape)
+                        .padding(vertical = 4.dp),
+                ) {
+                    actions.forEach { action ->
+                        PopoverMenuItem(
+                            label = action.label,
+                            color = action.menuColor,
+                            enabled = action.enabled,
+                            onClick = {
+                                open = false
+                                action.onClick()
+                            },
+                            icon = { Box(Modifier.width(20.dp), contentAlignment = Alignment.Center) { action.icon() } },
+                        )
+                    }
+                }
             }
         }
     }
