@@ -4,13 +4,29 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import java.net.SocketTimeoutException
+import kotlinx.serialization.SerializationException
 
 /** The six faces of syncEngine.js's own status object (its line 723). */
 enum class SyncState { CHECKING, SYNCED, PENDING, SYNCING, OFFLINE, ERROR }
 
+/** syncEngine.js's lastSyncError values, the ones its panel tells apart:
+ *  a plain network failure gets no detail line there. */
+enum class SyncErrorKind { UNREACHABLE, BACKEND_DOWN, SERVER_ERROR, TIMEOUT }
+
+/** Buckets a failed read the way syncEngine.js's health check does: a
+ *  timeout, a 5xx, an answer that is not GlassKeep's JSON (a proxy page),
+ *  else the server is simply unreachable. */
+fun syncErrorKindOf(error: Throwable?, httpCode: Int? = null): SyncErrorKind = when {
+    error is SocketTimeoutException -> SyncErrorKind.TIMEOUT
+    httpCode != null && httpCode >= 500 -> SyncErrorKind.SERVER_ERROR
+    error is SerializationException -> SyncErrorKind.BACKEND_DOWN
+    else -> SyncErrorKind.UNREACHABLE
+}
+
 /**
  * What the header's cloud icon and its panel read: whether the server
- * answered last time we asked, when the last successful exchange was, and
+ * answered last time we asked, when a queued change was last pushed, and
  * whether a queue drain is running right now. The queue's own counts are
  * not held here, they are observed straight from the sync-queue table.
  *
@@ -26,7 +42,7 @@ class SyncStatusState {
     var lastSyncAt: Long? by mutableStateOf(null)
         private set
 
-    var lastSyncError: String? by mutableStateOf(null)
+    var lastSyncError: SyncErrorKind? by mutableStateOf(null)
         private set
 
     /** How many probes in a row have failed, the number the panel shows
@@ -38,14 +54,19 @@ class SyncStatusState {
     var syncing: Boolean by mutableStateOf(false)
         private set
 
-    fun recordReachable(at: Long) {
+    fun recordReachable() {
         serverReachable = true
         failedChecks = 0
-        lastSyncAt = at
         lastSyncError = null
     }
 
-    fun recordUnreachable(error: String?) {
+    /** syncEngine.js only stamps _lastSyncAt once processQueue has pushed a
+     *  change, never on a mere health check. */
+    fun recordPushed(at: Long) {
+        lastSyncAt = at
+    }
+
+    fun recordUnreachable(error: SyncErrorKind) {
         serverReachable = false
         failedChecks += 1
         lastSyncError = error

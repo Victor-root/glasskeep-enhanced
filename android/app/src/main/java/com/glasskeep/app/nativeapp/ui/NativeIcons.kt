@@ -1865,6 +1865,21 @@ fun LogoIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Colo
     modifier, size, tint, strokeWidth = 2f,
 )
 
+/** Feather rotate-cw, SyncStatusIcon.jsx's RefreshIcon (stroke 2). */
+@Composable
+fun RotateCwIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M23 4L23 10L17 10 M20.49 15a9 9 0 1 1-2.12-9.36L23 10",
+    modifier, size, tint, strokeWidth = 2f,
+)
+
+/** Feather alert-triangle, SyncStatusIcon.jsx's WarningIcon (stroke 2). */
+@Composable
+fun AlertTriangleOutlineIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z " +
+        "M12 9L12 13 M12 17L12.01 17",
+    modifier, size, tint, strokeWidth = 2f,
+)
+
 // The rest of NotificationCard.jsx's SEMANTIC_ICONS, the outline Tabler
 // glyphs a notification names by key.
 

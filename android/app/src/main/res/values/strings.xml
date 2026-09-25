@@ -748,6 +748,9 @@
     <string name="native_sync_server_reachable">Server reachable</string>
     <string name="native_sync_server_unreachable">Server unreachable</string>
     <string name="native_sync_instance_locked">Instance locked, sync paused, waiting for an admin to unlock</string>
+    <string name="native_sync_error_backend_down">The proxy is responding but GlassKeep is not accessible</string>
+    <string name="native_sync_error_server_error">The server returned an error</string>
+    <string name="native_sync_error_timeout">Health check timed out</string>
     <string name="native_sync_failed_checks">%1$d failed reconnection attempt(s)</string>
     <string name="native_sync_queue_syncing">Syncing (%1$d active, %2$d waiting)</string>
     <string name="native_sync_queue_waiting">%1$d change(s) waiting to sync</string>

@@ -1,6 +1,10 @@
 package com.glasskeep.app.nativeapp.ui
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -36,27 +40,44 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
+import com.glasskeep.app.nativeapp.SyncErrorKind
 import com.glasskeep.app.nativeapp.SyncState
 import com.glasskeep.app.nativeapp.SyncStatusState
 import com.glasskeep.app.nativeapp.data.local.SyncQueueEntity
 import com.glasskeep.app.nativeapp.data.local.SyncQueueType
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 /** MAX_RETRIES (syncEngine.js:15, echoed by SyncStatusIcon.jsx:75). */
 private const val MaxRetries = 5
@@ -74,12 +95,12 @@ private val SyncBlueLight = Color(0xFF155DFC)
 private val SyncRedDark = Color(0xFFFF6467)
 private val SyncRedLight = Color(0xFFE7000B)
 
-private val SyncBadgeAmber = Color(0xFFFE9A00)
-private val SyncDotGray = Color(0xFF9CA3AF)
-private val SyncDotGreen = Color(0xFF10B981)
-private val SyncDotAmber = Color(0xFFF59E0B)
-private val SyncDotRed = Color(0xFFEF4444)
-private val SyncDotBlue = Color(0xFF3B82F6)
+// Tailwind v4 gray-400 / emerald-500 / amber-500 / red-500 / blue-500.
+private val SyncDotGray = Color(0xFF99A1AF)
+private val SyncDotGreen = Color(0xFF00BC7D)
+private val SyncDotAmber = Color(0xFFFE9A00)
+private val SyncDotRed = Color(0xFFFB2C36)
+private val SyncDotBlue = Color(0xFF2B7FFF)
 
 /** What the header button draws and what the panel repeats at its top. */
 internal data class SyncStatusFace(
@@ -152,31 +173,14 @@ internal fun SyncStatusSheet(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     var dragOffset by remember { mutableStateOf(0f) }
-
-    // The sheet is unmounted only after the slide back up has played, same
-    // as the notification centre's own mounted flag.
-    var mounted by remember { mutableStateOf(false) }
-    LaunchedEffect(open) {
-        if (open) {
-            mounted = true
-        } else {
-            delay(650)
-            mounted = false
-            dragOffset = 0f
-        }
-    }
-    if (!mounted && !open) return
-
-    // See NotificationCenter's identical fix: animateFloatAsState's
-    // remembered Animatable gets disposed while this whole composable is
-    // skipped (!mounted && !open), so a fresh open recreated one already
-    // sitting at the open target with nothing to animate from. Animatable
-    // + LaunchedEffect(open) always starts at -1f (off-screen) instead.
+    // Closing unmounts the sheet at once, the web's own `open &&` render:
+    // only the opening slides (.gk-sync-sheet.is-open, 0.42s).
+    if (!open) return
     val slideAnim = remember { Animatable(-1f) }
-    LaunchedEffect(open) {
-        slideAnim.animateTo(if (open) 0f else -1f, animationSpec = tween(durationMillis = 600, easing = TopSheetEasing))
+    LaunchedEffect(Unit) {
+        dragOffset = 0f
+        slideAnim.animateTo(0f, animationSpec = tween(durationMillis = 420, easing = TopSheetEasing))
     }
-    val slide = slideAnim.value
 
     val status = container.syncStatus
     val retrying = queue.filter { it.status == SyncQueueEntity.STATUS_PENDING && it.attempts > 0 }
@@ -186,123 +190,213 @@ internal fun SyncStatusSheet(
     val face = syncStatusFace(state, dark)
     val locked = container.lockState.isLocked
 
-    val titleColor = if (dark) Color(0xFFF0F0F5) else Color(0xFF1D1D1F)
-    val subtext = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
-    val chrome = WorkspaceTheme.colorsFor(themeId, dark)
-    val divider = chrome.chromeBorder
-    val statusBarBg = chrome.statusBar
-    val shape = RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp)
+    // text-gray-100 / text-gray-800 on the sheet.
+    val titleColor = if (dark) Color(0xFFF3F4F6) else Color(0xFF1E2939)
+    val divider = if (dark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.06f)
+    val statusBarBg = WorkspaceTheme.statusBarColor(themeId, dark)
+    val shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
+    val sheetShadow = Color(0xFF0F172A)
+
+    // The web's own "Sync now" state: set by the tap, cleared once the
+    // sync it started has finished, never by a background drain.
+    var forceSyncing by remember { mutableStateOf(false) }
+    LaunchedEffect(forceSyncing) {
+        if (!forceSyncing) return@LaunchedEffect
+        snapshotFlow { status.syncing }.first { !it }
+        forceSyncing = false
+    }
 
     Box(Modifier.fillMaxSize()) {
-        if (open) Box(Modifier.fillMaxSize().dismissOnOutsideTouch(onDismiss))
-        Column(
+        Box(Modifier.fillMaxSize().dismissOnOutsideTouch(onDismiss))
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .heightIn(max = configuration.screenHeightDp.dp)
-                .graphicsLayer { translationY = slide * size.height + dragOffset }
+                .graphicsLayer { translationY = slideAnim.value * size.height + dragOffset }
+                .dropShadow(shape, Shadow(radius = 6.dp, color = sheetShadow.copy(alpha = 0.07f), spread = (-1).dp, offset = DpOffset(0.dp, 4.dp)))
+                .dropShadow(shape, Shadow(radius = 28.dp, color = sheetShadow.copy(alpha = 0.12f), spread = (-4).dp, offset = DpOffset(0.dp, 10.dp)))
                 .clip(shape)
-                .background(statusBarBg),
+                .background(statusBarBg)
+                .bottomBorder(shape, if (dark) Color(0xFF364153) else Color(0xFFE5E7EB)),
         ) {
-            SyncSheetHeader(
-                face = face,
-                state = state,
-                status = container.syncStatus,
-                locked = locked,
-                dark = dark,
-                titleColor = titleColor,
-                subtext = subtext,
-                onClose = onDismiss,
-            )
-
-            if (waiting.isNotEmpty() || retrying.isNotEmpty()) {
-                SyncSheetQueueSummary(
-                    waiting = waiting.size,
-                    retrying = retrying.size,
-                    syncing = status.syncing,
+            Column(Modifier.fillMaxWidth()) {
+                SyncSheetHeader(
+                    face = face,
+                    state = state,
+                    status = status,
+                    locked = locked,
                     dark = dark,
-                    divider = divider,
-                )
-            }
-
-            if (retrying.isNotEmpty()) {
-                SyncSheetItemList(
-                    title = stringResource(R.string.native_sync_retrying_title),
-                    titleTint = if (dark) SyncAmberDark else SyncAmberLight,
-                    icon = { tint -> RefreshIcon(size = 12.dp, tint = tint) },
-                    items = retrying,
-                    showLastError = false,
-                    maxHeight = 120.dp,
-                    dark = dark,
-                    subtext = subtext,
-                    divider = divider,
                     titleColor = titleColor,
                 )
-            }
 
-            if (failed.isNotEmpty()) {
-                SyncSheetItemList(
-                    title = stringResource(R.string.native_sync_errors_title),
-                    titleTint = if (dark) SyncRedDark else SyncRedLight,
-                    icon = { tint -> AlertFilledIcon(size = 14.dp, tint = tint) },
-                    items = failed,
-                    showLastError = true,
-                    maxHeight = 180.dp,
+                if (waiting.isNotEmpty() || retrying.isNotEmpty()) {
+                    SyncSheetQueueSummary(
+                        waiting = waiting.size,
+                        retrying = retrying.size,
+                        syncing = status.syncing,
+                        dark = dark,
+                        divider = divider,
+                    )
+                }
+
+                if (retrying.isNotEmpty()) {
+                    SyncSheetItemList(
+                        title = stringResource(R.string.native_sync_retrying_title),
+                        titleTint = if (dark) SyncAmberDark else SyncAmberLight,
+                        icon = { tint -> RotateCwIcon(size = 12.dp, tint = tint) },
+                        items = retrying,
+                        showLastError = false,
+                        maxHeight = 120.dp,
+                        dark = dark,
+                        divider = divider,
+                    )
+                }
+
+                if (failed.isNotEmpty()) {
+                    SyncSheetItemList(
+                        title = stringResource(R.string.native_sync_errors_title),
+                        titleTint = if (dark) SyncRedDark else SyncRedLight,
+                        icon = { tint -> AlertTriangleOutlineIcon(size = 14.dp, tint = tint) },
+                        items = failed,
+                        showLastError = true,
+                        maxHeight = 180.dp,
+                        dark = dark,
+                        divider = divider,
+                    )
+                }
+
+                Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    SyncNowButton(
+                        busy = forceSyncing,
+                        dark = dark,
+                        onClick = {
+                            forceSyncing = true
+                            onSyncNow()
+                        },
+                    )
+                }
+
+                val notSafe = queue.isNotEmpty() || state == SyncState.ERROR || state == SyncState.OFFLINE
+                if (notSafe || state == SyncState.SYNCED) {
+                    Text(
+                        stringResource(if (notSafe) R.string.native_sync_not_safe_to_close else R.string.native_sync_safe_to_close),
+                        color = when {
+                            notSafe && dark -> SyncAmberDark
+                            notSafe -> SyncAmberLight
+                            dark -> SyncGreenDark
+                            else -> SyncGreenLight
+                        },
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
+                    )
+                }
+
+                TopSheetGrabber(
                     dark = dark,
-                    subtext = subtext,
-                    divider = divider,
-                    titleColor = titleColor,
-                )
-            }
-
-            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                GkGradientButton(
-                    label = stringResource(
-                        if (status.syncing) R.string.native_sync_server_checking else R.string.native_sync_now,
-                    ),
-                    themeId = themeId,
-                    enabled = !status.syncing,
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalPadding = 8.dp,
-                    leading = { RefreshIcon(size = 20.dp, tint = Color.White) },
-                    onClick = onSyncNow,
-                )
-            }
-
-            val allClear = state == SyncState.SYNCED
-            if (queue.isNotEmpty() || state == SyncState.ERROR || state == SyncState.OFFLINE || allClear) {
-                Text(
-                    stringResource(
-                        if (allClear) R.string.native_sync_safe_to_close else R.string.native_sync_not_safe_to_close,
-                    ),
-                    color = when {
-                        allClear && dark -> SyncGreenDark
-                        allClear -> SyncGreenLight
-                        dark -> SyncAmberDark
-                        else -> SyncAmberLight
+                    separator = null,
+                    height = 22.dp,
+                    onDrag = { dy -> dragOffset = (dragOffset + dy).coerceAtMost(0f) },
+                    onDragEnd = {
+                        val pulled = with(density) { (-dragOffset).toDp() }
+                        if (pulled > TopSheetCloseThreshold) onDismiss() else dragOffset = 0f
                     },
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
+                    onDragCancel = { dragOffset = 0f },
                 )
             }
 
-            TopSheetGrabber(
-                dark = dark,
-                separator = null,
-                onDrag = { dy -> dragOffset = (dragOffset + dy).coerceAtMost(0f) },
-                onDragEnd = {
-                    val pulled = with(density) { (-dragOffset).toDp() }
-                    if (pulled > TopSheetCloseThreshold) onDismiss() else dragOffset = 0f
-                },
-                onDragCancel = { dragOffset = 0f },
-            )
+            // The phone sheet's ✕: over the header, not beside it.
+            val closeLabel = stringResource(R.string.native_common_close)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 8.dp)
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .semantics { contentDescription = closeLabel }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onDismiss() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "✕",
+                    color = if (dark) SyncGrayDark else SyncGrayLight,
+                    fontSize = 16.sp,
+                    lineHeight = 24.sp,
+                )
+            }
         }
     }
 }
 
+/** The mobile sheet keeps only its bottom border, around the rounded
+ *  corners. */
+private fun Modifier.bottomBorder(shape: RoundedCornerShape, color: Color): Modifier = drawWithContent {
+    drawContent()
+    val stroke = 1.dp.toPx()
+    val outline = shape.createOutline(Size(size.width - stroke, size.height - stroke), layoutDirection, this)
+    clipRect(top = size.height / 2f) {
+        translate(stroke / 2f, stroke / 2f) {
+            drawOutline(outline, color = color, style = Stroke(width = stroke))
+        }
+    }
+}
+
+/** Section 4's button: flat indigo, and while the user's own sync runs a
+ *  paler one with a spinning icon and "Checking server...". */
+@Composable
+private fun SyncNowButton(busy: Boolean, dark: Boolean, onClick: () -> Unit) {
+    val spin = if (busy) {
+        rememberInfiniteTransition(label = "syncSpin").animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(durationMillis = 1_000, easing = LinearEasing)),
+            label = "syncSpinAngle",
+        )
+    } else {
+        null
+    }
+    val fg = if (busy) Color.White.copy(alpha = 0.7f) else Color.White
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(
+                when {
+                    busy -> Color(0xFF7C86FF)
+                    dark -> Color(0xFF4F39F6)
+                    else -> Color(0xFF615FFF)
+                },
+            )
+            .clickable(
+                enabled = !busy,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) { onClick() }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RotateCwIcon(size = 16.dp, tint = fg, modifier = Modifier.graphicsLayer { rotationZ = spin?.value ?: 0f })
+        Text(
+            stringResource(if (busy) R.string.native_sync_server_checking else R.string.native_sync_now),
+            color = fg,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
 /** Section 1: the icon and its sentence, the server dot with how long ago
- *  the last exchange was, then the lock and reconnection lines. */
+ *  a change was last pushed, then the lock, error and reconnection lines.
+ *  Its 6px fade bleeds over the section below. */
 @Composable
 private fun SyncSheetHeader(
     face: SyncStatusFace,
@@ -311,76 +405,87 @@ private fun SyncSheetHeader(
     locked: Boolean,
     dark: Boolean,
     titleColor: Color,
-    subtext: Color,
-    onClose: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                face.icon(face.color)
-                Text(face.label, color = titleColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            }
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                val (serverLabel, serverColor, dotColor) = serverLine(state, status.serverReachable, dark)
-                Box(Modifier.size(6.dp).clip(CircleShape).background(dotColor))
-                Text(serverLabel, color = serverColor, fontSize = 12.sp)
-                status.lastSyncAt?.let { at ->
-                    Text("· ${timeAgo(at)}", color = subtext, fontSize = 12.sp)
-                }
-            }
-            if (locked) {
-                Spacer(Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    LockIcon(size = 14.dp, tint = if (dark) SyncRedDark else SyncRedLight)
-                    Text(
-                        stringResource(R.string.native_sync_instance_locked),
-                        color = if (dark) SyncRedDark else SyncRedLight,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                    )
-                }
-            }
-            status.lastSyncError?.takeIf { status.serverReachable == false }?.let { error ->
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    error,
-                    color = (if (dark) SyncRedDark else SyncRedLight).copy(alpha = 0.75f),
-                    fontSize = 12.sp,
+    val fade = if (dark) Color.Black.copy(alpha = 0.20f) else Color(0xFF0F172A).copy(alpha = 0.05f)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .zIndex(1f)
+            .drawWithContent {
+                drawContent()
+                val fadeHeight = 6.dp.toPx()
+                drawRect(
+                    Brush.verticalGradient(listOf(fade, Color.Transparent), startY = size.height, endY = size.height + fadeHeight),
+                    topLeft = Offset(0f, size.height),
+                    size = Size(size.width, fadeHeight),
                 )
             }
-            if (status.failedChecks > 0 && state == SyncState.OFFLINE) {
-                Spacer(Modifier.height(4.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            face.icon(face.color)
+            Text(face.label, color = titleColor, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val (serverLabel, serverColor, dotColor) = serverLine(state, status.serverReachable, dark)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(Modifier.size(6.dp).clip(CircleShape).background(dotColor))
+                Text(serverLabel, color = serverColor, fontSize = 12.sp, lineHeight = 16.sp)
+            }
+            status.lastSyncAt?.let { at ->
                 Text(
-                    String.format(stringResource(R.string.native_sync_failed_checks), status.failedChecks),
-                    color = if (dark) SyncAmberDark else SyncAmberLight,
+                    "· ${timeAgo(at)}",
+                    color = if (dark) SyncGrayLight else SyncGrayDark,
                     fontSize = 12.sp,
+                    lineHeight = 16.sp,
                 )
             }
         }
-        val closeLabel = stringResource(R.string.native_common_close)
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .gkTooltip(closeLabel)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) { onClose() },
-            contentAlignment = Alignment.Center,
-        ) {
-            CloseIcon(size = 16.dp, tint = subtext)
+        if (locked) {
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                LockIcon(size = 14.dp, tint = if (dark) SyncRedDark else SyncRedLight, modifier = Modifier.padding(top = 2.dp))
+                Text(
+                    stringResource(R.string.native_sync_instance_locked),
+                    color = if (dark) SyncRedDark else SyncRedLight,
+                    fontSize = 12.sp,
+                    lineHeight = 16.5.sp,
+                )
+            }
+        }
+        syncErrorDetailRes(status.lastSyncError)?.takeIf { status.serverReachable == false }?.let { detail ->
+            Spacer(Modifier.height(2.dp))
+            Text(
+                stringResource(detail),
+                color = if (dark) SyncRedDark.copy(alpha = 0.70f) else SyncDotRed.copy(alpha = 0.70f),
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+            )
+        }
+        if (status.failedChecks > 0 && state == SyncState.OFFLINE) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                String.format(stringResource(R.string.native_sync_failed_checks), status.failedChecks),
+                color = if (dark) SyncAmberDark else SyncAmberLight,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+            )
         }
     }
 }
 
+/** The detail line syncEngine.js's known errors get; a plain network
+ *  failure has none. */
+private fun syncErrorDetailRes(kind: SyncErrorKind?): Int? = when (kind) {
+    SyncErrorKind.BACKEND_DOWN -> R.string.native_sync_error_backend_down
+    SyncErrorKind.SERVER_ERROR -> R.string.native_sync_error_server_error
+    SyncErrorKind.TIMEOUT -> R.string.native_sync_error_timeout
+    SyncErrorKind.UNREACHABLE, null -> null
+}
+
 /** Section 2: one line saying how much is waiting, with a dot that turns
- *  blue while a drain is actually running. */
+ *  blue, pulsing, while a drain is actually running. */
 @Composable
 private fun SyncSheetQueueSummary(
     waiting: Int,
@@ -395,15 +500,23 @@ private fun SyncSheetQueueSummary(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(if (syncing) SyncDotBlue else SyncDotAmber))
+            val pulse = if (syncing) rememberPulseAlpha() else null
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .graphicsLayer { alpha = pulse?.value ?: 1f }
+                    .clip(CircleShape)
+                    .background(if (syncing) SyncDotBlue else SyncDotAmber),
+            )
             Text(
                 if (syncing) {
                     String.format(stringResource(R.string.native_sync_queue_syncing), retrying, waiting)
                 } else {
                     String.format(stringResource(R.string.native_sync_queue_waiting), waiting + retrying)
                 },
-                color = if (dark) Color(0xFFD1D5DB) else Color(0xFF4B5563),
+                color = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565),
                 fontSize = 12.sp,
+                lineHeight = 16.sp,
             )
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(divider))
@@ -421,10 +534,9 @@ private fun SyncSheetItemList(
     showLastError: Boolean,
     maxHeight: Dp,
     dark: Boolean,
-    subtext: Color,
     divider: Color,
-    titleColor: Color,
 ) {
+    val faint = if (dark) SyncGrayLight else SyncGrayDark
     Column {
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
@@ -432,48 +544,50 @@ private fun SyncSheetItemList(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             icon(titleTint)
-            Text(title, color = titleTint, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(title, color = titleTint, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
         }
         LazyColumn(
             modifier = Modifier.fillMaxWidth().heightIn(max = maxHeight),
             contentPadding = PaddingValues(bottom = 4.dp),
         ) {
             items(items, key = { it.queueId }) { item ->
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (showLastError) 8.dp else 6.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
                             syncActionLabel(item.type),
-                            color = if (dark) Color(0xFFD1D5DB) else Color(0xFF374151),
+                            color = if (dark) Color(0xFFD1D5DC) else Color(0xFF364153),
                             fontSize = 12.sp,
+                            lineHeight = 16.sp,
                             fontWeight = if (showLastError) FontWeight.Medium else FontWeight.Normal,
+                            modifier = Modifier.weight(1f),
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (item.attempts > 0) {
-                                Text(
-                                    if (showLastError) {
-                                        String.format(stringResource(R.string.native_sync_retry_count), item.attempts)
-                                    } else {
-                                        String.format(stringResource(R.string.native_sync_retry_count), item.attempts) +
-                                            "/$MaxRetries"
-                                    },
-                                    color = if (showLastError) subtext else titleTint.copy(alpha = 0.8f),
-                                    fontSize = 12.sp,
-                                )
-                            }
-                            Text(shortNoteRef(item.noteId), color = subtext, fontSize = 12.sp)
+                        if (item.attempts > 0) {
+                            val count = String.format(stringResource(R.string.native_sync_retry_count), item.attempts)
+                            Text(
+                                if (showLastError) count else "$count/$MaxRetries",
+                                color = when {
+                                    showLastError -> faint
+                                    dark -> SyncAmberDark.copy(alpha = 0.70f)
+                                    else -> SyncDotAmber
+                                },
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp,
+                            )
                         }
+                        Text(shortNoteRef(item.noteId), color = faint, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 1)
                     }
                     if (showLastError) {
                         item.lastError?.let { error ->
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 error,
-                                color = (if (dark) SyncRedDark else SyncRedLight).copy(alpha = 0.75f),
+                                color = if (dark) SyncRedDark.copy(alpha = 0.70f) else SyncDotRed.copy(alpha = 0.80f),
                                 fontSize = 12.sp,
+                                lineHeight = 16.sp,
                             )
                         }
                     }
@@ -532,7 +646,7 @@ internal fun SyncStatusButton(
                     .height(16.dp)
                     .widthIn(min = 16.dp)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(SyncBadgeAmber)
+                    .background(SyncDotAmber)
                     .padding(horizontal = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {

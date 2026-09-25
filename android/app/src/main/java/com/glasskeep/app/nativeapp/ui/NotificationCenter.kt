@@ -421,13 +421,15 @@ private fun NotificationCenterHeader(
     }
 }
 
-/** `.gk-notif-center-grabber`: the 18dp strip at the foot of a top sheet,
- *  pulled UP to close. A downward pull does nothing. Shared with the sync
- *  sheet, which the web builds from the same parts. */
+/** `.gk-notif-center-grabber`: the strip at the foot of a top sheet (18dp,
+ *  22dp for the sync sheet's), pulled UP to close. A downward pull does
+ *  nothing. Shared with the sync sheet, which the web builds from the same
+ *  parts. */
 @Composable
 internal fun TopSheetGrabber(
     dark: Boolean,
     separator: Color?,
+    height: Dp = 18.dp,
     onDrag: (Float) -> Unit,
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit,
@@ -436,7 +438,7 @@ internal fun TopSheetGrabber(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(18.dp)
+            .height(height)
             .then(if (separator != null) Modifier.topHairline(separator) else Modifier)
             .pointerInput(Unit) {
                 detectVerticalDragGestures(

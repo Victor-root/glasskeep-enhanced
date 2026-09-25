@@ -54,6 +54,7 @@ import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.data.renewSessionTokenIfStale
+import com.glasskeep.app.nativeapp.syncErrorKindOf
 import com.glasskeep.app.nativeapp.syncReminderAlarms
 import com.glasskeep.app.reminders.ReminderSyncWorker
 import kotlinx.coroutines.CancellationException
@@ -204,6 +205,16 @@ fun NativeNavHost(
     // marks the server unreachable but never a lock, so a phone with no
     // signal keeps its cached notes instead of landing on the unlock screen.
     val pendingSyncIds by repository.observePendingSyncNoteIds().collectAsState(initial = emptySet())
+    // Only a successful push takes an item out of the queue (a failure
+    // keeps it, retried or given up), so a shrinking queue is the moment
+    // syncEngine.js stamps its "last sync" time.
+    LaunchedEffect(repository) {
+        var previous: Int? = null
+        repository.observeSyncQueue().collect { queue ->
+            previous?.let { if (queue.size < it) container.syncStatus.recordPushed(System.currentTimeMillis()) }
+            previous = queue.size
+        }
+    }
     LaunchedEffect(lifecycleOwner, lockPokes) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
@@ -211,12 +222,10 @@ fun NativeNavHost(
                 val body = outcome.getOrNull()?.takeIf { it.isSuccessful }?.body()
                 if (body != null) {
                     container.lockState.apply(body)
-                    container.syncStatus.recordReachable(System.currentTimeMillis())
+                    container.syncStatus.recordReachable()
                 } else {
-                    val error = outcome.exceptionOrNull()
                     container.syncStatus.recordUnreachable(
-                        error?.message ?: error?.javaClass?.simpleName
-                            ?: outcome.getOrNull()?.let { "HTTP ${it.code()}" },
+                        syncErrorKindOf(outcome.exceptionOrNull(), outcome.getOrNull()?.code()),
                     )
                 }
                 delay(

@@ -175,6 +175,7 @@ import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.NoteIconDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
+import com.glasskeep.app.nativeapp.syncErrorKindOf
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
@@ -676,14 +677,14 @@ fun NativeNotesListScreen(
         scope.launch {
             try {
                 repository.refresh()
-                container.syncStatus.recordReachable(System.currentTimeMillis())
+                container.syncStatus.recordReachable()
             } catch (t: CancellationException) {
                 throw t
             } catch (t: Throwable) {
                 // Nothing on the list itself: the header's offline pill and
                 // cloud are how the web reports it.
                 NativeDebug.e("Notes refresh failed", t)
-                container.syncStatus.recordUnreachable(t.message ?: t.javaClass.simpleName)
+                container.syncStatus.recordUnreachable(syncErrorKindOf(t))
             } finally {
                 refreshing = false
                 pullRefreshing = false

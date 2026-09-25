@@ -737,6 +737,9 @@
     <string name="native_sync_server_reachable">Serveur joignable</string>
     <string name="native_sync_server_unreachable">Serveur injoignable</string>
     <string name="native_sync_instance_locked">Instance verrouill\u00e9e, sync en pause, en attente de d\u00e9verrouillage par un administrateur</string>
+    <string name="native_sync_error_backend_down">Le proxy répond mais GlassKeep n\'est pas accessible</string>
+    <string name="native_sync_error_server_error">Le serveur a renvoyé une erreur</string>
+    <string name="native_sync_error_timeout">Délai de vérification dépassé</string>
     <string name="native_sync_failed_checks">%1$d tentative(s) de reconnexion \u00e9chou\u00e9e(s)</string>
     <string name="native_sync_queue_syncing">Synchronisation en cours (%1$d en cours, %2$d en attente)</string>
     <string name="native_sync_queue_waiting">%1$d modification(s) en attente de synchronisation</string>
@@ -748,9 +751,9 @@
     <string name="native_sync_not_safe_to_close">Modifications locales non sauv\u00e9es sur le serveur</string>
     <string name="native_sync_just_now">\u00e0 l\'instant</string>
     <string name="native_sync_ago_seconds">%1$ds</string>
-    <string name="native_sync_ago_minutes">%1$dmin</string>
+    <string name="native_sync_ago_minutes">%1$dm</string>
     <string name="native_sync_ago_hours">%1$dh</string>
-    <string name="native_sync_ago_days">%1$dj</string>
+    <string name="native_sync_ago_days">%1$dd</string>
     <string name="native_sync_action_update">Mise \u00e0 jour</string>
     <string name="native_sync_action_create">Création</string>
     <string name="native_sync_action_patch">Modification</string>
