@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp.ui
 
 import android.content.Context
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -166,6 +167,9 @@ data class BulkActionButton(
  * menu. Native keeps every action on the row and lets it scroll
  * sideways if a very narrow screen needs it. This keeps select-all, logo
  * and ZIP export directly reachable alongside the existing actions.
+ *
+ * [headerVisible] follows the notes header's auto-hide: the dock rises to
+ * 8dp under the status bar while the header is away (globalCSS.js:966-981).
  */
 @Composable
 internal fun SelectionActionBar(
@@ -174,24 +178,31 @@ internal fun SelectionActionBar(
     onClose: () -> Unit,
     dark: Boolean,
     modifier: Modifier = Modifier,
+    headerVisible: Boolean = true,
 ) {
     val closeLabel = stringResource(R.string.native_bulk_exit)
     val dividerColor = if (dark) Color(0xFFA78BFA).copy(alpha = 0.22f) else Color(0xFF7C3AED).copy(alpha = 0.22f)
     val closeColor = if (dark) Color(0xFFEDE9FE) else Color(0xFF6D28D9)
+    val dockEasing = CubicBezierEasing(0.22f, 0.61f, 0.36f, 1f)
 
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
     val progress by animateFloatAsState(
         targetValue = if (shown) 1f else 0f,
-        animationSpec = tween(durationMillis = 220, easing = CubicBezierEasing(0.22f, 0.61f, 0.36f, 1f)),
+        animationSpec = tween(durationMillis = 220, easing = dockEasing),
         label = "multiDockIn",
+    )
+    val top by animateDpAsState(
+        targetValue = if (headerVisible) 80.dp else 8.dp,
+        animationSpec = tween(durationMillis = 180, easing = dockEasing),
+        label = "multiDockTop",
     )
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(top = 80.dp, start = 8.dp, end = 8.dp),
+            .padding(top = top, start = 8.dp, end = 8.dp),
         contentAlignment = Alignment.TopCenter,
     ) {
         Row(

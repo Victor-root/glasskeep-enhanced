@@ -30,12 +30,6 @@ class NativeAppContainer(context: Context) {
     val branding = BrandingState(tokenStore)
     val noteAiStore = NoteAiStore(appContext)
 
-    // Set by any full-screen dimming overlay (currently CreateNoteFab's
-    // speed dial) so NativeAppActivity can darken the status/nav bars along
-    // with it, instead of them staying at the flat theme color while the
-    // content below them dims.
-    val scrimActive = mutableStateOf(false)
-
     // Set (as an ARGB Int) by NoteDetailScreen while a note is open, so the
     // status/nav bars match that note's own background instead of staying
     // on the workspace theme color underneath it. Null restores the normal

@@ -13,7 +13,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -375,17 +374,17 @@ fun NativeNavHost(
     } else {
         Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Left))
     }
-    // Which of the unlock screen and the banner a locked server gets, on
-    // App.jsx:7367's own two rules. "Signed in" is read off the current
-    // route rather than off the token: it is the app's own answer to that
-    // question, and unlike the token it is Compose state, so signing out
-    // moves the screen straight to the full unlock version.
+    // Whether a locked server gets the full unlock screen, on App.jsx:7367's
+    // own rule; otherwise the notes list shows the banner (the web's other
+    // case). "Signed in" is read off the current route rather than off the
+    // token: it is the app's own answer to that question, and unlike the
+    // token it is Compose state, so signing out moves the screen straight
+    // to the full unlock version.
     val currentEntry by navController.currentBackStackEntryAsState()
     val route = currentEntry?.destination?.route ?: startDestination
     val signedIn = route != "login" && route != "login-secret" && route != "register"
     val lock = container.lockState
     val showUnlockScreen = lock.isLocked && (!signedIn || lock.overlayOpen)
-    val showLockedBanner = lock.isLocked && signedIn && !lock.bannerDismissed && !lock.overlayOpen
 
     CompositionLocalProvider(LocalGkToasts provides toasts, LocalGkTooltips provides tooltips) {
         Box(Modifier.fillMaxSize().then(safeLeft)) {
@@ -419,14 +418,7 @@ fun NativeNavHost(
                         null
                     },
                 )
-            } else Column(Modifier.fillMaxSize()) {
-                if (showLockedBanner) {
-                    LockedBanner(
-                        dark = LocalGkDark.current,
-                        onUnlock = { lock.overlayOpen = true },
-                        onDismiss = { lock.bannerDismissed = true },
-                    )
-                }
+            } else {
             NavHost(navController = navController, startDestination = startDestination) {
                 composable("login") {
                     NativeLoginScreen(

@@ -59,17 +59,19 @@
     <string name="native_settings_passkeys_delete_confirm_title">Supprimer cette clé d\'accès ?</string>
     <string name="native_settings_passkeys_delete_confirm_body">Cette clé d\'accès ne pourra plus servir à se connecter. Si elle pouvait déverrouiller l\'instance chiffrée, cette autorisation sera également révoquée.</string>
     <string name="native_header_notes_label">Notes</string>
+    <string name="native_header_offline">Hors ligne</string>
     <string name="native_sidebar_notes_all">Notes (Toutes)</string>
     <string name="native_sidebar_archived_notes">Notes archivées</string>
     <string name="native_notes_refresh">Actualiser</string>
-    <string name="native_notes_empty">Aucune note pour le moment.</string>
+    <string name="native_notes_empty">Aucune note pour le moment. Ajoutez-en une pour commencer !</string>
+    <string name="native_notes_loading">Chargement des notes…</string>
+    <string name="native_notes_offline_view_not_loaded">Le serveur est injoignable, cette vue n\'a pas pu être chargée. Elle se mettra à jour automatiquement quand la connexion sera rétablie.</string>
     <string name="native_note_detail_edited_prefix">Modifié : %1$s</string>
     <string name="native_note_detail_today">Aujourd\'hui</string>
     <string name="native_note_detail_yesterday">Hier</string>
     <string name="native_note_detail_note_id">Note ID : %1$s</string>
     <string name="native_notes_section_pinned">Épinglées</string>
     <string name="native_notes_section_others">Autres</string>
-    <string name="native_notes_error_sync">Synchronisation impossible : %1$s</string>
     <string name="native_notes_create_error">Impossible de créer la note : %1$s</string>
     <string name="native_notes_untitled">Sans titre</string>
     <string name="native_notes_more_items">+%1$d de plus…</string>
@@ -108,16 +110,17 @@
     <string name="native_note_ai_back">Retour à la note</string>
     <string name="native_note_ai_scroll_down">Aller en bas</string>
     <string name="native_note_ai_error">La requête IA a échoué.</string>
-    <string name="native_notes_search_or_ask">Rechercher ou demander à l\'IA…</string>
+    <string name="native_notes_search_or_ask">Rechercher ou demander à l\'IA...</string>
     <string name="native_notes_ask_ai">Demander à l\'IA</string>
     <string name="native_notes_ai_assistant">Assistant IA</string>
-    <string name="native_notes_ai_thinking">L\'assistant IA réfléchit…</string>
+    <string name="native_notes_ai_thinking">L\'assistant IA réfléchit...</string>
     <string name="native_notes_ai_cited">Notes utilisées</string>
     <string name="native_notes_ai_clear">Effacer la réponse</string>
     <string name="native_notes_ai_error">Désolé, une erreur s\'est produite lors du traitement de votre requête.</string>
-    <string name="native_notes_search_placeholder">Rechercher dans les notes…</string>
-    <string name="native_notes_search_close">Fermer la recherche</string>
-    <string name="native_notes_search_empty">Aucune note ne correspond à votre recherche.</string>
+    <string name="native_notes_search_placeholder">Rechercher...</string>
+    <string name="native_notes_search_clear">Effacer la recherche</string>
+    <string name="native_notes_search_empty">Aucune note correspondante trouvée.</string>
+    <string name="native_notes_no_reminders">Aucun rappel pour le moment.</string>
     <string name="native_notes_select_mode">Sélection multiple</string>
     <string name="native_notes_list_view">Vue liste</string>
     <string name="native_notes_grid_view">Vue grille</string>
@@ -140,14 +143,14 @@
     <string name="native_bulk_icon_success">Icône appliquée à %1$d note(s)</string>
     <string name="native_bulk_icon_error">Impossible d\'appliquer l\'icône à %1$d note(s)</string>
 
-    <string name="native_sidebar_open">Ouvrir le menu</string>
+    <string name="native_sidebar_open">Ouvrir les tags</string>
     <string name="native_sidebar_all_images">Toutes les images</string>
     <string name="native_sidebar_reminders">Rappels</string>
     <string name="native_sidebar_tags_title">Tags</string>
     <string name="native_sidebar_tags_empty">Aucun tag pour le moment</string>
     <string name="native_sidebar_active_tags">%1$d tags actifs</string>
     <string name="native_sidebar_clear_tags">Effacer</string>
-    <string name="native_notes_more_options">Plus d\'options</string>
+    <string name="native_header_menu">Menu</string>
 
     <string name="native_archived_title">Archivées</string>
     <string name="native_archived_empty">Aucune note archivée.</string>
@@ -723,10 +726,10 @@
     <!-- Header sync status: src/sync/SyncStatusIcon.jsx. -->
     <string name="native_sync_status_synced">Tout est sauvegard\u00e9 dans le cloud</string>
     <string name="native_sync_status_pending">Modifications locales en attente</string>
-    <string name="native_sync_status_syncing">Synchronisation en cours\u2026</string>
+    <string name="native_sync_status_syncing">Synchronisation en cours...</string>
     <string name="native_sync_status_offline">Serveur indisponible, sauvegard\u00e9 localement</string>
     <string name="native_sync_status_error">Erreur de synchronisation, certains changements non sauv\u00e9s</string>
-    <string name="native_sync_server_checking">V\u00e9rification du serveur\u2026</string>
+    <string name="native_sync_server_checking">V\u00e9rification du serveur...</string>
     <string name="native_sync_server_reachable">Serveur joignable</string>
     <string name="native_sync_server_unreachable">Serveur injoignable</string>
     <string name="native_sync_instance_locked">Instance verrouill\u00e9e, sync en pause, en attente de d\u00e9verrouillage par un administrateur</string>
@@ -786,7 +789,7 @@
     <string name="native_register_back">Retour à la connexion</string>
 
     <string name="native_admin_title">Administration</string>
-    <string name="native_notes_admin_panel">Panneau d’administration</string>
+    <string name="native_notes_admin_panel">Panneau d\'administration</string>
     <string name="native_admin_tab_users">Utilisateurs</string>
     <string name="native_admin_tab_branding">Apparence</string>
     <string name="native_admin_tab_ai">IA serveur</string>

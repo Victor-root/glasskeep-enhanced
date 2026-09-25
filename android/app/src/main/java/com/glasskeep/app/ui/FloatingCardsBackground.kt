@@ -147,12 +147,14 @@ internal fun FloatingCardsBackground(dark: Boolean, workspace: Boolean = false) 
             ) {
                 Box(Modifier.fillMaxWidth().height(3.dp).background(card.accent.copy(alpha = 0.7f)))
                 Column(Modifier.padding(16.dp)) {
+                    // The inline accent at 50% sits under `.deco-title`'s own
+                    // opacity: .25, hence 12.5% in the end.
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(0.7f)
                             .height(10.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(card.accent.copy(alpha = 0.5f)),
+                            .background(card.accent.copy(alpha = 0.125f)),
                     )
                     Spacer(Modifier.height(10.dp))
                     for (lineWidth in card.lines) {

@@ -61,6 +61,19 @@ class ShellPrefsState(private val tokenStore: TokenStore) {
     }
 
     /**
+     * Whether the server reports a newer GlassKeep release, read once per
+     * session for administrators (useUpdateCheck.js): the header's kebab
+     * and admin entry then carry a green dot. Null until that read has
+     * answered; like [isAdmin], a server fact, never cached.
+     */
+    var serverUpdateAvailable: Boolean? by mutableStateOf(null)
+        private set
+
+    fun applyServerUpdateAvailable(available: Boolean) {
+        serverUpdateAvailable = available
+    }
+
+    /**
      * The light/dark choice made from the header menu, or null to follow
      * the system. Deliberately NOT cached: the web keeps this one in
      * sessionStorage (App.jsx:2240), so it lasts the session and the

@@ -1175,6 +1175,18 @@ class NotesRepository(
      *  preferences above: the Settings screen simply shows the section
      *  switched off when the read fails rather than an error nobody
      *  asked for (UserAiSettingsSection.jsx:104-110). */
+    /** GET /api/update-check (admins only): whether a newer release is out.
+     *  Best-effort like the web's own read, which fails silently. */
+    suspend fun fetchServerUpdateAvailable(): Boolean? {
+        return try {
+            val response = api.checkServerUpdate()
+            response.body()?.takeIf { response.isSuccessful }?.updateAvailable
+        } catch (t: Throwable) {
+            NativeDebug.e("NotesRepository.fetchServerUpdateAvailable failed", t)
+            null
+        }
+    }
+
     suspend fun fetchUserAiSettings(): UserAiSettingsDto? {
         return try {
             val response = api.getUserAiSettings()

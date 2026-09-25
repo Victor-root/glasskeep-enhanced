@@ -1,32 +1,37 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -35,58 +40,81 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -94,26 +122,31 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.zIndex
 import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
+import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
-import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.SyncState
 import com.glasskeep.app.nativeapp.data.AiClient
-import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.ChecklistItemData
+import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.RichDoc
@@ -122,25 +155,33 @@ import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.TypographyPresets
 import com.glasskeep.app.nativeapp.data.TypographyProfile
 import com.glasskeep.app.nativeapp.data.isReminderPast
-import com.glasskeep.app.nativeapp.data.matchesAnyTag
-import com.glasskeep.app.nativeapp.data.matchesSearchQuery
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.local.SyncQueueEntity
+import com.glasskeep.app.nativeapp.data.matchesAnyTag
+import com.glasskeep.app.nativeapp.data.matchesSearchQuery
 import com.glasskeep.app.nativeapp.data.network.LogoDto
+import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.NoteIconDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
+import com.glasskeep.app.ui.FloatingCardsBackground
 import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
-import com.glasskeep.app.ui.FloatingCardsBackground
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -161,6 +202,7 @@ private val CardBorderDark = Color(0xFF4B5563).copy(alpha = 0.3f)
  * carrying the app's own branding, same shape as NotesHeader.jsx /
  * NoteCard.jsx on the web side, including the administrator entry point.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NativeNotesListScreen(
     container: NativeAppContainer,
@@ -212,14 +254,11 @@ fun NativeNotesListScreen(
     )
     var syncSheetOpen by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
+    // Only a pull shows the spinner: the old app's SwipeRefreshLayout spun
+    // for the reload its own gesture started, never for the app's loads.
+    var pullRefreshing by remember { mutableStateOf(false) }
     var creatingNote by remember { mutableStateOf(false) }
     var fabOpen by remember { mutableStateOf(false) }
-    LaunchedEffect(fabOpen) {
-        NativeDebug.d("NativeNotesListScreen: fabOpen=$fabOpen, writing scrimActive")
-        container.scrimActive.value = fabOpen
-        NativeDebug.d("NativeNotesListScreen: scrimActive now ${container.scrimActive.value}")
-    }
-    DisposableEffect(Unit) { onDispose { container.scrimActive.value = false } }
     // Scroll-reset investigation: this whole composable is a NavHost
     // destination, torn down while a note covers it and rebuilt fresh on
     // return - confirm that's actually happening (and when) alongside the
@@ -233,11 +272,18 @@ fun NativeNotesListScreen(
             onDispose { Log.d("GKScroll", "NativeNotesListScreen LEAVE composition instance=$instanceId") }
         }
     }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var searchOpen by remember { mutableStateOf(false) }
+    // Saveable like the scroll position below, and for the same reason: an
+    // open note replaces this whole screen, while on the web the list keeps
+    // its search, filters and assistant answer under the note.
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    // Bumped by the header's search button only, the one place the web
+    // focuses the field from (NotesHeader.jsx:375): coming back to a list
+    // whose search stayed open does not bring the keyboard back.
+    var searchFocusRequest by remember { mutableIntStateOf(0) }
+    var headerMenuOpen by remember { mutableStateOf(false) }
     var notificationsOpen by remember { mutableStateOf(false) }
     var unreadNotifications by remember { mutableStateOf(0) }
-    var searchQuery by remember { mutableStateOf("") }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showBulkTrashConfirm by remember { mutableStateOf(false) }
@@ -246,14 +292,42 @@ fun NativeNotesListScreen(
     var bulkLogos by remember { mutableStateOf<List<LogoDto>>(emptyList()) }
     var bulkActionRunning by remember { mutableStateOf(false) }
     var sidebarOpen by remember { mutableStateOf(false) }
-    var activeTagFilter by remember { mutableStateOf<String?>(null) }
-    var activeTagFilters by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var aiAnswer by remember { mutableStateOf<String?>(null) }
-    var aiCitedNoteIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var activeTagFilter by rememberSaveable { mutableStateOf<String?>(null) }
+    var activeTagFilters by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
+    var aiAnswer by rememberSaveable { mutableStateOf<String?>(null) }
+    var aiCitedNoteIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var aiLoading by remember { mutableStateOf(false) }
     val aiClient = remember(serverUrl) { AiClient(serverUrl, container.tokenStore) }
     val aiErrorMessage = stringResource(R.string.native_notes_ai_error)
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+
+    // Survives the note visit that tears this whole NavHost destination
+    // down: "notes" leaves composition entirely while a note covers it, and
+    // a plain remember (what rememberScrollState uses) does not survive
+    // that, so every return from a note started a brand new ScrollState at
+    // 0. rememberSaveable's state, unlike plain remember, is
+    // captured/restored by NavHost's SaveableStateHolder across exactly
+    // that dispose/recompose cycle. Tag "GKScroll" (distinct from
+    // "GKNative", used for the earlier status-bar-color debugging) - filter
+    // logcat on it to see whether this identity survives a note visit.
+    val notesScrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
+    SideEffect {
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                "GKScroll",
+                "notesScrollState id=${System.identityHashCode(notesScrollState)} value=${notesScrollState.value} " +
+                    "maxValue=${notesScrollState.maxValue} notes.size=${notes.size} refreshing=$refreshing",
+            )
+        }
+    }
+    var headerVisible by rememberSaveable { mutableStateOf(true) }
+    // The header floats over the page, which keeps a slot of the same
+    // height for it; measured, and kept across note visits so a return
+    // draws the right slot from its first frame.
+    var headerHeightPx by rememberSaveable { mutableIntStateOf(with(density) { DefaultHeaderHeight.roundToPx() }) }
+    var bannerHeightPx by remember { mutableIntStateOf(0) }
+    var screenHeightPx by remember { mutableIntStateOf(0) }
 
     // Tag list + per-tag note count for the drawer (TagSidebar.kt), same
     // "derive from what's already loaded" approach as filteredNotes below:
@@ -269,68 +343,57 @@ fun NativeNotesListScreen(
         counts.toList().sortedBy { it.first.lowercase() }
     }
 
-    // Manual drag reorder (see NotesRepository.reorderQueued). Disabled
-    // during multi-select (matches the web's own canDrag = !multiMode)
-    // and while searching or tag-filtered: filteredNotes is then a subset
-    // of notes, and a reorder needs every id in each pinned/unpinned
-    // group, not just what's currently visible.
-    val reorderEnabled = !selectionMode && searchQuery.isBlank() && activeTagFilter == null && activeTagFilters.isEmpty()
-    // Last-reported on-screen bounds per card (see ReorderableNoteCard's
-    // onGloballyPositioned), read only at drag-end to hit-test the drop
-    // target - doesn't need to be a State, nothing should recompose when
-    // it changes.
+    // Manual drag reorder (see NotesRepository.reorderQueued), on any view
+    // but multi-select, like the web's canDrag = !multiMode: a filtered
+    // view still swaps inside the full pinned/others group below.
+    // Unclipped window bounds per card (see ReorderableNoteCard), read by
+    // the drag to find the card under the finger - not State, nothing
+    // should recompose when they change.
     val cardBounds = remember { mutableMapOf<String, Rect>() }
     var draggedNoteId by remember { mutableStateOf<String?>(null) }
-    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    var dragOverNoteId by remember { mutableStateOf<String?>(null) }
+    // The held finger's window Y, for the edge auto-scroll below.
+    var dragPointerY by remember { mutableFloatStateOf(0f) }
 
     fun endDrag() {
         draggedNoteId = null
-        dragOffset = Offset.Zero
+        dragOverNoteId = null
+    }
+
+    // The note under the finger, except the held one (elementFromPoint in
+    // useNoteTouchDrag.js): the outlined drop target.
+    fun trackDrag(id: String, pointerInWindow: Offset) {
+        dragPointerY = pointerInWindow.y
+        dragOverNoteId = cardBounds.entries.firstOrNull { (otherId, bounds) ->
+            otherId != id && bounds.contains(pointerInWindow)
+        }?.key
     }
 
     // Web-equivalent swap semantics (see NotesRepository.reorderQueued's
-    // own doc comment): the dragged note and whichever OTHER note it's
-    // hovering over when released trade places, nothing in between
-    // shifts. Hit-testing uses the dragged card's own center (its
-    // original bounds offset by the accumulated drag delta), not the
-    // exact finger position: simpler to reason about correctly without
-    // being able to test this interactively, at the cost of needing a
-    // slightly larger movement than the web's own pointer-exact
-    // elementFromPoint check before a neighboring card is picked up as
-    // the target.
-    fun handleDragEnd(id: String) {
-        val draggedNote = notes.find { it.id == id }
-        val draggedRect = cardBounds[id]
-        if (draggedNote == null || draggedRect == null) {
-            NativeDebug.d("NativeNotesListScreen reorder: drag end for $id, missing note or bounds")
-            endDrag()
+    // own doc comment): the held note and the one it is released over trade
+    // places, nothing in between shifts. The web outlines a note of the
+    // other group too, but dropping there changes nothing (App.jsx onDrop).
+    fun dropDraggedNote(id: String) {
+        val targetId = dragOverNoteId
+        endDrag()
+        if (targetId == null) {
+            NativeDebug.d("NativeNotesListScreen reorder: no drop target for $id")
             return
         }
-        val draggedCenter = Offset(draggedRect.center.x + dragOffset.x, draggedRect.center.y + dragOffset.y)
-        val target = notes.firstOrNull { other ->
-            other.id != id && other.pinned == draggedNote.pinned && cardBounds[other.id]?.contains(draggedCenter) == true
-        }
-        if (target == null) {
-            NativeDebug.d("NativeNotesListScreen reorder: no drop target for $id")
-            endDrag()
+        val draggedNote = notes.find { it.id == id }
+        val target = notes.find { it.id == targetId }
+        if (draggedNote == null || target == null || target.pinned != draggedNote.pinned) {
+            NativeDebug.d("NativeNotesListScreen reorder: $id dropped on $targetId outside its group")
             return
         }
         val group = notes.filter { it.pinned == draggedNote.pinned }.toMutableList()
         val fromIndex = group.indexOfFirst { it.id == id }
-        val toIndex = group.indexOfFirst { it.id == target.id }
-        if (fromIndex == -1 || toIndex == -1) {
-            NativeDebug.e("NativeNotesListScreen reorder: $id or ${target.id} missing from its own pinned group, ignoring")
-            endDrag()
-            return
-        }
-        NativeDebug.d("NativeNotesListScreen reorder: swap $id <-> ${target.id} (pinned=${draggedNote.pinned})")
-        val tmp = group[fromIndex]
-        group[fromIndex] = group[toIndex]
-        group[toIndex] = tmp
+        val toIndex = group.indexOfFirst { it.id == targetId }
+        NativeDebug.d("NativeNotesListScreen reorder: swap $id <-> $targetId (pinned=${draggedNote.pinned})")
+        group[fromIndex] = group[toIndex].also { group[toIndex] = group[fromIndex] }
         val pinnedGroup = if (draggedNote.pinned) group else notes.filter { it.pinned }
         val otherGroup = if (draggedNote.pinned) notes.filter { !it.pinned } else group
         scope.launch { repository.reorderQueued(pinnedGroup, otherGroup) }
-        endDrag()
     }
 
     // Client-side parity with App.jsx: multi-tags are OR'ed, then search
@@ -348,7 +411,6 @@ fun NativeNotesListScreen(
         byTag.filter { it.matchesAnyTag(activeTagFilters) && it.matchesSearchQuery(searchQuery) }
     }
 
-    val errorSyncTemplate = stringResource(R.string.native_notes_error_sync)
     val errorCreateTemplate = stringResource(R.string.native_notes_create_error)
     val archivedSuccessTemplate = stringResource(R.string.native_bulk_archived_success)
     val trashedSuccessTemplate = stringResource(R.string.native_bulk_trashed_success)
@@ -383,9 +445,22 @@ fun NativeNotesListScreen(
         if (outcome.failed > 0) toasts.error(message) else toasts.success(message)
     }
 
+    // The web makes room for the dock with 44px above the list and scrolls
+    // by the same amount so nothing visibly moves (App.jsx onStartMulti /
+    // onExitMulti); that scroll is also what hides the header meanwhile.
+    fun enterSelection() {
+        if (selectionMode) return
+        selectionMode = true
+        selectedIds = emptySet()
+        fabOpen = false
+        notesScrollState.dispatchRawDelta(with(density) { SelectionShim.toPx() })
+    }
+
     fun exitSelection() {
+        if (!selectionMode) return
         selectionMode = false
         selectedIds = emptySet()
+        notesScrollState.dispatchRawDelta(-with(density) { SelectionShim.toPx() })
     }
 
     fun bulkArchive() {
@@ -581,8 +656,8 @@ fun NativeNotesListScreen(
     }
 
     fun refresh() {
+        if (refreshing) return
         refreshing = true
-        errorMessage = null
         // The queue drains alongside the pull, so the cloud icon reads
         // "syncing" for both halves at once, like the web's own
         // _processing || _pulling (syncEngine.js:730).
@@ -592,87 +667,35 @@ fun NativeNotesListScreen(
             try {
                 repository.refresh()
                 container.syncStatus.recordReachable(System.currentTimeMillis())
+            } catch (t: CancellationException) {
+                throw t
             } catch (t: Throwable) {
+                // Nothing on the list itself: the header's offline pill and
+                // cloud are how the web reports it.
                 NativeDebug.e("Notes refresh failed", t)
                 container.syncStatus.recordUnreachable(t.message ?: t.javaClass.simpleName)
-                errorMessage = String.format(errorSyncTemplate, t.message ?: t.javaClass.simpleName)
             } finally {
                 refreshing = false
+                pullRefreshing = false
                 container.syncStatus.markSyncing(false)
             }
         }
     }
 
-    fun createTextNote() {
+    fun createNote(create: suspend () -> NoteDto) {
         if (creatingNote) return
         creatingNote = true
-        errorMessage = null
         scope.launch {
             try {
-                val note = repository.createTextNote()
-                NativeDebug.d("Created text note id=${note.id}")
+                val note = create()
+                NativeDebug.d("Created ${note.type} note id=${note.id}")
                 SyncQueueWorker.triggerNow(context)
                 onOpenNote(note.id)
+            } catch (t: CancellationException) {
+                throw t
             } catch (t: Throwable) {
-                NativeDebug.e("Create text note failed", t)
-                errorMessage = String.format(errorCreateTemplate, t.message ?: t.javaClass.simpleName)
-            } finally {
-                creatingNote = false
-            }
-        }
-    }
-
-    fun createChecklistNote() {
-        if (creatingNote) return
-        creatingNote = true
-        errorMessage = null
-        scope.launch {
-            try {
-                val note = repository.createChecklistNote()
-                NativeDebug.d("Created checklist note id=${note.id}")
-                SyncQueueWorker.triggerNow(context)
-                onOpenNote(note.id)
-            } catch (t: Throwable) {
-                NativeDebug.e("Create checklist note failed", t)
-                errorMessage = String.format(errorCreateTemplate, t.message ?: t.javaClass.simpleName)
-            } finally {
-                creatingNote = false
-            }
-        }
-    }
-
-    fun createDrawingNote() {
-        if (creatingNote) return
-        creatingNote = true
-        errorMessage = null
-        scope.launch {
-            try {
-                val note = repository.createDrawingNote()
-                NativeDebug.d("Created drawing note id=${note.id}")
-                SyncQueueWorker.triggerNow(context)
-                onOpenNote(note.id)
-            } catch (t: Throwable) {
-                NativeDebug.e("Create drawing note failed", t)
-                errorMessage = String.format(errorCreateTemplate, t.message ?: t.javaClass.simpleName)
-            } finally {
-                creatingNote = false
-            }
-        }
-    }
-
-    fun createAudioNote() {
-        if (creatingNote) return
-        creatingNote = true
-        errorMessage = null
-        scope.launch {
-            try {
-                val note = repository.createAudioNote()
-                NativeDebug.d("Created audio note id=${note.id}")
-                SyncQueueWorker.triggerNow(context)
-                onOpenNote(note.id)
-            } catch (t: Throwable) {
-                NativeDebug.e("Create audio note failed", t)
-                errorMessage = String.format(errorCreateTemplate, t.message ?: t.javaClass.simpleName)
+                NativeDebug.e("Create note failed", t)
+                toasts.error(String.format(errorCreateTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 creatingNote = false
             }
@@ -691,9 +714,9 @@ fun NativeNotesListScreen(
     LaunchedEffect(pendingNewNoteType) {
         when (pendingNewNoteType) {
             null -> return@LaunchedEffect
-            "text" -> createTextNote()
-            "checklist" -> createChecklistNote()
-            "audio" -> createAudioNote()
+            "text" -> createNote(repository::createTextNote)
+            "checklist" -> createNote(repository::createChecklistNote)
+            "audio" -> createNote(repository::createAudioNote)
             else -> NativeDebug.e("Unknown launcher note type: $pendingNewNoteType")
         }
         onPendingNewNoteTypeConsumed()
@@ -708,229 +731,243 @@ fun NativeNotesListScreen(
         // (App.jsx:7933-7935).
         toasts.suppressed = notificationsOpen
         if (notificationsOpen) return@LaunchedEffect
-        unreadNotifications = repository.fetchPendingNotifications().size
+        // Unreachable server: the dot keeps its last answer.
+        try {
+            unreadNotifications = repository.fetchPendingNotifications().size
+        } catch (t: CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            NativeDebug.e("Pending notifications read failed", t)
+        }
     }
 
-    BackHandler(enabled = selectionMode) { exitSelection() }
-    // These three paint their own scrim/content directly (no Dialog/Popup
-    // window backing them), so unlike the confirm dialogs and popovers
-    // elsewhere in this screen, they get no back-dismissal for free -
-    // without this, back either fell through to the previous nav
-    // destination or, on this being the start destination, closed the app.
-    BackHandler(enabled = sidebarOpen) { sidebarOpen = false }
-    BackHandler(enabled = fabOpen) { fabOpen = false }
-    BackHandler(enabled = searchOpen) { searchOpen = false; searchQuery = "" }
-
-    Box(Modifier.fillMaxSize().then(bgModifier)) {
-        if (container.shellPrefs.floatingCards) {
-            FloatingCardsBackground(dark = dark, workspace = true)
+    // Once per session, for administrators (useUpdateCheck.js).
+    LaunchedEffect(container.shellPrefs.isAdmin) {
+        if (container.shellPrefs.isAdmin && container.shellPrefs.serverUpdateAvailable == null) {
+            repository.fetchServerUpdateAvailable()?.let { container.shellPrefs.applyServerUpdateAvailable(it) }
         }
-        Column(
-            // Compose has no real "blur what's behind this layer" primitive
-            // (unlike CSS backdrop-filter), so the FAB's backdrop-blur-[2px]
-            // is reproduced by blurring this content layer itself instead of
-            // the empty scrim drawn on top of it in CreateNoteFab.
-            Modifier
-                .fillMaxSize()
-                .blur(if (fabOpen) 2.dp else 0.dp),
-        ) {
-            NativeHeader(
-                dark = dark,
-                themeId = themeId,
-                titleColor = titleColor,
-                subtextColor = subtextColor,
-                // The two lenses read as their own names, not as the
-                // sentinels they are stored under.
-                activeTagLabel = when {
-                    activeTagFilters.size > 1 -> stringResource(R.string.native_sidebar_active_tags, activeTagFilters.size)
-                    activeTagFilters.size == 1 -> activeTagFilters.first()
-                    activeTagFilter == null -> null
-                    else -> when (activeTagFilter) {
-                    SidebarAllImages -> stringResource(R.string.native_sidebar_all_images)
-                    SidebarReminders -> stringResource(R.string.native_sidebar_reminders)
-                    else -> activeTagFilter
-                    }
-                },
-                activeLens = activeTagFilter?.takeIf { it == SidebarAllImages || it == SidebarReminders },
-                appName = container.branding.appName ?: stringResource(R.string.native_default_app_name),
-                brandingLogo = container.branding.logo,
-                syncState = syncState,
-                queuedCount = syncQueue.size,
-                instanceLocked = container.lockState.isLocked,
-                onOpenSyncStatus = { syncSheetOpen = !syncSheetOpen },
-                onOpenSidebar = { sidebarOpen = true },
-                onOpenSettings = onOpenSettings,
-                onOpenAdmin = onOpenAdmin,
-                showAdmin = container.shellPrefs.isAdmin,
-                searchOpen = searchOpen,
-                onSearchOpenChange = { open ->
-                    searchOpen = open
-                    if (!open) searchQuery = ""
-                },
-                searchQuery = searchQuery,
-                onSearchQueryChange = { searchQuery = it },
-                onEnterSelection = { selectionMode = true },
-                aiAssistantEnabled = container.shellPrefs.aiAssistantEnabled,
-                onAskAi = { question -> askAi(question) },
-                listView = container.shellPrefs.listView,
-                onToggleViewMode = { toggleViewMode() },
-                onToggleDark = { container.shellPrefs.toggleDark(dark) },
-                onOpenQrScanner = onOpenQrScanner,
-                qrQuickEnabled = container.shellPrefs.qrQuickEnabled,
-                // NotesHeader.jsx:100's own two conditions.
-                showLockInstance = container.shellPrefs.isAdmin && container.lockState.status?.enabled == true,
-                onLockInstance = { lockInstance() },
-                onSignOut = { signOut() },
-                notificationsOpen = notificationsOpen,
-                hasUnreadNotifications = unreadNotifications > 0,
-                onOpenNotifications = { notificationsOpen = !notificationsOpen },
-            )
+    }
 
-            errorMessage?.let {
-                Text(it, color = ErrorColor, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+    // The web's header auto-hide on phones (NotesUI.jsx:173-195): scrolling
+    // down more than 4px in one step hides it, scrolling up more than 4px or
+    // coming within 10px of the top shows it again.
+    LaunchedEffect(notesScrollState, density) {
+        val nearTop = with(density) { 10.dp.toPx() }
+        val threshold = with(density) { 4.dp.toPx() }
+        var last = notesScrollState.value
+        snapshotFlow { notesScrollState.value }.collect { y ->
+            val delta = y - last
+            when {
+                y < nearTop -> headerVisible = true
+                delta > threshold -> headerVisible = false
+                delta < -threshold -> headerVisible = true
             }
+            last = y
+        }
+    }
 
-            if (aiLoading || aiAnswer != null) {
-                AiAnswerCard(
-                    answer = aiAnswer,
-                    loading = aiLoading,
-                    dark = dark,
-                    titleColor = titleColor,
-                    citedNotes = notes.filter { it.id in aiCitedNoteIds },
-                    onOpenNote = onOpenNote,
-                    onDismiss = {
-                        aiAnswer = null
-                        aiCitedNoteIds = emptyList()
-                        searchQuery = ""
-                    },
-                )
+    // useNoteTouchDrag.js's edge scroll: while a card is held, a finger in
+    // the top or bottom 80px of the screen scrolls by up to 15px a frame.
+    LaunchedEffect(draggedNoteId) {
+        if (draggedNoteId == null) return@LaunchedEffect
+        val edgeZone = with(density) { 80.dp.toPx() }
+        val maxStep = with(density) { 15.dp.toPx() }
+        while (true) {
+            withFrameNanos { }
+            val y = dragPointerY
+            val step = when {
+                y > screenHeightPx - edgeZone -> min(maxStep, (y - (screenHeightPx - edgeZone)) / edgeZone * maxStep)
+                y < edgeZone -> -min(maxStep, (edgeZone - y) / edgeZone * maxStep)
+                else -> 0f
             }
+            if (step != 0f) notesScrollState.dispatchRawDelta(step)
+        }
+    }
 
-            // Hoisted above the empty/search-empty/list branches below so a
-            // one-frame empty branch during a refetch doesn't tear the
-            // ScrollState down mid-visit. That alone wasn't enough to
-            // survive the real culprit: this whole screen is a NavHost
-            // destination, so opening a note pushes "notes/{id}" on top of
-            // it and "notes" leaves composition entirely while it's
-            // covered - a plain remember (what rememberScrollState uses)
-            // does not survive that, so every return from a note started a
-            // brand new ScrollState at 0. rememberSaveable's state, unlike
-            // plain remember, is captured/restored by NavHost's
-            // SaveableStateHolder across exactly that dispose/recompose
-            // cycle, which is what actually keeps the position. Tag
-            // "GKScroll" (distinct from "GKNative", used for the earlier
-            // status-bar-color debugging) - filter logcat on it to see
-            // whether this identity now survives a note visit.
-            val notesScrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
-            SideEffect {
-                if (BuildConfig.DEBUG) {
-                    Log.d(
-                        "GKScroll",
-                        "notesScrollState id=${System.identityHashCode(notesScrollState)} value=${notesScrollState.value} " +
-                            "maxValue=${notesScrollState.maxValue} notes.size=${notes.size} filteredNotes.size=${filteredNotes.size} " +
-                            "refreshing=$refreshing errorMessage=$errorMessage",
+    fun closeSearch() {
+        searchOpen = false
+        searchQuery = ""
+    }
+
+    // The web closes the topmost overlay first, in App.jsx's own popstate
+    // order; the header menu and the dialogs are windows of their own and
+    // take back before this. Nothing open leaves back to the system.
+    BackHandler(enabled = fabOpen || notificationsOpen || syncSheetOpen || searchOpen || selectionMode || sidebarOpen) {
+        when {
+            fabOpen -> fabOpen = false
+            notificationsOpen -> notificationsOpen = false
+            syncSheetOpen -> syncSheetOpen = false
+            searchOpen -> closeSearch()
+            selectionMode -> exitSelection()
+            else -> sidebarOpen = false
+        }
+    }
+
+    val showLockedBanner = container.lockState.isLocked && !container.lockState.bannerDismissed && !container.lockState.overlayOpen
+    val bannerSlotPx = if (showLockedBanner) bannerHeightPx else 0
+    val statusBarTopPx = WindowInsets.statusBars.getTop(density)
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val headerHideFraction by animateFloatAsState(
+        targetValue = if (headerVisible) 0f else 1f,
+        animationSpec = tween(durationMillis = 300, easing = CssEase),
+        label = "headerHide",
+    )
+    val pullToRefreshState = rememberPullToRefreshState()
+    // App.jsx:4972-4982: the old app switched its pull-to-refresh off
+    // whenever anything was open over the list.
+    val pullToRefreshEnabled = !fabOpen && !searchOpen && !headerMenuOpen && !selectionMode &&
+        !sidebarOpen && !notificationsOpen && !syncSheetOpen
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .then(bgModifier)
+            .onSizeChanged { screenHeightPx = it.height }
+            .pullToRefresh(
+                isRefreshing = pullRefreshing,
+                state = pullToRefreshState,
+                enabled = pullToRefreshEnabled,
+                threshold = PullRefreshTrigger,
+                onRefresh = {
+                    pullRefreshing = true
+                    refresh()
+                },
+            ),
+    ) {
+        // MobileCreateFab's backdrop-blur-[2px] blurs what lies under its
+        // scrim: the page, not the header drawn above it.
+        Box(Modifier.fillMaxSize().blur(if (fabOpen) cssBlur(2.dp) else 0.dp)) {
+            if (container.shellPrefs.floatingCards) {
+                FloatingCardsBackground(dark = dark, workspace = true)
+            }
+            // The page scrolls like the web's document, from under the status
+            // bar: the locked banner, the header's own slot (the header
+            // itself floats above), the assistant's answer, then the notes.
+            // It stays unscrollable until Room answers (see rawNotes).
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .then(if (rawNotes != null) Modifier.verticalScroll(notesScrollState) else Modifier),
+            ) {
+                if (showLockedBanner) {
+                    LockedBanner(
+                        dark = dark,
+                        onUnlock = { container.lockState.overlayOpen = true },
+                        onDismiss = { container.lockState.bannerDismissed = true },
+                        modifier = Modifier.onSizeChanged { bannerHeightPx = it.height },
                     )
                 }
-            }
-            if (rawNotes == null) {
-                // Room hasn't answered this fresh collector yet (see the
-                // long comment on rawNotes above) - an empty Box here, not
-                // the scrollable list, so notesScrollState never measures
-                // against zero content and gets clamped to 0.
-                Box(Modifier.weight(1f).fillMaxWidth()) {}
-            } else if (notes.isEmpty() && !refreshing && errorMessage == null) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.native_notes_empty), color = subtextColor)
-                }
-            } else if (filteredNotes.isEmpty() && (searchQuery.isNotBlank() || activeTagFilter != null || activeTagFilters.isNotEmpty())) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.native_notes_search_empty), color = subtextColor)
-                }
-            } else {
-                val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                val pinnedNotes = remember(filteredNotes) { filteredNotes.filter { it.pinned } }
-                val otherNotes = remember(filteredNotes) { filteredNotes.filter { !it.pinned } }
-                val renderNoteCard: @Composable (NoteEntity) -> Unit = { note ->
-                    ReorderableNoteCard(
-                        note = note,
+                // The header's height, then its mb-6.
+                Spacer(Modifier.height(with(density) { headerHeightPx.toDp() } + 24.dp))
+                if (selectionMode) Spacer(Modifier.height(SelectionShim))
+                val aiBoxShown = aiLoading || aiAnswer != null
+                if (aiBoxShown) {
+                    AiAnswerCard(
+                        answer = aiAnswer,
+                        loading = aiLoading,
                         dark = dark,
                         titleColor = titleColor,
                         subtextColor = subtextColor,
-                        onClick = { onOpenNote(note.id) },
-                        selectionMode = selectionMode,
-                        selected = note.id in selectedIds,
-                        onToggleSelect = {
-                            selectedIds = if (note.id in selectedIds) selectedIds - note.id else selectedIds + note.id
-                        },
+                        citedNotes = notes.filter { it.id in aiCitedNoteIds },
                         typography = container.editorPrefs.typography.activeProfile,
                         taskStrike = container.editorPrefs.taskStrike,
-                        reorderEnabled = reorderEnabled,
-                        isDragged = note.id == draggedNoteId,
-                        dragOffset = if (note.id == draggedNoteId) dragOffset else Offset.Zero,
-                        onBoundsChanged = { rect -> cardBounds[note.id] = rect },
-                        onDragStart = {
-                            NativeDebug.d("NativeNotesListScreen reorder: drag start ${note.id}")
-                            draggedNoteId = note.id
-                            dragOffset = Offset.Zero
+                        onOpenNote = onOpenNote,
+                        onDismiss = {
+                            aiAnswer = null
+                            aiCitedNoteIds = emptyList()
+                            searchQuery = ""
                         },
-                        onDragDelta = { delta -> dragOffset += delta },
-                        onDragEnd = { handleDragEnd(note.id) },
-                        onDragCancel = { endDrag() },
                     )
+                    Spacer(Modifier.height(24.dp))
                 }
-                // react-masonry-css distributes by index (0/2/4 in the
-                // left column, 1/3/5 in the right). Compose's staggered
-                // grid instead picks the currently shortest lane, visibly
-                // reordering cards. Use the web's real column algorithm.
-                val listView = container.shellPrefs.listView
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(notesScrollState)
-                        .padding(start = 16.dp, top = 24.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
-                ) {
-                    if (pinnedNotes.isNotEmpty()) {
-                        SectionLabel(stringResource(R.string.native_notes_section_pinned), subtextColor)
-                        NotesMasonry(notes = pinnedNotes, listView = listView, renderNoteCard = renderNoteCard)
-                    }
-                    if (pinnedNotes.isNotEmpty() && otherNotes.isNotEmpty()) Spacer(Modifier.height(40.dp))
-                    if (otherNotes.isNotEmpty()) {
-                        if (pinnedNotes.isNotEmpty()) {
-                            SectionLabel(stringResource(R.string.native_notes_section_others), subtextColor)
+                // The empty texts' mt-10 collapses into the margin above them
+                // (40 under the header), except right under the dock's shim.
+                val emptyTop = if (selectionMode && !aiBoxShown) 40.dp else 16.dp
+                val filtering = searchQuery.isNotEmpty() || activeTagFilter != null || activeTagFilters.isNotEmpty()
+                val reminderLens = activeTagFilter == SidebarReminders
+                // main.px-4.pb-12, over the body's own bottom inset.
+                Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 48.dp + navBarBottom)) {
+                    when {
+                        rawNotes == null || (refreshing && notes.isEmpty()) ->
+                            EmptyListText(stringResource(R.string.native_notes_loading), subtextColor, Modifier.padding(top = emptyTop))
+                        notes.isEmpty() -> Column(Modifier.padding(top = emptyTop, start = 16.dp, end = 16.dp)) {
+                            EmptyListText(
+                                stringResource(if (reminderLens) R.string.native_notes_no_reminders else R.string.native_notes_empty),
+                                subtextColor,
+                            )
+                            if (syncState == SyncState.OFFLINE) {
+                                Text(
+                                    stringResource(R.string.native_notes_offline_view_not_loaded),
+                                    color = if (dark) Color(0xFFFFB900) else Color(0xFFFE9A00),
+                                    fontSize = 14.sp,
+                                    lineHeight = 20.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                )
+                            }
                         }
-                        NotesMasonry(notes = otherNotes, listView = listView, renderNoteCard = renderNoteCard)
+                        filteredNotes.isEmpty() && filtering -> EmptyListText(
+                            stringResource(if (reminderLens) R.string.native_notes_no_reminders else R.string.native_notes_search_empty),
+                            subtextColor,
+                            Modifier.padding(top = emptyTop),
+                        )
+                        else -> {
+                            val pinnedNotes = remember(filteredNotes) { filteredNotes.filter { it.pinned } }
+                            val otherNotes = remember(filteredNotes) { filteredNotes.filter { !it.pinned } }
+                            val renderNoteCard: @Composable (NoteEntity) -> Unit = { note ->
+                                ReorderableNoteCard(
+                                    note = note,
+                                    dark = dark,
+                                    titleColor = titleColor,
+                                    subtextColor = subtextColor,
+                                    onClick = { onOpenNote(note.id) },
+                                    selectionMode = selectionMode,
+                                    selected = note.id in selectedIds,
+                                    onToggleSelect = {
+                                        selectedIds = if (note.id in selectedIds) selectedIds - note.id else selectedIds + note.id
+                                    },
+                                    typography = container.editorPrefs.typography.activeProfile,
+                                    taskStrike = container.editorPrefs.taskStrike,
+                                    isDragged = note.id == draggedNoteId,
+                                    isDragOver = note.id == dragOverNoteId,
+                                    onBoundsChanged = { bounds ->
+                                        if (bounds == null) cardBounds.remove(note.id) else cardBounds[note.id] = bounds
+                                    },
+                                    onDragStart = { pointer ->
+                                        NativeDebug.d("NativeNotesListScreen reorder: drag start ${note.id}")
+                                        draggedNoteId = note.id
+                                        trackDrag(note.id, pointer)
+                                    },
+                                    onDragMove = { pointer -> trackDrag(note.id, pointer) },
+                                    onDrop = { dropDraggedNote(note.id) },
+                                    onDragCancel = { endDrag() },
+                                )
+                            }
+                            // react-masonry-css distributes by index (0/2/4 in the
+                            // left column, 1/3/5 in the right). Compose's staggered
+                            // grid instead picks the currently shortest lane, visibly
+                            // reordering cards. Use the web's real column algorithm.
+                            val listView = container.shellPrefs.listView
+                            if (pinnedNotes.isNotEmpty()) {
+                                SectionLabel(stringResource(R.string.native_notes_section_pinned), subtextColor)
+                                NotesMasonry(notes = pinnedNotes, listView = listView, renderNoteCard = renderNoteCard)
+                                // The pinned section's mb-10.
+                                Spacer(Modifier.height(40.dp))
+                            }
+                            if (otherNotes.isNotEmpty()) {
+                                if (pinnedNotes.isNotEmpty()) {
+                                    SectionLabel(stringResource(R.string.native_notes_section_others), subtextColor)
+                                }
+                                NotesMasonry(notes = otherNotes, listView = listView, renderNoteCard = renderNoteCard)
+                            }
+                        }
                     }
                 }
             }
         }
 
-        TagSidebar(
-            open = sidebarOpen,
-            dark = dark,
-            themeId = themeId,
-            tags = tagCounts,
-            activeTag = activeTagFilter,
-            activeTags = activeTagFilters,
-            onSelectNotes = { activeTagFilter = null; activeTagFilters = emptySet(); sidebarOpen = false },
-            onSelectTag = { tag, additive ->
-                activeTagFilter = null
-                activeTagFilters = if (additive) {
-                    val current = activeTagFilters.firstOrNull { it.equals(tag, ignoreCase = true) }
-                    if (current != null) activeTagFilters - current else activeTagFilters + tag
-                } else {
-                    if (activeTagFilters.size == 1 && activeTagFilters.first().equals(tag, ignoreCase = true)) emptySet()
-                    else setOf(tag)
-                }
-                if (!additive) sidebarOpen = false
-            },
-            onClearTagFilters = { activeTagFilters = emptySet() },
-            onSelectImages = { activeTagFilter = SidebarAllImages; activeTagFilters = emptySet(); sidebarOpen = false },
-            onSelectReminders = { activeTagFilter = SidebarReminders; activeTagFilters = emptySet(); sidebarOpen = false },
-            onOpenArchived = { sidebarOpen = false; onOpenArchived() },
-            onOpenTrash = { sidebarOpen = false; onOpenTrash() },
-            onClose = { sidebarOpen = false },
-        )
+        if (!selectionMode) CreateNoteScrim(open = fabOpen)
 
         if (selectionMode) {
             val visibleIds = filteredNotes.mapTo(linkedSetOf()) { it.id }
@@ -1001,18 +1038,163 @@ fun NativeNotesListScreen(
                 onClose = { exitSelection() },
                 dark = dark,
                 modifier = Modifier.align(Alignment.TopCenter),
+                headerVisible = headerVisible,
             )
-        } else {
+        }
+
+        // The header and the status-bar strip it slides under: above the
+        // page, the create menu's scrim and the dock (z-40 against 30 and 35
+        // on the web), and above the search's tap catcher while searching.
+        Box(Modifier.fillMaxSize().zIndex(if (searchOpen) 2f else 0f)) {
+            NativeHeader(
+                dark = dark,
+                themeId = themeId,
+                titleColor = titleColor,
+                // The two lenses read as their own names, not as the
+                // sentinels they are stored under.
+                activeTagLabel = when {
+                    activeTagFilters.size > 1 -> stringResource(R.string.native_sidebar_active_tags, activeTagFilters.size)
+                    activeTagFilters.size == 1 -> activeTagFilters.first()
+                    activeTagFilter == null -> null
+                    else -> when (activeTagFilter) {
+                        SidebarAllImages -> stringResource(R.string.native_sidebar_all_images)
+                        SidebarReminders -> stringResource(R.string.native_sidebar_reminders)
+                        else -> activeTagFilter
+                    }
+                },
+                activeLens = activeTagFilter?.takeIf { it == SidebarAllImages || it == SidebarReminders },
+                appName = container.branding.appName ?: stringResource(R.string.native_default_app_name),
+                brandingLogo = container.branding.logo,
+                syncState = syncState,
+                queuedCount = syncQueue.size,
+                instanceLocked = container.lockState.isLocked,
+                hasServerUpdate = container.shellPrefs.isAdmin && container.shellPrefs.serverUpdateAvailable == true,
+                onOpenSyncStatus = { syncSheetOpen = !syncSheetOpen },
+                onOpenSidebar = { sidebarOpen = true },
+                onOpenSettings = onOpenSettings,
+                onOpenAdmin = onOpenAdmin,
+                showAdmin = container.shellPrefs.isAdmin,
+                searchOpen = searchOpen,
+                searchFocusRequest = searchFocusRequest,
+                onOpenSearch = {
+                    searchOpen = true
+                    searchFocusRequest++
+                },
+                onCloseSearch = { closeSearch() },
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                onEnterSelection = { enterSelection() },
+                aiAssistantEnabled = container.shellPrefs.aiAssistantEnabled,
+                onAskAi = { question -> askAi(question) },
+                listView = container.shellPrefs.listView,
+                onToggleViewMode = { toggleViewMode() },
+                onToggleDark = { container.shellPrefs.toggleDark(dark) },
+                onOpenQrScanner = onOpenQrScanner,
+                qrQuickEnabled = container.shellPrefs.qrQuickEnabled,
+                // NotesHeader.jsx:100's own two conditions.
+                showLockInstance = container.shellPrefs.isAdmin && container.lockState.status?.enabled == true,
+                onLockInstance = { lockInstance() },
+                onSignOut = { signOut() },
+                menuOpen = headerMenuOpen,
+                onMenuOpenChange = { headerMenuOpen = it },
+                notificationsOpen = notificationsOpen,
+                hasUnreadNotifications = unreadNotifications > 0,
+                onOpenNotifications = { notificationsOpen = !notificationsOpen },
+                modifier = Modifier
+                    .onSizeChanged { headerHeightPx = it.height }
+                    // Sticky under the status bar once the banner has scrolled
+                    // away, and slid up by its own height while hidden.
+                    .offset {
+                        val sticky = max(0, bannerSlotPx - notesScrollState.value)
+                        IntOffset(0, statusBarTopPx + sticky - (headerHideFraction * headerHeightPx).roundToInt())
+                    },
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .windowInsetsTopHeight(WindowInsets.statusBars)
+                    .background(WorkspaceTheme.statusBarColor(themeId, dark)),
+            )
+            // SwipeRefreshLayout's stock look: a #FAFAFA disc with a black
+            // arrow, coming out from under the status bar.
+            PullToRefreshDefaults.Indicator(
+                state = pullToRefreshState,
+                isRefreshing = pullRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.statusBars),
+                containerColor = Color(0xFFFAFAFA),
+                color = Color.Black,
+                maxDistance = PullRefreshRest,
+            )
+        }
+
+        if (fabOpen) {
+            // The web swallows the next tap anywhere outside the menu, the
+            // header included, and only closes it (MobileCreateFab.jsx:23-33).
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { fabOpen = false },
+            )
+        }
+
+        if (!selectionMode) {
             CreateNoteFab(
                 dark = dark,
                 open = fabOpen,
                 onOpenChange = { fabOpen = it },
-                onCreateText = { createTextNote() },
-                onCreateChecklist = { createChecklistNote() },
-                onCreateDrawing = { createDrawingNote() },
-                onCreateAudio = { createAudioNote() },
+                onCreateText = { createNote(repository::createTextNote) },
+                onCreateChecklist = { createNote(repository::createChecklistNote) },
+                onCreateDrawing = { createNote(repository::createDrawingNote) },
+                onCreateAudio = { createNote(repository::createAudioNote) },
             )
         }
+
+        if (searchOpen && searchQuery.isEmpty()) {
+            // NotesHeader.jsx:384-390: while the search is open and empty, a
+            // clear layer under the header closes it on the next tap. The page
+            // still scrolls through it, as a touch on the web's fixed layer
+            // scrolls the document.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .zIndex(1f)
+                    .scrollable(notesScrollState, Orientation.Vertical, reverseDirection = true)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { closeSearch() },
+            )
+        }
+
+        TagSidebar(
+            open = sidebarOpen,
+            dark = dark,
+            themeId = themeId,
+            tags = tagCounts,
+            activeTag = activeTagFilter,
+            activeTags = activeTagFilters,
+            onSelectNotes = { activeTagFilter = null; activeTagFilters = emptySet(); sidebarOpen = false },
+            onSelectTag = { tag, additive ->
+                activeTagFilter = null
+                activeTagFilters = if (additive) {
+                    val current = activeTagFilters.firstOrNull { it.equals(tag, ignoreCase = true) }
+                    if (current != null) activeTagFilters - current else activeTagFilters + tag
+                } else {
+                    if (activeTagFilters.size == 1 && activeTagFilters.first().equals(tag, ignoreCase = true)) emptySet()
+                    else setOf(tag)
+                }
+                if (!additive) sidebarOpen = false
+            },
+            onClearTagFilters = { activeTagFilters = emptySet() },
+            onSelectImages = { activeTagFilter = SidebarAllImages; activeTagFilters = emptySet(); sidebarOpen = false },
+            onSelectReminders = { activeTagFilter = SidebarReminders; activeTagFilters = emptySet(); sidebarOpen = false },
+            onOpenArchived = { sidebarOpen = false; onOpenArchived() },
+            onOpenTrash = { sidebarOpen = false; onOpenTrash() },
+            onClose = { sidebarOpen = false },
+        )
 
         if (showBulkTrashConfirm) {
             ConfirmActionDialog(
@@ -1077,17 +1259,51 @@ fun NativeNotesListScreen(
             onSyncNow = { refresh() },
         )
     }
-
-    BackHandler(enabled = notificationsOpen) { notificationsOpen = false }
-    BackHandler(enabled = syncSheetOpen) { syncSheetOpen = false }
 }
 
+// Before the first measure: py-4 around the 44px title block, plus the rule.
+private val DefaultHeaderHeight = 77.dp
+
+// The room the web makes above the list for the selection dock on a phone.
+private val SelectionShim = 44.dp
+
+// SwipeRefreshLayout's own numbers in the old app: a pull of 64dp triggers,
+// and the 40dp disc rests with its top 64dp under the status bar.
+private val PullRefreshTrigger = 64.dp
+private val PullRefreshRest = 104.dp
+
+// CSS `ease`.
+private val CssEase = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)
+
+// Android turns a blur radius r into a standard deviation of 0.57735 r,
+// where CSS blur() takes the standard deviation itself.
+private fun cssBlur(sigma: Dp): Dp = sigma / 0.57735f
+
+/** The web's empty and loading lines: 16px, centred, gray-500 / gray-400. */
+@Composable
+private fun EmptyListText(text: String, color: Color, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        color = color,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        textAlign = TextAlign.Center,
+        modifier = modifier.fillMaxWidth(),
+    )
+}
+
+/**
+ * The notes header on a phone (NotesHeader.jsx): a flat --gk-statusbar bar
+ * with its rule and soft shadow, hamburger, logo, name and section, then
+ * search, bell, cloud, the optional QR quick button and the kebab. It
+ * floats over the page (see NativeNotesListScreen), which is how the web's
+ * sticky header can slide away and back.
+ */
 @Composable
 private fun NativeHeader(
     dark: Boolean,
     themeId: String,
     titleColor: Color,
-    subtextColor: Color,
     activeTagLabel: String?,
     /** Which of the drawer's two lenses is on, if either: the header row
      *  shows their own glyph rather than the tag one. */
@@ -1098,13 +1314,16 @@ private fun NativeHeader(
     syncState: SyncState,
     queuedCount: Int,
     instanceLocked: Boolean,
+    hasServerUpdate: Boolean,
     onOpenSyncStatus: () -> Unit,
     onOpenSidebar: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAdmin: () -> Unit,
     showAdmin: Boolean,
     searchOpen: Boolean,
-    onSearchOpenChange: (Boolean) -> Unit,
+    searchFocusRequest: Int,
+    onOpenSearch: () -> Unit,
+    onCloseSearch: () -> Unit,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onEnterSelection: () -> Unit,
@@ -1118,147 +1337,44 @@ private fun NativeHeader(
     showLockInstance: Boolean,
     onLockInstance: () -> Unit,
     onSignOut: () -> Unit,
+    menuOpen: Boolean,
+    onMenuOpenChange: (Boolean) -> Unit,
     notificationsOpen: Boolean,
     hasUnreadNotifications: Boolean,
     onOpenNotifications: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    // Flat --gk-statusbar fill, no gradient and no blur: header.glass-card's
-    // desktop two-gradient-plus-blur look is fully replaced by a flat
-    // background under the site's own `pointer: coarse` media query (see
-    // src/styles/globalCSS.js) - i.e. on every real phone, which is this
-    // app's only target - so this flat fill IS the faithful port, not a
-    // simplification of the desktop look. WorkspaceTheme.headerGradient
-    // stays in use for TagSidebar's own header row below, for the same
-    // reason it never applied here to begin with.
-    val accentColor = if (dark) Color(0xFF818cf8) else Color(0xFF4f46e5)
+    val chrome = WorkspaceTheme.colorsFor(themeId, dark)
+    val offline = syncState == SyncState.OFFLINE
+    // The QR quick button makes the web tighten the whole row so it still
+    // fits (NotesHeader.jsx:233, 249, 366, 572, 616).
+    val sidePadding = if (qrQuickEnabled) 6.dp else 10.dp
+    val clusterGap = if (qrQuickEnabled) 6.dp else 12.dp
+    val buttonGap = if (qrQuickEnabled) 0.dp else 4.dp
+    val compactButton = if (qrQuickEnabled) 32.dp else 36.dp
     Column(
-        modifier = Modifier.shadow(
-            elevation = 3.dp,
-            shape = RectangleShape,
-            ambientColor = WorkspaceTheme.colorsFor(themeId, dark).chromeShadow,
-            spotColor = WorkspaceTheme.colorsFor(themeId, dark).chromeShadow,
-        ),
+        modifier
+            .fillMaxWidth()
+            .headerDropShadow(chrome.chromeShadow)
+            .background(chrome.statusBar),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(WorkspaceTheme.statusBarColor(themeId, dark))
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(horizontal = 10.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AnimatedContent(
-                targetState = searchOpen,
-                modifier = Modifier.weight(1f),
-                // A little "ripple" pop instead of a hard cut: the
-                // incoming side fades and expands outward from the
-                // centre with a soft spring overshoot (like a wave
-                // settling), the outgoing side fades and contracts in.
-                transitionSpec = {
-                    (
-                        fadeIn(animationSpec = tween(220, easing = LinearOutSlowInEasing)) +
-                            scaleIn(
-                                initialScale = 0.85f,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessMediumLow,
-                                ),
-                            )
-                        ).togetherWith(
-                        fadeOut(animationSpec = tween(140)) +
-                            scaleOut(targetScale = 0.9f, animationSpec = tween(140)),
-                    ).using(SizeTransform(clip = false))
-                },
-                label = "headerSearchToggle",
-            ) { showSearch ->
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            if (showSearch) {
-                val focusRequester = remember { FocusRequester() }
-                val keyboard = LocalSoftwareKeyboardController.current
-                val closeSearchLabel = stringResource(R.string.native_notes_search_close)
-                SearchIcon(size = 20.dp, tint = subtextColor)
-                Spacer(Modifier.width(10.dp))
-                Box(modifier = Modifier.weight(1f)) {
-                    if (searchQuery.isEmpty()) {
-                        Text(
-                            stringResource(
-                                if (aiAssistantEnabled) R.string.native_notes_search_or_ask
-                                else R.string.native_notes_search_placeholder
-                            ),
-                            color = subtextColor,
-                            fontSize = 16.sp,
-                        )
-                    }
-                    BasicTextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChange,
-                        textStyle = TextStyle(color = titleColor, fontSize = 16.sp),
-                        singleLine = true,
-                        cursorBrush = SolidColor(Indigo),
-                        // Enter sends the question rather than just
-                        // dismissing the keyboard, same as the web.
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(
-                            onSearch = { if (aiAssistantEnabled && searchQuery.isNotBlank()) onAskAi(searchQuery) },
-                        ),
-                        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
-                    )
-                }
-                if (aiAssistantEnabled && searchQuery.isNotBlank()) {
-                    val askAiLabel = stringResource(R.string.native_notes_ask_ai)
-                    Spacer(Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .semantics { contentDescription = askAiLabel }
-                            .gkTooltip(askAiLabel)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                role = Role.Button,
-                            ) { onAskAi(searchQuery) }
-                            .padding(6.dp),
-                    ) {
-                        FileAiIcon(size = 20.dp, tint = if (dark) Color(0xFF818CF8) else Color(0xFF4F46E5))
-                    }
-                }
-                Spacer(Modifier.width(8.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .semantics { contentDescription = closeSearchLabel }
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onSearchOpenChange(false) }
-                        .padding(6.dp),
-                ) {
-                    CloseIcon(size = 20.dp, tint = titleColor)
-                }
-                LaunchedEffect(Unit) {
-                    focusRequester.requestFocus()
-                    keyboard?.show()
-                }
-            } else {
-                val openSidebarLabel = stringResource(R.string.native_sidebar_open)
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .semantics { contentDescription = openSidebarLabel }
-                        .gkTooltip(openSidebarLabel)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onOpenSidebar() }
-                        .padding(8.dp),
-                ) {
+        Box {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (searchOpen) Modifier.searchBackdrop() else Modifier)
+                    // pb-7 while offline: the pill hangs under the title block.
+                    .padding(start = sidePadding, end = sidePadding, top = 16.dp, bottom = if (offline) 28.dp else 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val openTagsLabel = stringResource(R.string.native_sidebar_open)
+                HeaderButton(size = 40.dp, label = openTagsLabel, tooltip = openTagsLabel, onClick = onOpenSidebar) {
                     HamburgerIcon(size = 24.dp, tint = titleColor)
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(clusterGap))
                 // Same split as AuthShell: a custom logo is drawn raw, the
-                // bundled one keeps its rounded tile (NotesHeader.jsx:265).
+                // bundled one keeps its rounded, lightly shadowed tile
+                // (NotesHeader.jsx:265-279).
                 val customLogo = brandingLogo?.let { rememberDecodedImage(it) }
                 if (customLogo != null) {
                     Image(
@@ -1271,13 +1387,28 @@ private fun NativeHeader(
                     Image(
                         painter = painterResource(id = R.drawable.glasskeep_logo),
                         contentDescription = appName,
-                        modifier = Modifier.size(28.dp).clip(RoundedCornerShape(12.dp)),
+                        modifier = Modifier
+                            .size(28.dp)
+                            .shadow(1.dp, RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(12.dp)),
                     )
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(clusterGap))
                 Column(Modifier.weight(1f)) {
-                    Text(appName, color = titleColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        appName,
+                        color = titleColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        lineHeight = 28.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                    Row(
+                        modifier = Modifier.widthIn(max = 160.dp).height(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        val accentColor = chrome.accent
                         when {
                             activeTagLabel == null -> NotesIcon(size = 12.dp, tint = accentColor)
                             activeLens == SidebarAllImages -> SidebarImagesIcon(size = 12.dp, tint = accentColor)
@@ -1289,77 +1420,31 @@ private fun NativeHeader(
                             activeTagLabel ?: stringResource(R.string.native_header_notes_label),
                             color = accentColor,
                             fontSize = 12.sp,
+                            lineHeight = 16.sp,
                             fontWeight = FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                    if (offline) OfflinePill(dark)
                 }
                 val searchLabel = stringResource(R.string.native_notes_search)
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .semantics { contentDescription = searchLabel }
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onSearchOpenChange(true) }
-                        .padding(8.dp),
-                ) {
-                    SearchIcon(size = 20.dp, tint = subtextColor)
+                HeaderButton(size = compactButton, label = searchLabel, tooltip = null, onClick = onOpenSearch) {
+                    SearchIcon(size = 20.dp, tint = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565))
                 }
+                Spacer(Modifier.width(4.dp))
                 val notificationsLabel = stringResource(R.string.native_notifications_title)
-                if (qrQuickEnabled) {
-                    val qrLabel = stringResource(R.string.native_qr_scan_title)
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .semantics { contentDescription = qrLabel }
-                            .gkTooltip(qrLabel)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                role = Role.Button,
-                            ) { onOpenQrScanner() }
-                            .padding(8.dp),
-                    ) {
-                        QrCodeIcon(size = 18.dp, tint = titleColor)
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .semantics { contentDescription = notificationsLabel }
-                        .gkTooltip(notificationsLabel)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onOpenNotifications() }
-                        .padding(8.dp),
-                ) {
-                    if (notificationsOpen) {
-                        BellRingingFilledIcon(size = 20.dp, tint = if (dark) Color(0xFF9C9DDB) else Color(0xFF6366F1))
-                    } else {
-                        BellIcon(size = 20.dp, tint = if (dark) Color(0xFF9C9DDB) else Color(0xFF6366F1))
-                    }
+                HeaderButton(size = 36.dp, label = notificationsLabel, tooltip = notificationsLabel, onClick = onOpenNotifications) {
+                    val bellTint = if (dark) Color(0xFF9C9DDB) else Color(0xFF6366F1)
+                    if (notificationsOpen) BellFilledIcon(size = 20.dp, tint = bellTint) else BellIcon(size = 20.dp, tint = bellTint)
                     // .gk-notif-bell-dot: a plain red dot, never a count
                     // (the web dropped the counter with the read/unread
                     // distinction, see NotificationBell.jsx:56-59).
                     if (hasUnreadNotifications) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .size(9.dp)
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(if (dark) Color(0xFF1C1C22) else Color.White)
-                                .padding(2.dp)
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(Color(0xFFEF4444)),
-                        )
+                        NotificationDot(dark, Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp))
                     }
                 }
+                Spacer(Modifier.width(buttonGap))
                 SyncStatusButton(
                     state = syncState,
                     queued = queuedCount,
@@ -1367,56 +1452,351 @@ private fun NativeHeader(
                     dark = dark,
                     onClick = onOpenSyncStatus,
                 )
-                var moreMenuExpanded by remember { mutableStateOf(false) }
-                val moreLabel = stringResource(R.string.native_notes_more_options)
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .semantics { contentDescription = moreLabel }
-                            .gkTooltip(moreLabel)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                role = Role.Button,
-                            ) { moreMenuExpanded = true }
-                            .padding(8.dp),
-                    ) {
-                        // The dots step aside while the panel is open: on a
-                        // phone the web anchors it right over the button
-                        // (NotesHeader.jsx:624-627).
-                        if (!moreMenuExpanded) KebabIcon(size = 20.dp, tint = titleColor)
+                Spacer(Modifier.width(buttonGap))
+                if (qrQuickEnabled) {
+                    val qrLabel = stringResource(R.string.native_settings_qr_signin)
+                    HeaderButton(size = 32.dp, label = qrLabel, tooltip = qrLabel, onClick = onOpenQrScanner) {
+                        QrQuickIcon(size = 20.dp, tint = if (dark) Color(0xFFE5E7EB) else Color(0xFF364153))
+                    }
+                }
+                val menuLabel = stringResource(R.string.native_header_menu)
+                HeaderButton(size = compactButton, label = menuLabel, tooltip = menuLabel, onClick = { onMenuOpenChange(!menuOpen) }) {
+                    // The dots step aside while the panel is open: on a
+                    // phone the web anchors it right over the button
+                    // (NotesHeader.jsx:624-627).
+                    if (!menuOpen) KebabIcon(size = 20.dp, tint = titleColor)
+                    if (hasServerUpdate) {
+                        ServerUpdateDot(
+                            size = 10.dp,
+                            ringColor = if (dark) Color(0xFF1E2939) else Color.White,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 4.dp),
+                        )
                     }
                     HeaderMenu(
-                        expanded = moreMenuExpanded,
+                        expanded = menuOpen,
                         dark = dark,
                         listView = listView,
-                        onDismiss = { moreMenuExpanded = false },
-                        onOpenSettings = { moreMenuExpanded = false; onOpenSettings() },
+                        hasServerUpdate = hasServerUpdate,
+                        onDismiss = { onMenuOpenChange(false) },
+                        onOpenSettings = { onMenuOpenChange(false); onOpenSettings() },
                         showAdmin = showAdmin,
-                        onOpenAdmin = { moreMenuExpanded = false; onOpenAdmin() },
-                        onToggleViewMode = { moreMenuExpanded = false; onToggleViewMode() },
-                        onToggleDark = { moreMenuExpanded = false; onToggleDark() },
-                        onEnterSelection = { moreMenuExpanded = false; onEnterSelection() },
-                        onOpenQrScanner = { moreMenuExpanded = false; onOpenQrScanner() },
+                        onOpenAdmin = { onMenuOpenChange(false); onOpenAdmin() },
+                        onToggleViewMode = { onMenuOpenChange(false); onToggleViewMode() },
+                        onToggleDark = { onMenuOpenChange(false); onToggleDark() },
+                        onEnterSelection = { onMenuOpenChange(false); onEnterSelection() },
+                        onOpenQrScanner = { onMenuOpenChange(false); onOpenQrScanner() },
                         showLockInstance = showLockInstance,
-                        onLockInstance = { moreMenuExpanded = false; onLockInstance() },
-                        onSignOut = { moreMenuExpanded = false; onSignOut() },
+                        onLockInstance = { onMenuOpenChange(false); onLockInstance() },
+                        onSignOut = { onMenuOpenChange(false); onSignOut() },
                     )
                 }
             }
-            }
+            if (searchOpen) {
+                HeaderSearchLayer(
+                    query = searchQuery,
+                    onQueryChange = onSearchQueryChange,
+                    onClear = onCloseSearch,
+                    aiAssistantEnabled = aiAssistantEnabled,
+                    onAskAi = onAskAi,
+                    focusRequest = searchFocusRequest,
+                    dark = dark,
+                    textColor = titleColor,
+                    modifier = Modifier.matchParentSize(),
+                )
             }
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(WorkspaceTheme.headerBorderColor(themeId, dark)))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(chrome.chromeBorder))
     }
 }
 
+/** One of the header's round icon buttons: no press feedback, since the
+ *  web's only feedback is a hover style a phone never shows. */
+@Composable
+private fun HeaderButton(
+    size: Dp,
+    label: String,
+    tooltip: String?,
+    onClick: () -> Unit,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .semantics { contentDescription = label }
+            .then(if (tooltip != null) Modifier.gkTooltip(tooltip) else Modifier)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+        content = content,
+    )
+}
+
+/** `.gk-notif-bell-dot`: a 9px red dot with a 2px ring around it. */
+@Composable
+private fun NotificationDot(dark: Boolean, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .size(13.dp)
+            .background(if (dark) Color(0xFA1C1C22) else Color(0xF5FFFFFF), CircleShape)
+            .padding(2.dp)
+            .background(Color(0xFFEF4444), CircleShape),
+    )
+}
+
+/** The admin's "update available" dot: emerald-500 with a 2px ring, over
+ *  an emerald-400 halo that keeps pinging outwards (`animate-ping`). */
+@Composable
+private fun ServerUpdateDot(size: Dp, ringColor: Color, modifier: Modifier = Modifier) {
+    val ping by rememberInfiniteTransition(label = "updatePing").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            keyframes {
+                durationMillis = 1_000
+                0f at 0 using GkEaseOut
+                1f at 750
+            },
+        ),
+        label = "updatePingProgress",
+    )
+    Box(modifier.size(size)) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    scaleX = 1f + ping
+                    scaleY = 1f + ping
+                    alpha = 0.75f * (1f - ping)
+                }
+                .background(Color(0xFF00D492), CircleShape),
+        )
+        Box(
+            Modifier
+                .matchParentSize()
+                .drawBehind { drawCircle(ringColor, radius = this.size.minDimension / 2f + 2.dp.toPx()) }
+                .background(Color(0xFF00BC7D), CircleShape),
+        )
+    }
+}
+
+/** The "offline" pill that hangs 3px under the title block, positioned
+ *  like the web's absolute one: it takes no room in the row. */
+@Composable
+private fun OfflinePill(dark: Boolean) {
+    val shape = RoundedCornerShape(999.dp)
+    Text(
+        stringResource(R.string.native_header_offline),
+        color = if (dark) Color(0xFFFFB86A) else Color(0xFFCA3500),
+        fontSize = 11.sp,
+        lineHeight = 11.sp,
+        fontWeight = FontWeight.Medium,
+        maxLines = 1,
+        softWrap = false,
+        modifier = Modifier
+            .layout { measurable, _ ->
+                val placeable = measurable.measure(Constraints())
+                layout(0, 0) { placeable.place(0, 3.dp.roundToPx()) }
+            }
+            .clip(shape)
+            .background(Color(0x1AF54900))
+            .border(1.dp, Color(0x33F54900), shape)
+            .padding(horizontal = 9.dp, vertical = 3.dp),
+    )
+}
+
 /**
- * The assistant's answer, above the grid (NotesComposer.jsx:89-160): a
- * card with an indigo edge and a faint indigo-to-purple wash, the
- * "thinking" line while the model is working, and the notes the answer
- * actually leant on underneath.
+ * The phone search (NotesHeader.jsx:391-441): a layer over the whole
+ * header, the header's own content left underneath, blurred. One rounded
+ * field with a thin ring that turns into a 2px indigo one while focused;
+ * inside it on the right, the assistant's button once there is a question
+ * and a "×" that clears and closes the search.
+ */
+@Composable
+private fun HeaderSearchLayer(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit,
+    aiAssistantEnabled: Boolean,
+    onAskAi: (String) -> Unit,
+    focusRequest: Int,
+    dark: Boolean,
+    textColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(focusRequest) {
+        if (focusRequest > 0) {
+            focusRequester.requestFocus()
+            keyboard?.show()
+        }
+    }
+    var focused by remember { mutableStateOf(false) }
+    val ringWidth by animateDpAsState(
+        targetValue = if (focused) 2.dp else 1.dp,
+        animationSpec = tween(150, easing = GkStandardEasing),
+        label = "searchRingWidth",
+    )
+    val ringColor by animateColorAsState(
+        targetValue = if (focused) Color(0xFF615FFF) else Color(0x2690A1B9),
+        animationSpec = tween(150, easing = GkStandardEasing),
+        label = "searchRingColor",
+    )
+    Box(
+        modifier = modifier
+            // The layer itself keeps the covered buttons out of reach.
+            .pointerInput(Unit) { awaitEachGesture { awaitFirstDown(requireUnconsumed = false) } }
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            singleLine = true,
+            textStyle = TextStyle(color = textColor, fontSize = 14.sp, lineHeight = 20.sp),
+            cursorBrush = SolidColor(textColor),
+            // Enter sends the question rather than just dismissing the
+            // keyboard, same as the web.
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(
+                onSearch = { if (aiAssistantEnabled && query.isNotBlank()) onAskAi(query) },
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .focusRequester(focusRequester)
+                .onFocusChanged { focused = it.isFocused }
+                .drawBehind {
+                    // A CSS ring: drawn outside the 8px-rounded box.
+                    val width = ringWidth.toPx()
+                    drawRoundRect(
+                        color = ringColor,
+                        topLeft = Offset(-width / 2f, -width / 2f),
+                        size = Size(size.width + width, size.height + width),
+                        cornerRadius = CornerRadius(8.dp.toPx() + width / 2f),
+                        style = Stroke(width = width),
+                    )
+                },
+            decorationBox = { innerTextField ->
+                // pl-3 and pr-8 (pr-16 with the assistant) inside the
+                // input's transparent 1px border.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 13.dp, end = if (aiAssistantEnabled) 65.dp else 33.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    if (query.isEmpty()) {
+                        Text(
+                            stringResource(
+                                if (aiAssistantEnabled) R.string.native_notes_search_or_ask
+                                else R.string.native_notes_search_placeholder,
+                            ),
+                            color = if (dark) DarkSubtextColor else LightSubtextColor,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Clip,
+                        )
+                    }
+                    innerTextField()
+                }
+            },
+        )
+        Row(
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (aiAssistantEnabled && query.isNotBlank()) {
+                val askAiLabel = stringResource(R.string.native_notes_ask_ai)
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .semantics { contentDescription = askAiLabel }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onAskAi(query) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AskAiIcon(size = 16.dp, tint = Color(0xFF4F39F6))
+                }
+            }
+            if (query.isNotEmpty()) {
+                val clearLabel = stringResource(R.string.native_notes_search_clear)
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .semantics { contentDescription = clearLabel }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onClear() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "×",
+                        color = if (dark) Color(0xFFD1D5DC) else Color(0xFF6A7282),
+                        fontSize = 16.sp,
+                        lineHeight = 16.sp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The search field's backdrop-blur-xl over the header content. Blur
+ *  needs Android 12; below it the covered content is hidden instead. */
+private fun Modifier.searchBackdrop(): Modifier =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) blur(cssBlur(24.dp)) else alpha(0f)
+
+/**
+ * header.glass-card's `0 1px 2px S, 0 6px 18px -12px S` on a phone,
+ * painted as the strip it casts under the header: each CSS shadow is the
+ * header's box blurred with a standard deviation of half its blur, moved
+ * down and shrunk by its spread.
+ */
+private fun Modifier.headerDropShadow(color: Color): Modifier = drawBehind {
+    val stops = Array(HeaderShadowSteps + 1) { step ->
+        val fraction = step.toFloat() / HeaderShadowSteps
+        val depth = fraction * HeaderShadowDepth.value
+        val near = color.alpha * gaussianCdf(1f - depth)
+        val far = color.alpha * gaussianCdf(-(depth + 6f) / 9f)
+        fraction to color.copy(alpha = 1f - (1f - near) * (1f - far))
+    }
+    val depthPx = HeaderShadowDepth.toPx()
+    drawRect(
+        brush = Brush.verticalGradient(*stops, startY = size.height, endY = size.height + depthPx),
+        topLeft = Offset(0f, size.height),
+        size = Size(size.width, depthPx),
+    )
+}
+
+private val HeaderShadowDepth = 16.dp
+private const val HeaderShadowSteps = 16
+
+/** Standard normal CDF, through Abramowitz and Stegun's 7.1.26 erf. */
+private fun gaussianCdf(x: Float): Float {
+    val z = abs(x) / sqrt(2f)
+    val t = 1f / (1f + 0.3275911f * z)
+    val erf = 1f - ((((1.0614054f * t - 1.4531521f) * t + 1.4214137f) * t - 0.28449672f) * t + 0.2548296f) * t * exp(-z * z)
+    return if (x >= 0f) 0.5f * (1f + erf) else 0.5f * (1f - erf)
+}
+
+/**
+ * The assistant's answer, above the notes (NotesComposer.jsx:89-160): a
+ * near-opaque card under a faint indigo-to-purple wash, a thin progress bar
+ * and a pulsing "thinking" line while the model works, then the answer and
+ * the cards of the notes it leant on.
  */
 @Composable
 private fun AiAnswerCard(
@@ -1424,36 +1804,54 @@ private fun AiAnswerCard(
     loading: Boolean,
     dark: Boolean,
     titleColor: Color,
+    subtextColor: Color,
     citedNotes: List<NoteEntity>,
+    typography: TypographyProfile,
+    taskStrike: Boolean,
     onOpenNote: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val accent = if (dark) Color(0xFF818CF8) else Color(0xFF4F46E5)
+    val shape = RoundedCornerShape(12.dp)
+    val headingColor = if (dark) Color(0xFFA3B3FF) else Color(0xFF432DD7)
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .padding(bottom = 12.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .shadow(elevation = 2.dp, shape = shape, ambientColor = CardShadowTint.copy(alpha = 0.06f), spotColor = CardShadowTint.copy(alpha = 0.06f))
+            .clip(shape)
+            .background(if (dark) Color(0xEB282828) else Color(0xEBFFFFFF))
             .background(
-                Brush.linearGradient(
-                    if (dark) {
-                        listOf(Color(0x4D1E1B4B), Color(0x4D2E1065))
-                    } else {
-                        listOf(Color(0x80EEF2FF), Color(0x80FAF5FF))
-                    },
+                cssToBottomRightGradient(
+                    if (dark) listOf(Color(0x4D1E1A4D), Color(0x4D3C0366)) else listOf(Color(0x80EEF2FF), Color(0x80FAF5FF)),
                 ),
             )
-            .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .border(1.dp, if (dark) CardBorderDark else CardBorderLight, shape)
+            .then(
+                if (loading) {
+                    // The request reports no progress, so the bar keeps its
+                    // 5% minimum along the top.
+                    Modifier.drawBehind {
+                        val border = 1.dp.toPx()
+                        drawRect(
+                            color = Color(0xFF615FFF),
+                            topLeft = Offset(border, border),
+                            size = Size((size.width - 2 * border) * 0.05f, 4.dp.toPx()),
+                        )
+                    }
+                } else {
+                    Modifier
+                },
+            )
             .padding(20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SparklesIcon(size = 20.dp, tint = accent)
+            AiSparklesIcon(size = 20.dp, tint = if (dark) Color(0xFF7C86FF) else Color(0xFF4F39F6))
             Spacer(Modifier.width(8.dp))
             Text(
                 stringResource(R.string.native_notes_ai_assistant),
-                color = if (dark) Color(0xFFA5B4FC) else Color(0xFF4338CA),
+                color = headingColor,
                 fontSize = 16.sp,
+                lineHeight = 24.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
@@ -1461,32 +1859,31 @@ private fun AiAnswerCard(
                 val clearLabel = stringResource(R.string.native_notes_ai_clear)
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
+                        .size(32.dp)
                         .semantics { contentDescription = clearLabel }
                         .gkTooltip(clearLabel)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             role = Role.Button,
-                        ) { onDismiss() }
-                        .padding(4.dp),
+                        ) { onDismiss() },
+                    contentAlignment = Alignment.Center,
                 ) {
-                    CloseIcon(size = 18.dp, tint = titleColor)
+                    CloseIcon(size = 24.dp, tint = titleColor)
                 }
             }
         }
         Spacer(Modifier.height(12.dp))
         if (loading) {
-            Text(
-                stringResource(R.string.native_notes_ai_thinking),
-                color = if (dark) DarkSubtextColor else LightSubtextColor,
-                fontSize = 14.sp,
-            )
+            AiThinkingLine()
         } else if (answer != null) {
-            MarkdownText(
-                markdown = answer,
-                color = titleColor,
+            RichTextReader(
+                blocks = remember(answer) { MarkdownDoc.toRichBlocks(answer) },
+                typography = TypographyPresets.DEFAULT.activeProfile,
+                taskStrike = false,
                 dark = dark,
+                titleColor = if (dark) Color(0xFFE5E7EB) else Color(0xFF1E2939),
+                compact = true,
             )
         }
         if (!loading && citedNotes.isNotEmpty()) {
@@ -1495,50 +1892,85 @@ private fun AiAnswerCard(
                 Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(accent.copy(alpha = 0.2f)),
+                    .background(Color(0xFF615FFF).copy(alpha = 0.2f)),
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
             Text(
                 stringResource(R.string.native_notes_ai_cited).uppercase(),
-                color = accent.copy(alpha = 0.8f),
+                color = headingColor.copy(alpha = 0.8f),
                 fontSize = 12.sp,
+                lineHeight = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.6.sp,
+                letterSpacing = 0.3.sp,
             )
             Spacer(Modifier.height(8.dp))
-            for (note in citedNotes) {
-                Text(
-                    note.title.ifBlank { stringResource(R.string.native_notes_untitled) },
-                    color = titleColor,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onOpenNote(note.id) }
-                        .padding(vertical = 6.dp),
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                for (note in citedNotes) {
+                    NoteCard(
+                        note = note,
+                        dark = dark,
+                        titleColor = titleColor,
+                        subtextColor = subtextColor,
+                        onClick = { onOpenNote(note.id) },
+                        typography = typography,
+                        taskStrike = taskStrike,
+                    )
+                }
             }
         }
     }
 }
 
+/** The pulsing italic "thinking" line with its bouncing indigo dot. */
+@Composable
+private fun AiThinkingLine() {
+    val pulse = rememberPulseAlpha()
+    // animate-bounce: up by a quarter of its height and back each second,
+    // falling in on cubic-bezier(.8,0,1,1) and rising out on (0,0,.2,1).
+    val bounce by rememberInfiniteTransition(label = "aiDotBounce").animateFloat(
+        initialValue = -0.25f,
+        targetValue = -0.25f,
+        animationSpec = infiniteRepeatable(
+            keyframes {
+                durationMillis = 1_000
+                -0.25f at 0 using CubicBezierEasing(0.8f, 0f, 1f, 1f)
+                0f at 500 using GkEaseOut
+            },
+        ),
+        label = "aiDotOffset",
+    )
+    Row(Modifier.graphicsLayer { alpha = pulse.value }, verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(8.dp)
+                .graphicsLayer { translationY = bounce * size.height }
+                .background(Color(0xFF615FFF), CircleShape),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            stringResource(R.string.native_notes_ai_thinking),
+            color = Color(0xFF6A7282),
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontStyle = FontStyle.Italic,
+        )
+    }
+}
+
 /**
  * The header's own menu (NotesHeader.jsx:637-738). Deliberately not a
- * Material DropdownMenu: the web's panel has its own geometry (it opens
- * over the kebab rather than under it, hugs its widest row, and scrolls
- * past 72% of the screen) and its own row shape (16sp label, 12dp gap,
- * one accent colour per action), including the admin-only entry.
+ * Material DropdownMenu: the web's panel has its own geometry (its top
+ * right corner sits on the kebab's, it hugs its widest row, and scrolls
+ * past 72% of the screen) and its own row shape (16sp label, 12dp gap, one
+ * accent colour per action), including the admin-only entry. It appears
+ * and goes without animation, and its rows give no press feedback.
  */
 @Composable
 private fun HeaderMenu(
     expanded: Boolean,
     dark: Boolean,
     listView: Boolean,
+    hasServerUpdate: Boolean,
     showLockInstance: Boolean,
     showAdmin: Boolean,
     onDismiss: () -> Unit,
@@ -1553,28 +1985,12 @@ private fun HeaderMenu(
 ) {
     if (!expanded) return
     val configuration = LocalConfiguration.current
-    val popupOffset = with(LocalDensity.current) { IntOffset(0, (-14).dp.roundToPx()) }
+    val shape = RoundedCornerShape(8.dp)
     Popup(
         alignment = Alignment.TopEnd,
-        offset = popupOffset,
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
-        // Pops open with a quick fade + grow from the kebab button it
-        // hangs off (top-right) instead of snapping to full size on the
-        // first frame.
-        var visible by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) { visible = true }
-        val scale by animateFloatAsState(
-            targetValue = if (visible) 1f else 0.9f,
-            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-            label = "headerMenuScale",
-        )
-        val alpha by animateFloatAsState(
-            targetValue = if (visible) 1f else 0f,
-            animationSpec = tween(120),
-            label = "headerMenuAlpha",
-        )
         Column(
             modifier = Modifier
                 // Hugs the widest row's own intrinsic width (NotesHeader.jsx's
@@ -1587,28 +2003,15 @@ private fun HeaderMenu(
                 // only a ceiling now, not the width itself.
                 .widthIn(max = minOf(298.dp, (configuration.screenWidthDp - 26).dp))
                 .heightIn(max = (configuration.screenHeightDp * 0.72f).dp)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    this.alpha = alpha
-                    transformOrigin = TransformOrigin(1f, 0f)
-                    // Default Auto strategy offscreen-buffers this layer
-                    // while alpha < 1, which the .shadow() below renders
-                    // into wrong - a large flat blurry rectangle instead of
-                    // a soft drop shadow. ModulateAlpha folds alpha into
-                    // each draw call instead, keeping the shadow's normal
-                    // outline-based blur through the whole fade.
-                    compositingStrategy = CompositingStrategy.ModulateAlpha
-                }
-                .shadow(6.dp, RoundedCornerShape(12.dp), clip = false)
-                .clip(RoundedCornerShape(12.dp))
+                .shadow(6.dp, shape, clip = false)
+                .clip(shape)
                 .background(if (dark) Color(0xFF222222) else Color.White)
-                .border(1.dp, if (dark) DarkBorderColor else LightBorderColor, RoundedCornerShape(12.dp))
+                .border(1.dp, if (dark) DarkBorderColor else LightBorderColor, shape)
                 .verticalScroll(rememberScrollState()),
         ) {
             HeaderMenuItem(
                 label = stringResource(R.string.native_settings_title),
-                iconTint = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
+                iconTint = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
                 dark = dark,
                 onClick = onOpenSettings,
             ) { tint -> SettingsIcon(size = 20.dp, tint = tint) }
@@ -1616,7 +2019,7 @@ private fun HeaderMenu(
                 label = stringResource(
                     if (listView) R.string.native_notes_grid_view else R.string.native_notes_list_view
                 ),
-                iconTint = if (dark) Color(0xFF60A5FA) else Color(0xFF2563EB),
+                iconTint = if (dark) Color(0xFF51A2FF) else Color(0xFF155DFC),
                 dark = dark,
                 onClick = onToggleViewMode,
             ) { tint ->
@@ -1626,7 +2029,7 @@ private fun HeaderMenu(
                 label = stringResource(
                     if (dark) R.string.native_notes_light_mode else R.string.native_notes_dark_mode
                 ),
-                iconTint = if (dark) Color(0xFFFBBF24) else Color(0xFF4F46E5),
+                iconTint = if (dark) Color(0xFFFFB900) else Color(0xFF4F39F6),
                 dark = dark,
                 onClick = onToggleDark,
             ) { tint ->
@@ -1634,26 +2037,43 @@ private fun HeaderMenu(
             }
             HeaderMenuItem(
                 label = stringResource(R.string.native_notes_select_mode),
-                iconTint = if (dark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
+                iconTint = if (dark) Color(0xFFA684FF) else Color(0xFF7F22FE),
                 dark = dark,
                 onClick = onEnterSelection,
             ) { tint -> CheckSquareIcon(size = 20.dp, tint = tint) }
             HeaderMenuItem(
                 label = stringResource(R.string.native_qr_scan_title),
-                iconTint = if (dark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
+                iconTint = if (dark) Color(0xFF00D5BE) else Color(0xFF009689),
                 dark = dark,
                 onClick = onOpenQrScanner,
-            ) { tint -> QrCodeIcon(size = 20.dp, tint = tint) }
+            ) { tint ->
+                // A 24px Tabler glyph in an inline box whose line box is 31px
+                // tall, glyph at its top: this row is 7px taller than the rest.
+                Box(Modifier.size(width = 24.dp, height = 31.dp)) {
+                    QrCodeIcon(size = 24.dp, tint = tint, modifier = Modifier.align(Alignment.TopStart))
+                }
+            }
+            // The whole row is red on the web, glyph and label alike.
+            val signOutColor = if (dark) Color(0xFFFF6467) else Color(0xFFE7000B)
             if (showAdmin) {
                 HeaderMenuItem(
                     label = stringResource(R.string.native_notes_admin_panel),
-                    iconTint = if (dark) Color(0xFFF87171) else Color(0xFFDC2626),
+                    iconTint = signOutColor,
                     dark = dark,
                     onClick = onOpenAdmin,
-                ) { tint -> ShieldLockIcon(size = 20.dp, tint = tint) }
+                ) { tint ->
+                    Box {
+                        ShieldCheckIcon(size = 20.dp, tint = tint)
+                        if (hasServerUpdate) {
+                            ServerUpdateDot(
+                                size = 8.dp,
+                                ringColor = if (dark) Color(0xFF222222) else Color.White,
+                                modifier = Modifier.align(Alignment.TopEnd),
+                            )
+                        }
+                    }
+                }
             }
-            // The whole row is red on the web, glyph and label alike.
-            val signOutColor = if (dark) Color(0xFFF87171) else Color(0xFFDC2626)
             if (showLockInstance) {
                 // Red glyph, ordinary label: the row above sign-out on the
                 // web reddens only its icon (NotesHeader.jsx:719).
@@ -1688,7 +2108,12 @@ private fun HeaderMenuItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1696,7 +2121,7 @@ private fun HeaderMenuItem(
         Spacer(Modifier.width(12.dp))
         Text(
             label,
-            color = labelColor ?: if (dark) Color(0xFFF3F4F6) else Color(0xFF1F2937),
+            color = labelColor ?: if (dark) Color(0xFFF3F4F6) else Color(0xFF1E2939),
             fontSize = 16.sp,
             maxLines = 1,
         )
@@ -1704,14 +2129,15 @@ private fun HeaderMenuItem(
 }
 
 // "Pinned"/"Others" group labels above the grid below, matching
-// NotesSections.jsx's own gk-section-label (uppercase, 12sp/600, 4dp
-// start margin, 12dp bottom margin before the cards start).
+// NotesSections.jsx's own gk-section-label (uppercase, 12sp/600 on a 16sp
+// line, 4dp start margin, 12dp bottom margin before the cards start).
 @Composable
 private fun SectionLabel(text: String, color: Color) {
     Text(
         text.uppercase(),
         color = color,
         fontSize = 12.sp,
+        lineHeight = 16.sp,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(start = 4.dp, bottom = 12.dp),
     )
@@ -1719,7 +2145,9 @@ private fun SectionLabel(text: String, color: Color) {
 
 /** Mobile branch of react-masonry-css's `items.map((item, index) =>
  * column[index % 2])`. Keeping the columns in one shared scroll surface
- * reproduces both its order and its independent vertical packing. */
+ * reproduces both its order and its independent vertical packing. In the
+ * grid every card keeps its 12px bottom margin, the last one included;
+ * the list's space-y-6 has none after the last card. */
 @Composable
 private fun NotesMasonry(
     notes: List<NoteEntity>,
@@ -1733,7 +2161,7 @@ private fun NotesMasonry(
         return
     }
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top,
     ) {
@@ -1758,22 +2186,31 @@ private fun NotesMasonry(
 // is the closest native equivalent, not a byte-for-byte port.
 private val CardShadowTint = Color(0xFF8B5CF6)
 
-/** Wraps NoteCard with the long-press-then-drag gesture that drives manual
- *  reordering (see NativeNotesListScreen's own handleDragEnd), leaving
+// useNoteTouchDrag.js's timings: hold 300ms (moving over 10px first gives
+// the touch to the scroll), then the drag is dropped when the finger has
+// not moved 600ms after it began, or 3s after its last move.
+private const val ReorderHoldMs = 300L
+private const val ReorderNoMoveMs = 600L
+private const val ReorderIdleMs = 3_000L
+private val ReorderSlop = 10.dp
+
+// `.drag-over`: a 2.5px dashed indigo outline 4px outside the card, whose
+// offset and colour ease in over 150ms. Chromium dashes it at 3x its width
+// with gaps of 2x.
+private val DropOutlineWidth = 2.5.dp
+private val DropOutlineOffset = 4.dp
+private val DropOutlineColor = Color(0xFF6366F1)
+
+/** Wraps NoteCard with the touch reordering of the notes list, leaving
  *  NoteCard itself untouched: ArchivedNotesScreen.kt/SecondaryNotesScreen.kt
  *  render plain NoteCards with no reorder concept (see NoteEntity.position's
  *  own doc comment - those screens aren't Room-backed or position-aware),
  *  so the gesture plumbing has no business being on NoteCard itself.
  *
- *  onGloballyPositioned reports this card's own on-screen bounds up to the
- *  parent on every layout pass (cheap - just a Rect write into a plain
- *  map, no recomposition) so a LATER drag-end elsewhere can hit-test
- *  against them. The lift effect (translate-with-finger, slight scale
- *  up, a bit of elevation) only ever applies to whichever single card
- *  [isDragged] is currently true for. detectDragGesturesAfterLongPress's
- *  long-press requirement is what lets a plain quick tap still reach
- *  NoteCard's own onClick underneath: this modifier never engages at
- *  all for a tap that releases before the long-press threshold. */
+ *  Like the web, the held card stays in place, dimmed to 35% and 97%, and
+ *  the card under the finger gets the dashed drop outline. The bounds
+ *  reported up are the card's unclipped window bounds, dropped when the
+ *  card leaves the list. */
 @Composable
 private fun ReorderableNoteCard(
     note: NoteEntity,
@@ -1786,46 +2223,79 @@ private fun ReorderableNoteCard(
     onToggleSelect: () -> Unit,
     typography: TypographyProfile,
     taskStrike: Boolean,
-    reorderEnabled: Boolean,
     isDragged: Boolean,
-    dragOffset: Offset,
-    onBoundsChanged: (Rect) -> Unit,
-    onDragStart: () -> Unit,
-    onDragDelta: (Offset) -> Unit,
-    onDragEnd: () -> Unit,
+    isDragOver: Boolean,
+    onBoundsChanged: (Rect?) -> Unit,
+    onDragStart: (Offset) -> Unit,
+    onDragMove: (Offset) -> Unit,
+    onDrop: () -> Unit,
     onDragCancel: () -> Unit,
 ) {
+    val currentOnBoundsChanged by rememberUpdatedState(onBoundsChanged)
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDragMove by rememberUpdatedState(onDragMove)
+    val currentOnDrop by rememberUpdatedState(onDrop)
+    val currentOnDragCancel by rememberUpdatedState(onDragCancel)
+    DisposableEffect(note.id) { onDispose { currentOnBoundsChanged(null) } }
+    var windowOrigin by remember { mutableStateOf(Offset.Zero) }
+    val dimAlpha by animateFloatAsState(
+        targetValue = if (isDragged) 0.35f else 1f,
+        animationSpec = tween(150, easing = CssEase),
+        label = "dragAlpha",
+    )
+    val dimScale by animateFloatAsState(
+        targetValue = if (isDragged) 0.97f else 1f,
+        animationSpec = tween(150, easing = CssEase),
+        label = "dragScale",
+    )
+    val outline = remember { Animatable(0f) }
+    LaunchedEffect(isDragOver) {
+        if (isDragOver) {
+            outline.snapTo(0f)
+            outline.animateTo(1f, tween(150, easing = CssEase))
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .onGloballyPositioned { onBoundsChanged(it.boundsInWindow()) }
+            .onGloballyPositioned { coordinates ->
+                windowOrigin = coordinates.positionInWindow()
+                currentOnBoundsChanged(Rect(windowOrigin, coordinates.size.toSize()))
+            }
             .then(
-                if (isDragged) {
-                    Modifier.graphicsLayer {
-                        translationX = dragOffset.x
-                        translationY = dragOffset.y
-                        scaleX = 1.04f
-                        scaleY = 1.04f
-                        shadowElevation = 12f
-                    }
-                } else {
+                if (selectionMode) {
                     Modifier
-                },
-            )
-            .then(
-                if (reorderEnabled) {
+                } else {
                     Modifier.pointerInput(note.id) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = { onDragStart() },
-                            onDrag = { change, dragAmount -> change.consume(); onDragDelta(dragAmount) },
-                            onDragEnd = onDragEnd,
-                            onDragCancel = onDragCancel,
+                        detectNoteReorder(
+                            onStart = { position -> currentOnDragStart(windowOrigin + position) },
+                            onMove = { position -> currentOnDragMove(windowOrigin + position) },
+                            onDrop = { currentOnDrop() },
+                            onCancel = { currentOnDragCancel() },
                         )
                     }
-                } else {
-                    Modifier
                 },
-            ),
+            )
+            .drawWithContent {
+                drawContent()
+                if (isDragOver) {
+                    val progress = outline.value
+                    val width = DropOutlineWidth.toPx()
+                    val inset = DropOutlineOffset.toPx() * progress + width / 2f
+                    drawRoundRect(
+                        color = lerp(titleColor, DropOutlineColor, progress),
+                        topLeft = Offset(-inset, -inset),
+                        size = Size(size.width + 2 * inset, size.height + 2 * inset),
+                        cornerRadius = CornerRadius(12.dp.toPx() + inset),
+                        style = Stroke(width = width, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * width, 2 * width))),
+                    )
+                }
+            }
+            .graphicsLayer {
+                alpha = dimAlpha
+                scaleX = dimScale
+                scaleY = dimScale
+            },
     ) {
         NoteCard(
             note = note,
@@ -1839,6 +2309,63 @@ private fun ReorderableNoteCard(
             typography = typography,
             taskStrike = taskStrike,
         )
+    }
+}
+
+/**
+ * useNoteTouchDrag.js's gesture. The first 300ms are only watched: a
+ * release leaves the tap to the card and a move leaves the touch to the
+ * scroll. Past them the drag owns the touch, so nothing scrolls and the
+ * card's tap never fires; a release drops, a finger that stops moving
+ * cancels.
+ */
+private suspend fun PointerInputScope.detectNoteReorder(
+    onStart: (Offset) -> Unit,
+    onMove: (Offset) -> Unit,
+    onDrop: () -> Unit,
+    onCancel: () -> Unit,
+) = awaitEachGesture {
+    val down = awaitFirstDown(requireUnconsumed = false)
+    val slop = ReorderSlop.toPx()
+    var position = down.position
+    val interrupted = withTimeoutOrNull(ReorderHoldMs) {
+        while (true) {
+            val change = awaitPointerEvent(PointerEventPass.Final).changes.firstOrNull { it.id == down.id } ?: break
+            position = change.position
+            if (!change.pressed || change.isConsumed) break
+            if (abs(position.x - down.position.x) > slop || abs(position.y - down.position.y) > slop) break
+        }
+    }
+    if (interrupted != null) return@awaitEachGesture
+    onStart(position)
+    var deadline = SystemClock.uptimeMillis() + ReorderNoMoveMs
+    while (true) {
+        val remaining = deadline - SystemClock.uptimeMillis()
+        val event = if (remaining > 0) withTimeoutOrNull(remaining) { awaitPointerEvent(PointerEventPass.Initial) } else null
+        if (event == null) {
+            onCancel()
+            consumeUntilUp(down.id)
+            return@awaitEachGesture
+        }
+        val change = event.changes.firstOrNull { it.id == down.id } ?: continue
+        change.consume()
+        if (!change.pressed) {
+            onDrop()
+            return@awaitEachGesture
+        }
+        if (change.positionChanged()) {
+            deadline = SystemClock.uptimeMillis() + ReorderIdleMs
+            onMove(change.position)
+        }
+    }
+}
+
+/** What is left of a touch whose drag was dropped does nothing. */
+private suspend fun AwaitPointerEventScope.consumeUntilUp(pointerId: PointerId) {
+    while (true) {
+        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == pointerId } ?: continue
+        change.consume()
+        if (!change.pressed) return
     }
 }
 

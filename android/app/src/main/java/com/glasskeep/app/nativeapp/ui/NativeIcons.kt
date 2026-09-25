@@ -458,23 +458,27 @@ fun KeyIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color
     }
 }
 
+/** tabler/bell.svg. The web only ever draws it through `.tabler-icon`,
+ *  which strokes it at 1.75 (header bell, note menu, reminder chip). */
 @Composable
-fun BellIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    // tabler/bell.svg, viewBox 24x24, stroke (not filled), strokeWidth 2,
-    // round caps/joins.
-    val path = remember {
-        PathParser().parsePathString(
-            "M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6 " +
-                "M9 17v1a3 3 0 0 0 6 0v-1"
-        ).toPath()
-    }
-    Canvas(modifier.size(size)) {
-        val scale = this.size.minDimension / 24f
-        scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        }
-    }
-}
+fun BellIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6 " +
+        "M9 17v1a3 3 0 0 0 6 0v-1",
+    modifier, size, tint,
+)
+
+/** tabler/bell-filled.svg: the header bell while the notification centre
+ *  is open (NotificationBell.jsx:109). */
+@Composable
+fun BellFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M14.235 19c.865 0 1.322 1.024 .745 1.668a3.992 3.992 0 0 1 -2.98 1.332a3.992 3.992 0 0 1 -2.98 " +
+        "-1.332c-.552 -.616 -.158 -1.579 .634 -1.661l.11 -.006h4.471z " +
+        "M12 2c1.358 0 2.506 .903 2.875 2.141l.046 .171l.008 .043a8.013 8.013 0 0 1 4.024 6.069l.028 .287" +
+        "l.019 .289v2.931l.021 .136a3 3 0 0 0 1.143 1.847l.167 .117l.162 .099c.86 .487 .56 1.766 -.377 1.864" +
+        "l-.116 .006h-16c-1.028 0 -1.387 -1.364 -.493 -1.87a3 3 0 0 0 1.472 -2.063l.021 -.143l.001 -2.91" +
+        "a8 8 0 0 1 3.821 -6.454l.248 -.146l.01 -.043a3.003 3.003 0 0 1 2.562 -2.29l.182 -.017l.176 -.004z",
+    modifier, size, tint,
+)
 
 @Composable
 fun BellRingingFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
@@ -1034,6 +1038,45 @@ fun LogOutIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Co
     modifier, size, tint,
 )
 
+/** icons/index.jsx ShieldIcon (Heroicons shield-check): the header menu's
+ *  admin entry. Arc flags spelled out, see [MoonIcon]. */
+@Composable
+fun ShieldCheckIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M9 12l2 2 4-4 m5.618-4.016 A11.955 11.955 0 0 1 12 2.944 a11.955 11.955 0 0 1 -8.618 3.04 " +
+        "A12.02 12.02 0 0 0 3 9 c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 " +
+        "0-1.042-.133-2.052-.382-3.016 z",
+    modifier, size, tint,
+)
+
+/** NotesHeader.jsx's inline QR glyph on the header's quick-access button:
+ *  6px squares with 1px corners, unlike the Tabler [QrCodeIcon]. */
+@Composable
+fun QrQuickIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M5 4h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1z " +
+        "M5 14h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1z " +
+        "M15 4h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1z " +
+        "M14 14h3 M14 14v3 M17 17h3v3 M20 14v.01 M14 20h.01 M17 20h.01 M20 17h.01 M20 20h.01",
+    modifier, size, tint,
+)
+
+/** LockedBanner.jsx's own padlock: a plain body and shackle, no keyhole. */
+@Composable
+fun PadlockIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M7 11h10a2 2 0 0 1 2 2v5a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-5a2 2 0 0 1 2 -2z " +
+        "M8 11V8a4 4 0 1 1 8 0v3",
+    modifier, size, tint,
+)
+
+/** icons/index.jsx Sparkles, the AI answer box's glyph (the settings rows
+ *  use the Tabler [SparklesIcon] instead). */
+@Composable
+fun AiSparklesIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M12 3l-1.912 5.813a2 2 0 0 1 -1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21" +
+        "l1.912 -5.813a2 2 0 0 1 1.275 -1.275L21 12l-5.813 -1.912a2 2 0 0 1 -1.275 -1.275L12 3z " +
+        "M5 3v4 M19 17v4 M3 5h4 M17 19h4",
+    modifier, size, tint,
+)
+
 // Tabler icons used by the settings panel's section headers and rows,
 // taken from the same src/icons/editor/tabler/*.svg files the web
 // imports. `.tabler-icon` renders them at strokeWidth 1.75 with round
@@ -1407,16 +1450,21 @@ fun FileTextSparkIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Col
     modifier, size, tint,
 )
 
-/** tabler/file-ai.svg: the glyph in the search field that sends the
- *  question to the assistant instead of filtering with it. */
+private const val FileAiPath = "M14 3v4a1 1 0 0 0 1 1h4 " +
+    "M10 21h-3a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v3.5 " +
+    "M9 9h1 M9 13h2.5 M9 17h1 " +
+    "M14 21v-4a2 2 0 1 1 4 0v4 M14 19h4 M21 15v6"
+
+/** tabler/file-ai.svg. */
 @Composable
-fun FileAiIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
-    "M14 3v4a1 1 0 0 0 1 1h4 " +
-        "M10 21h-3a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v3.5 " +
-        "M9 9h1 M9 13h2.5 M9 17h1 " +
-        "M14 21v-4a2 2 0 1 1 4 0v4 M14 19h4 M21 15v6",
-    modifier, size, tint,
-)
+fun FileAiIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) =
+    TablerIcon(FileAiPath, modifier, size, tint)
+
+/** The same glyph as NotesHeader.jsx inlines it in the search field (the
+ *  button that asks the assistant instead of filtering): stroke 2. */
+@Composable
+fun AskAiIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) =
+    WebIcon(FileAiPath, modifier, size, tint)
 
 /** tabler/brain.svg. */
 @Composable
@@ -1721,10 +1769,10 @@ fun SwapServerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color 
     modifier, size, tint,
 )
 
-/** tabler/lock.svg: the header menu's "lock the instance" entry and the
- *  locked banner (icons/index.jsx:416). */
+/** icons/index.jsx LockIcon: the Tabler lock drawn by the web itself at
+ *  stroke 2, the header menu's "lock the instance" entry. */
 @Composable
-fun LockIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+fun LockIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
     "M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6 " +
         "M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0 " +
         "M8 11v-4a4 4 0 1 1 8 0v4",
