@@ -193,7 +193,7 @@ class ToastController {
 
     fun error(message: String) = show(message, NotifVariant.ERROR)
 
-    fun success(message: String) = show(message, NotifVariant.SUCCESS)
+    fun success(message: String, icon: String? = null) = show(message, NotifVariant.SUCCESS, icon = icon)
 
     internal fun dismiss(id: Long) {
         queue.removeAll { it.id == id }

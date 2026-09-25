@@ -449,7 +449,7 @@ internal fun SettingsScreen(
                     } else {
                         val confirmedUrl = repository.setAvatar(dataUrl)
                         updateProfile { it.copy(avatarUrl = confirmedUrl) }
-                        toasts.success(avatarUpdatedMessage)
+                        toasts.success(avatarUpdatedMessage, "camera")
                     }
                 } catch (t: Throwable) {
                     NativeDebug.e("SettingsScreen setAvatar failed", t)
@@ -472,7 +472,7 @@ internal fun SettingsScreen(
             try {
                 repository.removeAvatar()
                 updateProfile { it.copy(avatarUrl = null) }
-                toasts.show(avatarRemovedMessage)
+                toasts.show(avatarRemovedMessage, icon = "camera")
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen removeAvatar failed", t)
                 toasts.error(avatarRemoveFailedMessage)

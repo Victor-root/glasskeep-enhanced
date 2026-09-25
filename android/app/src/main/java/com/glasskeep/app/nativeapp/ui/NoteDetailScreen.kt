@@ -586,7 +586,7 @@ fun NoteDetailScreen(
                 repository.restoreNoteQueued(current.toEntity())
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen restoreNote queued id=${current.id}")
-                toasts.success(restoredMessage)
+                toasts.success(restoredMessage, "restore")
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen restoreNote failed", t)
@@ -608,7 +608,10 @@ fun NoteDetailScreen(
                 repository.trashNoteQueued(current.id, mode)
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen trash queued id=${current.id} mode=$mode")
-                toasts.success(if (mode == "delete_for_all") deletedForAllMessage else movedToTrashMessage)
+                toasts.success(
+                    if (mode == "delete_for_all") deletedForAllMessage else movedToTrashMessage,
+                    if (mode == "delete_for_all") "trash-x" else "trash",
+                )
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen trash failed", t)
@@ -632,7 +635,7 @@ fun NoteDetailScreen(
                 repository.deleteNotePermanentlyQueued(current.id)
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen deleteNotePermanently queued id=${current.id}")
-                toasts.success(deletedPermanentlyMessage)
+                toasts.success(deletedPermanentlyMessage, "trash-x")
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen deleteNotePermanently failed", t)
@@ -1165,7 +1168,7 @@ fun NoteDetailScreen(
                 val created = repository.duplicateNote(source, newTitle)
                 NativeDebug.d("NoteDetailScreen duplicateNote OK newId=${created.id}")
                 SyncQueueWorker.triggerNow(context)
-                toasts.success(duplicatedMessage)
+                toasts.success(duplicatedMessage, "copy")
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen duplicateNote failed", t)
@@ -1750,7 +1753,7 @@ fun NoteDetailScreen(
                     cancelPendingAutosaves()
                     repository.trashNoteQueued(current.id, null)
                     repository.deleteNotePermanentlyQueued(current.id)
-                    toasts.show(emptyRemovedMessage, NotifVariant.INFO, durationMs = 3_000L)
+                    toasts.show(emptyRemovedMessage, NotifVariant.INFO, icon = "trash", durationMs = 3_000L)
                 } else {
                     flushLiveEdits()
                 }

@@ -658,9 +658,9 @@ internal suspend fun decidePendingRegistration(
     if (!response.isSuccessful) error("HTTP ${response.code()}")
     repository.removeNotifications(listOf(notificationId))
     if (approve) {
-        toasts.success(context.getString(R.string.native_admin_registration_approved))
+        toasts.success(context.getString(R.string.native_admin_registration_approved), "user-check")
     } else {
-        toasts.show(context.getString(R.string.native_admin_registration_rejected))
+        toasts.show(context.getString(R.string.native_admin_registration_rejected), icon = "user-x")
     }
     true
 } catch (t: Throwable) {

@@ -334,7 +334,7 @@ internal class SettingsActions(
                     is ChangePasswordResult.Saved -> {
                         container.tokenStore.token = result.token
                         changePasswordOpen = false
-                        toasts.success(context.getString(R.string.native_settings_password_success))
+                        toasts.success(context.getString(R.string.native_settings_password_success), "key")
                     }
                     is ChangePasswordResult.Rejected -> {
                         passwordError = context.getString(R.string.native_settings_password_error, result.httpCode)

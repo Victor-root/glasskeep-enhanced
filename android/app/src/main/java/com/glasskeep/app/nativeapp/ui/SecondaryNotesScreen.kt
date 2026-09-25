@@ -178,10 +178,10 @@ fun SecondaryNotesScreen(
     val bulkExportSuccess = stringResource(R.string.native_bulk_export_success)
     val bulkExportError = stringResource(R.string.native_bulk_export_error)
 
-    fun reportOutcome(successTemplate: String, outcome: BulkOutcome) {
+    fun reportOutcome(successTemplate: String, outcome: BulkOutcome, icon: String? = null) {
         val message = String.format(successTemplate, outcome.succeeded) +
             if (outcome.failed > 0) " " + String.format(partialFailureTemplate, outcome.failed) else ""
-        if (outcome.failed > 0) toasts.error(message) else toasts.success(message)
+        if (outcome.failed > 0) toasts.error(message) else toasts.success(message, icon)
     }
 
     fun bulkUnarchive() {
@@ -209,7 +209,7 @@ fun SecondaryNotesScreen(
             val outcome = runBulkAction(context, ids) { id -> repository.trashNoteQueued(id) }
             notes = notes.filterNot { it.id in outcome.succeededIds }
             bulkActionRunning = false
-            reportOutcome(trashedSuccessTemplate, outcome)
+            reportOutcome(trashedSuccessTemplate, outcome, "trash")
             exitSelection()
         }
     }
@@ -225,7 +225,7 @@ fun SecondaryNotesScreen(
             }
             notes = notes.filterNot { it.id in outcome.succeededIds }
             bulkActionRunning = false
-            reportOutcome(restoredSuccessTemplate, outcome)
+            reportOutcome(restoredSuccessTemplate, outcome, "restore")
             exitSelection()
         }
     }
@@ -239,7 +239,7 @@ fun SecondaryNotesScreen(
             val outcome = runBulkAction(context, ids) { id -> repository.deleteNotePermanentlyQueued(id) }
             notes = notes.filterNot { it.id in outcome.succeededIds }
             bulkActionRunning = false
-            reportOutcome(deletedSuccessTemplate, outcome)
+            reportOutcome(deletedSuccessTemplate, outcome, "trash-x")
             exitSelection()
         }
     }

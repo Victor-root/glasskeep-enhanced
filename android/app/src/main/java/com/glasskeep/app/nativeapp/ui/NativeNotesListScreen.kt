@@ -449,10 +449,10 @@ fun NativeNotesListScreen(
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val borderColor = if (dark) CardBorderDark else CardBorderLight
 
-    fun reportOutcome(successTemplate: String, outcome: BulkOutcome) {
+    fun reportOutcome(successTemplate: String, outcome: BulkOutcome, icon: String? = null) {
         val message = String.format(successTemplate, outcome.succeeded) +
             if (outcome.failed > 0) " " + String.format(partialFailureTemplate, outcome.failed) else ""
-        if (outcome.failed > 0) toasts.error(message) else toasts.success(message)
+        if (outcome.failed > 0) toasts.error(message) else toasts.success(message, icon)
     }
 
     // The web makes room for the dock with 44px above the list and scrolls
@@ -496,7 +496,7 @@ fun NativeNotesListScreen(
         scope.launch {
             val outcome = runBulkAction(context, ids) { id -> repository.trashNoteQueued(id) }
             bulkActionRunning = false
-            reportOutcome(trashedSuccessTemplate, outcome)
+            reportOutcome(trashedSuccessTemplate, outcome, "trash")
             exitSelection()
         }
     }
