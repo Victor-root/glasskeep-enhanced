@@ -299,7 +299,7 @@ fun GkToastHost(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
             ) {
                 Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
-                    NotifGlyph(current.icon, current.variant, 18.dp)
+                    NotifGlyph(current.icon?.takeIf { it in PillSemanticIcons }, current.variant, 18.dp)
                 }
                 Column(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -393,6 +393,14 @@ fun GkToastHost(
         }
     }
 }
+
+/** NotificationMobileToast.jsx's own SEMANTIC_ICONS: the pill knows fewer
+ *  keys than the centre's cards and falls back on the variant glyph for
+ *  the rest (a reminder, notably). */
+private val PillSemanticIcons = setOf(
+    "trash", "trash-x", "restore", "archive", "archive-off", "copy", "save", "share", "unshare",
+    "user-plus", "user-check", "user-x", "user-clock", "key", "shield", "qr", "camera", "refresh", "power",
+)
 
 /** CSS asks 2.5px; Chromium floors every border to whole pixels. */
 internal val NotifBorderWidth = 2.dp

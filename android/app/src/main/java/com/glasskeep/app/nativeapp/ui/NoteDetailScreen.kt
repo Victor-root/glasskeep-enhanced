@@ -730,9 +730,9 @@ fun NoteDetailScreen(
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen setReminder queued id=${current.id}")
                 if (reminderAtIso != null) {
-                    toasts.success(reminderSetMessage)
+                    toasts.success(reminderSetMessage, "reminder")
                 } else {
-                    toasts.show(reminderRemovedMessage, NotifVariant.INFO)
+                    toasts.show(reminderRemovedMessage, NotifVariant.INFO, icon = "reminder")
                 }
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen setReminder failed", t)

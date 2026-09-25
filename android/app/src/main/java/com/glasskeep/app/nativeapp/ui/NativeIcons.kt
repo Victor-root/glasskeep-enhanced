@@ -145,12 +145,13 @@ fun SearchIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Co
 }
 
 @Composable
-fun CloseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+fun CloseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, strokeWidth: Float = 2.4f) {
     // src/icons/index.jsx CloseIcon: two diagonal strokes forming an "x",
-    // viewBox 24x24, strokeWidth 2.4, round caps.
+    // viewBox 24x24, strokeWidth 2.4, round caps. The same geometry is
+    // Tabler's `x` (1.75) and Popover.jsx's close (2).
     Canvas(modifier.size(size)) {
         val scale = this.size.minDimension / 24f
-        val strokeWidth = 2.4f * scale
+        val strokeWidth = strokeWidth * scale
         drawLine(
             color = tint,
             start = Offset(6f * scale, 6f * scale),

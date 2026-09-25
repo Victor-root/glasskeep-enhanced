@@ -1,5 +1,7 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +33,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,18 +43,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
@@ -80,7 +90,7 @@ private val PastHintDark = Color(0xFFF87171)
  * ReminderPicker.jsx, in its phone shape. `useIsMobile` is true under
  * 768px, so the web never shows the small anchored 286px popover here:
  * it opens the full-screen variant, on a neutral white / #1f2937 panel
- * rather than the note's own colour, with no entrance animation.
+ * rather than the note's own colour.
  *
  * Contents in the web's own order: the label, a Monday-first mini
  * calendar of 42 cells, the time picker with its quick-time chips, the
@@ -121,8 +131,19 @@ fun ReminderPickerOverlay(
     var selectedYear by remember { mutableStateOf(initial.get(Calendar.YEAR)) }
     var selectedMonth by remember { mutableStateOf(initial.get(Calendar.MONTH)) }
     var selectedDay by remember { mutableStateOf(initial.get(Calendar.DAY_OF_MONTH)) }
-    var viewYear by remember { mutableStateOf(initial.get(Calendar.YEAR)) }
-    var viewMonth by remember { mutableStateOf(initial.get(Calendar.MONTH)) }
+    // The visible month is the selected date's when that date is today or
+    // later, else the current month (ReminderPicker.jsx:73-75).
+    val initialView = remember(initial) {
+        val startOfToday = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        if (initial.timeInMillis >= startOfToday.timeInMillis) initial else startOfToday
+    }
+    var viewYear by remember { mutableStateOf(initialView.get(Calendar.YEAR)) }
+    var viewMonth by remember { mutableStateOf(initialView.get(Calendar.MONTH)) }
     var hour by remember { mutableStateOf(initial.get(Calendar.HOUR_OF_DAY)) }
     var minute by remember { mutableStateOf(initial.get(Calendar.MINUTE)) }
 
@@ -141,165 +162,172 @@ fun ReminderPickerOverlay(
     }
     val isPast = picked.timeInMillis <= System.currentTimeMillis()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(if (dark) PickerBgDark else PickerBgLight)
-            .windowInsetsPadding(WindowInsets.systemBars),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, top = 10.dp, end = 10.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                stringResource(R.string.native_note_detail_reminder),
-                color = fg,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-            )
-            val closeLabel = stringResource(R.string.native_common_close)
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .semantics { contentDescription = closeLabel }
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Button,
-                    ) { onDismiss() },
-                contentAlignment = Alignment.Center,
-            ) {
-                CloseIcon(size = 20.dp, tint = fg)
-            }
-        }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(border))
-
+    // .rt-pop's rt-pop-in: a 120ms ease-out fade dropping in 2px, over the
+    // popover's 50% black backdrop.
+    val appear = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, tween(durationMillis = 120, easing = CssEaseOut)) }
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f))) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 18.dp),
-        ) {
-            Text(
-                stringResource(R.string.native_reminder_pick_datetime).uppercase(),
-                color = fg.copy(alpha = 0.65f),
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.46.sp,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 0.dp),
-            )
-            Spacer(Modifier.height(4.dp))
-
-            MiniCalendar(
-                viewYear = viewYear,
-                viewMonth = viewMonth,
-                selectedYear = selectedYear,
-                selectedMonth = selectedMonth,
-                selectedDay = selectedDay,
-                accent = accent,
-                fg = fg,
-                dark = dark,
-                onPrevMonth = {
-                    if (viewMonth == 0) {
-                        viewMonth = 11
-                        viewYear -= 1
-                    } else {
-                        viewMonth -= 1
-                    }
-                },
-                onNextMonth = {
-                    if (viewMonth == 11) {
-                        viewMonth = 0
-                        viewYear += 1
-                    } else {
-                        viewMonth += 1
-                    }
-                },
-                onPick = { y, m, d ->
-                    selectedYear = y
-                    selectedMonth = m
-                    selectedDay = d
-                    viewYear = y
-                    viewMonth = m
-                },
-            )
-            Spacer(Modifier.height(10.dp))
-
-            TimeSection(
-                hour = hour,
-                minute = minute,
-                chips = chips,
-                editing = editingChips,
-                accent = accent,
-                fg = fg,
-                dark = dark,
-                border = border,
-                onHourChange = { hour = (it + 24) % 24 },
-                onMinuteChange = { minute = (it + 60) % 60 },
-                onChipPicked = { h, m -> hour = h; minute = m },
-                onEditToggle = { editingChips = !editingChips },
-                onChipsCommitted = { committed ->
-                    chips.clear()
-                    chips.addAll(committed)
-                    editingChips = false
-                    onChipsChange(committed)
-                },
-            )
-
-            if (isPast) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    stringResource(R.string.native_reminder_past_hint),
-                    color = if (dark) PastHintDark else PastHintLight,
-                    fontSize = 11.5.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
-                )
-            }
-
-            Spacer(Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (currentReminderIso != null) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                role = Role.Button,
-                            ) { onRemove() }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                    ) {
-                        Text(
-                            stringResource(R.string.native_reminder_remove),
-                            color = if (dark) PastHintDark else PastHintLight,
-                            fontSize = 12.8.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = appear.value
+                    translationY = (1f - appear.value) * -2.dp.toPx()
                 }
-                Spacer(Modifier.weight(1f))
-                GkGradientButton(
-                    label = if (currentReminderIso != null) {
-                        stringResource(R.string.native_reminder_update)
-                    } else {
-                        stringResource(R.string.native_reminder_set)
-                    },
-                    themeId = themeId,
-                    enabled = !isPast,
-                    horizontalPadding = 12.dp,
-                    verticalPadding = 6.dp,
-                    onClick = { onSave(picked.time) },
+                .background(if (dark) PickerBgDark else PickerBgLight)
+                .windowInsetsPadding(WindowInsets.systemBars),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, top = 10.dp, end = 10.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.native_note_detail_reminder),
+                    color = fg,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
                 )
+                val closeLabel = stringResource(R.string.native_common_close)
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .semantics { contentDescription = closeLabel }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onDismiss() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CloseIcon(size = 20.dp, tint = fg, strokeWidth = 2f)
+                }
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(border))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 18.dp),
+            ) {
+                Text(
+                    stringResource(R.string.native_reminder_pick_datetime).uppercase(),
+                    color = fg.copy(alpha = 0.65f),
+                    fontSize = 11.5.sp,
+                    lineHeight = 17.28.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.46.sp,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 0.dp),
+                )
+                Spacer(Modifier.height(4.dp))
+
+                MiniCalendar(
+                    viewYear = viewYear,
+                    viewMonth = viewMonth,
+                    selectedYear = selectedYear,
+                    selectedMonth = selectedMonth,
+                    selectedDay = selectedDay,
+                    accent = accent,
+                    fg = fg,
+                    dark = dark,
+                    onPrevMonth = {
+                        if (viewMonth == 0) {
+                            viewMonth = 11
+                            viewYear -= 1
+                        } else {
+                            viewMonth -= 1
+                        }
+                    },
+                    onNextMonth = {
+                        if (viewMonth == 11) {
+                            viewMonth = 0
+                            viewYear += 1
+                        } else {
+                            viewMonth += 1
+                        }
+                    },
+                    onPick = { y, m, d ->
+                        selectedYear = y
+                        selectedMonth = m
+                        selectedDay = d
+                    },
+                )
+                Spacer(Modifier.height(10.dp))
+
+                TimeSection(
+                    hour = hour,
+                    minute = minute,
+                    chips = chips,
+                    editing = editingChips,
+                    accent = accent,
+                    fg = fg,
+                    dark = dark,
+                    border = border,
+                    onHourChange = { hour = (it + 24) % 24 },
+                    onMinuteChange = { minute = (it + 60) % 60 },
+                    onChipPicked = { h, m -> hour = h; minute = m },
+                    onEditToggle = { editingChips = !editingChips },
+                    onChipsCommitted = { committed ->
+                        chips.clear()
+                        chips.addAll(committed)
+                        editingChips = false
+                        onChipsChange(committed)
+                    },
+                )
+
+                if (isPast) {
+                    Text(
+                        stringResource(R.string.native_reminder_past_hint),
+                        color = if (dark) PastHintDark else PastHintLight,
+                        fontSize = 11.5.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (currentReminderIso != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    role = Role.Button,
+                                ) { onRemove() }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                        ) {
+                            Text(
+                                stringResource(R.string.native_reminder_remove),
+                                color = if (dark) PastHintDark else PastHintLight,
+                                fontSize = 12.8.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    GkGradientButton(
+                        label = if (currentReminderIso != null) {
+                            stringResource(R.string.native_reminder_update)
+                        } else {
+                            stringResource(R.string.native_reminder_set)
+                        },
+                        themeId = themeId,
+                        enabled = !isPast,
+                        horizontalPadding = 12.dp,
+                        verticalPadding = 6.dp,
+                        onClick = { onSave(picked.time) },
+                    )
+                }
             }
         }
     }
@@ -356,9 +384,9 @@ private fun MiniCalendar(
         }
     }
 
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().padding(start = 2.dp, top = 2.dp, end = 2.dp, bottom = 4.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CalendarArrow(
@@ -371,6 +399,7 @@ private fun MiniCalendar(
                 monthTitle,
                 color = fg,
                 fontSize = 13.6.sp,
+                lineHeight = 20.4.sp,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(1f),
@@ -382,59 +411,73 @@ private fun MiniCalendar(
                 onClick = onNextMonth,
             )
         }
-        Row(Modifier.fillMaxWidth()) {
-            dayLabels.forEach { label ->
-                Text(
-                    label,
-                    color = fg.copy(alpha = 0.55f),
-                    fontSize = 9.9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f).padding(vertical = 2.dp),
-                )
-            }
-        }
-        cells.chunked(7).forEach { week ->
+        Spacer(Modifier.height(5.dp))
+        // One 7-column grid, 2px apart both ways, weekday row included.
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                week.forEach { (year, month, day) ->
-                    val outside = month != viewMonth || year != viewYear
-                    val isToday = year == todayY && month == todayM && day == todayD
-                    val isSelected = year == selectedYear && month == selectedMonth && day == selectedDay
-                    val isPastDay = compareDates(year, month, day, todayY, todayM, todayD) < 0
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
-                            .heightIn(min = 38.dp)
-                            .padding(vertical = 1.dp)
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(if (isSelected) accent else Color.Transparent)
-                            .then(
-                                if (isToday && !isSelected) {
-                                    Modifier.border(1.5.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(9.dp))
-                                } else {
-                                    Modifier
+                dayLabels.forEach { label ->
+                    Text(
+                        label,
+                        color = fg.copy(alpha = 0.55f),
+                        fontSize = 9.9.sp,
+                        lineHeight = 14.88.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f).padding(vertical = 2.dp),
+                    )
+                }
+            }
+            cells.chunked(7).forEach { week ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    week.forEach { (year, month, day) ->
+                        val outside = month != viewMonth || year != viewYear
+                        val isToday = year == todayY && month == todayM && day == todayD
+                        val isSelected = year == selectedYear && month == selectedMonth && day == selectedDay
+                        val isPastDay = compareDates(year, month, day, todayY, todayM, todayD) < 0
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .aspectRatio(1f)
+                                .heightIn(min = 38.dp)
+                                .then(
+                                    if (isSelected) {
+                                        Modifier.dropShadow(
+                                            RoundedCornerShape(9.dp),
+                                            Shadow(radius = 8.dp, color = accent.copy(alpha = 0.45f), offset = DpOffset(0.dp, 2.dp)),
+                                        )
+                                    } else {
+                                        Modifier
+                                    },
+                                )
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(if (isSelected) accent else Color.Transparent)
+                                .then(
+                                    if (isToday && !isSelected) {
+                                        Modifier.border(1.5.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(9.dp))
+                                    } else {
+                                        Modifier
+                                    },
+                                )
+                                .alpha(if (isPastDay) 0.25f else if (outside) 0.32f else 1f)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    enabled = !isPastDay,
+                                    role = Role.Button,
+                                ) { onPick(year, month, day) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                day.toString(),
+                                color = if (isSelected) Color.White else fg,
+                                fontSize = 14.7.sp,
+                                fontWeight = when {
+                                    isSelected -> FontWeight.SemiBold
+                                    isToday -> FontWeight.Bold
+                                    else -> FontWeight.Normal
                                 },
                             )
-                            .alpha(if (isPastDay) 0.25f else if (outside) 0.32f else 1f)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                enabled = !isPastDay,
-                                role = Role.Button,
-                            ) { onPick(year, month, day) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            day.toString(),
-                            color = if (isSelected) Color.White else fg,
-                            fontSize = 14.7.sp,
-                            fontWeight = when {
-                                isSelected -> FontWeight.SemiBold
-                                isToday -> FontWeight.Bold
-                                else -> FontWeight.Normal
-                            },
-                        )
+                        }
                     }
                 }
             }
@@ -484,7 +527,10 @@ private fun TimeSection(
     onEditToggle: () -> Unit,
     onChipsCommitted: (List<String>) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -493,6 +539,7 @@ private fun TimeSection(
             TimeColumn(
                 value = hour,
                 max = 23,
+                fieldDescription = stringResource(R.string.native_reminder_hour_field),
                 upDescription = stringResource(R.string.native_reminder_hour_up),
                 downDescription = stringResource(R.string.native_reminder_hour_down),
                 accent = accent,
@@ -505,6 +552,7 @@ private fun TimeSection(
             TimeColumn(
                 value = minute,
                 max = 59,
+                fieldDescription = stringResource(R.string.native_reminder_minute_field),
                 upDescription = stringResource(R.string.native_reminder_minute_up),
                 downDescription = stringResource(R.string.native_reminder_minute_down),
                 accent = accent,
@@ -562,6 +610,7 @@ private fun TimeSection(
                             chip,
                             color = if (active) (if (dark) Color.White else accent) else fg,
                             fontSize = 13.8.sp,
+                            lineHeight = 20.64.sp,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
@@ -579,9 +628,10 @@ private fun TimeSection(
                             indication = null,
                             role = Role.Button,
                         ) { onEditToggle() }
-                        .padding(horizontal = 9.dp, vertical = 7.dp),
+                        // The fs chip padding wins over the pencil's own.
+                        .padding(horizontal = 13.dp, vertical = 7.dp),
                 ) {
-                    PencilIcon(size = 14.dp, tint = fg)
+                    PencilIcon(size = 14.dp, tint = fg, strokeWidth = 1.75f)
                 }
             }
         }
@@ -592,6 +642,7 @@ private fun TimeSection(
 private fun TimeColumn(
     value: Int,
     max: Int,
+    fieldDescription: String,
     upDescription: String,
     downDescription: String,
     accent: Color,
@@ -600,31 +651,55 @@ private fun TimeColumn(
     onStep: (Int) -> Unit,
     onSet: (Int) -> Unit,
 ) {
-    var editingText by remember { mutableStateOf<String?>(null) }
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    // TimeField (ReminderPicker.jsx:155-185): the whole value is selected
+    // on focus, typing commits on Done or when the field loses focus,
+    // clamped, and a change from the chevrons or chips resets the draft.
+    val formatted = "%02d".format(value)
+    var draft by remember(value) { mutableStateOf(TextFieldValue(formatted)) }
+    var focused by remember { mutableStateOf(false) }
+    val commit = {
+        val parsed = draft.text.toIntOrNull()
+        if (parsed != null && parsed != value) onSet(parsed.coerceIn(0, max)) else draft = TextFieldValue(formatted)
+    }
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         TimeStepButton(contentDescription = upDescription, rotation = 180f, dark = dark, tint = fg) { onStep(1) }
         BasicTextField(
-            value = editingText ?: "%02d".format(value),
-            onValueChange = { raw -> editingText = raw.filter { it.isDigit() }.take(2) },
+            value = draft,
+            onValueChange = { raw -> draft = raw.copy(text = raw.text.filter { it.isDigit() }.take(2)) },
             singleLine = true,
             textStyle = TextStyle(
                 color = fg,
                 fontSize = 20.8.sp,
+                lineHeight = 31.2.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
+                fontFeatureSettings = "tnum",
             ),
             cursorBrush = SolidColor(accent),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(
-                onDone = {
-                    val parsed = editingText?.toIntOrNull()
-                    if (parsed != null) onSet(parsed.coerceIn(0, max))
-                    editingText = null
-                },
-            ),
+            keyboardActions = KeyboardActions(onDone = { commit() }),
             modifier = Modifier
-                .width(48.dp)
-                .padding(vertical = 2.dp),
+                .semantics { contentDescription = fieldDescription }
+                .onFocusChanged { state ->
+                    if (state.isFocused && !focused) {
+                        draft = draft.copy(selection = TextRange(0, draft.text.length))
+                    } else if (!state.isFocused && focused) {
+                        commit()
+                    }
+                    focused = state.isFocused
+                }
+                .clip(RoundedCornerShape(7.dp))
+                .then(
+                    if (focused) {
+                        Modifier
+                            .background(accent.copy(alpha = 0.14f))
+                            .border(1.5.dp, accent.copy(alpha = 0.55f), RoundedCornerShape(7.dp))
+                    } else {
+                        Modifier
+                    },
+                )
+                .width(29.dp)
+                .padding(vertical = 1.dp),
         )
         TimeStepButton(contentDescription = downDescription, rotation = 0f, dark = dark, tint = fg) { onStep(-1) }
     }
@@ -656,9 +731,10 @@ private fun TimeStepButton(
     }
 }
 
-/** The chips' inline edit mode: one field per chip, a dotted "+" while
- *  under five, and a Done button that normalises, de-duplicates and
- *  truncates the list (ReminderPicker.jsx:221-283). */
+/** The chips' inline edit mode (ReminderPicker.jsx:221-283): one centred
+ *  "HH:MM" field per chip with its delete cross, then a dashed "+" (while
+ *  under five) kept together with Done, which normalises, de-duplicates
+ *  and truncates the list. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChipEditor(
@@ -671,30 +747,46 @@ private fun ChipEditor(
 ) {
     val drafts = remember(chips) { mutableStateListOf<String>().apply { addAll(chips) } }
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
     ) {
         drafts.forEachIndexed { index, draft ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+                var fieldFocused by remember { mutableStateOf(false) }
+                val fieldStyle = TextStyle(
+                    color = fg,
+                    fontSize = 13.12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    fontFeatureSettings = "tnum",
+                )
                 BasicTextField(
                     value = draft,
                     onValueChange = { raw -> drafts[index] = formatChipInput(raw) },
                     singleLine = true,
-                    textStyle = TextStyle(color = fg, fontSize = 13.1.sp, fontWeight = FontWeight.SemiBold),
+                    textStyle = fieldStyle,
                     cursorBrush = SolidColor(accent),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                     modifier = Modifier
-                        .width(56.dp)
+                        .width(41.dp)
+                        .onFocusChanged { fieldFocused = it.isFocused }
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (dark) BtnHoverDark else BtnHoverLight)
+                        .border(1.dp, if (fieldFocused) accent else border, RoundedCornerShape(8.dp))
                         .padding(horizontal = 2.dp, vertical = 4.dp),
+                    decorationBox = { inner ->
+                        Box(contentAlignment = Alignment.Center) {
+                            if (draft.isEmpty()) Text(ChipPlaceholder, style = fieldStyle.copy(color = fg.copy(alpha = 0.45f)))
+                            inner()
+                        }
+                    },
                 )
                 val deleteLabel = stringResource(R.string.native_reminder_delete_chip)
                 Box(
                     modifier = Modifier
                         .size(22.dp)
-                        .clip(CircleShape)
+                        .clip(RoundedCornerShape(6.dp))
                         .semantics { contentDescription = deleteLabel }
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
@@ -703,52 +795,56 @@ private fun ChipEditor(
                         ) { drafts.removeAt(index) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    CloseIcon(size = 12.dp, tint = if (dark) PastHintDark else PastHintLight)
+                    CloseIcon(size = 14.dp, tint = if (dark) PastHintDark else PastHintLight, strokeWidth = 1.75f)
                 }
             }
         }
-        if (drafts.size < MaxTimeChips) {
-            val addLabel = stringResource(R.string.native_reminder_add_chip)
-            Box(
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (drafts.size < MaxTimeChips) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .dashedBorder(border, CircleShape)
+                        .clip(CircleShape)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { drafts.add("12:00") },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("+", color = fg, fontSize = 18.4.sp, lineHeight = 18.4.sp)
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .border(1.dp, border, CircleShape)
-                    .semantics { contentDescription = addLabel }
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(if (dark) accent.copy(alpha = 0.32f) else accent.copy(alpha = 0.14f))
+                    .border(1.dp, accent, RoundedCornerShape(999.dp))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         role = Role.Button,
-                    ) { drafts.add("09:00") },
-                contentAlignment = Alignment.Center,
+                    ) { onCommit(normaliseChips(drafts)) }
+                    .padding(horizontal = 11.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                PlusIcon(size = 14.dp, tint = fg)
+                TablerCheckIcon(size = 14.dp, tint = if (dark) Color.White else accent)
+                Text(
+                    stringResource(R.string.native_reminder_done),
+                    color = if (dark) Color.White else accent,
+                    fontSize = 12.48.sp,
+                    lineHeight = 18.72.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(if (dark) accent.copy(alpha = 0.32f) else accent.copy(alpha = 0.14f))
-                .border(1.dp, accent, RoundedCornerShape(999.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) { onCommit(normaliseChips(drafts)) }
-                .padding(horizontal = 11.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            CheckmarkIcon(size = 14.dp, tint = if (dark) Color.White else accent)
-            Text(
-                stringResource(R.string.native_reminder_done),
-                color = if (dark) Color.White else accent,
-                fontSize = 12.8.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
         }
     }
 }
+
+/** The chip fields' own placeholder, the same in every language. */
+private const val ChipPlaceholder = "HH:MM"
 
 /** formatChipInput (ReminderPicker.jsx:64-67): digits only, with the
  *  colon inserted on its own after the second one. */
