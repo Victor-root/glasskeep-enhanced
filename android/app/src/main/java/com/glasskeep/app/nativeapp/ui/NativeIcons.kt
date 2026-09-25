@@ -1118,6 +1118,73 @@ fun IndentIncreaseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Co
     modifier, size, tint,
 )
 
+/** tabler/check.svg, the settings pickers' "current choice" mark. */
+@Composable
+fun TablerCheckIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M5 12l5 5l10 -10",
+    modifier, size, tint,
+)
+
+/** tabler/bell.svg and tabler/eye.svg at the settings rows' 1.75 stroke;
+ *  [BellIcon] and [EyeIcon] keep the 2px stroke their other screens draw. */
+@Composable
+fun TablerBellIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6 " +
+        "M9 17v1a3 3 0 0 0 6 0v-1",
+    modifier, size, tint,
+)
+
+@Composable
+fun TablerEyeIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0 " +
+        "M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6",
+    modifier, size, tint,
+)
+
+/** tabler/layout-sidebar.svg. */
+@Composable
+fun LayoutSidebarIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z M9 4l0 16",
+    modifier, size, tint,
+)
+
+/** tabler/float-center.svg. */
+@Composable
+fun FloatCenterIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M9 6a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4 " +
+        "M4 7l1 0 M4 11l1 0 M19 7l1 0 M19 11l1 0 M4 15l16 0 M4 19l16 0",
+    modifier, size, tint,
+)
+
+/** tabler/clock.svg. */
+@Composable
+fun ClockIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0 M12 7v5l3 3",
+    modifier, size, tint,
+)
+
+/** tabler/heading.svg. */
+@Composable
+fun HeadingIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M7 12h10 M7 4v16 M17 4v16 M15 20h4 M15 4h4 M5 20h4 M5 4h4",
+    modifier, size, tint,
+)
+
+/** tabler/typography.svg. */
+@Composable
+fun TypographyIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 20l3 0 M14 20l7 0 M6.9 15l6.9 0 M10.2 6.3l5.8 13.7 M5 20l6 -16l2 0l7 16",
+    modifier, size, tint,
+)
+
+/** tabler/clipboard.svg. */
+@Composable
+fun ClipboardIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2 " +
+        "M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z",
+    modifier, size, tint,
+)
+
 /** The colour picker's own check (`ColorPickerPanel.jsx:101-103`): a
  *  filled glyph, not the stroked [CheckmarkIcon] used elsewhere. */
 @Composable
@@ -1410,8 +1477,7 @@ fun UserXIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Col
     modifier, size, tint,
 )
 
-/** tabler/world-www.svg, trimmed to the outline the row needs at 16dp:
- *  the full glyph's inner meridians turn to mush that small. */
+/** tabler/world-www.svg. */
 @Composable
 fun WorldWwwIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
     "M19.5 7a9 9 0 0 0 -7.5 -4a8.991 8.991 0 0 0 -7.484 4 " +
@@ -1419,7 +1485,10 @@ fun WorldWwwIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = 
         "M12.5 3a16.989 16.989 0 0 1 1.828 4 " +
         "M19.5 17a9 9 0 0 1 -7.5 4a8.991 8.991 0 0 1 -7.484 -4 " +
         "M11.5 21a16.989 16.989 0 0 1 -1.826 -4 " +
-        "M12.5 21a16.989 16.989 0 0 0 1.828 -4",
+        "M12.5 21a16.989 16.989 0 0 0 1.828 -4 " +
+        "M2 10l1 4l1.5 -4l1.5 4l1 -4 " +
+        "M17 10l1 4l1.5 -4l1.5 4l1 -4 " +
+        "M9.5 10l1 4l1.5 -4l1.5 4l1 -4",
     modifier, size, tint,
 )
 
@@ -1632,6 +1701,23 @@ fun InfoFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color 
         "l.117 -.007a1 1 0 0 0 .876 -.876l.007 -.117l-.007 -.117a1 1 0 0 0 -.764 -.857l-.112 -.02l-.117 -.006v-3" +
         "l-.007 -.117a1 1 0 0 0 -.876 -.876l-.117 -.007z" +
         "m.01 -3l-.127 .007a1 1 0 0 0 0 1.986l.117 .007l.127 -.007a1 1 0 0 0 0 -1.986l-.117 -.007z",
+    modifier, size, tint,
+)
+
+/** tabler/alert-circle-filled.svg. */
+@Composable
+fun AlertCircleFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M12 2c5.523 0 10 4.477 10 10a10 10 0 0 1 -19.995 .324l-.005 -.324l.004 -.28c.148 -5.393 4.566 -9.72 9.996 -9.72z" +
+        "m.01 13l-.127 .007a1 1 0 0 0 0 1.986l.117 .007l.127 -.007a1 1 0 0 0 0 -1.986l-.117 -.007z" +
+        "m-.01 -8a1 1 0 0 0 -.993 .883l-.007 .117v4l.007 .117a1 1 0 0 0 1.986 0l.007 -.117v-4l-.007 -.117a1 1 0 0 0 -.993 -.883z",
+    modifier, size, tint,
+)
+
+/** The WebView-era change-server dialog's own glyph (its ic_swap_server
+ *  drawable): a filled 24x24 circular arrow, drawn by the same helper. */
+@Composable
+fun SwapServerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M12,5V1L7,6l5,5V7c3.31,0 6,2.69 6,6s-2.69,6 -6,6 -6,-2.69 -6,-6H4c0,4.42 3.58,8 8,8s8,-3.58 8,-8 -3.58,-8 -8,-8z",
     modifier, size, tint,
 )
 

@@ -753,6 +753,14 @@ data class UserSettingsDto(
     /** Strike completed rich-text task rows, synced across devices. */
     val taskStrikeEnabled: Boolean? = null,
     val qrQuickEnabled: Boolean? = null,
+    /** Whether the tag sidebar stays pinned on a screen at least
+     *  [sidebarBreakpoint] px wide. Only the desktop web acts on them, but
+     *  the phone's Settings shows and edits them (SettingsPanel.jsx:511-600). */
+    val alwaysShowSidebarOnWide: Boolean? = null,
+    val sidebarBreakpoint: Int? = null,
+    /** What a plain paste keeps in the rich-text editor: "rich" (the
+     *  source's formatting) or "plain". */
+    val pasteMode: String? = null,
 )
 
 /** Body for a PATCH /api/user/settings that sets only the workspace theme.
@@ -801,6 +809,15 @@ data class SetEdgeToEdgeLandscapeRequest(val edgeToEdgeLandscape: Boolean)
 
 @Serializable
 data class SetFloatingCardsRequest(val floatingCardsEnabled: Boolean)
+
+@Serializable
+data class SetAlwaysShowSidebarOnWideRequest(val alwaysShowSidebarOnWide: Boolean)
+
+@Serializable
+data class SetSidebarBreakpointRequest(val sidebarBreakpoint: Int)
+
+@Serializable
+data class SetPasteModeRequest(val pasteMode: String)
 
 /** Body for a PATCH /api/user/settings that sets only the notes screen's
  *  layout ("list" or "grid"). */
@@ -1471,6 +1488,15 @@ interface GlassKeepApi {
 
     @PATCH("api/user/settings")
     suspend fun setFloatingCards(@Body body: SetFloatingCardsRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setAlwaysShowSidebarOnWide(@Body body: SetAlwaysShowSidebarOnWideRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setSidebarBreakpoint(@Body body: SetSidebarBreakpointRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setPasteMode(@Body body: SetPasteModeRequest): Response<UserSettingsDto>
 
     @PATCH("api/user/settings")
     suspend fun setViewMode(@Body body: SetViewModeRequest): Response<UserSettingsDto>

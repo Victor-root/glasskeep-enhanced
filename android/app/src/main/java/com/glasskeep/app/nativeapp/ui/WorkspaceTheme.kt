@@ -373,11 +373,32 @@ object WorkspaceTheme {
 
     fun activeFg(id: String?, dark: Boolean): Color = colorsFor(id, dark).activeFg
 
-    /** The app's primary button/gradient fill, left to right. */
+    /** --gk-chrome-grad-from to -to, left to right: the gradient the web
+     *  draws from the theme tokens themselves (the active sidebar entry). */
     fun accentGradient(id: String?): Brush {
         val entry = forId(id)
         return Brush.horizontalGradient(listOf(entry.gradFrom, entry.gradTo))
     }
+
+    /** `btn-gradient`, the `from-indigo-500 to-violet-600` fill of the
+     *  app's buttons, selected segments and small switches. The default
+     *  theme paints those Tailwind v4 colours as rendered; every other
+     *  theme's `html[class*="gk-theme-"] .btn-gradient` rule swaps in its
+     *  own grad-from/grad-to (globalCSS.js:338-340). */
+    fun buttonGradient(id: String?): Brush {
+        val entry = forId(id)
+        return if (entry.id == DEFAULT_ID) {
+            Brush.horizontalGradient(listOf(Color(0xFF615FFF), Color(0xFF7F22FE)))
+        } else {
+            Brush.horizontalGradient(listOf(entry.gradFrom, entry.gradTo))
+        }
+    }
+
+    /** `focus:ring-indigo-500` on a form field: indigo-500 as rendered in
+     *  the default theme, the accent in every other one, whose
+     *  `html[class*="gk-theme-"]` rule retints the ring (globalCSS.js:378-380). */
+    fun fieldFocusRing(id: String?, dark: Boolean): Color =
+        if (forId(id).id == DEFAULT_ID) Color(0xFF615FFF) else accent(id, dark)
 
     fun gradFrom(id: String?): Color = forId(id).gradFrom
 

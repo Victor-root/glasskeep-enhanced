@@ -34,6 +34,11 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
     var toolbarMode: String by mutableStateOf(tokenStore.editorToolbarMode ?: "simple")
         private set
 
+    /** What a plain paste keeps: "rich" (the source's formatting, the
+     *  web's default) or "plain". */
+    var pasteMode: String by mutableStateOf(tokenStore.pasteMode ?: "rich")
+        private set
+
     var taskStrike: Boolean by mutableStateOf(tokenStore.taskStrikeChecked)
         private set
 
@@ -105,6 +110,12 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
         val resolved = if (mode == "advanced") "advanced" else "simple"
         toolbarMode = resolved
         tokenStore.editorToolbarMode = resolved
+    }
+
+    fun applyPasteMode(mode: String) {
+        val resolved = if (mode == "plain") "plain" else "rich"
+        pasteMode = resolved
+        tokenStore.pasteMode = resolved
     }
 
     fun applyTaskStrike(on: Boolean) {

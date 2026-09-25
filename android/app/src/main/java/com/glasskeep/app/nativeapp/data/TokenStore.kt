@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.data.network.ProfileDto
+import kotlinx.serialization.json.Json
 
 /**
  * Session storage for the native rewrite: server URL + JWT, encrypted at
@@ -169,6 +171,44 @@ class TokenStore(context: Context) {
             prefs.edit().putBoolean(KEY_QR_QUICK, value).apply()
         }
 
+    /** Cached desktop tag-sidebar pinning and its minimum screen width,
+     *  on and 1280px by default like the web's own (App.jsx:221-238). */
+    var alwaysShowSidebarOnWide: Boolean
+        get() = prefs.getBoolean(KEY_SIDEBAR_ON_WIDE, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_SIDEBAR_ON_WIDE, value).apply()
+        }
+
+    var sidebarBreakpoint: Int
+        get() = prefs.getInt(KEY_SIDEBAR_BREAKPOINT, DEFAULT_SIDEBAR_BREAKPOINT)
+        set(value) {
+            prefs.edit().putInt(KEY_SIDEBAR_BREAKPOINT, value).apply()
+        }
+
+    /** Cached rich-text paste mode ("rich"/"plain"). */
+    var pasteMode: String?
+        get() = prefs.getString(KEY_PASTE_MODE, null)
+        set(value) {
+            prefs.edit().putString(KEY_PASTE_MODE, value).apply()
+        }
+
+    /** The signed-in account's last known profile, what Settings renders
+     *  at once, offline too, the way the web draws its panel from the
+     *  session user. It belongs to the account, so it leaves with the
+     *  session. */
+    var profile: ProfileDto?
+        get() = prefs.getString(KEY_PROFILE, null)?.let { raw ->
+            try {
+                profileJson.decodeFromString(ProfileDto.serializer(), raw)
+            } catch (t: Throwable) {
+                NativeDebug.e("TokenStore: cached profile unreadable", t)
+                null
+            }
+        }
+        set(value) {
+            prefs.edit().putString(KEY_PROFILE, value?.let { profileJson.encodeToString(ProfileDto.serializer(), it) }).apply()
+        }
+
     /** Cached "the AI assistant is available to me" flag, off by default:
      *  most instances have no AI configured at all. */
     var aiAssistantEnabled: Boolean
@@ -206,15 +246,15 @@ class TokenStore(context: Context) {
     }
 
     /**
-     * Signing out: drops the session and nothing else. The look of the app
-     * (theme, editor and shell preferences) is a per-device cache the web
-     * deliberately keeps too, "preserve UI prefs like dark mode"
-     * (App.jsx:4607), and the server URL is what the login screen this
-     * lands on talks to.
+     * Signing out: drops the session and the account's cached [profile],
+     * nothing else. The look of the app (theme, editor and shell
+     * preferences) is a per-device cache the web deliberately keeps too,
+     * "preserve UI prefs like dark mode" (App.jsx:4607), and the server URL
+     * is what the login screen this lands on talks to.
      */
     fun clearSession() {
         NativeDebug.d("TokenStore.clearSession")
-        prefs.edit().remove(KEY_TOKEN).apply()
+        prefs.edit().remove(KEY_TOKEN).remove(KEY_PROFILE).apply()
     }
 
     companion object {
@@ -227,6 +267,10 @@ class TokenStore(context: Context) {
         private const val KEY_READ_MODE = "read_mode_enabled"
         private const val KEY_LIST_VIEW = "list_view"
         private const val KEY_QR_QUICK = "qr_quick_enabled"
+        private const val KEY_SIDEBAR_ON_WIDE = "always_show_sidebar_on_wide"
+        private const val KEY_SIDEBAR_BREAKPOINT = "sidebar_breakpoint"
+        private const val KEY_PASTE_MODE = "paste_mode"
+        private const val KEY_PROFILE = "profile"
         private const val KEY_AI_ASSISTANT = "ai_assistant_enabled"
         private const val KEY_EDGE_TO_EDGE_LANDSCAPE = "edge_to_edge_landscape"
         private const val KEY_FLOATING_CARDS = "floating_cards_enabled"
@@ -243,5 +287,10 @@ class TokenStore(context: Context) {
 
         /** notificationsDuration's own default (App.jsx:478-487). */
         const val DEFAULT_TOAST_DURATION_MS = 10_000L
+
+        /** sidebarBreakpoint's own default, the "Standard" preset. */
+        const val DEFAULT_SIDEBAR_BREAKPOINT = 1280
+
+        private val profileJson = Json { ignoreUnknownKeys = true }
     }
 }

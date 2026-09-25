@@ -1,5 +1,7 @@
 package com.glasskeep.app.nativeapp.data
 
+import com.glasskeep.app.nativeapp.data.network.ProfileDto
+
 /**
  * The account-wide preferences every screen reads at startup, fetched in
  * one GET /api/user/settings (see NotesRepository.fetchWorkspacePreferences).
@@ -12,11 +14,11 @@ data class WorkspacePreferences(
     val shellTheme: String?,
     val editorToolbarMode: String?,
     val typography: TypographyPresets,
-    /** The account's interface language ("en", "fr"), or null to follow
-     *  the device, and whether this user administers the instance. Both
-     *  live on the profile rather than the settings blob. */
-    val language: String?,
-    val isAdmin: Boolean?,
+    /** The account itself, read alongside: its interface language ("en",
+     *  "fr", or null to follow the device) and whether this user
+     *  administers the instance live on the profile rather than the
+     *  settings blob. Null when that read failed. */
+    val profile: ProfileDto?,
     /** Where the notification pill sits, and how long it stays (null =
      *  until dismissed). */
     val toastPosition: String?,
@@ -40,4 +42,9 @@ data class WorkspacePreferences(
      *  with the items it owned. */
     val checklistInsertPosition: String?,
     val checklistRemoveSectionBehavior: String?,
+    /** The desktop tag sidebar's pinning, edited from the phone's Settings. */
+    val alwaysShowSidebarOnWide: Boolean?,
+    val sidebarBreakpoint: Int?,
+    /** "rich" or "plain": what a plain paste keeps in the rich-text editor. */
+    val pasteMode: String?,
 )
