@@ -941,10 +941,6 @@ class NotesRepository(
         updateCachedNote(entity.id) { it.copy(reminderAt = reminderAtIso, reminderFiredAt = null, updatedAt = instant, clientUpdatedAt = instant) }
     }
 
-    /** How many of this note's edits are still waiting to reach the
-     *  server; drives NoteDetailScreen's small "Syncing…" indicator. */
-    fun observePendingSyncCount(noteId: String): Flow<Int> = syncQueueDao.observePendingCountForNote(noteId)
-
     /** See NoteDao.replaceAll's own doc comment; exposed (not just used
      *  internally by refresh()) so a non-Room-backed screen with its own
      *  in-memory list (SecondaryNotesScreen.kt) can guard its own refresh

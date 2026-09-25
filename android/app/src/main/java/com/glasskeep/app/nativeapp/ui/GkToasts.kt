@@ -72,6 +72,8 @@ data class GkToast(
     val variant: NotifVariant,
     val actionLabel: String? = null,
     val action: (() -> Unit)? = null,
+    /** Overrides the user's configured duration for this one pill. */
+    val durationMs: Long? = null,
 )
 
 /**
@@ -109,11 +111,12 @@ class ToastController {
          *  one; null for a message the app raised itself, which is then
          *  categorised by its variant alone. */
         type: String? = null,
+        durationMs: Long? = null,
     ) {
         val category = NotifCategory.of(type, variant.categoryKey)
         val settings = prefs
         if (settings != null && !settings.allowsNotification(category)) return
-        queue.add(GkToast(nextId++, title, message, variant, actionLabel, action))
+        queue.add(GkToast(nextId++, title, message, variant, actionLabel, action, durationMs))
         if (settings != null && settings.ringsFor(category)) NotificationDing.play()
     }
 
@@ -153,7 +156,7 @@ fun GkToastHost(
 
     // A burst shares the configured duration between everything that
     // arrived together, never dropping below 800ms a piece.
-    val slice = durationMs?.let { total ->
+    val slice = (current.durationMs ?: durationMs)?.let { total ->
         if (controller.queue.size > 1) maxOf(MinBurstSliceMs, total / controller.queue.size) else total
     }
 

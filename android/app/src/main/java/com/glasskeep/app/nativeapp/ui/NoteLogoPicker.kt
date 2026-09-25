@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -34,6 +33,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.network.LogoDto
+import com.glasskeep.app.ui.DarkBorderColor
+import com.glasskeep.app.ui.LightBorderColor
 
 // The sub-menu's three tinted rows (AddImageMenu.jsx:33-70).
 private val MenuBlueDark = Color(0xFF7DD3FC)
@@ -49,7 +50,7 @@ private val MenuBgDark = Color(0xFF222222)
 /**
  * AddImageMenu.jsx: the two clearly separated choices behind the footer's
  * "Image" button, plus the "remove" row a note that already has an icon
- * gets. Same popover shape as the footer's own colour and tag panels.
+ * gets. Same card and rows as the note's kebab menu, 220px at least.
  */
 @Composable
 internal fun AddImageMenu(
@@ -60,77 +61,38 @@ internal fun AddImageMenu(
     onRemoveIcon: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // Same box the footer's kebab menu uses (NoteDetailScreen's own
-    // FooterPopover call), since the web says this menu mirrors it.
+    val borderColor = if (dark) DarkBorderColor else LightBorderColor
     FooterPopover(
-        // No fixed width: hugs its widest row (IntrinsicSize.Max in
-        // FooterPopover) instead of a flat 220dp, same as the kebab menu.
-        minWidth = 180.dp,
+        minWidth = 220.dp,
         gap = 8.dp,
         cornerRadius = 8.dp,
         elevation = 10.dp,
         background = if (dark) MenuBgDark else Color.White,
-        borderColor = if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.10f),
+        borderColor = borderColor,
         onDismiss = onDismiss,
     ) {
-        Column {
-            AddImageMenuRow(
-                label = stringResource(R.string.native_add_an_image),
-                tint = if (dark) MenuBlueDark else MenuBlueLight,
-                dark = dark,
-                onClick = { onAddImage(); onDismiss() },
-            ) { tint -> AddImageIcon(size = 18.dp, tint = tint) }
-            AddImageMenuRow(
-                label = stringResource(
-                    if (hasIcon) R.string.native_replace_logo else R.string.native_add_logo,
-                ),
-                tint = if (dark) MenuVioletDark else MenuVioletLight,
-                dark = dark,
-                onClick = { onAddIcon(); onDismiss() },
-            ) { tint -> LogoIcon(size = 18.dp, tint = tint) }
-            if (hasIcon) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp)
-                        .topHairline(if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)),
-                )
-                AddImageMenuRow(
-                    label = stringResource(R.string.native_remove_logo),
-                    tint = if (dark) MenuRedDark else MenuRedLight,
-                    dark = dark,
-                    onClick = { onRemoveIcon(); onDismiss() },
-                ) { tint -> TrashIcon(size = 18.dp, tint = tint) }
-            }
+        val imageTint = if (dark) MenuBlueDark else MenuBlueLight
+        PopoverMenuItem(
+            label = stringResource(R.string.native_add_an_image),
+            color = imageTint,
+            onClick = { onAddImage(); onDismiss() },
+        ) { AddImageIcon(size = 16.dp, tint = imageTint) }
+        val logoTint = if (dark) MenuVioletDark else MenuVioletLight
+        PopoverMenuItem(
+            label = stringResource(if (hasIcon) R.string.native_replace_logo else R.string.native_add_logo),
+            color = logoTint,
+            onClick = { onAddIcon(); onDismiss() },
+        ) { LogoIcon(size = 16.dp, tint = logoTint) }
+        if (hasIcon) {
+            val removeTint = if (dark) MenuRedDark else MenuRedLight
+            PopoverMenuItem(
+                label = stringResource(R.string.native_remove_logo),
+                color = removeTint,
+                // The row's own `border-t`, which adds its 1px to the row.
+                modifier = Modifier.topHairline(borderColor).padding(top = 1.dp),
+                onClick = { onRemoveIcon(); onDismiss() },
+            ) { TrashOutlineIcon(size = 16.dp, tint = removeTint) }
         }
-    }
-}
-
-/** Same sizing as the note kebab's own PopoverMenuItem (GkControls.kt):
- *  14/11dp padding, 10dp gap, 15sp text - scaled a step past the web's
- *  own 12/8px/14px so a real phone doesn't risk tapping the wrong row. */
-@Composable
-private fun AddImageMenuRow(
-    label: String,
-    tint: Color,
-    dark: Boolean,
-    onClick: () -> Unit,
-    icon: @Composable (Color) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Button,
-            ) { onClick() }
-            .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        icon(tint)
-        Text(label, color = tint, fontSize = 15.sp)
     }
 }
 

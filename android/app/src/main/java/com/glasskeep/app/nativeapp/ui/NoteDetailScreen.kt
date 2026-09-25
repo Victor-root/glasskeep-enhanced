@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -144,13 +145,19 @@ import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
+import java.text.DateFormat
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 private val ErrorColor = Color(0xFFdc2626)
@@ -195,6 +202,24 @@ private data class Editability(
     val originalAudioCaptionText: String? = null,
 )
 
+/** This same note once the given live editor state has been queued: the
+ *  as-loaded snapshots every change check diffs against move up to it. */
+private fun Editability.rebaselined(
+    blocks: List<RichBlock>?,
+    body: String,
+    paths: List<DrawingStrokeDto>,
+    dimensions: DrawingDimensionsDto?,
+    clips: List<AudioClipDto>,
+    caption: String?,
+): Editability = copy(
+    bodyPlainText = if (bodyEditable) body else bodyPlainText,
+    originalRichBlocks = if (isRichEditableType || isDrawType) blocks else originalRichBlocks,
+    originalDrawingPaths = if (isDrawType) paths else originalDrawingPaths,
+    originalDrawingDimensions = if (isDrawType) dimensions else originalDrawingDimensions,
+    originalAudioClips = if (isAudioType) clips else originalAudioClips,
+    originalAudioCaptionText = if (isAudioType) caption else originalAudioCaptionText,
+)
+
 /** One entry in the tag suggestion list: a tag already used on at least one
  *  of this user's notes, and how many. Mirrors App.jsx's tagsWithCounts. */
 private data class TagCount(val tag: String, val count: Int)
@@ -236,7 +261,10 @@ fun NoteDetailScreen(
     var titleText by remember { mutableStateOf("") }
     var bodyText by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
-    var saveError by remember { mutableStateOf<String?>(null) }
+    // Every path that queues the live editor state goes through this one
+    // lock (explicit save, the debounced autosaves, leaving), so two of
+    // them can never both diff against the same stale snapshot.
+    val persistLock = remember { Mutex() }
 
     var pinning by remember { mutableStateOf(false) }
     var archiving by remember { mutableStateOf(false) }
@@ -344,11 +372,6 @@ fun NoteDetailScreen(
     // repository's whole local cache, same source NativeNotesListScreen
     // observes for the grid.
     val allNotes by repository.observeNotes().collectAsState(initial = emptyList())
-    // Small "Syncing…" indicator for edits queued by the *Queued repository
-    // methods below (see SyncQueueWorker.kt): this note's own count only,
-    // not a global one, since that's what the user editing THIS note cares
-    // about seeing settle back to zero.
-    val pendingSyncCount by repository.observePendingSyncCount(noteId).collectAsState(initial = 0)
     // Server-computed permission for THIS user on this note (see NoteDto.access's
     // own doc comment): gated here, proactively, rather than only reacting to a
     // rejected write after the fact, both for a better experience and because a
@@ -358,6 +381,10 @@ fun NoteDetailScreen(
     // edit here (see server/index.js's getNote vs getNoteWithCollaboration).
     val isReadOnlyAccess = note?.access == "read"
     val isOwnerAccess = note?.access == "owner"
+    // NoteModal.jsx's noteReadOnly: a mirrored note whose own server can't
+    // be reached is paused exactly like a read-only share (the server
+    // refuses the content edits too).
+    val isNoteReadOnly = isReadOnlyAccess || note?.federation?.readOnly == true
     // isCollaborativeNote() (useModalState.js:223): shared with someone, or
     // owned by someone else. The server already answers the second half in
     // `access`, so this needs no separate user-id comparison.
@@ -376,9 +403,17 @@ fun NoteDetailScreen(
 
     val errorLoadTemplate = stringResource(R.string.native_note_detail_error)
     val errorSaveTemplate = stringResource(R.string.native_note_detail_save_error)
-    val readOnlyMessage = stringResource(R.string.native_note_detail_readonly)
-    val syncingLabel = stringResource(R.string.native_note_detail_syncing)
     val actionErrorTemplate = stringResource(R.string.native_note_detail_action_error)
+    val archivedMessage = stringResource(R.string.native_note_detail_archived)
+    val unarchivedMessage = stringResource(R.string.native_note_detail_unarchived)
+    val movedToTrashMessage = stringResource(R.string.native_note_detail_moved_to_trash)
+    val deletedForAllMessage = stringResource(R.string.native_note_detail_deleted_for_all)
+    val deletedPermanentlyMessage = stringResource(R.string.native_note_detail_deleted_permanently)
+    val restoredMessage = stringResource(R.string.native_note_detail_restored)
+    val duplicatedMessage = stringResource(R.string.native_note_detail_duplicated)
+    val emptyRemovedMessage = stringResource(R.string.native_note_detail_empty_removed)
+    val reminderSetMessage = stringResource(R.string.native_note_detail_reminder_set)
+    val reminderRemovedMessage = stringResource(R.string.native_note_detail_reminder_removed)
     val convertedToChecklistMessage = stringResource(R.string.native_note_detail_converted_to_checklist)
     val convertedToTextMessage = stringResource(R.string.native_note_detail_converted_to_text)
     val duplicateSuffix = stringResource(R.string.native_note_detail_duplicate_suffix)
@@ -387,23 +422,40 @@ fun NoteDetailScreen(
     val imageAddErrorMessage = stringResource(R.string.native_note_detail_add_image_error)
     val iconErrorMessage = stringResource(R.string.native_note_icon_error)
     val editedPrefix = stringResource(R.string.native_note_detail_edited_prefix)
+    val todayLabel = stringResource(R.string.native_note_detail_today)
+    val yesterdayLabel = stringResource(R.string.native_note_detail_yesterday)
+
+    /** Whether the editors hold a body [note] doesn't have yet. Compared on
+     *  the parsed state, never on the content string: re-encoding a body
+     *  nobody touched can still reorder its JSON, and resending that would
+     *  move the note's "Modifié" date for nothing. */
+    fun bodyChanged(edit: Editability): Boolean = when {
+        edit.isChecklistType -> false
+        edit.isRichEditableType -> richBlocks != null && richBlocks != edit.originalRichBlocks
+        edit.isDrawType -> richBlocks != edit.originalRichBlocks ||
+            drawingPaths != edit.originalDrawingPaths.orEmpty() ||
+            drawingDimensions != edit.originalDrawingDimensions
+        edit.isAudioType -> audioClips != edit.originalAudioClips.orEmpty() ||
+            audioCaptionText != edit.originalAudioCaptionText
+        else -> edit.bodyEditable && bodyText != edit.bodyPlainText
+    }
 
     /** Materializes exactly what is on screen. Lifecycle actions and
      *  duplication must not use the last server snapshot while a title,
-     *  rich block, checklist row, stroke, or recording is still local. */
+     *  rich block, checklist row, stroke, or recording is still local. A
+     *  body nobody touched keeps its content string exactly as loaded. */
     fun liveNoteSnapshot(): NoteDto? {
         val current = note ?: return null
         val edit = editability ?: return current.copy(title = titleText)
         val content = when {
-            edit.isChecklistType -> ""
-            edit.isRichEditableType -> RichDoc.encode(richBlocks ?: edit.originalRichBlocks.orEmpty())
+            !bodyChanged(edit) -> current.content
+            edit.isRichEditableType -> RichDoc.encode(richBlocks.orEmpty())
             edit.isDrawType -> DrawingContent.encode(
                 drawingPaths,
                 drawingDimensions,
                 RichDoc.encode(richBlocks ?: listOf(RichDoc.newBlock())),
             )
             edit.isAudioType -> AudioContent.encode(audioClips, audioCaptionText.orEmpty())
-            !edit.bodyEditable -> current.content
             edit.isLegacyPlain -> bodyText
             else -> NoteContent.plainTextToRichContent(bodyText)
         }
@@ -420,24 +472,63 @@ fun NoteDetailScreen(
         )
     }
 
+    /** Queues whatever title and body the editors hold that [note] doesn't
+     *  have yet, the checklist rows too unless [withItems] leaves them to
+     *  their own save-on-blur, then takes that state as the new baseline:
+     *  the header check goes back to its idle ring, as after the web's
+     *  autoSaveTextNote. */
+    suspend fun persistLiveEdits(withItems: Boolean): NoteDto? = persistLock.withLock {
+        val current = note ?: return@withLock null
+        val blocks = richBlocks
+        val body = bodyText
+        val paths = drawingPaths
+        val dimensions = drawingDimensions
+        val clips = audioClips
+        val caption = audioCaptionText
+        val live = liveNoteSnapshot() ?: return@withLock current
+        if (!isNoteReadOnly) {
+            if (live.title != current.title || live.content != current.content) {
+                repository.patchNoteQueued(current.id, live.title, live.content)
+            }
+            if (withItems && live.items != current.items) {
+                repository.setChecklistItemsQueued(current.id, live.items)
+            }
+        }
+        // Applied to the latest state, not the snapshot taken above: a
+        // pin, colour or tag change may have landed while this was queueing.
+        editability = editability?.rebaselined(blocks, body, paths, dimensions, clips, caption)
+        note = note?.let { latest ->
+            latest.copy(title = live.title, content = live.content, items = if (withItems) live.items else latest.items)
+        }
+        note
+    }
+
+    fun cancelPendingAutosaves() {
+        drawingSaveJob?.cancel()
+        audioSaveJob?.cancel()
+    }
+
     /** Commits the live editor state to the offline queue before an exit
      *  or status transition. This closes the debounce/blur race for every
      *  note type and gives Android the web editor's save-on-close safety. */
     suspend fun flushLiveEdits(): NoteDto? {
-        val current = note ?: return null
-        val live = liveNoteSnapshot() ?: return current
-        drawingSaveJob?.cancel()
-        audioSaveJob?.cancel()
-        if (!isReadOnlyAccess) {
-            if (live.title != current.title || live.content != current.content) {
-                repository.patchNoteQueued(current.id, live.title, live.content)
-            }
-            if (live.items != current.items) {
-                repository.setChecklistItemsQueued(current.id, live.items)
-            }
+        cancelPendingAutosaves()
+        return persistLiveEdits(withItems = true)
+    }
+
+    /** One debounced autosave. A queue write that has started is always
+     *  finished, even when a newer edit reschedules this one meanwhile. */
+    suspend fun autosaveLiveEdits() {
+        try {
+            withContext(NonCancellable) { persistLiveEdits(withItems = false) }
+            SyncQueueWorker.triggerNow(context)
+            NativeDebug.d("NoteDetailScreen autosave queued id=$noteId")
+        } catch (t: CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            NativeDebug.e("NoteDetailScreen autosave failed", t)
+            toasts.error(String.format(errorSaveTemplate, t.message ?: t.javaClass.simpleName))
         }
-        note = live
-        return live
     }
 
     fun togglePin() {
@@ -459,17 +550,21 @@ fun NoteDetailScreen(
         }
     }
 
+    /** Archiving leaves the note; unarchiving keeps it open, the way the
+     *  web's handleArchiveNote only closes the modal for the former. */
     fun toggleArchive() {
         val current = note ?: return
         if (archiving) return
         archiving = true
+        val archive = !current.archived
         scope.launch {
             try {
                 val live = flushLiveEdits() ?: current
-                repository.setArchivedQueued(live.toEntity(), !current.archived)
+                repository.setArchivedQueued(live.toEntity(), archive)
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen toggleArchive queued id=${current.id}")
-                onBack()
+                toasts.success(if (archive) archivedMessage else unarchivedMessage)
+                if (archive) onBack() else note = note?.copy(archived = false)
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen toggleArchive failed", t)
                 toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
@@ -491,6 +586,7 @@ fun NoteDetailScreen(
                 repository.restoreNoteQueued(current.toEntity())
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen restoreNote queued id=${current.id}")
+                toasts.success(restoredMessage)
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen restoreNote failed", t)
@@ -512,6 +608,7 @@ fun NoteDetailScreen(
                 repository.trashNoteQueued(current.id, mode)
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen trash queued id=${current.id} mode=$mode")
+                toasts.success(if (mode == "delete_for_all") deletedForAllMessage else movedToTrashMessage)
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen trash failed", t)
@@ -523,8 +620,8 @@ fun NoteDetailScreen(
     }
 
     /** Permanently deletes a trashed note (irreversible, see
-     *  repository.deleteNotePermanently). Only ever offered from a trashed
-     *  note's own kebab menu, in place of Move to trash there. */
+     *  repository.deleteNotePermanently): what the trash button does on a
+     *  note opened from the trash. */
     fun confirmPermanentDelete() {
         val current = note ?: return
         showPermanentDeleteConfirm = false
@@ -535,6 +632,7 @@ fun NoteDetailScreen(
                 repository.deleteNotePermanentlyQueued(current.id)
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen deleteNotePermanently queued id=${current.id}")
+                toasts.success(deletedPermanentlyMessage)
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen deleteNotePermanently failed", t)
@@ -582,6 +680,11 @@ fun NoteDetailScreen(
                 note = current.copy(reminderAt = reminderAtIso)
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen setReminder queued id=${current.id}")
+                if (reminderAtIso != null) {
+                    toasts.success(reminderSetMessage)
+                } else {
+                    toasts.show(reminderRemovedMessage, NotifVariant.INFO)
+                }
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen setReminder failed", t)
                 toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
@@ -882,36 +985,14 @@ fun NoteDetailScreen(
     // ---------- Drawing note edits (DrawingContent.parse-approved notes only) ----------
 
     /** Debounced autosave: cancels and restarts on every stroke/erase/
-     *  clear/undo/redo/title edit, same 500-ish ms idea as the web
-     *  editor's own drawing autosave (App.jsx), so a fast burst of strokes
-     *  sends one PATCH after the user actually pauses rather than one per
-     *  gesture. Deliberately its own function, not save(): save() also
-     *  navigates back on success, which is right for an explicit Save
-     *  button press but would be wrong here, autosave firing mid-drawing
-     *  must never suddenly leave the screen. */
-    suspend fun performDrawingSave() {
-        if (note == null || isReadOnlyAccess) return
-        saveError = null
-        try {
-            val encoded = DrawingContent.encode(
-                drawingPaths,
-                drawingDimensions,
-                RichDoc.encode(richBlocks ?: listOf(RichDoc.newBlock())),
-            )
-            repository.patchNoteQueued(noteId, titleText, encoded)
-            SyncQueueWorker.triggerNow(context)
-            NativeDebug.d("NoteDetailScreen drawing autosave queued id=$noteId")
-        } catch (t: Throwable) {
-            NativeDebug.e("NoteDetailScreen drawing autosave failed", t)
-            saveError = String.format(errorSaveTemplate, t.message ?: t.javaClass.simpleName)
-        }
-    }
-
+     *  clear/undo/redo, same idea as the web editor's own drawing autosave
+     *  (App.jsx), so a fast burst of strokes sends one PATCH after the
+     *  user actually pauses rather than one per gesture. */
     fun scheduleDrawingAutosave() {
         drawingSaveJob?.cancel()
         drawingSaveJob = scope.launch {
             delay(600)
-            performDrawingSave()
+            autosaveLiveEdits()
         }
     }
 
@@ -955,29 +1036,12 @@ fun NoteDetailScreen(
 
     // ---------- Audio note edits (AudioContent.parse-approved notes only) ----------
 
-    /** Same debounced-no-button shape as scheduleDrawingAutosave, reused
-     *  as-is rather than merged into one generic function: they persist
-     *  different content shapes and there is no third note type waiting
-     *  to reuse a unified version yet. */
-    suspend fun performAudioSave() {
-        if (note == null || isReadOnlyAccess) return
-        saveError = null
-        try {
-            val encoded = AudioContent.encode(audioClips, audioCaptionText.orEmpty())
-            repository.patchNoteQueued(noteId, titleText, encoded)
-            SyncQueueWorker.triggerNow(context)
-            NativeDebug.d("NoteDetailScreen audio autosave queued id=$noteId")
-        } catch (t: Throwable) {
-            NativeDebug.e("NoteDetailScreen audio autosave failed", t)
-            saveError = String.format(errorSaveTemplate, t.message ?: t.javaClass.simpleName)
-        }
-    }
-
+    /** Same debounced shape as scheduleDrawingAutosave. */
     fun scheduleAudioAutosave() {
         audioSaveJob?.cancel()
         audioSaveJob = scope.launch {
             delay(600)
-            performAudioSave()
+            autosaveLiveEdits()
         }
     }
 
@@ -996,14 +1060,23 @@ fun NoteDetailScreen(
         scheduleAudioAutosave()
     }
 
-    // The drawing caption is the same rich document as a text note. It
-    // follows the drawing's debounce instead of waiting for an explicit
-    // Save, matching App.jsx's title+caption drawing autosave.
-    LaunchedEffect(richBlocks, editability?.isDrawType) {
+    // A note that can't be edited always shows its read face.
+    LaunchedEffect(isNoteReadOnly) {
+        if (isNoteReadOnly) {
+            viewMode = true
+            drawingCanvasMode = false
+        }
+    }
+
+    // Title and body typing autosave one second after the last keystroke,
+    // like the web's autoSaveTextNote; the header check stays the manual
+    // way to save sooner.
+    LaunchedEffect(titleText, bodyText, richBlocks) {
+        val current = note ?: return@LaunchedEffect
         val edit = editability ?: return@LaunchedEffect
-        if (!edit.isDrawType || richBlocks == edit.originalRichBlocks || note == null) return@LaunchedEffect
-        delay(600)
-        performDrawingSave()
+        if (isNoteReadOnly || (titleText == current.title && !bodyChanged(edit))) return@LaunchedEffect
+        delay(1000)
+        autosaveLiveEdits()
     }
 
     // ---------- Content images (text/checklist notes only) ----------
@@ -1092,6 +1165,7 @@ fun NoteDetailScreen(
                 val created = repository.duplicateNote(source, newTitle)
                 NativeDebug.d("NoteDetailScreen duplicateNote OK newId=${created.id}")
                 SyncQueueWorker.triggerNow(context)
+                toasts.success(duplicatedMessage)
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen duplicateNote failed", t)
@@ -1557,7 +1631,7 @@ fun NoteDetailScreen(
     fun performConvertNoteType() {
         val current = note ?: return
         val edit = editability ?: return
-        if (converting || current.trashed || isReadOnlyAccess) return
+        if (converting || current.trashed || isNoteReadOnly) return
         if (!edit.isTextType && !edit.isChecklistType) return
         converting = true
         val toChecklist = edit.isTextType
@@ -1621,22 +1695,37 @@ fun NoteDetailScreen(
         }
     }
 
+    /** The header check: saves now and stays on the note, as the web's
+     *  modal save button does. */
     fun save() {
-        if (note == null || editability == null) return
+        if (note == null || editability == null || saving) return
         saving = true
-        saveError = null
         scope.launch {
             try {
                 flushLiveEdits()
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen save queued id=$noteId")
-                onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen save failed", t)
-                saveError = String.format(errorSaveTemplate, t.message ?: t.javaClass.simpleName)
+                toasts.error(String.format(errorSaveTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 saving = false
             }
+        }
+    }
+
+    /** Nothing typed, drawn, recorded or attached: closing such a note
+     *  removes it, like the web's handleCloseEmptyNote. */
+    fun isEmptyNote(edit: Editability): Boolean {
+        if (titleText.isNotBlank() || images.isNotEmpty()) return false
+        return when {
+            edit.isChecklistType -> edit.checklistItems.isNullOrEmpty()
+            edit.isDrawType -> NoteConversion.richBlocksToPlainText(richBlocks.orEmpty()).isBlank() &&
+                drawingPaths.none { it.points.size >= 2 }
+            edit.isAudioType -> audioClips.isEmpty()
+            edit.isRichEditableType -> NoteConversion.richBlocksToPlainText(richBlocks.orEmpty()).isBlank()
+            edit.bodyEditable -> bodyText.isBlank()
+            else -> edit.bodyPlainText.isBlank()
         }
     }
 
@@ -1646,6 +1735,10 @@ fun NoteDetailScreen(
         if (BuildConfig.DEBUG) {
             Log.d("GKBack", "goBack() invoked - showFormatSheet=$showFormatSheet noteAiOpen=$noteAiOpen showReminderPicker=$showReminderPicker", Throwable("GKBack trace"))
         }
+        val current = note
+        val edit = editability
+        val removeEmpty = current != null && edit != null && isOwnerAccess && !isNoteReadOnly &&
+            !current.trashed && isEmptyNote(edit)
         scope.launch {
             // Never let a flush/enqueue failure strand the user on this
             // screen with no way out and no explanation - leaving must
@@ -1653,7 +1746,14 @@ fun NoteDetailScreen(
             // inside flushLiveEdits/patchNoteQueued; still queued edits
             // catch up next time SyncQueueWorker runs regardless.
             try {
-                flushLiveEdits()
+                if (removeEmpty && current != null) {
+                    cancelPendingAutosaves()
+                    repository.trashNoteQueued(current.id, null)
+                    repository.deleteNotePermanentlyQueued(current.id)
+                    toasts.show(emptyRemovedMessage, NotifVariant.INFO, durationMs = 3_000L)
+                } else {
+                    flushLiveEdits()
+                }
                 SyncQueueWorker.triggerNow(context)
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen goBack: flush failed, leaving anyway", t)
@@ -1815,19 +1915,22 @@ fun NoteDetailScreen(
                         // ModalHeader.jsx groups pin+save with its own small
                         // gap-0.5 (2px) rather than sitting them flush
                         // against each other.
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(2.dp))
                     }
                     val edit = editability
-                    val hasUnsavedChanges = edit != null && (
-                        titleText != currentNote.title ||
-                            (edit.isRichEditableType && richBlocks != edit.originalRichBlocks) ||
-                            (edit.isDrawType && richBlocks != edit.originalRichBlocks) ||
-                            (edit.bodyEditable && bodyText != edit.bodyPlainText)
-                        )
+                    val armed = edit != null && !isNoteReadOnly &&
+                        (titleText != currentNote.title || bodyChanged(edit))
                     ModalSaveButton(
                         dark = dark,
-                        enabled = hasUnsavedChanges && !saving && !isReadOnlyAccess,
-                        contentDescription = stringResource(R.string.native_note_detail_save),
+                        armed = armed,
+                        enabled = !saving && !isNoteReadOnly,
+                        contentDescription = stringResource(
+                            when {
+                                !armed -> R.string.native_note_detail_saved
+                                saving -> R.string.native_note_detail_saving
+                                else -> R.string.native_note_detail_save
+                            },
+                        ),
                         onClick = { save() },
                     )
                 }
@@ -1860,7 +1963,7 @@ fun NoteDetailScreen(
                         // the web's own deliberate 4px offset.
                         NoteTitleField(
                             value = titleText,
-                            enabled = !isReadOnlyAccess &&
+                            enabled = !isNoteReadOnly &&
                                 (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType),
                             // The web drops the field entirely and prints the
                             // title as text whenever the note shows its read
@@ -1869,7 +1972,7 @@ fun NoteDetailScreen(
                             // interactive, so their title does too.
                             asText = (edit.isRichEditableType && viewMode) ||
                                 (edit.isDrawType && !drawingCanvasMode && viewMode) ||
-                                (isReadOnlyAccess && !edit.isChecklistType),
+                                (isNoteReadOnly && !edit.isChecklistType),
                             titleColor = titleColor,
                             placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
                             onValueChange = { raw ->
@@ -1878,18 +1981,15 @@ fun NoteDetailScreen(
                                 // ModalHeader.jsx: a title is single-line
                                 // everywhere else in the app.
                                 titleText = raw.replace(TitleNewlines, " ")
-                                if (edit.isDrawType) scheduleDrawingAutosave()
-                                if (edit.isAudioType) scheduleAudioAutosave()
                             },
                         )
 
                         if (edit.isTextType || edit.isChecklistType || (edit.isDrawType && !drawingCanvasMode)) {
-                            Box(Modifier.padding(horizontal = 8.dp).padding(bottom = 8.dp)) {
-                                NoteImagesSection(
-                                    images = images,
-                                    onImageClick = { index -> viewerIndex = index },
-                                )
-                            }
+                            NoteImagesSection(
+                                images = images,
+                                borderColor = borderColor,
+                                onImageClick = { index -> viewerIndex = index },
+                            )
                         }
 
                         // The two warnings that sit between the images and
@@ -1928,16 +2028,17 @@ fun NoteDetailScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 16.dp),
+                                .padding(
+                                    when {
+                                        edit.isDrawType -> PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp)
+                                        edit.isAudioType -> PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp)
+                                        else -> PaddingValues(start = 24.dp, top = 4.dp, end = 24.dp, bottom = 16.dp)
+                                    },
+                                ),
                         ) {
-                            if (isReadOnlyAccess) {
-                                Text(readOnlyMessage, color = subtextColor, fontSize = 12.sp)
-                                Spacer(Modifier.height(14.dp))
-                            }
-
                             if (edit.isChecklistType) {
                                 val checklistEntries = edit.checklistItems.orEmpty()
-                                if (isReadOnlyAccess) {
+                                if (isNoteReadOnly) {
                                     ChecklistReadOnlyPreview(
                                         items = currentNote.items,
                                         titleColor = titleColor,
@@ -2004,7 +2105,7 @@ fun NoteDetailScreen(
                                     onCommit = { newPaths, w, h -> commitDrawingChange(newPaths, w, h) },
                                     onUndo = { undoDrawing() },
                                     onRedo = { redoDrawing() },
-                                    readOnly = !drawingCanvasMode || isReadOnlyAccess,
+                                    readOnly = !drawingCanvasMode || isNoteReadOnly,
                                 )
                             } else if (edit.isAudioType) {
                                 AudioClipsSection(
@@ -2087,7 +2188,7 @@ fun NoteDetailScreen(
                                     BasicTextField(
                                         value = bodyText,
                                         onValueChange = { bodyText = it },
-                                        readOnly = isReadOnlyAccess,
+                                        readOnly = isNoteReadOnly,
                                         textStyle = TextStyle(color = titleColor, fontSize = 16.sp),
                                         cursorBrush = SolidColor(accentColor),
                                         modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
@@ -2095,27 +2196,33 @@ fun NoteDetailScreen(
                                 }
                             }
 
-                            saveError?.let {
-                                Spacer(Modifier.height(10.dp))
-                                Text(it, color = ErrorColor, fontSize = 12.sp)
-                            }
-                            if (pendingSyncCount > 0) {
-                                Spacer(Modifier.height(10.dp))
-                                Text(syncingLabel, color = subtextColor, fontSize = 12.sp)
-                            }
-
                             // "Edited:" stamp, right-aligned at the end of the
                             // content, 24dp above it (NoteModal.jsx's own
                             // scrollable placement).
-                            currentNote.updatedAt?.let { updatedAt ->
+                            editedStampText(currentNote, todayLabel, yesterdayLabel)?.let { stamp ->
                                 Spacer(Modifier.height(24.dp))
-                                Text(
-                                    String.format(editedPrefix, formatEditedStamp(updatedAt)),
-                                    color = if (dark) Color(0xFFD1D5DB) else Color(0xFF4B5563),
-                                    fontSize = 12.sp,
+                                val stampColor = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565)
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    textAlign = TextAlign.End,
-                                )
+                                    horizontalArrangement = Arrangement.End,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        String.format(editedPrefix, stamp),
+                                        color = stampColor,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                    )
+                                    Text(
+                                        " \u24D8",
+                                        color = stampColor.copy(alpha = 0.3f),
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                        modifier = Modifier.gkTooltip(
+                                            String.format(stringResource(R.string.native_note_detail_note_id), currentNote.id),
+                                        ),
+                                    )
+                                }
                             }
                         }
                     }
@@ -2126,7 +2233,7 @@ fun NoteDetailScreen(
             // and the footer (NoteModal.jsx:927-948), so opening it shrinks
             // the note above instead of covering it.
             editability?.let { edit ->
-                if ((edit.isRichEditableType || (edit.isDrawType && !drawingCanvasMode)) && !isReadOnlyAccess && !viewMode) {
+                if ((edit.isRichEditableType || (edit.isDrawType && !drawingCanvasMode)) && !isNoteReadOnly && !viewMode) {
                     FormatSheet(
                         open = showFormatSheet,
                         dark = dark,
@@ -2309,16 +2416,6 @@ fun NoteDetailScreen(
                                             if (currentNote.reminderAt != null) {
                                                 BellRingingFilledIcon(size = 20.dp, tint = reminderMenuColor)
                                             } else {
-                                                BellIcon(size = 20.dp, tint = reminderMenuColor)
-                                            }
-                                        }
-                                        if (currentNote.reminderAt != null) {
-                                            PopoverMenuItem(
-                                                label = stringResource(R.string.native_note_detail_reminder_remove),
-                                                color = reminderMenuColor,
-                                                enabled = !changingReminder,
-                                                onClick = { menuExpanded = false; setReminder(null) },
-                                            ) {
                                                 BellIcon(size = 20.dp, tint = reminderMenuColor)
                                             }
                                         }
@@ -3144,9 +3241,27 @@ private val TitleNewlines = Regex("[\\r\\n]+")
 
 /** "Edited:" stamp value. The web prints a locale date-time; this is the
  *  device-locale equivalent. */
-private fun formatEditedStamp(iso: String): String {
-    val ms = parseIsoToEpochMillis(iso) ?: return ""
-    return SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault()).format(Date(ms))
+/** NoteModal.jsx's "Modifie" line: who last touched a shared note and
+ *  when, else the note's own last change. Today and yesterday are named,
+ *  the year only shows when it isn't this one. */
+private fun editedStampText(note: NoteDto, todayLabel: String, yesterdayLabel: String): String? {
+    val by = note.lastEditedBy?.takeIf { it.isNotBlank() }
+    val iso = (if (by != null) note.lastEditedAt else null) ?: note.updatedAt ?: note.timestamp ?: return null
+    val ms = parseIsoToEpochMillis(iso) ?: return null
+    val date = Calendar.getInstance().apply { timeInMillis = ms }
+    val now = Calendar.getInstance()
+    val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+    fun sameDay(a: Calendar, b: Calendar) =
+        a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
+    val time = DateFormat.getTimeInstance(DateFormat.SHORT, Locale.getDefault()).format(Date(ms))
+    val formatted = when {
+        sameDay(date, now) -> "$todayLabel, $time"
+        sameDay(date, yesterday) -> "$yesterdayLabel, $time"
+        date.get(Calendar.YEAR) == now.get(Calendar.YEAR) ->
+            SimpleDateFormat("d LLL", Locale.getDefault()).format(Date(ms))
+        else -> SimpleDateFormat("d LLL yyyy", Locale.getDefault()).format(Date(ms))
+    }
+    return if (by != null) "$by, $formatted" else formatted
 }
 
 /**
@@ -3193,7 +3308,13 @@ private fun ModalIconButton(
  * button.
  */
 @Composable
-private fun ModalSaveButton(dark: Boolean, enabled: Boolean, contentDescription: String, onClick: () -> Unit) {
+private fun ModalSaveButton(
+    dark: Boolean,
+    armed: Boolean,
+    enabled: Boolean,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.9f else 1f, tween(80), label = "modalSavePress")
@@ -3205,10 +3326,10 @@ private fun ModalSaveButton(dark: Boolean, enabled: Boolean, contentDescription:
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(CircleShape)
             .then(
-                if (enabled) {
+                if (armed) {
                     Modifier.background(Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF059669))))
                 } else {
-                    Modifier.border(width = 1.5.dp, color = idleBorder, shape = CircleShape)
+                    Modifier.border(width = 1.dp, color = idleBorder, shape = CircleShape)
                 },
             )
             .semantics { this.contentDescription = contentDescription }
@@ -3221,7 +3342,7 @@ private fun ModalSaveButton(dark: Boolean, enabled: Boolean, contentDescription:
             ) { onClick() },
         contentAlignment = Alignment.Center,
     ) {
-        SaveCheckIcon(size = 16.dp, tint = if (enabled) Color.White else idleTint)
+        SaveCheckIcon(size = 16.dp, tint = if (armed) Color.White else idleTint)
     }
 }
 
