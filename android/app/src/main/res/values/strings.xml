@@ -378,6 +378,7 @@
     <string name="native_note_detail_type_unsupported">This note type (%1$s) isn\'t editable natively yet.</string>
     <string name="native_note_detail_pin">Pin note</string>
     <string name="native_note_detail_unpin">Unpin note</string>
+    <string name="native_note_detail_pin_unpin">Pin/unpin</string>
     <string name="native_note_detail_more">More options</string>
     <string name="native_note_detail_archive">Archive</string>
     <string name="native_note_detail_unarchive">Unarchive</string>
@@ -395,6 +396,7 @@
     <string name="native_note_detail_delete_for_all">Delete for everyone</string>
     <string name="native_note_detail_deleted_for_all">Note deleted for every collaborator</string>
     <string name="native_note_detail_action_error">Action failed: %1$s</string>
+    <string name="native_note_detail_color">Color</string>
     <string name="native_note_detail_change_color">Change color</string>
     <string name="native_note_detail_color_title">Note color</string>
     <string name="native_note_color_default">Default</string>
@@ -430,7 +432,7 @@
     <string name="native_note_detail_deleted_permanently">Note permanently deleted</string>
     <string name="native_note_detail_permanent_delete_confirm_title">Permanently delete this note?</string>
     <string name="native_note_detail_permanent_delete_confirm_body">This action cannot be undone. The note will be permanently removed.</string>
-    <string name="native_note_detail_tags">Tags</string>
+    <string name="native_note_detail_tags">Add tag</string>
     <string name="native_note_detail_tags_search_placeholder">Search or create…</string>
     <string name="native_note_detail_tags_existing">Existing tags</string>
     <string name="native_note_detail_tags_none_found">No tags found</string>
@@ -477,7 +479,7 @@
     <string name="native_checklist_remove_section">Remove section</string>
     <string name="native_checklist_confirm_remove_section">Confirm deletion</string>
     <string name="native_checklist_done">Done</string>
-    <string name="native_note_detail_add_image">Add an image</string>
+    <string name="native_note_detail_add_image">Add images</string>
     <string name="native_note_detail_add_image_error">Couldn\'t add that image</string>
     <string name="native_note_detail_image_close">Close</string>
     <string name="native_note_detail_image_download">Download</string>
@@ -581,7 +583,7 @@
     <string name="native_drawing_size_thick">Thick</string>
     <string name="native_drawing_size_large">Large</string>
     <string name="native_drawing_caption_notice">Caption</string>
-    <string name="native_drawing_enter_mode">Drawing mode</string>
+    <string name="native_drawing_enter_mode">Switch to Draw mode</string>
     <string name="native_drawing_exit_mode">Reading mode</string>
     <string name="native_audio_too_large">Recording is too large to save. Try a shorter recording.</string>
     <string name="native_audio_empty_hint">Record a voice memo and it will be saved with this note.</string>

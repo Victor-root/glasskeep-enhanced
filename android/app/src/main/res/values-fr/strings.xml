@@ -373,6 +373,7 @@
     <string name="native_note_detail_type_unsupported">Ce type de note (%1$s) n\'est pas encore modifiable en natif.</string>
     <string name="native_note_detail_pin">Épingler la note</string>
     <string name="native_note_detail_unpin">Désépingler la note</string>
+    <string name="native_note_detail_pin_unpin">Épingler / Désépingler</string>
     <string name="native_note_detail_more">Plus d\'options</string>
     <string name="native_note_detail_archive">Archiver</string>
     <string name="native_note_detail_unarchive">Désarchiver</string>
@@ -390,6 +391,7 @@
     <string name="native_note_detail_delete_for_all">Supprimer pour tous</string>
     <string name="native_note_detail_deleted_for_all">Note supprimée pour tous les collaborateurs</string>
     <string name="native_note_detail_action_error">Action impossible : %1$s</string>
+    <string name="native_note_detail_color">Couleur</string>
     <string name="native_note_detail_change_color">Changer la couleur</string>
     <string name="native_note_detail_color_title">Couleur de la note</string>
     <string name="native_note_color_default">Par défaut</string>
@@ -425,7 +427,7 @@
     <string name="native_note_detail_deleted_permanently">Note supprimée définitivement</string>
     <string name="native_note_detail_permanent_delete_confirm_title">Supprimer définitivement cette note ?</string>
     <string name="native_note_detail_permanent_delete_confirm_body">Cette action est irréversible. La note sera définitivement supprimée.</string>
-    <string name="native_note_detail_tags">Tags</string>
+    <string name="native_note_detail_tags">Ajouter un tag</string>
     <string name="native_note_detail_tags_search_placeholder">Rechercher ou créer…</string>
     <string name="native_note_detail_tags_existing">Tags existants</string>
     <string name="native_note_detail_tags_none_found">Aucun tag trouvé</string>
@@ -472,7 +474,7 @@
     <string name="native_checklist_remove_section">Supprimer la section</string>
     <string name="native_checklist_confirm_remove_section">Confirmer la suppression</string>
     <string name="native_checklist_done">Terminé</string>
-    <string name="native_note_detail_add_image">Ajouter une image</string>
+    <string name="native_note_detail_add_image">Ajouter des images</string>
     <string name="native_note_detail_add_image_error">Impossible d\'ajouter cette image</string>
     <string name="native_note_detail_image_close">Fermer</string>
     <string name="native_note_detail_image_download">Télécharger</string>
@@ -576,7 +578,7 @@
     <string name="native_drawing_size_thick">Épais</string>
     <string name="native_drawing_size_large">Large</string>
     <string name="native_drawing_caption_notice">Légende</string>
-    <string name="native_drawing_enter_mode">Mode dessin</string>
+    <string name="native_drawing_enter_mode">Passer en mode dessin</string>
     <string name="native_drawing_exit_mode">Mode lecture</string>
     <string name="native_audio_too_large">L\'enregistrement est trop volumineux. Essayez un enregistrement plus court.</string>
     <string name="native_audio_empty_hint">Enregistrez un mémo vocal, il sera conservé avec cette note.</string>

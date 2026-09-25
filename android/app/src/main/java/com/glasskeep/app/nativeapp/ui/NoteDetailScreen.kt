@@ -22,6 +22,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -75,6 +76,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
@@ -87,6 +89,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -107,6 +110,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.BuildConfig
@@ -1901,6 +1905,8 @@ fun NoteDetailScreen(
             ) {
                 ModalIconButton(
                     contentDescription = stringResource(R.string.native_note_detail_back),
+                    // ModalHeader.jsx gives the back arrow an aria-label only.
+                    tooltip = null,
                     onClick = { goBack() },
                 ) {
                     ArrowLeftIcon(size = 20.dp, tint = modalIconColor)
@@ -1917,11 +1923,19 @@ fun NoteDetailScreen(
                         ModalIconButton(
                             contentDescription = pinLabel,
                             enabled = !pinning,
+                            tooltip = stringResource(R.string.native_note_detail_pin_unpin),
+                            // .modal-icon-btn--active (globalCSS.js:1463-1482).
                             activeBackground = if (currentNote.pinned) {
                                 if (dark) Color.White.copy(alpha = 0.16f) else Color(0xFF1E293B)
                             } else {
                                 null
                             },
+                            activeShadow = if (currentNote.pinned) {
+                                Color.Black.copy(alpha = if (dark) 0.40f else 0.22f)
+                            } else {
+                                null
+                            },
+                            activeRing = if (currentNote.pinned && dark) Color.White.copy(alpha = 0.20f) else null,
                             onClick = { togglePin() },
                         ) {
                             PinIcon(
@@ -2279,12 +2293,14 @@ fun NoteDetailScreen(
                         dark = dark,
                         iconColor = footerIconColor,
                         borderColor = borderColor,
-                        accentGradient = WorkspaceTheme.accentGradient(container.themeState.themeId),
+                        themeId = container.themeState.themeId,
                         tagCount = currentNote.tags.size,
                         collaboratorCount = currentNote.collaborators?.size ?: 0,
                         imageButtonColor = imageButtonColor,
                         collaborateColor = collaborateColor,
-                        trashColor = trashMenuColor,
+                        // .modal-footer-btn--trash is a paler red in dark mode
+                        // than the kebab's trash row.
+                        trashColor = if (dark) Color(0xFFFCA5A5) else Color(0xFFDC2626),
                         showColorButton = !isReadOnlyAccess,
                         showImageButton = (edit.isTextType || edit.isChecklistType ||
                             (edit.isDrawType && !drawingCanvasMode && !viewMode)) && !isReadOnlyAccess,
@@ -3363,7 +3379,10 @@ private fun ModalIconButton(
     contentDescription: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
+    tooltip: String? = contentDescription,
     activeBackground: Color? = null,
+    activeShadow: Color? = null,
+    activeRing: Color? = null,
     content: @Composable () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -3373,10 +3392,18 @@ private fun ModalIconButton(
         modifier = Modifier
             .size(32.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
+            .then(
+                if (activeShadow != null) {
+                    Modifier.dropShadow(CircleShape, Shadow(radius = 8.dp, color = activeShadow, offset = DpOffset(0.dp, 2.dp)))
+                } else {
+                    Modifier
+                },
+            )
             .clip(CircleShape)
             .then(if (activeBackground != null) Modifier.background(activeBackground) else Modifier)
+            .then(if (activeRing != null) Modifier.border(1.dp, activeRing, CircleShape) else Modifier)
             .semantics { this.contentDescription = contentDescription }
-            .gkTooltip(contentDescription)
+            .then(if (tooltip != null) Modifier.gkTooltip(tooltip) else Modifier)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -3506,7 +3533,7 @@ private fun NoteModalFooter(
     dark: Boolean,
     iconColor: Color,
     borderColor: Color,
-    accentGradient: Brush,
+    themeId: String?,
     tagCount: Int,
     collaboratorCount: Int,
     imageButtonColor: Color,
@@ -3580,7 +3607,7 @@ private fun NoteModalFooter(
             if (showColorButton) {
                 Box {
                     FooterIconButton(
-                        contentDescription = stringResource(R.string.native_note_detail_change_color),
+                        contentDescription = stringResource(R.string.native_note_detail_color),
                         onClick = onColorClick,
                     ) {
                         PaletteIcon(size = 18.dp)
@@ -3616,8 +3643,7 @@ private fun NoteModalFooter(
                 Box {
                     FooterIconButton(
                         contentDescription = stringResource(R.string.native_note_detail_tags),
-                        badgeCount = tagCount,
-                        badgeGradient = accentGradient,
+                        badge = if (tagCount > 0) { { TagCountBadge(tagCount, themeId) } } else null,
                         onClick = onTagsClick,
                     ) {
                         TagIcon(size = 18.dp, tint = iconColor)
@@ -3663,9 +3689,8 @@ private fun NoteModalFooter(
             }
             if (showCollaborateButton) {
                 FooterIconButton(
-                    contentDescription = stringResource(R.string.native_collaborators_title),
-                    badgeCount = collaboratorCount,
-                    badgeGradient = accentGradient,
+                    contentDescription = stringResource(R.string.native_note_detail_collaborate),
+                    badge = if (collaboratorCount > 0) { { CollaboratorCountBadge(collaboratorCount, dark) } } else null,
                     onClick = onCollaborateClick,
                 ) {
                     // 20dp, not the 18dp most other mobile footer icons use
@@ -3945,8 +3970,7 @@ private val ModeButtonGradient = Brush.linearGradient(listOf(Color(0xFF6366F1), 
 private fun FooterIconButton(
     contentDescription: String,
     onClick: () -> Unit,
-    badgeCount: Int = 0,
-    badgeGradient: Brush? = null,
+    badge: (@Composable BoxScope.() -> Unit)? = null,
     background: Color = Color.Transparent,
     backgroundBrush: Brush? = null,
     enabled: Boolean = true,
@@ -3975,25 +3999,55 @@ private fun FooterIconButton(
         ) {
             content()
         }
-        if (badgeCount > 0 && badgeGradient != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 4.dp, y = (-4).dp)
-                    .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
-                    .clip(CircleShape)
-                    .background(badgeGradient)
-                    .padding(horizontal = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    badgeCount.toString(),
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
+        badge?.invoke(this)
+    }
+}
+
+/** `.gk-tag-count-badge`: 16px, 10px bold, the theme gradient at 135deg. */
+@Composable
+private fun BoxScope.TagCountBadge(count: Int, themeId: String?) {
+    Box(
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .offset(x = 4.dp, y = (-4).dp)
+            .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
+            .clip(CircleShape)
+            .background(
+                Brush.linearGradient(
+                    listOf(WorkspaceTheme.gradFrom(themeId), WorkspaceTheme.gradTo(themeId)),
+                    start = Offset.Zero,
+                    end = Offset.Infinite,
+                ),
+            )
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(count.toString(), color = Color.White, fontSize = 10.sp, lineHeight = 10.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** The collaborate button's own count (ModalFooter.jsx:664-668): 14px,
+ *  9px bold, indigo-500 to purple-600 towards the bottom-right, a 1.5px
+ *  ring and a small shadow. */
+@Composable
+private fun BoxScope.CollaboratorCountBadge(count: Int, dark: Boolean) {
+    Box(
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            // The ring sits outside the 14px disc that -top-0.5/-right-0.5 place.
+            .offset(x = 3.5.dp, y = (-3.5).dp)
+            // shadow-md
+            .dropShadow(CircleShape, Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.10f), spread = (-1).dp, offset = DpOffset(0.dp, 4.dp)))
+            .dropShadow(CircleShape, Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.10f), spread = (-2).dp, offset = DpOffset(0.dp, 2.dp)))
+            .border(1.5.dp, if (dark) Color(0xFF1E2939) else Color.White, CircleShape)
+            .padding(1.5.dp)
+            .defaultMinSize(minWidth = 14.dp, minHeight = 14.dp)
+            .clip(CircleShape)
+            .background(Brush.linearGradient(listOf(Color(0xFF615FFF), Color(0xFF9810FA)), start = Offset.Zero, end = Offset.Infinite))
+            .padding(horizontal = 2.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(count.toString(), color = Color.White, fontSize = 9.sp, lineHeight = 9.sp, fontWeight = FontWeight.Bold)
     }
 }
 
