@@ -55,12 +55,6 @@ interface SyncQueueDao {
     @Query("UPDATE sync_queue SET status = '${SyncQueueEntity.STATUS_FAILED}', attempts = :attempts, lastError = :error WHERE queueId = :queueId")
     suspend fun markFailed(queueId: Long, attempts: Int, error: String?)
 
-    /** Drives a small "syncing…" indicator on the note being edited (see
-     *  NoteDetailScreen.kt): pending, not failed, so a give-up'd item
-     *  doesn't show as perpetually "still syncing". */
-    @Query("SELECT COUNT(*) FROM sync_queue WHERE noteId = :noteId AND status = '${SyncQueueEntity.STATUS_PENDING}'")
-    fun observePendingCountForNote(noteId: String): Flow<Int>
-
     /** Locally-created notes until their CREATE row is removed (including
      *  a failed row, so a refresh never erases unsynced user data), plus
      *  notes with a not-yet-confirmed archive/trash/restore/permanent-delete/

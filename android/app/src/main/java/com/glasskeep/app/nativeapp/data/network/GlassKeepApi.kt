@@ -94,6 +94,9 @@ data class NoteDto(
     val timestamp: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
     @SerialName("client_updated_at") val clientUpdatedAt: String? = null,
+    /** Who last changed a shared note, and when (server/index.js). */
+    val lastEditedBy: String? = null,
+    val lastEditedAt: String? = null,
     val archived: Boolean = false,
     val trashed: Boolean = false,
     /** This user's access level on this note: "owner" | "write" | "read".
