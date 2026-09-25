@@ -11,6 +11,8 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 
@@ -34,24 +36,31 @@ private val DarkColorScheme = darkColorScheme(
 // preflight gives the whole page `line-height: 1.5`, which every element
 // without its own line height inherits as a factor of its font size.
 // Material 3 would otherwise hand every Text that only sets a size its
-// bodyLarge 0.5sp tracking and fixed 24sp line.
+// bodyLarge 0.5sp tracking and fixed 24sp line, and Compose would trim a
+// single line's box to the font's own height where CSS keeps the full,
+// centred line height.
+private fun TextStyle.web() = copy(
+    letterSpacing = 0.sp,
+    lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
+)
+
 private val WebTypography = Typography().run {
     Typography(
-        displayLarge = displayLarge.copy(letterSpacing = 0.sp),
-        displayMedium = displayMedium.copy(letterSpacing = 0.sp),
-        displaySmall = displaySmall.copy(letterSpacing = 0.sp),
-        headlineLarge = headlineLarge.copy(letterSpacing = 0.sp),
-        headlineMedium = headlineMedium.copy(letterSpacing = 0.sp),
-        headlineSmall = headlineSmall.copy(letterSpacing = 0.sp),
-        titleLarge = titleLarge.copy(letterSpacing = 0.sp),
-        titleMedium = titleMedium.copy(letterSpacing = 0.sp),
-        titleSmall = titleSmall.copy(letterSpacing = 0.sp),
-        bodyLarge = bodyLarge.copy(lineHeight = 1.5.em, letterSpacing = 0.sp),
-        bodyMedium = bodyMedium.copy(letterSpacing = 0.sp),
-        bodySmall = bodySmall.copy(letterSpacing = 0.sp),
-        labelLarge = labelLarge.copy(letterSpacing = 0.sp),
-        labelMedium = labelMedium.copy(letterSpacing = 0.sp),
-        labelSmall = labelSmall.copy(letterSpacing = 0.sp),
+        displayLarge = displayLarge.web(),
+        displayMedium = displayMedium.web(),
+        displaySmall = displaySmall.web(),
+        headlineLarge = headlineLarge.web(),
+        headlineMedium = headlineMedium.web(),
+        headlineSmall = headlineSmall.web(),
+        titleLarge = titleLarge.web(),
+        titleMedium = titleMedium.web(),
+        titleSmall = titleSmall.web(),
+        bodyLarge = bodyLarge.web().copy(lineHeight = 1.5.em),
+        bodyMedium = bodyMedium.web(),
+        bodySmall = bodySmall.web(),
+        labelLarge = labelLarge.web(),
+        labelMedium = labelMedium.web(),
+        labelSmall = labelSmall.web(),
     )
 }
 
