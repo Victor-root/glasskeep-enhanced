@@ -5,9 +5,13 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -28,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -328,6 +333,7 @@ fun NativeNavHost(
     // one too, and it is what replaces the platform's own Toast here.
     val toasts = rememberToastController()
     toasts.prefs = container.editorPrefs
+    val settingsActions = rememberSettingsActions(container, repository, toasts)
 
     // Raised from the composition rather than from the SSE thread, so the
     // pill's own strings resolve against the app's current language.
@@ -461,26 +467,46 @@ fun NativeNavHost(
                         },
                     )
                 }
-                composable("notes") {
-                    NativeNotesListScreen(
-                        container = container,
-                        serverUrl = serverUrl,
-                        onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
-                        onOpenArchived = { navController.navigate("archived") },
-                        onOpenTrash = { navController.navigate("trash") },
-                        onOpenSettings = { navController.navigate("settings") },
-                        onOpenAdmin = { navController.navigate("admin") },
-                        onOpenQrScanner = { navController.navigate("qr-scan") },
-                        onOpenSideBySide = { first, second -> navController.navigate("compare/$first/$second") },
-                        pendingNewNoteType = pendingNewNoteType,
-                        onPendingNewNoteTypeConsumed = onPendingNewNoteTypeConsumed,
-                        onSignedOut = {
-                            realtimeClient.stop()
-                            navController.navigate("login") {
-                                popUpTo(navController.graph.id) { inclusive = true }
-                            }
-                        },
-                    )
+                // Under the settings panel the notes list neither fades nor
+                // moves: it sits behind the web's instant bg-black/50 scrim
+                // while the panel slides in, and is simply there again,
+                // with no scrim, the moment the panel starts sliding out
+                // (SettingsPanel.jsx:286-295).
+                composable(
+                    route = "notes",
+                    exitTransition = {
+                        if (targetState.destination.route == "settings") ExitTransition.KeepUntilTransitionsFinished else null
+                    },
+                    popEnterTransition = {
+                        if (initialState.destination.route == "settings") EnterTransition.None else null
+                    },
+                ) {
+                    val nextRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+                    val coveredBySettings = transition.targetState == EnterExitState.PostExit && nextRoute == "settings"
+                    Box {
+                        NativeNotesListScreen(
+                            container = container,
+                            serverUrl = serverUrl,
+                            onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
+                            onOpenArchived = { navController.navigate("archived") },
+                            onOpenTrash = { navController.navigate("trash") },
+                            onOpenSettings = { navController.navigate("settings") },
+                            onOpenAdmin = { navController.navigate("admin") },
+                            onOpenQrScanner = { navController.navigate("qr-scan") },
+                            onOpenSideBySide = { first, second -> navController.navigate("compare/$first/$second") },
+                            pendingNewNoteType = pendingNewNoteType,
+                            onPendingNewNoteTypeConsumed = onPendingNewNoteTypeConsumed,
+                            onSignedOut = {
+                                realtimeClient.stop()
+                                navController.navigate("login") {
+                                    popUpTo(navController.graph.id) { inclusive = true }
+                                }
+                            },
+                        )
+                        if (coveredBySettings) {
+                            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f)))
+                        }
+                    }
                 }
                 // The web's settings panel is a full-width sheet that slides in
                 // from the right in 200ms (SettingsPanel.jsx:295), with nothing
@@ -504,6 +530,7 @@ fun NativeNavHost(
                     SettingsScreen(
                         container = container,
                         serverUrl = serverUrl,
+                        actions = settingsActions,
                         onBack = { navController.popBackStack() },
                         onOpenQrScanner = { navController.navigate("qr-scan") },
                     )
@@ -581,6 +608,7 @@ fun NativeNavHost(
                 durationMs = container.editorPrefs.toastDurationMs,
             )
             GkTooltipHost(tooltips)
+            SettingsActionDialogs(settingsActions, container.themeState.themeId, LocalGkDark.current)
         }
     }
 }

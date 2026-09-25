@@ -1,22 +1,28 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.app.Activity
-import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,11 +39,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,32 +57,34 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.MainActivity
 import com.glasskeep.app.R
@@ -85,16 +93,10 @@ import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NativePasskeys
-import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.PasskeyCeremonyResult
-import com.glasskeep.app.nativeapp.data.ChangePasswordResult
-import com.glasskeep.app.nativeapp.data.NoteTransfer
 import com.glasskeep.app.nativeapp.data.NotifCategory
 import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
-import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TypographyPresets
-import com.glasskeep.app.nativeapp.data.local.NoteEntity
-import com.glasskeep.app.nativeapp.data.network.ImportNotesResponse
 import com.glasskeep.app.nativeapp.data.network.PasskeyDto
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
 import com.glasskeep.app.nativeapp.data.network.UserAiSettingsDto
@@ -102,10 +104,12 @@ import com.glasskeep.app.nativeapp.data.network.UserAiSettingsRequest
 import com.glasskeep.app.nativeapp.data.network.UserAiTestRequest
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.isUserCancellation
+import com.glasskeep.app.ui.ButtonGradient
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightBorderColor
+import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import com.glasskeep.app.update.ReleaseInfo
 import com.glasskeep.app.update.UpdateManager
@@ -113,21 +117,12 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 
-/** The export file is written the way the web writes its own:
- *  JSON.stringify(payload, null, 2) (useImportExport.js:156). The
- *  two-space indent is what needs the opt-in; the rest is stable API. */
-@OptIn(ExperimentalSerializationApi::class)
-private val prettyJson = Json { prettyPrint = true; prettyPrintIndent = "  " }
-
-/** `red-500`, the "remove photo" link. */
-private val LinkRed = Color(0xFFEF4444)
+/** `red-500` as rendered, the "remove photo" link. */
+private val LinkRed = Color(0xFFFB2C36)
 private val PasskeyDeleteBorderLight = Color(0xFFFCA5A5)
 private val PasskeyDeleteBorderDark = Color(0xFF991B1B)
 private val PasskeyDeleteFgLight = Color(0xFFDC2626)
@@ -140,24 +135,50 @@ private val BadgeGrayBgLight = Color(0xFFF3F4F6)
 private val BadgeGrayFgLight = Color(0xFF374151)
 private val BadgeGrayBgDark = Color(0xFF374151)
 private val BadgeGrayFgDark = Color(0xFFE5E7EB)
-private val VersionBadgeLight = Color(0xFF9CA3AF)
-private val VersionBadgeDark = Color(0xFF4B5563)
+
+// Tailwind v4 greys as the web renders them (gray-500 is SettingsSubtleColor).
+private val Gray200 = Color(0xFFE5E7EB)
+private val Gray300 = Color(0xFFD1D5DC)
+private val Gray400 = Color(0xFF99A1AF)
+private val Gray600 = Color(0xFF4A5565)
+private val Gray700 = Color(0xFF364153)
+private val Gray800 = Color(0xFF1E2939)
+private val Gray900 = Color(0xFF101828)
+private val Gray100 = Color(0xFFF3F4F6)
+
+/** Where the web's "Comment exporter ?" link sends a Google Keep user. */
+private const val GoogleTakeoutHelpUrl = "https://support.google.com/accounts/answer/3024190?hl=en-AM&utm"
+
+/** The web's sidebar width presets, in px, and their labels
+ *  (SettingsPanel.jsx:19-25). */
+private val SidebarBreakpointPresets = listOf(
+    1024 to R.string.native_settings_sidebar_breakpoint_1024,
+    1280 to R.string.native_settings_sidebar_breakpoint_1280,
+    1366 to R.string.native_settings_sidebar_breakpoint_1366,
+    1440 to R.string.native_settings_sidebar_breakpoint_1440,
+    1600 to R.string.native_settings_sidebar_breakpoint_1600,
+)
 
 /**
  * SettingsPanel.jsx, natively. On a phone the web panel is a full-width
  * sheet sliding in from the right over `--gk-statusbar`, with a 72px
  * header, a 16px scrollable body, one profile block and eight accordion
  * sections, all closed on first open, and the app version pinned bottom
- * right.
+ * right. It draws at once from the account the device last knew, as the
+ * web does from its session user, and refreshes that in the background.
  *
- * Five of those eight sections are ported (Security, UI Preferences,
- * Notes, Data Management, Language) plus the Android-only Application
- * section. Deliberately left out, because nothing native sits behind
- * them, including notification filters, AI, typography, transfers,
- * native passkeys and their administrator unlock authorization.
+ * The account actions that close the panel on the web (password change,
+ * export, imports, secret key, note order reset) run through [actions],
+ * which outlives this route.
  */
 @Composable
-fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () -> Unit, onOpenQrScanner: () -> Unit) {
+internal fun SettingsScreen(
+    container: NativeAppContainer,
+    serverUrl: String,
+    actions: SettingsActions,
+    onBack: () -> Unit,
+    onOpenQrScanner: () -> Unit,
+) {
     val dark = LocalGkDark.current
     val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
@@ -165,40 +186,26 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     val context = LocalContext.current
     val toasts = LocalGkToasts.current
     val activity = LocalView.current.context as Activity
-    val clipboard = LocalClipboard.current
 
-    var profile by remember { mutableStateOf<ProfileDto?>(null) }
-    var loadError by remember { mutableStateOf<String?>(null) }
+    var profile by remember { mutableStateOf(container.tokenStore.profile) }
     var passkeys by remember { mutableStateOf<List<PasskeyDto>>(emptyList()) }
 
+    // Keys of the preferences whose save is still out: a second change of
+    // the same one waits for the first to land.
+    val savingPreferences = remember { mutableSetOf<String>() }
     var changingAvatar by remember { mutableStateOf(false) }
     var changingShowOnLogin by remember { mutableStateOf(false) }
     var changingLanguage by remember { mutableStateOf(false) }
     var changingTheme by remember { mutableStateOf(false) }
-    var changingChecklistPosition by remember { mutableStateOf(false) }
-    var changingRemoveSection by remember { mutableStateOf(false) }
-    var changingToolbarMode by remember { mutableStateOf(false) }
-    var changingReadMode by remember { mutableStateOf(false) }
-    var changingEdgeToEdge by remember { mutableStateOf(false) }
-    var changingFloatingCards by remember { mutableStateOf(false) }
-    var changingQrQuick by remember { mutableStateOf(false) }
-    var changingToastPrefs by remember { mutableStateOf(false) }
-    var changingNotifPrefs by remember { mutableStateOf(false) }
     var notifSoundTypesOpen by rememberSaveable { mutableStateOf(false) }
     var notifFilterTypesOpen by rememberSaveable { mutableStateOf(false) }
     var toastDurationMenuOpen by remember { mutableStateOf(false) }
+    var sidebarBreakpointMenuOpen by remember { mutableStateOf(false) }
     var showTypographyModal by remember { mutableStateOf(false) }
     var addingPasskey by remember { mutableStateOf(false) }
     var removingPasskeyId by remember { mutableStateOf<String?>(null) }
     var testingPasskeyId by remember { mutableStateOf<String?>(null) }
     var renamingPasskeyId by remember { mutableStateOf<String?>(null) }
-
-    var showPasswordDialog by remember { mutableStateOf(false) }
-    var changingPassword by remember { mutableStateOf(false) }
-    var currentPasswordInput by remember { mutableStateOf("") }
-    var newPasswordInput by remember { mutableStateOf("") }
-    var confirmPasswordInput by remember { mutableStateOf("") }
-    var passwordDialogError by remember { mutableStateOf<String?>(null) }
 
     var showAddPasskeyDialog by remember { mutableStateOf(false) }
     var addPasskeyNameInput by remember { mutableStateOf("") }
@@ -206,13 +213,10 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var renamePasskeyInput by remember { mutableStateOf("") }
     var pendingDeletePasskeyId by remember { mutableStateOf<String?>(null) }
 
-    var generatingSecretKey by remember { mutableStateOf(false) }
-    var generatedSecretKey by remember { mutableStateOf<String?>(null) }
-
-    var transferRunning by remember { mutableStateOf(false) }
     var showResetOrderConfirm by remember { mutableStateOf(false) }
 
     var aiSettings by remember { mutableStateOf<UserAiSettingsDto?>(null) }
+    var aiLoading by remember { mutableStateOf(true) }
     var aiDraft by remember { mutableStateOf(AiSettingsDraft("", "", "", "0.3", "800", false)) }
     var aiTestOutcome by remember { mutableStateOf<AiTestOutcome?>(null) }
     var savingAi by remember { mutableStateOf(false) }
@@ -236,63 +240,48 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var passkeyListOpen by rememberSaveable { mutableStateOf(false) }
     var languageMenuOpen by remember { mutableStateOf(false) }
 
-    val errorLoadTemplate = stringResource(R.string.native_settings_error)
     val actionErrorTemplate = stringResource(R.string.native_settings_action_error)
-    val passwordMismatchMessage = stringResource(R.string.native_settings_password_mismatch)
-    val passwordTooShortMessage = stringResource(R.string.native_settings_password_too_short)
-    val passwordErrorTemplate = stringResource(R.string.native_settings_password_error)
-    val passwordSuccessMessage = stringResource(R.string.native_settings_password_success)
     val passkeyUntitledLabel = stringResource(R.string.native_settings_passkeys_untitled)
     val passkeyTestOkMessage = stringResource(R.string.native_settings_passkeys_test_ok)
     val passkeyTestFailedMessage = stringResource(R.string.native_settings_passkeys_test_failed)
-    val copiedMessage = stringResource(R.string.native_settings_secret_key_copied)
     val aiSavedMessage = stringResource(R.string.native_settings_ai_saved)
     val aiKeyClearedMessage = stringResource(R.string.native_settings_ai_api_key_cleared)
     val aiTestOkMessage = stringResource(R.string.native_settings_ai_test_ok)
     val aiTestFailedMessage = stringResource(R.string.native_settings_ai_test_failed)
-    val exportFailedMessage = stringResource(R.string.native_settings_export_failed)
-    val importFailedMessage = stringResource(R.string.native_settings_import_failed)
-    val importInvalidJsonMessage = stringResource(R.string.native_settings_import_invalid_json)
-    val importNoNotesMessage = stringResource(R.string.native_settings_import_no_notes)
-    val importedTemplate = stringResource(R.string.native_settings_import_done)
-    val importedWithSkippedTemplate = stringResource(R.string.native_settings_import_done_skipped)
-    val importAllSkippedTemplate = stringResource(R.string.native_settings_import_all_skipped)
-    val importAllUpdatedTemplate = stringResource(R.string.native_settings_import_all_updated)
-    val importAlsoUpdatedTemplate = stringResource(R.string.native_settings_import_also_updated)
-    val importRejectedTemplate = stringResource(R.string.native_settings_import_rejected)
-    val gkeepNoneMessage = stringResource(R.string.native_settings_import_gkeep_none)
-    val gkeepImportedTemplate = stringResource(R.string.native_settings_import_gkeep_done)
-    val gkeepFailedMessage = stringResource(R.string.native_settings_import_gkeep_failed)
-    val markdownNoneMessage = stringResource(R.string.native_settings_import_md_none)
-    val markdownImportedTemplate = stringResource(R.string.native_settings_import_md_done)
-    val markdownFailedMessage = stringResource(R.string.native_settings_import_md_failed)
-    val secretKeySavedMessage = stringResource(R.string.native_settings_secret_key_downloaded)
-    val orderResetMessage = stringResource(R.string.native_settings_reset_order_done)
-    val forgotPasswordLabel = stringResource(R.string.native_login_forgot_password)
-    val secretLoginLabel = stringResource(R.string.native_secret_login_title)
-    val updateCheckingMessage = stringResource(R.string.update_checking)
-    val updateUpToDateMessage = stringResource(R.string.update_up_to_date)
-    val updateDownloadingMessage = stringResource(R.string.update_downloading)
-    val updateDownloadFailedMessage = stringResource(R.string.update_download_failed)
+    val avatarUpdatedMessage = stringResource(R.string.native_settings_avatar_updated)
+    val avatarRemovedMessage = stringResource(R.string.native_settings_avatar_removed)
+    val avatarUploadFailedMessage = stringResource(R.string.native_settings_avatar_upload_failed)
+    val avatarRemoveFailedMessage = stringResource(R.string.native_settings_avatar_remove_failed)
+    val showOnLoginFailedMessage = stringResource(R.string.native_settings_show_on_login_failed)
+    val languageSaveErrorMessage = stringResource(R.string.native_settings_language_save_error)
+    val themeSaveErrorMessage = stringResource(R.string.native_settings_theme_save_error)
 
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else SettingsSubtleColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
     val accent = WorkspaceTheme.accent(themeId, dark)
 
+    /** Keeps the device's copy of the account in step with what the
+     *  screen shows, so the next opening starts from it. */
+    fun updateProfile(transform: (ProfileDto) -> ProfileDto) {
+        val next = profile?.let(transform) ?: return
+        profile = next
+        container.tokenStore.profile = next
+    }
+
     LaunchedEffect(serverUrl) {
         try {
-            profile = repository.fetchProfile()
+            val fresh = repository.fetchProfile()
+            profile = fresh
+            container.tokenStore.profile = fresh
         } catch (t: Throwable) {
             NativeDebug.e("SettingsScreen load failed", t)
-            loadError = String.format(errorLoadTemplate, t.message ?: t.javaClass.simpleName)
         }
     }
 
     // Its own effect, not folded into the one above: a passkey-list
     // failure is a lot less important than the profile fetch above (the
-    // rest of the screen works fine without it), so it shouldn't turn
-    // into the same full-screen loadError.
+    // rest of the screen works fine without it).
     LaunchedEffect(serverUrl) {
         try {
             passkeys = repository.listPasskeys()
@@ -318,14 +307,34 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
         )
     }
 
-    // Its own effect, best-effort like the passkey list: an instance with
-    // no AI at all simply shows the section switched off.
+    // Best-effort like the passkey list: until it answers the section
+    // shows its defaults with the controls held, and a failed read simply
+    // leaves those defaults in place (UserAiSettingsSection.jsx:93-118).
     LaunchedEffect(serverUrl) {
         repository.fetchUserAiSettings()?.let { applyAiSettings(it) }
+        aiLoading = false
     }
 
     fun reportActionError(t: Throwable) {
         toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
+    }
+
+    /** Applies a preference at once, the way the web's setters do, then
+     *  saves it; a failed save puts the previous value back. */
+    fun <T> savePreference(key: String, previous: T, next: T, apply: (T) -> Unit, save: suspend (T) -> Unit) {
+        if (next == previous || !savingPreferences.add(key)) return
+        apply(next)
+        scope.launch {
+            try {
+                save(next)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen saving $key failed", t)
+                apply(previous)
+                reportActionError(t)
+            } finally {
+                savingPreferences.remove(key)
+            }
+        }
     }
 
     fun addPasskey(name: String) {
@@ -422,190 +431,6 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
         }
     }
 
-    // No confirmation step, matching useImportExport.js's own
-    // downloadSecretKey(): the server always rotates on this call (there
-    // is no separate "just show me the existing one" route), so tapping
-    // the action link goes straight to a fresh key, shown here instead of
-    // downloaded as a .txt file (a file picker ceremony for one short
-    // string is friction the web's browser download button doesn't have
-    // to pay).
-    fun generateSecretKey() {
-        if (generatingSecretKey) return
-        generatingSecretKey = true
-        scope.launch {
-            try {
-                generatedSecretKey = repository.generateSecretKey()
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen generateSecretKey failed", t)
-                reportActionError(t)
-            } finally {
-                generatingSecretKey = false
-            }
-        }
-    }
-
-    /** buildImportMessage() (useImportExport.js:36-66): imported, restored,
-     *  skipped and rejected each get said out loud, since a restore that
-     *  only updates would otherwise report nothing at all. */
-    fun importMessage(result: ImportNotesResponse, attempted: Int, successTemplate: String): String {
-        val imported = result.imported
-        val base = when {
-            result.skipped > 0 && imported == 0 -> importAllSkippedTemplate.replace("{skipped}", "${result.skipped}")
-            result.skipped > 0 -> importedWithSkippedTemplate
-                .replace("{count}", "$imported")
-                .replace("{skipped}", "${result.skipped}")
-            else -> successTemplate.replace("{count}", "${if (imported > 0) imported else attempted}")
-        }
-        val withUpdated = when {
-            result.updated == 0 -> base
-            imported == 0 && result.skipped == 0 ->
-                importAllUpdatedTemplate.replace("{updated}", "${result.updated}")
-            else -> "$base ${importAlsoUpdatedTemplate.replace("{updated}", "${result.updated}")}"
-        }
-        if (result.rejected == 0) return withUpdated
-        return "$withUpdated ${importRejectedTemplate.replace("{rejected}", "${result.rejected}")}"
-    }
-
-    /** The three imports differ only in how the files are read; everything
-     *  after that (nothing usable, send, report) is the same. */
-    fun runImport(
-        emptyMessage: String,
-        successTemplate: String,
-        failureMessage: String,
-        read: suspend () -> NoteTransfer.ImportPayload?,
-    ) {
-        if (transferRunning) return
-        transferRunning = true
-        scope.launch {
-            try {
-                val payload = withContext(Dispatchers.IO) { read() }
-                if (payload == null) {
-                    toasts.error(importInvalidJsonMessage)
-                    return@launch
-                }
-                if (payload.notes.isEmpty()) {
-                    toasts.error(emptyMessage)
-                    return@launch
-                }
-                val result = repository.importNotes(payload.notes)
-                toasts.success(importMessage(result, payload.attempted, successTemplate))
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen import failed", t)
-                toasts.error(failureMessage)
-            } finally {
-                transferRunning = false
-            }
-        }
-    }
-
-    fun exportAllNotes() {
-        if (transferRunning) return
-        transferRunning = true
-        scope.launch {
-            try {
-                val payload = repository.exportNotes()
-                val filename = NoteTransfer.exportFilename(profile?.email) + ".json"
-                val pretty = withContext(Dispatchers.IO) { prettyJson.encodeToString(JsonElement.serializer(), payload) }
-                val shared = withContext(Dispatchers.IO) {
-                    NoteExporter.exportTextFile(context, NoteExporter.sanitizeFilename(filename), pretty, "application/json")
-                }
-                if (!shared) toasts.error(exportFailedMessage)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen exportAllNotes failed", t)
-                toasts.error(exportFailedMessage)
-            } finally {
-                transferRunning = false
-            }
-        }
-    }
-
-    fun downloadSecretKey() {
-        if (generatingSecretKey) return
-        generatingSecretKey = true
-        scope.launch {
-            try {
-                val key = repository.generateSecretKey()
-                val content = NoteTransfer.secretKeyFile(key, forgotPasswordLabel, secretLoginLabel)
-                val shared = withContext(Dispatchers.IO) {
-                    NoteExporter.exportTextFile(context, NoteTransfer.secretKeyFilename(), content, "text/plain")
-                }
-                // The key is also shown, and copyable: the file leaves
-                // through the share sheet, which the user may well cancel.
-                generatedSecretKey = key
-                if (shared) toasts.success(secretKeySavedMessage)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen downloadSecretKey failed", t)
-                reportActionError(t)
-            } finally {
-                generatingSecretKey = false
-            }
-        }
-    }
-
-    /**
-     * resetNoteOrder() (App.jsx:6614): pinned first, then most recently
-     * updated, then most recently created, sent through the same reorder
-     * the drag-and-drop uses. The web's own "override positions" checkbox
-     * has no counterpart here: it only decides whether ITS in-memory copy
-     * gets provisional positions before the server answers, and the server
-     * assigns the real ones from the id lists either way
-     * (server/index.js:2917-2933), which this app's optimistic reorder
-     * already mirrors.
-     */
-    fun resetNoteOrder() {
-        if (transferRunning) return
-        transferRunning = true
-        scope.launch {
-            try {
-                val all = repository.observeNotes().first()
-                // Pinned first, then most recently modified. The web adds
-                // creation date as a last tie-break; the local cache does
-                // not keep one (see NoteEntity), so two notes modified in
-                // the very same millisecond keep whatever order they had.
-                val sorted = all.sortedWith(
-                    compareByDescending<NoteEntity> { it.pinned }
-                        .thenByDescending { it.updatedAt?.let(::parseIsoToEpochMillis) ?: 0L },
-                )
-                repository.reorderQueued(sorted.filter { it.pinned }, sorted.filterNot { it.pinned })
-                SyncQueueWorker.triggerNow(context)
-                toasts.success(orderResetMessage)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen resetNoteOrder failed", t)
-                reportActionError(t)
-            } finally {
-                transferRunning = false
-            }
-        }
-    }
-
-    val importJsonLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        runImport(importNoNotesMessage, importedTemplate, importFailedMessage) {
-            val raw = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
-            raw?.let { NoteTransfer.readGlassKeepExport(it) }
-        }
-    }
-
-    val importGkeepLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments(),
-    ) { uris ->
-        if (uris.isEmpty()) return@rememberLauncherForActivityResult
-        runImport(gkeepNoneMessage, gkeepImportedTemplate, gkeepFailedMessage) {
-            NoteTransfer.readGoogleKeep(context, uris)
-        }
-    }
-
-    val importMarkdownLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments(),
-    ) { uris ->
-        if (uris.isEmpty()) return@rememberLauncherForActivityResult
-        runImport(markdownNoneMessage, markdownImportedTemplate, markdownFailedMessage) {
-            NoteTransfer.readMarkdown(context, uris)
-        }
-    }
-
     val avatarPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri: Uri? ->
@@ -620,19 +445,24 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                         ImageCompression.compressToDataUrl(context, picked, maxDimension = 256)
                     }
                     if (dataUrl == null) {
-                        reportActionError(IllegalStateException("unreadable image"))
+                        toasts.error(avatarUploadFailedMessage)
                     } else {
                         val confirmedUrl = repository.setAvatar(dataUrl)
-                        profile = profile?.copy(avatarUrl = confirmedUrl)
+                        updateProfile { it.copy(avatarUrl = confirmedUrl) }
+                        toasts.success(avatarUpdatedMessage)
                     }
                 } catch (t: Throwable) {
                     NativeDebug.e("SettingsScreen setAvatar failed", t)
-                    reportActionError(t)
+                    toasts.error(avatarUploadFailedMessage)
                 } finally {
                     changingAvatar = false
                 }
             }
         }
+    }
+
+    fun pickAvatar() {
+        avatarPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
     fun removeAvatar() {
@@ -641,45 +471,55 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
         scope.launch {
             try {
                 repository.removeAvatar()
-                profile = profile?.copy(avatarUrl = null)
+                updateProfile { it.copy(avatarUrl = null) }
+                toasts.show(avatarRemovedMessage)
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen removeAvatar failed", t)
-                reportActionError(t)
+                toasts.error(avatarRemoveFailedMessage)
             } finally {
                 changingAvatar = false
             }
         }
     }
 
+    /** Flips at once and flips back if the server refuses, like the web's
+     *  handleShowOnLoginToggle. */
     fun toggleShowOnLogin(value: Boolean) {
         if (changingShowOnLogin) return
         changingShowOnLogin = true
+        updateProfile { it.copy(showOnLogin = value) }
         scope.launch {
             try {
                 val confirmed = repository.setShowOnLogin(value)
-                profile = profile?.copy(showOnLogin = confirmed)
+                updateProfile { it.copy(showOnLogin = confirmed) }
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen setShowOnLogin failed", t)
-                reportActionError(t)
+                updateProfile { it.copy(showOnLogin = !value) }
+                toasts.error(showOnLoginFailedMessage)
             } finally {
                 changingShowOnLogin = false
             }
         }
     }
 
+    /** The web saves the choice then reloads the whole app, landing on the
+     *  notes list; here the panel closes and the Activity restarts in the
+     *  new language. */
     fun changeLanguage(value: String?) {
-        if (changingLanguage) return
+        val previous = profile?.language
+        if (changingLanguage || value == previous) return
         changingLanguage = true
+        updateProfile { it.copy(language = value) }
         scope.launch {
             try {
                 val confirmed = repository.setLanguage(value)
-                profile = profile?.copy(language = confirmed)
-                // Applied to this app's own UI too, not just saved on the
-                // account: this restarts the Activity in the new language.
+                updateProfile { it.copy(language = confirmed) }
+                onBack()
                 AppLanguage.apply(confirmed)
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen setLanguage failed", t)
-                reportActionError(t)
+                updateProfile { it.copy(language = previous) }
+                toasts.error(languageSaveErrorMessage)
             } finally {
                 changingLanguage = false
             }
@@ -689,77 +529,24 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     fun changeTheme(id: String) {
         if (changingTheme || id == themeId) return
         changingTheme = true
-        // Applied immediately (same optimistic-then-persist shape the web's
-        // own setShellTheme() uses), not rolled back if the PATCH below
-        // fails: a failed save just means the choice doesn't survive a
-        // future refetch, same as the web leaving its own applied class in
-        // place while only the persistence step can silently fail.
+        // Applied immediately and kept even if the save below fails: the
+        // web's own choose() applies and caches the theme first, and only
+        // says the server copy could not be written.
         container.themeState.apply(id)
         scope.launch {
             try {
                 repository.setShellTheme(id)
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen setShellTheme failed", t)
-                reportActionError(t)
+                toasts.error(themeSaveErrorMessage)
             } finally {
                 changingTheme = false
             }
         }
     }
 
-    fun changeChecklistInsertPosition(position: String) {
-        if (changingChecklistPosition || position == container.editorPrefs.checklistInsertPosition) return
-        changingChecklistPosition = true
-        val previous = container.editorPrefs.checklistInsertPosition
-        container.editorPrefs.applyChecklistInsertPosition(position)
-        scope.launch {
-            try {
-                repository.setChecklistInsertPosition(position)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen setChecklistInsertPosition failed", t)
-                container.editorPrefs.applyChecklistInsertPosition(previous)
-                reportActionError(t)
-            } finally {
-                changingChecklistPosition = false
-            }
-        }
-    }
-
-    fun changeToastPosition(position: String) {
-        if (changingToastPrefs || position == container.editorPrefs.toastPosition) return
-        changingToastPrefs = true
-        val previous = container.editorPrefs.toastPosition
-        container.editorPrefs.applyToastPosition(position)
-        scope.launch {
-            try {
-                repository.setToastPosition(position)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen setToastPosition failed", t)
-                container.editorPrefs.applyToastPosition(previous)
-                reportActionError(t)
-            } finally {
-                changingToastPrefs = false
-            }
-        }
-    }
-
-    fun changeToastDuration(durationMs: Long?) {
-        if (changingToastPrefs || durationMs == container.editorPrefs.toastDurationMs) return
-        changingToastPrefs = true
-        val previous = container.editorPrefs.toastDurationMs
-        container.editorPrefs.applyToastDuration(durationMs)
-        scope.launch {
-            try {
-                repository.setToastDuration(durationMs)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen setToastDuration failed", t)
-                container.editorPrefs.applyToastDuration(previous)
-                reportActionError(t)
-            } finally {
-                changingToastPrefs = false
-            }
-        }
-    }
+    val editorPrefs = container.editorPrefs
+    val shellPrefs = container.shellPrefs
 
     /** buildPatch() (UserAiSettingsSection.jsx:118-129): the whole config
      *  every time, with [overrides] for the one field the caller is
@@ -833,149 +620,17 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
         }
     }
 
-    fun changeRemoveSectionBehavior(behavior: String) {
-        if (changingRemoveSection || behavior == container.editorPrefs.checklistRemoveSectionBehavior) return
-        changingRemoveSection = true
-        val previous = container.editorPrefs.checklistRemoveSectionBehavior
-        container.editorPrefs.applyChecklistRemoveSectionBehavior(behavior)
-        scope.launch {
-            try {
-                repository.setChecklistRemoveSectionBehavior(behavior)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen setChecklistRemoveSectionBehavior failed", t)
-                container.editorPrefs.applyChecklistRemoveSectionBehavior(previous)
-                reportActionError(t)
-            } finally {
-                changingRemoveSection = false
-            }
-        }
-    }
-
-    fun toggleNotificationsSound(enabled: Boolean) {
-        if (changingNotifPrefs) return
-        changingNotifPrefs = true
-        val previous = container.editorPrefs.notificationsSound
-        container.editorPrefs.applyNotificationsSound(enabled)
-        scope.launch {
-            try {
-                repository.setNotificationsSound(enabled)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen setNotificationsSound failed", t)
-                container.editorPrefs.applyNotificationsSound(previous)
-                reportActionError(t)
-            } finally {
-                changingNotifPrefs = false
-            }
-        }
-    }
-
     fun toggleSoundCategory(category: NotifCategory, enabled: Boolean) {
-        if (changingNotifPrefs) return
-        changingNotifPrefs = true
-        val previous = container.editorPrefs.notificationsSoundTypes
-        val next = previous.with(category, enabled)
-        container.editorPrefs.applyNotificationsSoundTypes(next)
-        scope.launch {
-            try {
-                repository.setNotificationsSoundTypes(next.values)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen setNotificationsSoundTypes failed", t)
-                container.editorPrefs.applyNotificationsSoundTypes(previous)
-                reportActionError(t)
-            } finally {
-                changingNotifPrefs = false
-            }
+        val previous = editorPrefs.notificationsSoundTypes
+        savePreference("notificationsSoundTypes", previous, previous.with(category, enabled), editorPrefs::applyNotificationsSoundTypes) {
+            repository.setNotificationsSoundTypes(it.values)
         }
     }
 
     fun toggleFilterCategory(category: NotifCategory, enabled: Boolean) {
-        if (changingNotifPrefs) return
-        changingNotifPrefs = true
-        val previous = container.editorPrefs.notificationsFilterTypes
-        val next = previous.with(category, enabled)
-        container.editorPrefs.applyNotificationsFilterTypes(next)
-        scope.launch {
-            try {
-                repository.setNotificationsFilterTypes(next.values)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen setNotificationsFilterTypes failed", t)
-                container.editorPrefs.applyNotificationsFilterTypes(previous)
-                reportActionError(t)
-            } finally {
-                changingNotifPrefs = false
-            }
-        }
-    }
-
-    fun toggleEdgeToEdgeLandscape(enabled: Boolean) {
-        if (changingEdgeToEdge) return
-        changingEdgeToEdge = true
-        val previous = container.shellPrefs.edgeToEdgeLandscape
-        container.shellPrefs.applyEdgeToEdgeLandscape(enabled)
-        scope.launch {
-            try {
-                repository.setEdgeToEdgeLandscape(enabled)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen setEdgeToEdgeLandscape failed", t)
-                container.shellPrefs.applyEdgeToEdgeLandscape(previous)
-                reportActionError(t)
-            } finally {
-                changingEdgeToEdge = false
-            }
-        }
-    }
-
-    fun toggleFloatingCards(enabled: Boolean) {
-        if (changingFloatingCards) return
-        changingFloatingCards = true
-        val previous = container.shellPrefs.floatingCards
-        container.shellPrefs.applyFloatingCards(enabled)
-        scope.launch {
-            try {
-                repository.setFloatingCards(enabled)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen setFloatingCards failed", t)
-                container.shellPrefs.applyFloatingCards(previous)
-                reportActionError(t)
-            } finally {
-                changingFloatingCards = false
-            }
-        }
-    }
-
-    fun toggleReadMode(enabled: Boolean) {
-        if (changingReadMode) return
-        changingReadMode = true
-        val previous = container.editorPrefs.readModeEnabled
-        container.editorPrefs.applyReadMode(enabled)
-        scope.launch {
-            try {
-                repository.setReadMode(enabled)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen setReadMode failed", t)
-                container.editorPrefs.applyReadMode(previous)
-                reportActionError(t)
-            } finally {
-                changingReadMode = false
-            }
-        }
-    }
-
-    fun changeToolbarMode(mode: String) {
-        if (changingToolbarMode || mode == container.editorPrefs.toolbarMode) return
-        changingToolbarMode = true
-        val previous = container.editorPrefs.toolbarMode
-        container.editorPrefs.applyToolbarMode(mode)
-        scope.launch {
-            try {
-                repository.setEditorToolbarMode(mode)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen setEditorToolbarMode failed", t)
-                container.editorPrefs.applyToolbarMode(previous)
-                reportActionError(t)
-            } finally {
-                changingToolbarMode = false
-            }
+        val previous = editorPrefs.notificationsFilterTypes
+        savePreference("notificationsFilterTypes", previous, previous.with(category, enabled), editorPrefs::applyNotificationsFilterTypes) {
+            repository.setNotificationsFilterTypes(it.values)
         }
     }
 
@@ -983,55 +638,15 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
      *  setPresets: the modal has no Save button, each control is applied
      *  as it is touched. */
     fun changeTypography(presets: TypographyPresets) {
-        val previous = container.editorPrefs.typography
-        container.editorPrefs.applyTypography(presets)
+        val previous = editorPrefs.typography
+        editorPrefs.applyTypography(presets)
         scope.launch {
             try {
                 repository.setTypographyPresets(presets)
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen setTypographyPresets failed", t)
-                container.editorPrefs.applyTypography(previous)
+                editorPrefs.applyTypography(previous)
                 reportActionError(t)
-            }
-        }
-    }
-
-    fun submitPasswordChange() {
-        if (changingPassword) return
-        passwordDialogError = null
-        if (newPasswordInput.length < 6) {
-            passwordDialogError = passwordTooShortMessage
-            return
-        }
-        if (newPasswordInput != confirmPasswordInput) {
-            passwordDialogError = passwordMismatchMessage
-            return
-        }
-        changingPassword = true
-        scope.launch {
-            try {
-                when (val result = repository.changePassword(currentPasswordInput.ifBlank { null }, newPasswordInput)) {
-                    is ChangePasswordResult.Saved -> {
-                        // The server invalidated every other session with this
-                        // change; this device keeps working only because it
-                        // gets the fresh token below (see changePassword's own
-                        // doc comment).
-                        container.tokenStore.token = result.token
-                        showPasswordDialog = false
-                        currentPasswordInput = ""
-                        newPasswordInput = ""
-                        confirmPasswordInput = ""
-                        toasts.success(passwordSuccessMessage)
-                    }
-                    is ChangePasswordResult.Rejected -> {
-                        passwordDialogError = String.format(passwordErrorTemplate, result.httpCode)
-                    }
-                }
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen changePassword failed", t)
-                passwordDialogError = String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName)
-            } finally {
-                changingPassword = false
             }
         }
     }
@@ -1052,38 +667,21 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
         }
     }
 
-    fun toggleQrQuick(enabled: Boolean) {
-        if (changingQrQuick) return
-        changingQrQuick = true
-        val previous = container.shellPrefs.qrQuickEnabled
-        container.shellPrefs.applyQrQuick(enabled)
-        scope.launch {
-            try {
-                repository.setQrQuick(enabled)
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen setQrQuick failed", t)
-                container.shellPrefs.applyQrQuick(previous)
-                reportActionError(t)
-            } finally {
-                changingQrQuick = false
-            }
-        }
-    }
-
+    // The update messages were Android's own toasts in the WebView era
+    // too: the check has always run natively (WebViewActivity's
+    // checkForUpdate / installAvailableUpdate bridge).
     fun checkForUpdate() {
-        toasts.show(updateCheckingMessage)
+        Toast.makeText(context, R.string.update_checking, Toast.LENGTH_SHORT).show()
         UpdateManager.forceCheck(context) { release ->
             availableUpdate = release
-            if (release == null) {
-                toasts.success(updateUpToDateMessage)
-            }
+            if (release == null) Toast.makeText(context, R.string.update_up_to_date, Toast.LENGTH_LONG).show()
         }
     }
 
     fun downloadUpdate(release: ReleaseInfo) {
-        toasts.show(updateDownloadingMessage)
+        Toast.makeText(context, R.string.update_downloading, Toast.LENGTH_SHORT).show()
         UpdateManager.downloadAndInstall(context, release) { ok ->
-            if (!ok) toasts.error(updateDownloadFailedMessage)
+            if (!ok) Toast.makeText(context, R.string.update_download_failed, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -1091,8 +689,11 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
         Modifier
             .fillMaxSize()
             // .gk-side-panel on a phone: the panel is opaque
-            // --gk-statusbar, not the page background behind it.
+            // --gk-statusbar, not the page background behind it, with a
+            // 1px --border-light left edge.
             .background(WorkspaceTheme.statusBarColor(themeId, dark))
+            .drawBehind { drawRect(borderColor, size = Size(1.dp.toPx(), size.height)) }
+            .padding(start = 1.dp)
             .windowInsetsPadding(WindowInsets.systemBars),
     ) {
         Column(Modifier.fillMaxSize()) {
@@ -1108,6 +709,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                         stringResource(R.string.native_settings_title),
                         color = titleColor,
                         fontSize = 18.sp,
+                        lineHeight = 28.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
@@ -1129,772 +731,730 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
 
-            when {
-                loadError != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(loadError.orEmpty(), color = DangerRed, modifier = Modifier.padding(24.dp))
-                }
-                profile == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = accent)
-                        Spacer(Modifier.height(12.dp))
-                        Text(stringResource(R.string.native_settings_loading), color = subtextColor)
-                    }
-                }
-                else -> {
-                    val current = profile!!
-                    BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-                        val bodyMinHeight = maxHeight
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                                .heightIn(min = bodyMinHeight)
-                                .padding(16.dp),
-                            // Two children only, so SpaceBetween is the
-                            // web's `mt-auto` on the version badge: it
-                            // sits at the bottom while the sections fit,
-                            // and flows right after them once they don't.
-                            verticalArrangement = Arrangement.SpaceBetween,
+            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+                val bodyMinHeight = maxHeight
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .heightIn(min = bodyMinHeight)
+                        .padding(16.dp),
+                    // Two children only, so SpaceBetween is the web's
+                    // `mt-auto` on the version badge: it sits at the
+                    // bottom while the sections fit, and flows right
+                    // after them once they don't.
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column {
+                        profile?.let { current ->
+                            ProfileBlock(
+                                profile = current,
+                                accent = accent,
+                                titleColor = titleColor,
+                                avatarEnabled = !changingAvatar,
+                                onPickAvatar = { pickAvatar() },
+                                onRemoveAvatar = { removeAvatar() },
+                                onChangeServer = { showChangeServerDialog = true },
+                            )
+                        }
+
+                        SettingsAccordionSection(
+                            title = stringResource(R.string.native_settings_security_section),
+                            expanded = securityOpen,
+                            themeId = themeId,
+                            dark = dark,
+                            titleColor = titleColor,
+                            icon = { tint -> ShieldLockIcon(size = 20.dp, tint = tint) },
+                            onToggle = { securityOpen = !securityOpen },
                         ) {
-                            Column {
-                                // Profile block: mb-4 under the row plus
-                                // the mb-8 wrapper (SettingsPanel.jsx:319).
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    AvatarCircle(
-                                        avatarUrl = current.avatarUrl,
-                                        name = current.name.ifBlank { current.email },
-                                        size = 64.dp,
-                                        onClick = { avatarPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                                    )
-                                    Spacer(Modifier.width(16.dp))
-                                    Column(Modifier.weight(1f)) {
-                                        Text(
-                                            current.name.ifBlank { current.email },
-                                            color = titleColor,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        Row(modifier = Modifier.padding(top = 4.dp)) {
-                                            ProfileLink(
-                                                label = if (current.avatarUrl != null) {
-                                                    stringResource(R.string.native_settings_change_avatar)
-                                                } else {
-                                                    stringResource(R.string.native_settings_upload_avatar)
-                                                },
-                                                color = accent,
-                                                enabled = !changingAvatar,
-                                                onClick = { avatarPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                                            )
-                                            if (current.avatarUrl != null) {
-                                                Spacer(Modifier.width(8.dp))
-                                                ProfileLink(
-                                                    label = stringResource(R.string.native_settings_remove_avatar),
-                                                    color = LinkRed,
-                                                    enabled = !changingAvatar,
-                                                    onClick = { removeAvatar() },
-                                                )
-                                            }
-                                        }
-                                        Row(modifier = Modifier.padding(top = 4.dp)) {
-                                            ProfileLink(
-                                                label = stringResource(R.string.native_settings_change_server),
-                                                color = accent,
-                                                enabled = true,
-                                                onClick = { showChangeServerDialog = true },
-                                            )
-                                        }
-                                    }
-                                }
+                            SettingsSwitchRow(
+                                title = stringResource(R.string.native_settings_show_on_login),
+                                subtitle = null,
+                                checked = profile?.showOnLogin ?: true,
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                icon = { tint -> TablerEyeIcon(size = 20.dp, tint = tint) },
+                                onCheckedChange = { toggleShowOnLogin(it) },
+                            )
 
-                                SettingsAccordionSection(
-                                    title = stringResource(R.string.native_settings_security_section),
-                                    expanded = securityOpen,
+                            SettingsCardButton(
+                                title = stringResource(R.string.native_settings_change_password),
+                                subtitle = stringResource(R.string.native_settings_change_password_desc),
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                borderColor = borderColor,
+                                icon = { tint -> TablerKeyIcon(size = 20.dp, tint = tint) },
+                                onClick = { onBack(); actions.openChangePassword() },
+                            )
+
+                            // mt-5 on the web, where the rows are
+                            // already 12px apart (SettingsPanel.jsx:432).
+                            QrSignInCard(
+                                quickEnabled = shellPrefs.qrQuickEnabled,
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                borderColor = borderColor,
+                                modifier = Modifier.padding(top = 8.dp),
+                                onOpenScanner = onOpenQrScanner,
+                                onQuickChange = { enabled ->
+                                    savePreference("qrQuickEnabled", shellPrefs.qrQuickEnabled, enabled, shellPrefs::applyQrQuick) {
+                                        repository.setQrQuick(it)
+                                    }
+                                },
+                            )
+
+                            PasskeysCard(
+                                passkeys = passkeys,
+                                listOpen = passkeyListOpen,
+                                adding = addingPasskey,
+                                testingId = testingPasskeyId,
+                                renamingId = renamingPasskeyId,
+                                removingId = removingPasskeyId,
+                                untitledLabel = passkeyUntitledLabel,
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                borderColor = borderColor,
+                                onToggleList = { passkeyListOpen = !passkeyListOpen },
+                                onAdd = { addPasskeyNameInput = ""; showAddPasskeyDialog = true },
+                                onTest = { testPasskey(it) },
+                                onRename = { renamePasskeyTarget = it; renamePasskeyInput = it.name.orEmpty() },
+                                onDelete = { pendingDeletePasskeyId = it },
+                            )
+                        }
+
+                        SettingsAccordionSection(
+                            title = stringResource(R.string.native_settings_ui_section),
+                            expanded = uiOpen,
+                            themeId = themeId,
+                            dark = dark,
+                            titleColor = titleColor,
+                            icon = { tint -> AdjustmentsIcon(size = 20.dp, tint = tint) },
+                            onToggle = { uiOpen = !uiOpen },
+                            contentSpacing = 16.dp,
+                        ) {
+                            SettingsSwitchRow(
+                                title = stringResource(R.string.native_settings_sidebar_wide),
+                                subtitle = stringResource(R.string.native_settings_sidebar_wide_desc),
+                                checked = shellPrefs.alwaysShowSidebarOnWide,
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                icon = { tint -> LayoutSidebarIcon(size = 20.dp, tint = tint) },
+                                onCheckedChange = { enabled ->
+                                    savePreference(
+                                        "alwaysShowSidebarOnWide",
+                                        shellPrefs.alwaysShowSidebarOnWide,
+                                        enabled,
+                                        shellPrefs::applyAlwaysShowSidebarOnWide,
+                                    ) { repository.setAlwaysShowSidebarOnWide(it) }
+                                },
+                            )
+                            if (shellPrefs.alwaysShowSidebarOnWide) {
+                                SidebarBreakpointPicker(
+                                    breakpoint = shellPrefs.sidebarBreakpoint,
+                                    menuOpen = sidebarBreakpointMenuOpen,
                                     themeId = themeId,
                                     dark = dark,
                                     titleColor = titleColor,
-                                    icon = { tint -> ShieldLockIcon(size = 20.dp, tint = tint) },
-                                    onToggle = { securityOpen = !securityOpen },
-                                ) {
-                                    SettingsSwitchRow(
-                                        title = stringResource(R.string.native_settings_show_on_login),
-                                        subtitle = null,
-                                        checked = current.showOnLogin,
-                                        enabled = !changingShowOnLogin,
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        icon = { tint -> EyeIcon(size = 20.dp, tint = tint) },
-                                        onCheckedChange = { toggleShowOnLogin(it) },
-                                    )
-
-                                    SettingsCardButton(
-                                        title = stringResource(R.string.native_settings_change_password),
-                                        subtitle = stringResource(R.string.native_settings_change_password_desc),
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        borderColor = borderColor,
-                                        icon = { tint -> TablerKeyIcon(size = 20.dp, tint = tint) },
-                                        onClick = { passwordDialogError = null; showPasswordDialog = true },
-                                    )
-
-                                    // mt-5 on the web, where the rows are
-                                    // already 12px apart (SettingsPanel.jsx:434).
-                                    SettingsCardButton(
-                                        title = stringResource(R.string.native_settings_qr_signin),
-                                        subtitle = stringResource(R.string.native_settings_qr_signin_desc),
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        borderColor = borderColor,
-                                        icon = { tint -> QrCodeIcon(size = 20.dp, tint = tint) },
-                                        onClick = onOpenQrScanner,
-                                        modifier = Modifier.padding(top = 8.dp),
-                                    )
-                                    SettingsSwitchRow(
-                                        title = stringResource(R.string.native_settings_qr_quick),
-                                        subtitle = stringResource(R.string.native_settings_qr_quick_desc),
-                                        checked = container.shellPrefs.qrQuickEnabled,
-                                        enabled = !changingQrQuick,
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        icon = { tint -> QrCodeIcon(size = 20.dp, tint = tint) },
-                                        onCheckedChange = { toggleQrQuick(it) },
-                                    )
-
-                                    PasskeysCard(
-                                        passkeys = passkeys,
-                                        listOpen = passkeyListOpen,
-                                        adding = addingPasskey,
-                                        testingId = testingPasskeyId,
-                                        renamingId = renamingPasskeyId,
-                                        removingId = removingPasskeyId,
-                                        untitledLabel = passkeyUntitledLabel,
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        borderColor = borderColor,
-                                        onToggleList = { passkeyListOpen = !passkeyListOpen },
-                                        onAdd = { addPasskeyNameInput = ""; showAddPasskeyDialog = true },
-                                        onTest = { testPasskey(it) },
-                                        onRename = { renamePasskeyTarget = it; renamePasskeyInput = it.name.orEmpty() },
-                                        onDelete = { pendingDeletePasskeyId = it },
-                                    )
-                                }
-
-                                SettingsAccordionSection(
-                                    title = stringResource(R.string.native_settings_ui_section),
-                                    expanded = uiOpen,
-                                    themeId = themeId,
-                                    dark = dark,
-                                    titleColor = titleColor,
-                                    icon = { tint -> AdjustmentsIcon(size = 20.dp, tint = tint) },
-                                    onToggle = { uiOpen = !uiOpen },
-                                    contentSpacing = 12.dp,
-                                ) {
-                                    SettingsSwitchRow(
-                                        title = stringResource(R.string.native_settings_edge_to_edge_landscape),
-                                        subtitle = stringResource(R.string.native_settings_edge_to_edge_landscape_desc),
-                                        checked = container.shellPrefs.edgeToEdgeLandscape,
-                                        enabled = !changingEdgeToEdge,
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        icon = { tint -> DeviceMobileRotatedIcon(size = 20.dp, tint = tint) },
-                                        onCheckedChange = { toggleEdgeToEdgeLandscape(it) },
-                                    )
-                                    SettingsSwitchRow(
-                                        title = stringResource(R.string.native_settings_animations),
-                                        subtitle = stringResource(R.string.native_settings_animations_desc),
-                                        checked = container.shellPrefs.floatingCards,
-                                        enabled = !changingFloatingCards,
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        icon = { tint -> SparklesIcon(size = 20.dp, tint = tint) },
-                                        onCheckedChange = { toggleFloatingCards(it) },
-                                    )
-                                    // The web fences the theme picker off from
-                                    // the switches above with a hairline
-                                    // (SettingsPanel.jsx:655-657).
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .topHairline(borderColor)
-                                            .padding(top = 8.dp)
-                                            .padding(horizontal = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        SettingsRowIcon(themeId, dark) { tint -> PaintRollerIcon(size = 20.dp, tint = tint) }
-                                        Spacer(Modifier.width(12.dp))
-                                        Column {
-                                            Text(
-                                                stringResource(R.string.native_settings_theme_title),
-                                                color = titleColor,
-                                                fontSize = 16.sp,
-                                                fontWeight = FontWeight.Medium,
-                                            )
-                                            Text(
-                                                stringResource(R.string.native_settings_theme_desc),
-                                                color = SettingsSubtleColor,
-                                                fontSize = 14.sp,
-                                                lineHeight = 20.sp,
-                                            )
-                                        }
-                                    }
-                                    ThemeGrid(
-                                        currentThemeId = themeId,
-                                        enabled = !changingTheme,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        borderColor = borderColor,
-                                        accent = accent,
-                                        modifier = Modifier.padding(horizontal = 12.dp),
-                                        onSelect = { changeTheme(it) },
-                                    )
-                                }
-
-                                SettingsAccordionSection(
-                                    title = stringResource(R.string.native_settings_notifications_section),
-                                    expanded = notificationsOpen,
-                                    themeId = themeId,
-                                    dark = dark,
-                                    titleColor = titleColor,
-                                    icon = { tint -> BellIcon(size = 20.dp, tint = tint) },
-                                    onToggle = { notificationsOpen = !notificationsOpen },
-                                    contentSpacing = 16.dp,
-                                ) {
-                                    Column(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            SettingsRowIcon(themeId, dark) { tint -> BellIcon(size = 20.dp, tint = tint) }
-                                            Spacer(Modifier.width(12.dp))
-                                            Column {
-                                                Text(
-                                                    stringResource(R.string.native_settings_notif_position),
-                                                    color = titleColor,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                )
-                                                Text(
-                                                    stringResource(R.string.native_settings_notif_position_desc),
-                                                    color = SettingsSubtleColor,
-                                                    fontSize = 14.sp,
-                                                    lineHeight = 20.sp,
-                                                )
-                                            }
-                                        }
-                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                                            GkSegmented(
-                                                options = listOf(
-                                                    GkSegmentOption("top", stringResource(R.string.native_settings_notif_position_top)),
-                                                    GkSegmentOption("bottom", stringResource(R.string.native_settings_notif_position_bottom)),
-                                                ),
-                                                selectedId = container.editorPrefs.toastPosition,
-                                                enabled = !changingToastPrefs,
-                                                themeId = themeId,
-                                                dark = dark,
-                                                onSelect = { changeToastPosition(it) },
-                                            )
-                                        }
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                                SettingsRowIcon(themeId, dark) { tint -> VolumeIcon(size = 20.dp, tint = tint) }
-                                                Spacer(Modifier.width(12.dp))
-                                                Column {
-                                                    Text(
-                                                        stringResource(R.string.native_settings_notif_sound),
-                                                        color = titleColor,
-                                                        fontSize = 16.sp,
-                                                        fontWeight = FontWeight.Medium,
-                                                    )
-                                                    Text(
-                                                        stringResource(R.string.native_settings_notif_sound_desc),
-                                                        color = SettingsSubtleColor,
-                                                        fontSize = 14.sp,
-                                                        lineHeight = 20.sp,
-                                                    )
-                                                }
-                                            }
-                                            Spacer(Modifier.width(4.dp))
-                                            CategoryListToggle(
-                                                open = notifSoundTypesOpen,
-                                                label = stringResource(R.string.native_settings_notif_sound_types),
-                                                themeId = themeId,
-                                                dark = dark,
-                                                onClick = { notifSoundTypesOpen = !notifSoundTypesOpen },
-                                            )
-                                            Spacer(Modifier.width(4.dp))
-                                            GkSwitch(
-                                                checked = container.editorPrefs.notificationsSound,
-                                                enabled = !changingNotifPrefs,
-                                                themeId = themeId,
-                                                dark = dark,
-                                                onCheckedChange = { toggleNotificationsSound(it) },
-                                            )
-                                        }
-                                        if (notifSoundTypesOpen) {
-                                            NotifCategoryList(
-                                                categories = NotifCategory.SOUND,
-                                                flags = container.editorPrefs.notificationsSoundTypes,
-                                                // Every row greys out while the
-                                                // master switch is off: nothing
-                                                // would ring anyway.
-                                                enabled = container.editorPrefs.notificationsSound && !changingNotifPrefs,
-                                                dark = dark,
-                                                titleColor = titleColor,
-                                                borderColor = borderColor,
-                                                onToggle = { category, on -> toggleSoundCategory(category, on) },
-                                            )
-                                        }
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                                SettingsRowIcon(themeId, dark) { tint -> BellIcon(size = 20.dp, tint = tint) }
-                                                Spacer(Modifier.width(12.dp))
-                                                Column {
-                                                    Text(
-                                                        stringResource(R.string.native_settings_notif_filter),
-                                                        color = titleColor,
-                                                        fontSize = 16.sp,
-                                                        fontWeight = FontWeight.Medium,
-                                                    )
-                                                    Text(
-                                                        stringResource(R.string.native_settings_notif_filter_desc),
-                                                        color = SettingsSubtleColor,
-                                                        fontSize = 14.sp,
-                                                        lineHeight = 20.sp,
-                                                    )
-                                                }
-                                            }
-                                            Spacer(Modifier.width(4.dp))
-                                            CategoryListToggle(
-                                                open = notifFilterTypesOpen,
-                                                label = stringResource(R.string.native_settings_notif_filter_types),
-                                                themeId = themeId,
-                                                dark = dark,
-                                                onClick = { notifFilterTypesOpen = !notifFilterTypesOpen },
-                                            )
-                                        }
-                                        if (notifFilterTypesOpen) {
-                                            NotifCategoryList(
-                                                categories = NotifCategory.FILTER,
-                                                flags = container.editorPrefs.notificationsFilterTypes,
-                                                enabled = !changingNotifPrefs,
-                                                dark = dark,
-                                                titleColor = titleColor,
-                                                borderColor = borderColor,
-                                                onToggle = { category, on -> toggleFilterCategory(category, on) },
-                                            )
-                                        }
-
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            SettingsRowIcon(themeId, dark) { tint -> RefreshIcon(size = 20.dp, tint = tint) }
-                                            Spacer(Modifier.width(12.dp))
-                                            Column {
-                                                Text(
-                                                    stringResource(R.string.native_settings_notif_duration),
-                                                    color = titleColor,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                )
-                                                Text(
-                                                    stringResource(R.string.native_settings_notif_duration_desc),
-                                                    color = SettingsSubtleColor,
-                                                    fontSize = 14.sp,
-                                                    lineHeight = 20.sp,
-                                                )
-                                            }
-                                        }
-                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                                            ToastDurationPicker(
-                                                durationMs = container.editorPrefs.toastDurationMs,
-                                                menuOpen = toastDurationMenuOpen,
-                                                enabled = !changingToastPrefs,
-                                                themeId = themeId,
-                                                dark = dark,
-                                                titleColor = titleColor,
-                                                borderColor = borderColor,
-                                                onToggleMenu = { toastDurationMenuOpen = !toastDurationMenuOpen },
-                                                onDismissMenu = { toastDurationMenuOpen = false },
-                                                onSelect = { toastDurationMenuOpen = false; changeToastDuration(it) },
-                                            )
-                                        }
-                                    }
-                                }
-
-                                SettingsAccordionSection(
-                                    title = stringResource(R.string.native_settings_notes_section),
-                                    expanded = notesOpen,
-                                    themeId = themeId,
-                                    dark = dark,
-                                    titleColor = titleColor,
-                                    icon = { tint -> NoteTablerIcon(size = 20.dp, tint = tint) },
-                                    onToggle = { notesOpen = !notesOpen },
-                                    contentSpacing = 16.dp,
-                                ) {
-                                    Column(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        SettingsSwitchRow(
-                                            title = stringResource(R.string.native_settings_read_mode),
-                                            subtitle = stringResource(R.string.native_settings_read_mode_desc),
-                                            checked = container.editorPrefs.readModeEnabled,
-                                            enabled = !changingReadMode,
-                                            themeId = themeId,
-                                            dark = dark,
-                                            titleColor = titleColor,
-                                            icon = { tint -> EyeIcon(size = 20.dp, tint = tint) },
-                                            onCheckedChange = { toggleReadMode(it) },
-                                        )
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            SettingsRowIcon(themeId, dark) { tint -> TextColorIcon(size = 20.dp, tint = tint) }
-                                            Spacer(Modifier.width(12.dp))
-                                            Column {
-                                                Text(
-                                                    stringResource(R.string.native_settings_editor_toolbar_mode),
-                                                    color = titleColor,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                )
-                                                Text(
-                                                    stringResource(
-                                                        if (container.editorPrefs.toolbarMode == "advanced") {
-                                                            R.string.native_settings_editor_toolbar_advanced_desc
-                                                        } else {
-                                                            R.string.native_settings_editor_toolbar_simple_desc
-                                                        },
-                                                    ),
-                                                    color = SettingsSubtleColor,
-                                                    fontSize = 14.sp,
-                                                    lineHeight = 20.sp,
-                                                )
-                                            }
-                                        }
-                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                                            GkSegmented(
-                                                options = listOf(
-                                                    GkSegmentOption("simple", stringResource(R.string.native_settings_editor_toolbar_simple)),
-                                                    GkSegmentOption("advanced", stringResource(R.string.native_settings_editor_toolbar_advanced)),
-                                                ),
-                                                selectedId = container.editorPrefs.toolbarMode,
-                                                enabled = !changingToolbarMode,
-                                                themeId = themeId,
-                                                dark = dark,
-                                                onSelect = { changeToolbarMode(it) },
-                                            )
-                                        }
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            SettingsRowIcon(themeId, dark) { tint -> PaintRollerIcon(size = 20.dp, tint = tint) }
-                                            Spacer(Modifier.width(12.dp))
-                                            Column {
-                                                Text(
-                                                    stringResource(R.string.native_typography_title),
-                                                    color = titleColor,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                )
-                                                Text(
-                                                    stringResource(R.string.native_typography_desc),
-                                                    color = SettingsSubtleColor,
-                                                    fontSize = 14.sp,
-                                                    lineHeight = 20.sp,
-                                                )
-                                            }
-                                        }
-                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                                            GkGradientButton(
-                                                label = stringResource(R.string.native_typography_open),
-                                                themeId = themeId,
-                                                onClick = { showTypographyModal = true },
-                                            )
-                                        }
-                                    }
-
-                                    SettingsSubHeading(stringResource(R.string.native_settings_checklist_group), dark)
-                                    Column(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            SettingsRowIcon(themeId, dark) { tint -> IndentIncreaseIcon(size = 20.dp, tint = tint) }
-                                            Spacer(Modifier.width(12.dp))
-                                            Column {
-                                                Text(
-                                                    stringResource(R.string.native_settings_checklist_insert_position),
-                                                    color = titleColor,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                )
-                                                Text(
-                                                    stringResource(R.string.native_settings_checklist_insert_position_desc),
-                                                    color = SettingsSubtleColor,
-                                                    fontSize = 14.sp,
-                                                    lineHeight = 20.sp,
-                                                )
-                                            }
-                                        }
-                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                                            GkSegmented(
-                                                options = listOf(
-                                                    GkSegmentOption("top", stringResource(R.string.native_settings_checklist_insert_top)),
-                                                    GkSegmentOption("bottom", stringResource(R.string.native_settings_checklist_insert_bottom)),
-                                                ),
-                                                selectedId = container.editorPrefs.checklistInsertPosition,
-                                                enabled = !changingChecklistPosition,
-                                                themeId = themeId,
-                                                dark = dark,
-                                                onSelect = { changeChecklistInsertPosition(it) },
-                                            )
-                                        }
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            SettingsRowIcon(themeId, dark) { tint -> FilterQuestionIcon(size = 20.dp, tint = tint) }
-                                            Spacer(Modifier.width(12.dp))
-                                            Column {
-                                                Text(
-                                                    stringResource(R.string.native_settings_checklist_remove_section),
-                                                    color = titleColor,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                )
-                                                Text(
-                                                    stringResource(R.string.native_settings_checklist_remove_section_desc),
-                                                    color = SettingsSubtleColor,
-                                                    fontSize = 14.sp,
-                                                    lineHeight = 20.sp,
-                                                )
-                                            }
-                                        }
-                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                                            GkSegmented(
-                                                options = listOf(
-                                                    GkSegmentOption("cascade", stringResource(R.string.native_settings_checklist_remove_cascade)),
-                                                    GkSegmentOption("keep", stringResource(R.string.native_settings_checklist_remove_keep)),
-                                                ),
-                                                selectedId = container.editorPrefs.checklistRemoveSectionBehavior,
-                                                enabled = !changingRemoveSection,
-                                                themeId = themeId,
-                                                dark = dark,
-                                                onSelect = { changeRemoveSectionBehavior(it) },
-                                            )
-                                        }
-                                    }
-                                }
-
-                                SettingsAccordionSection(
-                                    title = stringResource(R.string.native_settings_data_section),
-                                    expanded = dataOpen,
-                                    themeId = themeId,
-                                    dark = dark,
-                                    titleColor = titleColor,
-                                    icon = { tint -> DatabaseIcon(size = 20.dp, tint = tint) },
-                                    onToggle = { dataOpen = !dataOpen },
-                                ) {
-                                    SettingsCardButton(
-                                        title = stringResource(R.string.native_settings_export_all),
-                                        subtitle = stringResource(R.string.native_settings_export_all_desc),
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        borderColor = borderColor,
-                                        enabled = !transferRunning,
-                                        icon = { tint -> UploadIcon(size = 20.dp, tint = tint) },
-                                        onClick = { exportAllNotes() },
-                                    )
-                                    SettingsCardButton(
-                                        title = stringResource(R.string.native_settings_import_json),
-                                        subtitle = stringResource(R.string.native_settings_import_json_desc),
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        borderColor = borderColor,
-                                        enabled = !transferRunning,
-                                        icon = { tint -> TablerDownloadIcon(size = 20.dp, tint = tint) },
-                                        // "*/*" as well: a .json picked from a
-                                        // file manager often reports as
-                                        // application/octet-stream.
-                                        onClick = { importJsonLauncher.launch(arrayOf("application/json", "*/*")) },
-                                    )
-                                    SettingsCardButton(
-                                        title = stringResource(R.string.native_settings_import_gkeep),
-                                        subtitle = stringResource(R.string.native_settings_import_gkeep_desc),
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        borderColor = borderColor,
-                                        enabled = !transferRunning,
-                                        icon = { tint -> BrandGoogleIcon(size = 20.dp, tint = tint) },
-                                        onClick = { importGkeepLauncher.launch(arrayOf("application/zip", "application/json", "image/*", "*/*")) },
-                                    )
-                                    SettingsCardButton(
-                                        title = stringResource(R.string.native_settings_import_markdown),
-                                        subtitle = stringResource(R.string.native_settings_import_markdown_desc),
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        borderColor = borderColor,
-                                        enabled = !transferRunning,
-                                        icon = { tint -> FileTextIcon(size = 20.dp, tint = tint) },
-                                        onClick = { importMarkdownLauncher.launch(arrayOf("text/markdown", "text/plain", "*/*")) },
-                                    )
-                                    SettingsCardButton(
-                                        title = stringResource(R.string.native_settings_secret_key_generate),
-                                        subtitle = stringResource(R.string.native_settings_secret_key_desc),
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        borderColor = borderColor,
-                                        enabled = !generatingSecretKey,
-                                        icon = { tint -> TablerKeyIcon(size = 20.dp, tint = tint) },
-                                        onClick = { downloadSecretKey() },
-                                    )
-                                    SettingsCardButton(
-                                        title = stringResource(R.string.native_settings_reset_order),
-                                        subtitle = stringResource(R.string.native_settings_reset_order_desc),
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        borderColor = borderColor,
-                                        enabled = !transferRunning,
-                                        icon = { tint -> ArrowsSortIcon(size = 20.dp, tint = tint) },
-                                        onClick = { showResetOrderConfirm = true },
-                                    )
-                                }
-
-                                aiSettings?.let { ai ->
-                                    SettingsAccordionSection(
-                                        title = stringResource(R.string.native_settings_ai_section),
-                                        expanded = aiOpen,
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        icon = { tint -> BrainIcon(size = 20.dp, tint = tint) },
-                                        onToggle = { aiOpen = !aiOpen },
-                                    ) {
-                                        AiSettingsSection(
-                                            settings = ai,
-                                            draft = aiDraft,
-                                            testOutcome = aiTestOutcome,
-                                            busy = savingAi,
-                                            testing = testingAi,
-                                            themeId = themeId,
-                                            dark = dark,
-                                            titleColor = titleColor,
-                                            borderColor = borderColor,
-                                            onToggleEnabled = { saveAiSettings(aiPatch(enabled = it), null) },
-                                            onSelectMode = { mode ->
-                                                if (mode != ai.mode) saveAiSettings(aiPatch(mode = mode), null)
-                                            },
-                                            onDraftChange = { aiDraft = it },
-                                            // The one call that sends an
-                                            // empty key on purpose: that is
-                                            // how the server is told to
-                                            // forget the stored one.
-                                            onClearApiKey = {
-                                                saveAiSettings(aiPatch(apiKey = ""), aiKeyClearedMessage)
-                                            },
-                                            onTest = { testAiSettings() },
-                                            onSave = { saveAiSettings(aiPatch(), aiSavedMessage) },
-                                        )
-                                    }
-                                }
-
-                                SettingsAccordionSection(
-                                    title = stringResource(R.string.native_settings_app_section),
-                                    expanded = appOpen,
-                                    themeId = themeId,
-                                    dark = dark,
-                                    titleColor = titleColor,
-                                    icon = { tint -> RefreshIcon(size = 20.dp, tint = tint) },
-                                    onToggle = { appOpen = !appOpen },
-                                ) {
-                                    val release = availableUpdate
-                                    when {
-                                        installedFromFdroid -> SettingsCardButton(
-                                            title = stringResource(R.string.native_settings_open_fdroid),
-                                            subtitle = stringResource(R.string.native_settings_update_fdroid),
-                                            themeId = themeId,
-                                            dark = dark,
-                                            titleColor = titleColor,
-                                            borderColor = borderColor,
-                                            icon = { tint -> TablerDownloadIcon(size = 20.dp, tint = tint) },
-                                            onClick = { openFdroidPage(context) },
-                                            footer = { VersionLine(dark) },
-                                        )
-                                        release != null -> UpdateAvailableCard(
-                                            release = release,
-                                            themeId = themeId,
-                                            dark = dark,
-                                            titleColor = titleColor,
-                                            onLater = {
-                                                UpdateManager.clearAvailableRelease(context)
-                                                availableUpdate = null
-                                            },
-                                            onDownload = { downloadUpdate(release) },
-                                        )
-                                        else -> SettingsCardButton(
-                                            title = stringResource(R.string.native_settings_check_update),
-                                            subtitle = stringResource(R.string.native_settings_check_update_desc),
-                                            themeId = themeId,
-                                            dark = dark,
-                                            titleColor = titleColor,
-                                            borderColor = borderColor,
-                                            icon = { tint -> TablerDownloadIcon(size = 20.dp, tint = tint) },
-                                            onClick = { checkForUpdate() },
-                                            footer = { VersionLine(dark) },
-                                        )
-                                    }
-                                }
-
-                                SettingsAccordionSection(
-                                    title = stringResource(R.string.native_settings_language_section),
-                                    expanded = languageOpen,
-                                    themeId = themeId,
-                                    dark = dark,
-                                    titleColor = titleColor,
-                                    icon = { tint -> WorldIcon(size = 20.dp, tint = tint) },
-                                    onToggle = { languageOpen = !languageOpen },
-                                ) {
-                                    LanguageRow(
-                                        language = current.language,
-                                        menuOpen = languageMenuOpen,
-                                        enabled = !changingLanguage,
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        borderColor = borderColor,
-                                        onToggleMenu = { languageMenuOpen = !languageMenuOpen },
-                                        onDismissMenu = { languageMenuOpen = false },
-                                        onSelect = { languageMenuOpen = false; changeLanguage(it) },
-                                    )
-                                }
+                                    borderColor = borderColor,
+                                    onToggleMenu = { sidebarBreakpointMenuOpen = !sidebarBreakpointMenuOpen },
+                                    onDismissMenu = { sidebarBreakpointMenuOpen = false },
+                                    onSelect = { widthPx ->
+                                        sidebarBreakpointMenuOpen = false
+                                        savePreference(
+                                            "sidebarBreakpoint",
+                                            shellPrefs.sidebarBreakpoint,
+                                            widthPx,
+                                            shellPrefs::applySidebarBreakpoint,
+                                        ) { repository.setSidebarBreakpoint(it) }
+                                    },
+                                )
                             }
-
-                            Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.CenterEnd) {
-                                Text(
-                                    "v${BuildConfig.VERSION_NAME}",
-                                    color = if (dark) VersionBadgeDark else VersionBadgeLight,
-                                    fontSize = 12.sp,
+                            SettingsSwitchRow(
+                                title = stringResource(R.string.native_settings_edge_to_edge_landscape),
+                                subtitle = stringResource(R.string.native_settings_edge_to_edge_landscape_desc),
+                                checked = shellPrefs.edgeToEdgeLandscape,
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                icon = { tint -> DeviceMobileRotatedIcon(size = 20.dp, tint = tint) },
+                                onCheckedChange = { enabled ->
+                                    savePreference(
+                                        "edgeToEdgeLandscape",
+                                        shellPrefs.edgeToEdgeLandscape,
+                                        enabled,
+                                        shellPrefs::applyEdgeToEdgeLandscape,
+                                    ) { repository.setEdgeToEdgeLandscape(it) }
+                                },
+                            )
+                            SettingsSwitchRow(
+                                title = stringResource(R.string.native_settings_animations),
+                                subtitle = stringResource(R.string.native_settings_animations_desc),
+                                checked = shellPrefs.floatingCards,
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                icon = { tint -> SparklesIcon(size = 20.dp, tint = tint) },
+                                onCheckedChange = { enabled ->
+                                    savePreference("floatingCardsEnabled", shellPrefs.floatingCards, enabled, shellPrefs::applyFloatingCards) {
+                                        repository.setFloatingCards(it)
+                                    }
+                                },
+                            )
+                            // The web fences the theme picker off from the
+                            // switches above with a hairline and 8px of
+                            // padding under it (SettingsPanel.jsx:656).
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .topHairline(borderColor)
+                                    .padding(top = 9.dp)
+                                    .padding(horizontal = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                SettingsRowHeader(
+                                    title = stringResource(R.string.native_settings_theme_title),
+                                    subtitle = stringResource(R.string.native_settings_theme_desc),
+                                    themeId = themeId,
+                                    dark = dark,
+                                    titleColor = titleColor,
+                                    icon = { tint -> PaintRollerIcon(size = 20.dp, tint = tint) },
+                                )
+                                ThemeGrid(
+                                    currentThemeId = themeId,
+                                    dark = dark,
+                                    titleColor = titleColor,
+                                    borderColor = borderColor,
+                                    accent = accent,
+                                    onSelect = { changeTheme(it) },
                                 )
                             }
                         }
+
+                        SettingsAccordionSection(
+                            title = stringResource(R.string.native_settings_notifications_section),
+                            expanded = notificationsOpen,
+                            themeId = themeId,
+                            dark = dark,
+                            titleColor = titleColor,
+                            icon = { tint -> TablerBellIcon(size = 20.dp, tint = tint) },
+                            onToggle = { notificationsOpen = !notificationsOpen },
+                            // The push row sits 8px under the rest (mt-2).
+                            contentSpacing = 8.dp,
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().settingsCardBorder(borderColor).padding(13.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    SettingsRowHeader(
+                                        title = stringResource(R.string.native_settings_notif_position),
+                                        subtitle = stringResource(R.string.native_settings_notif_position_desc),
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        icon = { tint -> FloatCenterIcon(size = 20.dp, tint = tint) },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                    GkSegmented(
+                                        options = listOf(
+                                            GkSegmentOption("top", stringResource(R.string.native_settings_notif_position_top)),
+                                            GkSegmentOption("bottom", stringResource(R.string.native_settings_notif_position_bottom)),
+                                        ),
+                                        selectedId = editorPrefs.toastPosition,
+                                        themeId = themeId,
+                                        dark = dark,
+                                        onSelect = { position ->
+                                            savePreference("notificationsPositionMobile", editorPrefs.toastPosition, position, editorPrefs::applyToastPosition) {
+                                                repository.setToastPosition(it)
+                                            }
+                                        },
+                                        borderColor = borderColor,
+                                        idleBackground = Color.Transparent,
+                                        idleTextColor = if (dark) Gray200 else Gray700,
+                                    )
+                                }
+
+                                Column {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        SettingsRowHeader(
+                                            title = stringResource(R.string.native_settings_notif_sound),
+                                            subtitle = stringResource(R.string.native_settings_notif_sound_desc),
+                                            themeId = themeId,
+                                            dark = dark,
+                                            titleColor = titleColor,
+                                            icon = { tint -> VolumeIcon(size = 20.dp, tint = tint) },
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Spacer(Modifier.width(12.dp))
+                                        CategoryListToggle(
+                                            open = notifSoundTypesOpen,
+                                            label = stringResource(R.string.native_settings_notif_sound_types),
+                                            themeId = themeId,
+                                            dark = dark,
+                                            onClick = { notifSoundTypesOpen = !notifSoundTypesOpen },
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        GkSwitch(
+                                            checked = editorPrefs.notificationsSound,
+                                            themeId = themeId,
+                                            dark = dark,
+                                            onCheckedChange = { enabled ->
+                                                savePreference("notificationsSound", editorPrefs.notificationsSound, enabled, editorPrefs::applyNotificationsSound) {
+                                                    repository.setNotificationsSound(it)
+                                                }
+                                            },
+                                        )
+                                    }
+                                    if (notifSoundTypesOpen) {
+                                        NotifCategoryList(
+                                            categories = NotifCategory.SOUND,
+                                            flags = editorPrefs.notificationsSoundTypes,
+                                            // Every row greys out while the
+                                            // master switch is off: nothing
+                                            // would ring anyway.
+                                            enabled = editorPrefs.notificationsSound,
+                                            themeId = themeId,
+                                            dark = dark,
+                                            titleColor = titleColor,
+                                            borderColor = borderColor,
+                                            onToggle = { category, on -> toggleSoundCategory(category, on) },
+                                        )
+                                    }
+                                }
+
+                                Column {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        SettingsRowHeader(
+                                            title = stringResource(R.string.native_settings_notif_filter),
+                                            subtitle = stringResource(R.string.native_settings_notif_filter_desc),
+                                            themeId = themeId,
+                                            dark = dark,
+                                            titleColor = titleColor,
+                                            icon = { tint -> TablerBellIcon(size = 20.dp, tint = tint) },
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Spacer(Modifier.width(12.dp))
+                                        CategoryListToggle(
+                                            open = notifFilterTypesOpen,
+                                            label = stringResource(R.string.native_settings_notif_filter_types),
+                                            themeId = themeId,
+                                            dark = dark,
+                                            onClick = { notifFilterTypesOpen = !notifFilterTypesOpen },
+                                        )
+                                    }
+                                    if (notifFilterTypesOpen) {
+                                        NotifCategoryList(
+                                            categories = NotifCategory.FILTER,
+                                            flags = editorPrefs.notificationsFilterTypes,
+                                            enabled = true,
+                                            themeId = themeId,
+                                            dark = dark,
+                                            titleColor = titleColor,
+                                            borderColor = borderColor,
+                                            onToggle = { category, on -> toggleFilterCategory(category, on) },
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().settingsCardBorder(borderColor).padding(13.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    SettingsRowHeader(
+                                        title = stringResource(R.string.native_settings_notif_duration),
+                                        subtitle = stringResource(R.string.native_settings_notif_duration_desc),
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        icon = { tint -> ClockIcon(size = 20.dp, tint = tint) },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                    ToastDurationPicker(
+                                        durationMs = editorPrefs.toastDurationMs,
+                                        menuOpen = toastDurationMenuOpen,
+                                        themeId = themeId,
+                                        dark = dark,
+                                        borderColor = borderColor,
+                                        onToggleMenu = { toastDurationMenuOpen = !toastDurationMenuOpen },
+                                        onDismissMenu = { toastDurationMenuOpen = false },
+                                        onSelect = { durationMs ->
+                                            toastDurationMenuOpen = false
+                                            savePreference("notificationsDuration", editorPrefs.toastDurationMs, durationMs, editorPrefs::applyToastDuration) {
+                                                repository.setToastDuration(it)
+                                            }
+                                        },
+                                    )
+                                }
+                            }
+
+                            PushNotificationsRow(themeId = themeId, dark = dark, titleColor = titleColor)
+                        }
+
+                        SettingsAccordionSection(
+                            title = stringResource(R.string.native_settings_notes_section),
+                            expanded = notesOpen,
+                            themeId = themeId,
+                            dark = dark,
+                            titleColor = titleColor,
+                            icon = { tint -> NoteTablerIcon(size = 20.dp, tint = tint) },
+                            onToggle = { notesOpen = !notesOpen },
+                            contentSpacing = 16.dp,
+                        ) {
+                            SettingsSwitchRow(
+                                title = stringResource(R.string.native_settings_read_mode),
+                                subtitle = stringResource(R.string.native_settings_read_mode_desc),
+                                checked = editorPrefs.readModeEnabled,
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                icon = { tint -> TablerEyeIcon(size = 20.dp, tint = tint) },
+                                onCheckedChange = { enabled ->
+                                    savePreference("readModeEnabled", editorPrefs.readModeEnabled, enabled, editorPrefs::applyReadMode) {
+                                        repository.setReadMode(it)
+                                    }
+                                },
+                            )
+                            SettingsStackedRow(
+                                title = stringResource(R.string.native_settings_editor_toolbar_mode),
+                                subtitle = stringResource(
+                                    if (editorPrefs.toolbarMode == "advanced") {
+                                        R.string.native_settings_editor_toolbar_advanced_desc
+                                    } else {
+                                        R.string.native_settings_editor_toolbar_simple_desc
+                                    },
+                                ),
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                icon = { tint -> HeadingIcon(size = 20.dp, tint = tint) },
+                            ) {
+                                GkSegmented(
+                                    options = listOf(
+                                        GkSegmentOption("simple", stringResource(R.string.native_settings_editor_toolbar_simple)),
+                                        GkSegmentOption("advanced", stringResource(R.string.native_settings_editor_toolbar_advanced)),
+                                    ),
+                                    selectedId = editorPrefs.toolbarMode,
+                                    themeId = themeId,
+                                    dark = dark,
+                                    onSelect = { mode ->
+                                        savePreference("editorToolbarMode", editorPrefs.toolbarMode, mode, editorPrefs::applyToolbarMode) {
+                                            repository.setEditorToolbarMode(it)
+                                        }
+                                    },
+                                )
+                            }
+                            SettingsStackedRow(
+                                title = stringResource(R.string.native_typography_title),
+                                subtitle = stringResource(R.string.native_typography_desc),
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                icon = { tint -> TypographyIcon(size = 20.dp, tint = tint) },
+                                subtitleColor = if (dark) Gray400 else SettingsSubtleColor,
+                            ) {
+                                GkGradientButton(
+                                    label = stringResource(R.string.native_typography_open),
+                                    themeId = themeId,
+                                    onClick = { showTypographyModal = true },
+                                )
+                            }
+                            SettingsStackedRow(
+                                title = stringResource(R.string.native_settings_paste_title),
+                                subtitle = stringResource(
+                                    if (editorPrefs.pasteMode == "plain") {
+                                        R.string.native_settings_paste_plain_desc
+                                    } else {
+                                        R.string.native_settings_paste_rich_desc
+                                    },
+                                ),
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                icon = { tint -> ClipboardIcon(size = 20.dp, tint = tint) },
+                            ) {
+                                GkSegmented(
+                                    options = listOf(
+                                        GkSegmentOption("rich", stringResource(R.string.native_settings_paste_rich)),
+                                        GkSegmentOption("plain", stringResource(R.string.native_settings_paste_plain)),
+                                    ),
+                                    selectedId = editorPrefs.pasteMode,
+                                    themeId = themeId,
+                                    dark = dark,
+                                    onSelect = { mode ->
+                                        savePreference("pasteMode", editorPrefs.pasteMode, mode, editorPrefs::applyPasteMode) {
+                                            repository.setPasteMode(it)
+                                        }
+                                    },
+                                )
+                            }
+
+                            SettingsSubHeading(stringResource(R.string.native_settings_checklist_group), dark)
+
+                            SettingsStackedRow(
+                                title = stringResource(R.string.native_settings_checklist_insert_position),
+                                subtitle = stringResource(R.string.native_settings_checklist_insert_position_desc),
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                icon = { tint -> IndentIncreaseIcon(size = 20.dp, tint = tint) },
+                            ) {
+                                GkSegmented(
+                                    options = listOf(
+                                        GkSegmentOption("top", stringResource(R.string.native_settings_checklist_insert_top)),
+                                        GkSegmentOption("bottom", stringResource(R.string.native_settings_checklist_insert_bottom)),
+                                    ),
+                                    selectedId = editorPrefs.checklistInsertPosition,
+                                    themeId = themeId,
+                                    dark = dark,
+                                    onSelect = { position ->
+                                        savePreference(
+                                            "checklistInsertPosition",
+                                            editorPrefs.checklistInsertPosition,
+                                            position,
+                                            editorPrefs::applyChecklistInsertPosition,
+                                        ) { repository.setChecklistInsertPosition(it) }
+                                    },
+                                )
+                            }
+                            SettingsStackedRow(
+                                title = stringResource(R.string.native_settings_checklist_remove_section),
+                                subtitle = stringResource(R.string.native_settings_checklist_remove_section_desc),
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                icon = { tint -> FilterQuestionIcon(size = 20.dp, tint = tint) },
+                            ) {
+                                GkSegmented(
+                                    options = listOf(
+                                        GkSegmentOption("cascade", stringResource(R.string.native_settings_checklist_remove_cascade)),
+                                        GkSegmentOption("keep", stringResource(R.string.native_settings_checklist_remove_keep)),
+                                    ),
+                                    selectedId = editorPrefs.checklistRemoveSectionBehavior,
+                                    themeId = themeId,
+                                    dark = dark,
+                                    onSelect = { behavior ->
+                                        savePreference(
+                                            "checklistRemoveSectionBehavior",
+                                            editorPrefs.checklistRemoveSectionBehavior,
+                                            behavior,
+                                            editorPrefs::applyChecklistRemoveSectionBehavior,
+                                        ) { repository.setChecklistRemoveSectionBehavior(it) }
+                                    },
+                                )
+                            }
+                        }
+
+                        SettingsAccordionSection(
+                            title = stringResource(R.string.native_settings_data_section),
+                            expanded = dataOpen,
+                            themeId = themeId,
+                            dark = dark,
+                            titleColor = titleColor,
+                            icon = { tint -> DatabaseIcon(size = 20.dp, tint = tint) },
+                            onToggle = { dataOpen = !dataOpen },
+                        ) {
+                            SettingsCardButton(
+                                title = stringResource(R.string.native_settings_export_all),
+                                subtitle = stringResource(R.string.native_settings_export_all_desc),
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                borderColor = borderColor,
+                                icon = { tint -> UploadIcon(size = 20.dp, tint = tint) },
+                                onClick = { onBack(); actions.exportAll() },
+                            )
+                            SettingsCardButton(
+                                title = stringResource(R.string.native_settings_import_json),
+                                subtitle = stringResource(R.string.native_settings_import_json_desc),
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                borderColor = borderColor,
+                                icon = { tint -> TablerDownloadIcon(size = 20.dp, tint = tint) },
+                                onClick = { onBack(); actions.pickGlassKeepExport() },
+                            )
+                            SettingsCardButton(
+                                title = stringResource(R.string.native_settings_import_gkeep),
+                                subtitle = stringResource(R.string.native_settings_import_gkeep_desc),
+                                subtitleLink = SettingsInlineLink(
+                                    stringResource(R.string.native_settings_import_gkeep_help),
+                                    GoogleTakeoutHelpUrl,
+                                ),
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                borderColor = borderColor,
+                                icon = { tint -> BrandGoogleIcon(size = 20.dp, tint = tint) },
+                                onClick = { onBack(); actions.pickGoogleKeep() },
+                            )
+                            SettingsCardButton(
+                                title = stringResource(R.string.native_settings_import_markdown),
+                                subtitle = stringResource(R.string.native_settings_import_markdown_desc),
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                borderColor = borderColor,
+                                icon = { tint -> FileTextIcon(size = 20.dp, tint = tint) },
+                                onClick = { onBack(); actions.pickMarkdown() },
+                            )
+                            SettingsCardButton(
+                                title = stringResource(R.string.native_settings_secret_key_generate),
+                                subtitle = stringResource(R.string.native_settings_secret_key_desc),
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                borderColor = borderColor,
+                                icon = { tint -> TablerKeyIcon(size = 20.dp, tint = tint) },
+                                onClick = { onBack(); actions.downloadSecretKey() },
+                            )
+                            SettingsCardButton(
+                                title = stringResource(R.string.native_settings_reset_order),
+                                subtitle = stringResource(R.string.native_settings_reset_order_desc),
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                borderColor = borderColor,
+                                icon = { tint -> ArrowsSortIcon(size = 20.dp, tint = tint) },
+                                onClick = { showResetOrderConfirm = true },
+                            )
+                        }
+
+                        SettingsAccordionSection(
+                            title = stringResource(R.string.native_settings_ai_section),
+                            expanded = aiOpen,
+                            themeId = themeId,
+                            dark = dark,
+                            titleColor = titleColor,
+                            icon = { tint -> BrainIcon(size = 20.dp, tint = tint) },
+                            onToggle = { aiOpen = !aiOpen },
+                        ) {
+                            val ai = aiSettings ?: UserAiSettingsDto()
+                            AiSettingsSection(
+                                settings = ai,
+                                draft = aiDraft,
+                                testOutcome = aiTestOutcome,
+                                busy = savingAi || aiLoading,
+                                testing = testingAi,
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                borderColor = borderColor,
+                                onToggleEnabled = { saveAiSettings(aiPatch(enabled = it), null) },
+                                onSelectMode = { mode ->
+                                    if (mode != ai.mode) saveAiSettings(aiPatch(mode = mode), null)
+                                },
+                                onDraftChange = { aiDraft = it },
+                                // The one call that sends an
+                                // empty key on purpose: that is
+                                // how the server is told to
+                                // forget the stored one.
+                                onClearApiKey = {
+                                    saveAiSettings(aiPatch(apiKey = ""), aiKeyClearedMessage)
+                                },
+                                onTest = { testAiSettings() },
+                                onSave = { saveAiSettings(aiPatch(), aiSavedMessage) },
+                            )
+                        }
+
+                        SettingsAccordionSection(
+                            title = stringResource(R.string.native_settings_app_section),
+                            expanded = appOpen,
+                            themeId = themeId,
+                            dark = dark,
+                            titleColor = titleColor,
+                            icon = { tint -> RefreshIcon(size = 20.dp, tint = tint) },
+                            onToggle = { appOpen = !appOpen },
+                        ) {
+                            val release = availableUpdate
+                            when {
+                                installedFromFdroid -> SettingsCardButton(
+                                    title = stringResource(R.string.native_settings_open_fdroid),
+                                    subtitle = null,
+                                    themeId = themeId,
+                                    dark = dark,
+                                    titleColor = titleColor,
+                                    borderColor = borderColor,
+                                    icon = { tint -> TablerDownloadIcon(size = 20.dp, tint = tint) },
+                                    onClick = { openFdroidPage(context) },
+                                    footer = {
+                                        Text(
+                                            stringResource(R.string.native_settings_update_fdroid),
+                                            color = SettingsSubtleColor,
+                                            fontSize = 14.sp,
+                                            lineHeight = 20.sp,
+                                            modifier = Modifier.padding(top = 2.dp),
+                                        )
+                                        VersionLine(dark)
+                                    },
+                                )
+                                release != null -> UpdateAvailableCard(
+                                    release = release,
+                                    themeId = themeId,
+                                    dark = dark,
+                                    titleColor = titleColor,
+                                    onLater = {
+                                        UpdateManager.clearAvailableRelease(context)
+                                        availableUpdate = null
+                                    },
+                                    onDownload = { downloadUpdate(release) },
+                                )
+                                else -> SettingsCardButton(
+                                    title = stringResource(R.string.native_settings_check_update),
+                                    subtitle = stringResource(R.string.native_settings_check_update_desc),
+                                    themeId = themeId,
+                                    dark = dark,
+                                    titleColor = titleColor,
+                                    borderColor = borderColor,
+                                    icon = { tint -> TablerDownloadIcon(size = 20.dp, tint = tint) },
+                                    onClick = { checkForUpdate() },
+                                    footer = { VersionLine(dark) },
+                                )
+                            }
+                        }
+
+                        SettingsAccordionSection(
+                            title = stringResource(R.string.native_settings_language_section),
+                            expanded = languageOpen,
+                            themeId = themeId,
+                            dark = dark,
+                            titleColor = titleColor,
+                            icon = { tint -> WorldIcon(size = 20.dp, tint = tint) },
+                            onToggle = { languageOpen = !languageOpen },
+                        ) {
+                            LanguageRow(
+                                language = profile?.language,
+                                menuOpen = languageMenuOpen,
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                borderColor = borderColor,
+                                onToggleMenu = { languageMenuOpen = !languageMenuOpen },
+                                onDismissMenu = { languageMenuOpen = false },
+                                onSelect = { languageMenuOpen = false; changeLanguage(it) },
+                            )
+                        }
+                    }
+
+                    Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.CenterEnd) {
+                        Text(
+                            "v${BuildConfig.VERSION_NAME}",
+                            color = if (dark) Gray600 else Gray400,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                        )
                     }
                 }
             }
@@ -1902,90 +1462,12 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
 
         if (showTypographyModal) {
             TypographyModal(
-                presets = container.editorPrefs.typography,
+                presets = editorPrefs.typography,
                 themeId = themeId,
                 dark = dark,
                 onChange = { changeTypography(it) },
                 onDismiss = { showTypographyModal = false },
             )
-        }
-
-        if (showPasswordDialog) {
-            GkDialog(
-                onDismissRequest = { if (!changingPassword) showPasswordDialog = false },
-                dark = dark,
-                borderColor = borderColor,
-                dismissOnClickOutside = false,
-            ) {
-                Text(
-                    stringResource(R.string.native_settings_change_password),
-                    color = titleColor,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(12.dp))
-                GkTextField(
-                    value = currentPasswordInput,
-                    onValueChange = { currentPasswordInput = it; passwordDialogError = null },
-                    label = stringResource(R.string.native_settings_password_current),
-                    placeholder = stringResource(R.string.native_settings_password_current),
-                    themeId = themeId,
-                    dark = dark,
-                    titleColor = titleColor,
-                    borderColor = borderColor,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
-                    visualTransformation = PasswordVisualTransformation(),
-                )
-                Spacer(Modifier.height(16.dp))
-                GkTextField(
-                    value = newPasswordInput,
-                    onValueChange = { newPasswordInput = it; passwordDialogError = null },
-                    label = stringResource(R.string.native_settings_password_new),
-                    placeholder = stringResource(R.string.native_settings_password_new),
-                    themeId = themeId,
-                    dark = dark,
-                    titleColor = titleColor,
-                    borderColor = borderColor,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
-                    visualTransformation = PasswordVisualTransformation(),
-                )
-                Spacer(Modifier.height(16.dp))
-                GkTextField(
-                    value = confirmPasswordInput,
-                    onValueChange = { confirmPasswordInput = it; passwordDialogError = null },
-                    label = stringResource(R.string.native_settings_password_confirm),
-                    placeholder = stringResource(R.string.native_settings_password_confirm),
-                    themeId = themeId,
-                    dark = dark,
-                    titleColor = titleColor,
-                    borderColor = borderColor,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                    visualTransformation = PasswordVisualTransformation(),
-                )
-                passwordDialogError?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Text(it, color = DangerRed, fontSize = 14.sp)
-                }
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-                ) {
-                    GkSecondaryButton(
-                        label = stringResource(R.string.native_dialog_cancel),
-                        borderColor = borderColor,
-                        textColor = titleColor,
-                        enabled = !changingPassword,
-                        onClick = { showPasswordDialog = false },
-                    )
-                    GkGradientButton(
-                        label = stringResource(R.string.native_settings_change_password),
-                        themeId = themeId,
-                        enabled = !changingPassword,
-                        onClick = { submitPasswordChange() },
-                    )
-                }
-            }
         }
 
         if (showAddPasskeyDialog) {
@@ -2122,115 +1604,27 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
             }
         }
 
-        generatedSecretKey?.let { key ->
-            GkDialog(
-                onDismissRequest = { generatedSecretKey = null },
-                dark = dark,
-                borderColor = borderColor,
-            ) {
-                Text(
-                    stringResource(R.string.native_settings_secret_key_dialog_title),
-                    color = titleColor,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    key,
-                    color = titleColor,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 14.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(WorkspaceTheme.accentSoftBg(themeId, dark))
-                        .padding(12.dp),
-                )
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    stringResource(R.string.native_settings_secret_key_warning),
-                    color = subtextColor,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                )
-                Spacer(Modifier.height(20.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-                ) {
-                    GkSecondaryButton(
-                        label = stringResource(R.string.native_dialog_cancel),
-                        borderColor = borderColor,
-                        textColor = titleColor,
-                        onClick = { generatedSecretKey = null },
-                    )
-                    GkGradientButton(
-                        label = stringResource(R.string.native_settings_secret_key_copy),
-                        themeId = themeId,
-                        onClick = {
-                            scope.launch {
-                                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("secret key", key)))
-                                toasts.success(copiedMessage)
-                            }
-                        },
-                    )
-                }
-            }
-        }
-
         if (showResetOrderConfirm) {
-            GkConfirmDialog(
-                title = stringResource(R.string.native_settings_reset_order),
-                message = stringResource(R.string.native_settings_reset_order_confirm),
-                confirmLabel = stringResource(R.string.native_settings_reset_order_action),
-                cancelLabel = stringResource(R.string.native_dialog_cancel),
+            ResetNoteOrderDialog(
                 themeId = themeId,
                 dark = dark,
-                borderColor = borderColor,
                 titleColor = titleColor,
-                subtextColor = subtextColor,
-                onConfirm = { showResetOrderConfirm = false; resetNoteOrder() },
+                borderColor = borderColor,
+                onConfirm = {
+                    showResetOrderConfirm = false
+                    onBack()
+                    actions.resetNoteOrder()
+                },
                 onDismiss = { showResetOrderConfirm = false },
             )
         }
 
         if (showChangeServerDialog) {
-            GkDialog(
-                onDismissRequest = { showChangeServerDialog = false },
+            ChangeServerDialog(
                 dark = dark,
-                borderColor = borderColor,
-            ) {
-                Text(
-                    stringResource(R.string.dialog_change_server),
-                    color = titleColor,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.dialog_change_message),
-                    color = subtextColor,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                )
-                Spacer(Modifier.height(20.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-                ) {
-                    GkSecondaryButton(
-                        label = stringResource(R.string.dialog_no),
-                        borderColor = borderColor,
-                        textColor = titleColor,
-                        onClick = { showChangeServerDialog = false },
-                    )
-                    GkGradientButton(
-                        label = stringResource(R.string.dialog_yes),
-                        themeId = themeId,
-                        onClick = { showChangeServerDialog = false; changeServer() },
-                    )
-                }
-            }
+                onConfirm = { showChangeServerDialog = false; changeServer() },
+                onDismiss = { showChangeServerDialog = false },
+            )
         }
     }
 }
@@ -2247,6 +1641,71 @@ private fun openFdroidPage(context: Context) {
     }
 }
 
+/** The avatar, name and account links heading the panel: `mb-4` under the
+ *  row plus the `mb-8` wrapper (SettingsPanel.jsx:319-367). */
+@Composable
+private fun ProfileBlock(
+    profile: ProfileDto,
+    accent: Color,
+    titleColor: Color,
+    avatarEnabled: Boolean,
+    onPickAvatar: () -> Unit,
+    onRemoveAvatar: () -> Unit,
+    onChangeServer: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AvatarCircle(
+            avatarUrl = profile.avatarUrl,
+            name = profile.name.ifBlank { profile.email },
+            size = 64.dp,
+            onClick = onPickAvatar,
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                profile.name.ifBlank { profile.email },
+                color = titleColor,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(modifier = Modifier.padding(top = 4.dp)) {
+                ProfileLink(
+                    label = if (profile.avatarUrl != null) {
+                        stringResource(R.string.native_settings_change_avatar)
+                    } else {
+                        stringResource(R.string.native_settings_upload_avatar)
+                    },
+                    color = accent,
+                    enabled = avatarEnabled,
+                    onClick = onPickAvatar,
+                )
+                if (profile.avatarUrl != null) {
+                    Spacer(Modifier.width(8.dp))
+                    ProfileLink(
+                        label = stringResource(R.string.native_settings_remove_avatar),
+                        color = LinkRed,
+                        enabled = avatarEnabled,
+                        onClick = onRemoveAvatar,
+                    )
+                }
+            }
+            Row(modifier = Modifier.padding(top = 4.dp)) {
+                ProfileLink(
+                    label = stringResource(R.string.native_settings_change_server),
+                    color = accent,
+                    enabled = true,
+                    onClick = onChangeServer,
+                )
+            }
+        }
+    }
+}
+
 /** The 12px accent links under the profile name. */
 @Composable
 private fun ProfileLink(label: String, color: Color, enabled: Boolean, onClick: () -> Unit) {
@@ -2254,6 +1713,7 @@ private fun ProfileLink(label: String, color: Color, enabled: Boolean, onClick: 
         label,
         color = color,
         fontSize = 12.sp,
+        lineHeight = 16.sp,
         modifier = Modifier.clickable(
             interactionSource = remember { MutableInteractionSource() },
             indication = null,
@@ -2263,14 +1723,242 @@ private fun ProfileLink(label: String, color: Color, enabled: Boolean, onClick: 
     )
 }
 
+/**
+ * The "Connecter un autre appareil" card (SettingsPanel.jsx:422-472): the
+ * whole card opens the scanner, its icon at the top, and under the
+ * description the header-shortcut label and its Show/Hide control, which
+ * wrap onto their own lines on a phone. That line swallows its own taps,
+ * the web's stopPropagation, so it never opens the scanner.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun QrSignInCard(
+    quickEnabled: Boolean,
+    themeId: String,
+    dark: Boolean,
+    titleColor: Color,
+    borderColor: Color,
+    modifier: Modifier,
+    onOpenScanner: () -> Unit,
+    onQuickChange: (Boolean) -> Unit,
+) {
+    SettingsCardButton(
+        title = stringResource(R.string.native_settings_qr_signin),
+        subtitle = stringResource(R.string.native_settings_qr_signin_desc),
+        themeId = themeId,
+        dark = dark,
+        titleColor = titleColor,
+        borderColor = borderColor,
+        modifier = modifier,
+        iconAlignment = Alignment.Top,
+        icon = { tint -> QrCodeIcon(size = 20.dp, tint = tint) },
+        onClick = onOpenScanner,
+        footer = {
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+                    .pointerInput(Unit) { detectTapGestures() },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    stringResource(R.string.native_settings_qr_quick),
+                    color = if (dark) Gray400 else SettingsSubtleColor,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    modifier = Modifier.align(Alignment.CenterVertically),
+                )
+                GkSegmented(
+                    options = listOf(
+                        GkSegmentOption("show", stringResource(R.string.native_settings_qr_quick_show)),
+                        GkSegmentOption("hide", stringResource(R.string.native_settings_qr_quick_hide)),
+                    ),
+                    selectedId = if (quickEnabled) "show" else "hide",
+                    themeId = themeId,
+                    dark = dark,
+                    onSelect = { onQuickChange(it == "show") },
+                )
+            }
+        },
+    )
+}
+
+/**
+ * The block the sidebar switch opens (SettingsPanel.jsx:539-599): a
+ * title and description with no icon, then a full-width picker showing
+ * the chosen width, its chevron in a small gradient square, over a
+ * popover of the five presets.
+ */
+@Composable
+private fun SidebarBreakpointPicker(
+    breakpoint: Int,
+    menuOpen: Boolean,
+    themeId: String,
+    dark: Boolean,
+    titleColor: Color,
+    borderColor: Color,
+    onToggleMenu: () -> Unit,
+    onDismissMenu: () -> Unit,
+    onSelect: (Int) -> Unit,
+) {
+    val label = SidebarBreakpointPresets.firstOrNull { it.first == breakpoint }
+        ?.let { stringResource(it.second) }
+        ?: stringResource(R.string.native_settings_sidebar_breakpoint_custom, breakpoint)
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.99f else 1f,
+        animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
+        label = "breakpointScale",
+    )
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column {
+            Text(
+                stringResource(R.string.native_settings_sidebar_breakpoint),
+                color = titleColor,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                stringResource(R.string.native_settings_sidebar_breakpoint_desc),
+                color = SettingsSubtleColor,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+            )
+        }
+        Box {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .scale(scale)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (dark) Gray800 else Color.White)
+                    .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        role = Role.Button,
+                    ) { onToggleMenu() }
+                    .padding(1.dp)
+                    .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    label,
+                    color = if (dark) Gray100 else Gray900,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(WorkspaceTheme.buttonGradient(themeId)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ChevronDownIcon(
+                        modifier = Modifier.rotate(if (menuOpen) 180f else 0f),
+                        size = 20.dp,
+                        tint = Color.White,
+                    )
+                }
+            }
+            if (menuOpen) {
+                SettingsPopover(dark = dark, borderColor = borderColor, minWidth = 256.dp, onDismiss = onDismissMenu) {
+                    for ((widthPx, labelRes) in SidebarBreakpointPresets) {
+                        SettingsPopoverOption(
+                            label = stringResource(labelRes),
+                            selected = widthPx == breakpoint,
+                            themeId = themeId,
+                            dark = dark,
+                            onClick = { onSelect(widthPx) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A Notes-section row: its header, then its control right-aligned 8px
+ *  under it (`flex flex-col gap-2 px-3` with a `self-end` control). */
+@Composable
+private fun SettingsStackedRow(
+    title: String,
+    subtitle: String,
+    themeId: String,
+    dark: Boolean,
+    titleColor: Color,
+    icon: @Composable (Color) -> Unit,
+    subtitleColor: Color = SettingsSubtleColor,
+    control: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SettingsRowHeader(
+            title = title,
+            subtitle = subtitle,
+            themeId = themeId,
+            dark = dark,
+            titleColor = titleColor,
+            icon = icon,
+            subtitleColor = subtitleColor,
+        )
+        Box(Modifier.align(Alignment.End)) { control() }
+    }
+}
+
+/**
+ * PushNotificationToggle.jsx as the Android app's WebView rendered it: it
+ * has no Web Push, so the switch stays off and disabled, and the line
+ * under it says the reminders already arrive as local notifications.
+ */
+@Composable
+private fun PushNotificationsRow(themeId: String, dark: Boolean, titleColor: Color) {
+    Column {
+        SettingsSwitchRow(
+            title = stringResource(R.string.native_settings_push_title),
+            subtitle = stringResource(R.string.native_settings_push_desc),
+            checked = false,
+            themeId = themeId,
+            dark = dark,
+            titleColor = titleColor,
+            icon = { tint -> TablerBellIcon(size = 20.dp, tint = tint) },
+            onCheckedChange = {},
+            modifier = Modifier.padding(vertical = 8.dp),
+            enabled = false,
+            switchAlignment = Alignment.CenterVertically,
+        )
+        Text(
+            stringResource(R.string.native_settings_push_note),
+            color = if (dark) Gray400 else SettingsSubtleColor,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            modifier = Modifier.padding(start = 52.dp, end = 12.dp, bottom = 4.dp),
+        )
+    }
+}
+
 /** The `tabular-nums` version line the update rows carry under their
- *  subtitle (`SettingsPanel.jsx:1425`). */
+ *  subtitle (`SettingsPanel.jsx:1423`). */
 @Composable
 private fun VersionLine(dark: Boolean) {
     Text(
         stringResource(R.string.native_settings_current_version, BuildConfig.VERSION_NAME),
-        color = if (dark) VersionBadgeDark else VersionBadgeLight,
+        color = if (dark) SettingsSubtleColor else Gray400,
         fontSize = 12.sp,
+        lineHeight = 16.sp,
         modifier = Modifier.padding(top = 4.dp),
     )
 }
@@ -2292,7 +1980,7 @@ private fun UpdateAvailableCard(
             .clip(RoundedCornerShape(8.dp))
             .background(WorkspaceTheme.accentSoftBg(themeId, dark))
             .border(1.dp, WorkspaceTheme.accentSoftBorder(themeId, dark), RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .padding(13.dp),
     ) {
         Row {
             SettingsRowIcon(themeId, dark) { tint -> SparklesIcon(size = 20.dp, tint = tint) }
@@ -2306,14 +1994,14 @@ private fun UpdateAvailableCard(
                 )
                 Text(
                     stringResource(R.string.native_settings_update_available_version, release.versionName),
-                    color = titleColor,
+                    color = if (dark) Gray200 else Gray700,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                     modifier = Modifier.padding(top = 2.dp),
                 )
                 Text(
                     stringResource(R.string.native_settings_update_server_hint),
-                    color = SettingsSubtleColor,
+                    color = if (dark) Gray400 else SettingsSubtleColor,
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
                     modifier = Modifier.padding(top = 6.dp),
@@ -2337,8 +2025,9 @@ private fun UpdateAvailableCard(
             ) {
                 Text(
                     stringResource(R.string.native_settings_update_later),
-                    color = if (dark) DarkSubtextColor else Color(0xFF4B5563),
+                    color = if (dark) Gray300 else Gray600,
                     fontSize = 14.sp,
+                    lineHeight = 20.sp,
                     fontWeight = FontWeight.Medium,
                 )
             }
@@ -2354,8 +2043,10 @@ private fun UpdateAvailableCard(
 
 /**
  * The chevron next to a Notifications row that opens its per-category
- * list (SettingsPanel.jsx:804-816): a small square that fills with the
- * accent while the list is open, and whose glyph flips over.
+ * list (SettingsPanel.jsx:803-817): a small box that fills with the soft
+ * accent while the list is open, and whose glyph flips over. The web
+ * button's 24px line box sets its 20px icon 6px from its top and leaves
+ * 13px under it, hence a 32x39 box.
  */
 @Composable
 private fun CategoryListToggle(
@@ -2376,12 +2067,12 @@ private fun CategoryListToggle(
                 indication = null,
                 role = Role.Button,
             ) { onClick() }
-            .padding(6.dp),
+            .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = 13.dp),
     ) {
         ChevronDownIcon(
-            size = 16.dp,
+            size = 20.dp,
             tint = tint,
-            modifier = Modifier.graphicsLayer { rotationZ = if (open) 180f else 0f },
+            modifier = Modifier.rotate(if (open) 180f else 0f),
         )
     }
 }
@@ -2389,14 +2080,16 @@ private fun CategoryListToggle(
 /**
  * The per-category list under a Notifications row: one line per bucket,
  * each with its own glyph and a smaller switch, inside a bordered, faintly
- * tinted panel indented to clear the row's icon above
- * (SettingsPanel.jsx:834-864).
+ * tinted panel indented 40px to clear the row's icon above and 12px from
+ * the right edge (SettingsPanel.jsx:836-891). A disabled list greys out
+ * row by row, as the sound list does while the master switch is off.
  */
 @Composable
 private fun NotifCategoryList(
     categories: List<NotifCategory>,
     flags: NotifCategoryFlags,
     enabled: Boolean,
+    themeId: String?,
     dark: Boolean,
     titleColor: Color,
     borderColor: Color,
@@ -2405,32 +2098,34 @@ private fun NotifCategoryList(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 40.dp, top = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .padding(start = 40.dp, top = 8.dp, end = 12.dp)
+            .settingsCardBorder(borderColor)
             .background(if (dark) Color.White.copy(alpha = 0.03f) else Color.Black.copy(alpha = 0.02f))
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 13.dp, vertical = 9.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         for (category in categories) {
-            val on = flags[category]
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .alpha(if (enabled) 1f else 0.5f)
                     .padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    NotifCategoryIcon(category, dark)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(notifCategoryLabel(category)), color = titleColor, fontSize = 14.sp)
-                }
+                NotifCategoryIcon(category, titleColor)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(notifCategoryLabel(category)),
+                    color = titleColor,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.weight(1f),
+                )
                 Spacer(Modifier.width(12.dp))
                 GkSmallSwitch(
-                    checked = on,
+                    checked = flags[category],
                     enabled = enabled,
+                    themeId = themeId,
                     dark = dark,
                     onCheckedChange = { onToggle(category, it) },
                 )
@@ -2439,19 +2134,19 @@ private fun NotifCategoryList(
     }
 }
 
-/** The glyph each category carries, and the fixed colour the filled ones
- *  paint with (SettingsPanel.jsx:838-843 and 926-933). */
+/** The glyph each category carries: the outline ones take the text
+ *  colour (`.tabler-icon` inherits it), the filled ones their own fixed
+ *  colour (SettingsPanel.jsx:838-843 and 926-933). */
 @Composable
-private fun NotifCategoryIcon(category: NotifCategory, dark: Boolean) {
-    val neutral = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
+private fun NotifCategoryIcon(category: NotifCategory, textColor: Color) {
     when (category) {
-        NotifCategory.FEDERATION -> WorldWwwIcon(size = 16.dp, tint = neutral)
-        NotifCategory.SHARE -> UserShareIcon(size = 16.dp, tint = neutral)
-        NotifCategory.ACCESS -> UserXIcon(size = 16.dp, tint = neutral)
+        NotifCategory.FEDERATION -> WorldWwwIcon(size = 16.dp, tint = textColor)
+        NotifCategory.SHARE -> UserShareIcon(size = 16.dp, tint = textColor)
+        NotifCategory.ACCESS -> UserXIcon(size = 16.dp, tint = textColor)
         NotifCategory.REMINDER -> BellRingingFilledIcon(size = 16.dp, tint = Color(0xFF6366F1))
         NotifCategory.SUCCESS -> CircleCheckFilledIcon(size = 16.dp, tint = Color(0xFF10B981))
         NotifCategory.WARNING -> AlertFilledIcon(size = 16.dp, tint = Color(0xFFF59E0B))
-        NotifCategory.ERROR -> InfoFilledIcon(size = 16.dp, tint = Color(0xFFEF4444))
+        NotifCategory.ERROR -> AlertCircleFilledIcon(size = 16.dp, tint = Color(0xFFEF4444))
         NotifCategory.INFO -> InfoFilledIcon(size = 16.dp, tint = Color(0xFF3B82F6))
     }
 }
@@ -2467,16 +2162,14 @@ private fun notifCategoryLabel(category: NotifCategory): Int = when (category) {
     NotifCategory.INFO -> R.string.native_settings_notif_type_info
 }
 
-/** The five durations the web offers, "Persistent" included: a pill that
- *  opens a small popover, same shape as the language row below. */
+/** The five durations the web offers, "Persistent" included: the same
+ *  gradient pill as the language row, over a popover at least 9rem wide. */
 @Composable
 private fun ToastDurationPicker(
     durationMs: Long?,
     menuOpen: Boolean,
-    enabled: Boolean,
     themeId: String?,
     dark: Boolean,
-    titleColor: Color,
     borderColor: Color,
     onToggleMenu: () -> Unit,
     onDismissMenu: () -> Unit,
@@ -2492,49 +2185,31 @@ private fun ToastDurationPicker(
     )
     val selectedLabel = options.firstOrNull { it.first == durationMs }?.second ?: options[1].second
     Box {
-        var buttonHeight by remember { mutableStateOf(0) }
-        val density = LocalDensity.current
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .alpha(if (enabled) 1f else 0.5f)
-                .clip(RoundedCornerShape(8.dp))
-                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                .onSizeChanged { buttonHeight = it.height }
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    enabled = enabled,
-                    role = Role.Button,
-                ) { onToggleMenu() }
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            Text(selectedLabel, color = titleColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            ChevronDownIcon(
-                modifier = Modifier.rotate(if (menuOpen) 180f else 0f),
-                size = 14.dp,
-                tint = SettingsSubtleColor,
-            )
-        }
+        GkGradientButton(
+            label = selectedLabel,
+            themeId = themeId,
+            horizontalPadding = 12.dp,
+            verticalPadding = 6.dp,
+            modifier = Modifier.widthIn(min = 112.dp),
+            trailing = {
+                ChevronDownIcon(
+                    modifier = Modifier.rotate(if (menuOpen) 180f else 0f),
+                    size = 20.dp,
+                    tint = Color.White,
+                )
+            },
+            onClick = onToggleMenu,
+        )
         if (menuOpen) {
-            Popup(
-                alignment = Alignment.TopEnd,
-                offset = IntOffset(0, buttonHeight + with(density) { 6.dp.roundToPx() }),
-                onDismissRequest = onDismissMenu,
-                properties = PopupProperties(focusable = true),
-            ) {
-                SettingsPopoverCard(dark = dark, borderColor = borderColor) {
-                    for ((value, label) in options) {
-                        SettingsPopoverOption(
-                            label = label,
-                            selected = value == durationMs,
-                            themeId = themeId,
-                            dark = dark,
-                            titleColor = titleColor,
-                            onClick = { onSelect(value) },
-                        )
-                    }
+            SettingsPopover(dark = dark, borderColor = borderColor, minWidth = 144.dp, onDismiss = onDismissMenu) {
+                for ((value, label) in options) {
+                    SettingsPopoverOption(
+                        label = label,
+                        selected = value == durationMs,
+                        themeId = themeId,
+                        dark = dark,
+                        onClick = { onSelect(value) },
+                    )
                 }
             }
         }
@@ -2545,7 +2220,6 @@ private fun ToastDurationPicker(
 private fun LanguageRow(
     language: String?,
     menuOpen: Boolean,
-    enabled: Boolean,
     themeId: String?,
     dark: Boolean,
     titleColor: Color,
@@ -2563,9 +2237,8 @@ private fun LanguageRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .settingsCardBorder(borderColor)
+            .padding(13.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -2584,50 +2257,228 @@ private fun LanguageRow(
             )
         }
         Box {
-            // Measured on the button itself so the menu opens 6px under
-            // its bottom edge, the offset Popover.jsx uses.
-            var buttonHeight by remember { mutableStateOf(0) }
-            val density = LocalDensity.current
             GkGradientButton(
                 label = selectedLabel,
                 themeId = themeId,
-                enabled = enabled,
                 horizontalPadding = 12.dp,
                 verticalPadding = 6.dp,
-                modifier = Modifier
-                    .widthIn(min = 144.dp)
-                    .onSizeChanged { buttonHeight = it.height },
+                modifier = Modifier.widthIn(min = 144.dp),
                 trailing = {
                     ChevronDownIcon(
                         modifier = Modifier.rotate(if (menuOpen) 180f else 0f),
-                        size = 16.dp,
+                        size = 20.dp,
                         tint = Color.White,
                     )
                 },
                 onClick = onToggleMenu,
             )
             if (menuOpen) {
-                Popup(
-                    alignment = Alignment.TopEnd,
-                    offset = IntOffset(0, buttonHeight + with(density) { 6.dp.roundToPx() }),
-                    onDismissRequest = onDismissMenu,
-                    properties = PopupProperties(focusable = true),
-                ) {
-                    SettingsPopoverCard(dark = dark, borderColor = borderColor) {
-                        options.forEach { (code, label) ->
-                            SettingsPopoverOption(
-                                label = label,
-                                selected = code == language,
-                                themeId = themeId,
-                                dark = dark,
-                                titleColor = titleColor,
-                                onClick = { onSelect(code) },
-                            )
-                        }
+                SettingsPopover(dark = dark, borderColor = borderColor, minWidth = 160.dp, onDismiss = onDismissMenu) {
+                    options.forEach { (code, label) ->
+                        SettingsPopoverOption(
+                            label = label,
+                            selected = code == language,
+                            themeId = themeId,
+                            dark = dark,
+                            onClick = { onSelect(code) },
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+/** The web's reset-order dialog (SettingsPanel.jsx:1590-1638): a
+ *  95%-opaque `glass-card` over a `bg-black/40` scrim, the message, the
+ *  "overwrite custom positions" box (checked by default), then Cancel and
+ *  Confirm. The glass card's faint violet shadow does not show on that
+ *  scrim, so the card carries none. */
+@Composable
+private fun ResetNoteOrderDialog(
+    themeId: String,
+    dark: Boolean,
+    titleColor: Color,
+    borderColor: Color,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var overridePositions by remember { mutableStateOf(true) }
+    GkDialog(
+        onDismissRequest = onDismiss,
+        dark = dark,
+        borderColor = borderColor,
+        maxWidth = 384.dp,
+        background = if (dark) Color(0xF2282828) else Color(0xF2FFFFFF),
+        elevation = 0.dp,
+        scrimAlpha = 0.4f,
+    ) {
+        Text(
+            stringResource(R.string.native_settings_reset_order),
+            color = titleColor,
+            fontSize = 18.sp,
+            lineHeight = 28.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(R.string.native_settings_reset_order_confirm),
+            color = if (dark) Gray300 else Gray600,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+        )
+        Spacer(Modifier.height(16.dp))
+        Row(
+            modifier = Modifier.toggleable(
+                value = overridePositions,
+                role = Role.Checkbox,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onValueChange = { overridePositions = it },
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Squeezed to Chromium's 13px intrinsic width by the long label.
+            GkCheckbox(checked = overridePositions, onCheckedChange = null, size = 13.dp)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                stringResource(R.string.native_settings_reset_order_override),
+                color = titleColor,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+            )
+        }
+        Spacer(Modifier.height(20.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GkSecondaryButton(
+                label = stringResource(R.string.native_dialog_cancel),
+                borderColor = borderColor,
+                textColor = titleColor,
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Normal,
+                onClick = onDismiss,
+            )
+            GkGradientButton(
+                label = stringResource(R.string.native_settings_reset_order_action),
+                themeId = themeId,
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                onClick = onConfirm,
+            )
+        }
+    }
+}
+
+/** A platform TextView's line box with its default font padding, which
+ *  the WebView-era change-server dialog was built from. */
+private val TextViewLineHeight = 1.33.em
+
+/**
+ * The change-server confirmation the APK has always shown natively
+ * (WebViewActivity's showChangeServerDialog): an 85%-wide, 20dp-radius
+ * card, the swap glyph in a tinted circle, centred title and message, and
+ * two equal buttons, the confirm one on the fixed indigo-to-violet
+ * gradient the old dialog hardcoded.
+ */
+@Composable
+private fun ChangeServerDialog(dark: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val cardShape = RoundedCornerShape(20.dp)
+    val buttonShape = RoundedCornerShape(12.dp)
+    val mutedColor = if (dark) DarkSubtextColor else LightSubtextColor
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .shadow(elevation = 16.dp, shape = cardShape)
+                .background(if (dark) Color(0xFF282828) else Color.White, cardShape)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(if (dark) Color(0xFF2D2644) else Color(0xFFF0E8FF), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                SwapServerIcon(size = 24.dp, tint = Color(0xFF6366F1))
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                stringResource(R.string.dialog_change_server),
+                color = if (dark) DarkTitleColor else LightTitleColor,
+                fontSize = 18.sp,
+                lineHeight = TextViewLineHeight,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.dialog_change_message),
+                color = mutedColor,
+                fontSize = 14.sp,
+                lineHeight = TextViewLineHeight,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(24.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ChangeServerButton(
+                    label = stringResource(R.string.dialog_no),
+                    textColor = mutedColor,
+                    background = Brush.horizontalGradient(
+                        List(2) { if (dark) Color(0xFF363636) else Color(0xFFF3F4F6) },
+                    ),
+                    shape = buttonShape,
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                )
+                ChangeServerButton(
+                    label = stringResource(R.string.dialog_yes),
+                    textColor = Color.White,
+                    background = ButtonGradient,
+                    shape = buttonShape,
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChangeServerButton(
+    label: String,
+    textColor: Color,
+    background: Brush,
+    shape: RoundedCornerShape,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(background)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) { onClick() }
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = textColor,
+            fontSize = 15.sp,
+            lineHeight = TextViewLineHeight,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -2656,9 +2507,8 @@ private fun PasskeysCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .settingsCardBorder(borderColor)
+            .padding(13.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2917,8 +2767,9 @@ private fun formatPasskeyDate(iso: String): String {
     return DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.getDefault()).format(Date(ms))
 }
 
-// internal, not private: CollaboratorsScreen.kt (same package, different
-// file) reuses this for the same avatar-with-initials-fallback rendering.
+// internal, not private: CollaboratorsScreen.kt and NativeLoginScreen.kt
+// (same package, different files) reuse this for the same
+// avatar-with-initials-fallback rendering, UserAvatar.jsx on the web.
 // Kotlin's top-level `private` is file-scoped.
 @Composable
 internal fun AvatarCircle(avatarUrl: String?, name: String, size: Dp, onClick: () -> Unit) {
@@ -2942,7 +2793,8 @@ internal fun AvatarCircle(avatarUrl: String?, name: String, size: Dp, onClick: (
         contentAlignment = Alignment.Center,
     ) {
         if (bitmap != null) {
-            Image(bitmap = bitmap, contentDescription = null, modifier = Modifier.fillMaxSize())
+            // object-cover: a photo that is not square fills the circle.
+            Image(bitmap = bitmap, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
             Text(
                 name.trim().take(1).uppercase().ifBlank { "?" },
@@ -2956,32 +2808,31 @@ internal fun AvatarCircle(avatarUrl: String?, name: String, size: Dp, onClick: (
     }
 }
 
+// indigo-100 / indigo-700 light, indigo-500 at 25% / indigo-300 dark, as
+// Tailwind v4 renders them.
 private val AvatarFallbackBgLight = Color(0xFFE0E7FF)
-private val AvatarFallbackFgLight = Color(0xFF4338CA)
-private val AvatarFallbackBgDark = Color(0x406366F1)
-private val AvatarFallbackFgDark = Color(0xFFA5B4FC)
+private val AvatarFallbackFgLight = Color(0xFF432DD7)
+private val AvatarFallbackBgDark = Color(0x40615FFF)
+private val AvatarFallbackFgDark = Color(0xFFA3B3FF)
 
 /** The theme picker (`WorkspaceThemeSection.jsx:63-100`): two columns of
  *  cards, each a 36px swatch band over a labelled foot. */
 @Composable
 private fun ThemeGrid(
     currentThemeId: String,
-    enabled: Boolean,
     dark: Boolean,
     titleColor: Color,
     borderColor: Color,
     accent: Color,
-    modifier: Modifier = Modifier,
     onSelect: (String) -> Unit,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         WorkspaceTheme.ALL.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { entry ->
                     ThemeCard(
                         entry = entry,
                         selected = entry.id == currentThemeId,
-                        enabled = enabled,
                         dark = dark,
                         titleColor = titleColor,
                         borderColor = borderColor,
@@ -2998,11 +2849,13 @@ private fun ThemeGrid(
     }
 }
 
+/** One theme card: a 1px border, the accent when selected plus Tailwind's
+ *  `ring-2` drawn outside the card like the box-shadow it is, the check in
+ *  the text colour (`.tabler-icon` inherits it), and the 0.99 press scale. */
 @Composable
 private fun ThemeCard(
     entry: WorkspaceThemeEntry,
     selected: Boolean,
-    enabled: Boolean,
     dark: Boolean,
     titleColor: Color,
     borderColor: Color,
@@ -3010,20 +2863,36 @@ private fun ThemeCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.99f else 1f,
+        animationSpec = tween(durationMillis = 150, easing = GkStandardEasing),
+        label = "themeCardScale",
+    )
     Column(
         modifier = modifier
+            .scale(scale)
+            .drawBehind {
+                if (selected) {
+                    val ring = 2.dp.toPx()
+                    drawRoundRect(
+                        color = accent,
+                        topLeft = Offset(-ring / 2f, -ring / 2f),
+                        size = Size(size.width + ring, size.height + ring),
+                        cornerRadius = CornerRadius(12.dp.toPx() + ring / 2f),
+                        style = Stroke(ring),
+                    )
+                }
+            }
             .clip(RoundedCornerShape(12.dp))
-            .border(
-                width = if (selected) 3.dp else 1.dp,
-                color = if (selected) accent else borderColor,
-                shape = RoundedCornerShape(12.dp),
-            )
+            .border(1.dp, if (selected) accent else borderColor, RoundedCornerShape(12.dp))
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 indication = null,
-                enabled = enabled,
                 role = Role.RadioButton,
-            ) { onClick() },
+            ) { onClick() }
+            .padding(1.dp),
     ) {
         Box(
             modifier = Modifier
@@ -3044,7 +2913,7 @@ private fun ThemeCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(if (dark) ThemeCardFootDark else Color.White)
+                .background(if (dark) Gray800 else Color.White)
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -3053,14 +2922,13 @@ private fun ThemeCard(
                 entry.label,
                 color = titleColor,
                 fontSize = 14.sp,
+                lineHeight = 20.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (selected) CheckmarkIcon(size = 16.dp, tint = accent)
+            if (selected) TablerCheckIcon(size = 20.dp, tint = titleColor)
         }
     }
 }
-
-private val ThemeCardFootDark = Color(0xFF1F2937)

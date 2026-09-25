@@ -38,6 +38,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +51,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -71,24 +74,34 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import com.glasskeep.app.ui.ButtonGradient
+import com.glasskeep.app.R
 
 /**
  * The web app's own controls, rebuilt natively.
@@ -109,23 +122,26 @@ internal val GkEaseOut = CubicBezierEasing(0f, 0f, 0.2f, 1f)
 
 /** `text-gray-500`, the sub-label colour, which the web keeps in both
  *  modes for these rows (no `dark:` variant on any of them). */
-internal val SettingsSubtleColor = Color(0xFF6B7280)
+internal val SettingsSubtleColor = Color(0xFF6A7282)
 
-private val SwitchOffLight = Color(0xFFD1D5DB)
-private val SwitchOffDark = Color(0xFF4B5563)
+// Tailwind v4 greys as the web renders them: gray-300/600 for a switch
+// that is off, gray-200/600, white/gray-800 and gray-500/400 for a
+// segmented control's frame, idle fill and idle label.
+private val SwitchOffLight = Color(0xFFD1D5DC)
+private val SwitchOffDark = Color(0xFF4A5565)
 private val SegmentBorderLight = Color(0xFFE5E7EB)
-private val SegmentBorderDark = Color(0xFF4B5563)
+private val SegmentBorderDark = Color(0xFF4A5565)
 private val SegmentBgLight = Color(0xFFFFFFFF)
-private val SegmentBgDark = Color(0xFF1F2937)
-private val SegmentFgLight = Color(0xFF6B7280)
-private val SegmentFgDark = Color(0xFF9CA3AF)
-private val ChevronClosedLight = Color(0xFF9CA3AF)
-private val ChevronClosedDark = Color(0xFF6B7280)
+private val SegmentBgDark = Color(0xFF1E2939)
+private val SegmentFgLight = Color(0xFF6A7282)
+private val SegmentFgDark = Color(0xFF99A1AF)
 private val PopoverBgDark = Color(0xFF222222)
+private val PopoverTextLight = Color(0xFF1E2939)
+private val PopoverTextDark = Color(0xFFF3F4F6)
 private val DialogBgDark = Color(0xFF282828)
 
 /** `red-600`, the one red the workspace themes never retint. */
-internal val DangerRed = Color(0xFFDC2626)
+internal val DangerRed = Color(0xFFE7000B)
 
 /** What an `<input type="checkbox">` without `accent-color` fills with. */
 internal val ChromiumCheckboxAccent = Color(0xFF0075FF)
@@ -220,10 +236,11 @@ private fun contrastRatio(a: Color, b: Color): Float {
 @Composable
 internal fun GkSwitch(
     checked: Boolean,
-    enabled: Boolean,
     themeId: String?,
     dark: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val trackColor by animateColorAsState(
         targetValue = when {
@@ -240,7 +257,7 @@ internal fun GkSwitch(
         label = "switchKnob",
     )
     Box(
-        modifier = Modifier
+        modifier = modifier
             .alpha(if (enabled) 1f else 0.5f)
             .width(44.dp)
             .height(24.dp)
@@ -268,31 +285,32 @@ internal fun GkSwitch(
 
 /**
  * The 36x20 track / 14px knob switch inside the notification sub-lists
- * (`SettingsPanel.jsx:855-864`). Its ON fill is the app's own indigo to
- * violet gradient, not the flat theme colour [GkSwitch] uses.
+ * (`SettingsPanel.jsx:865-887`). Its ON fill is the button gradient, not
+ * the flat colour [GkSwitch] uses, and its knob carries Tailwind's
+ * `shadow`. A disabled one is not dimmed by itself: its whole row is.
  */
 @Composable
 internal fun GkSmallSwitch(
     checked: Boolean,
     enabled: Boolean,
+    themeId: String?,
     dark: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val offColor = if (dark) SwitchOffDark else SwitchOffLight
     val knobOffset by animateDpAsState(
-        targetValue = if (checked) 20.dp else 2.dp,
+        targetValue = if (checked) 18.dp else 2.dp,
         animationSpec = tween(durationMillis = 150, easing = GkStandardEasing),
         label = "smallSwitchKnob",
     )
     Box(
         modifier = Modifier
-            .alpha(if (enabled) 1f else 0.5f)
             .width(36.dp)
             .height(20.dp)
             .clip(RoundedCornerShape(10.dp))
             .then(
                 if (checked) {
-                    Modifier.background(ButtonGradient)
+                    Modifier.background(WorkspaceTheme.buttonGradient(themeId))
                 } else {
                     Modifier.background(offColor)
                 },
@@ -311,8 +329,8 @@ internal fun GkSmallSwitch(
                 .align(Alignment.CenterStart)
                 .offset(x = knobOffset)
                 .size(14.dp)
-                .clip(CircleShape)
-                .background(Color.White),
+                .shadow(elevation = 1.dp, shape = CircleShape)
+                .background(Color.White, CircleShape),
         )
     }
 }
@@ -321,37 +339,43 @@ internal data class GkSegmentOption(val id: String, val label: String)
 
 /**
  * The two-state segmented chip (`SettingsPanel.jsx:1196-1217` and its
- * siblings): one rounded 8px box, a 1px border, the selected half filled
- * with the theme gradient. `btn-gradient` drops the shadow the Tailwind
- * classes ask for, so on a phone only the press scale is left.
+ * siblings): 32px segments inside a rounded 8px frame whose 1px border
+ * sits outside them, the selected one filled with the button gradient.
+ * `btn-gradient` drops the shadow the Tailwind classes ask for, so on a
+ * phone only the selected segment's press scale is left. The frame and
+ * idle segment colours default to the common gray-200 / white / gray-500
+ * set; the notification-position control passes its own.
  */
 @Composable
 internal fun GkSegmented(
     options: List<GkSegmentOption>,
     selectedId: String,
-    enabled: Boolean,
     themeId: String?,
     dark: Boolean,
     onSelect: (String) -> Unit,
+    borderColor: Color = if (dark) SegmentBorderDark else SegmentBorderLight,
+    idleBackground: Color = if (dark) SegmentBgDark else SegmentBgLight,
+    idleTextColor: Color = if (dark) SegmentFgDark else SegmentFgLight,
 ) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, if (dark) SegmentBorderDark else SegmentBorderLight, RoundedCornerShape(8.dp)),
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .padding(1.dp),
     ) {
         options.forEach { option ->
             val selected = option.id == selectedId
             val interactionSource = remember { MutableInteractionSource() }
             val pressed by interactionSource.collectIsPressedAsState()
             val scale by animateFloatAsState(
-                targetValue = if (pressed) 0.98f else 1f,
+                targetValue = if (selected && pressed) 0.98f else 1f,
                 animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
                 label = "segmentScale",
             )
             val background = if (selected) {
-                Modifier.background(WorkspaceTheme.accentGradient(themeId))
+                Modifier.background(WorkspaceTheme.buttonGradient(themeId))
             } else {
-                Modifier.background(if (dark) SegmentBgDark else SegmentBgLight)
+                Modifier.background(idleBackground)
             }
             Box(
                 modifier = Modifier
@@ -360,19 +384,15 @@ internal fun GkSegmented(
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null,
-                        enabled = enabled && !selected,
                         role = Role.RadioButton,
-                    ) { onSelect(option.id) }
+                    ) { if (!selected) onSelect(option.id) }
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             ) {
                 Text(
                     option.label,
-                    color = when {
-                        selected -> Color.White
-                        dark -> SegmentFgDark
-                        else -> SegmentFgLight
-                    },
+                    color = if (selected) Color.White else idleTextColor,
                     fontSize = 14.sp,
+                    lineHeight = 20.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -418,8 +438,11 @@ private fun SettingsPill(background: Color, tint: Color, icon: @Composable (Colo
 /**
  * One accordion section (`SettingsAccordion.jsx:45-80`): a 48px header
  * with a chevron that rotates from -90 to 0 in 200ms, and a body that
- * grows over 300ms with no fade. Every section starts closed, as the
- * web's empty `openSections` map does.
+ * grows over 300ms with no fade, uncovered from its top edge like the
+ * web's grid-rows transition. The chevron keeps the text colour open or
+ * closed: `.tabler-icon`'s unlayered `color: inherit` (globalCSS.js:3322)
+ * beats both of its Tailwind colour classes. Every section starts
+ * closed, as the web's empty `openSections` map does.
  */
 @Composable
 internal fun SettingsAccordionSection(
@@ -438,17 +461,6 @@ internal fun SettingsAccordionSection(
         animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
         label = "accordionChevron",
     )
-    val chevronColor by animateColorAsState(
-        targetValue = if (expanded) {
-            WorkspaceTheme.sectionPillFg(themeId, dark)
-        } else if (dark) {
-            ChevronClosedDark
-        } else {
-            ChevronClosedLight
-        },
-        animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
-        label = "accordionChevronColor",
-    )
     Column(Modifier.padding(bottom = 8.dp)) {
         Row(
             modifier = Modifier
@@ -462,7 +474,7 @@ internal fun SettingsAccordionSection(
                 .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ChevronDownIcon(modifier = Modifier.rotate(chevronRotation), size = 20.dp, tint = chevronColor)
+            ChevronDownIcon(modifier = Modifier.rotate(chevronRotation), size = 20.dp, tint = titleColor)
             Spacer(Modifier.width(12.dp))
             SettingsSectionIcon(themeId, dark, icon)
             Spacer(Modifier.width(12.dp))
@@ -470,8 +482,14 @@ internal fun SettingsAccordionSection(
         }
         AnimatedVisibility(
             visible = expanded,
-            enter = expandVertically(animationSpec = tween(durationMillis = 300, easing = GkEaseOut)),
-            exit = shrinkVertically(animationSpec = tween(durationMillis = 300, easing = GkEaseOut)),
+            enter = expandVertically(
+                animationSpec = tween(durationMillis = 300, easing = GkEaseOut),
+                expandFrom = Alignment.Top,
+            ),
+            exit = shrinkVertically(
+                animationSpec = tween(durationMillis = 300, easing = GkEaseOut),
+                shrinkTowards = Alignment.Top,
+            ),
         ) {
             Column(
                 modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
@@ -492,8 +510,9 @@ internal fun SettingsSubHeading(label: String, dark: Boolean) {
     ) {
         Text(
             label.uppercase(),
-            color = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
+            color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
             fontSize = 12.sp,
+            lineHeight = 16.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.6.sp,
         )
@@ -502,14 +521,69 @@ internal fun SettingsSubHeading(label: String, dark: Boolean) {
             modifier = Modifier
                 .weight(1f)
                 .height(1.dp)
-                .background(if (dark) Color(0xFF4B5563).copy(alpha = 0.4f) else Color(0xFFD1D5DB).copy(alpha = 0.6f)),
+                .background(if (dark) Color(0xFF4A5565).copy(alpha = 0.4f) else Color(0xFFD1D5DC).copy(alpha = 0.6f)),
         )
     }
 }
 
-/** The panel's plain preference row: coloured glyph, title, optional
- *  description, and a switch pinned to the right edge
- *  (`SettingsPanel.jsx:1067-1090` and every row shaped like it). */
+/** A help link closing a settings row's description, in the accent and
+ *  underlined, opened in the browser without triggering the row itself. */
+internal data class SettingsInlineLink(val label: String, val url: String)
+
+/**
+ * The start of every settings row: the icon pill, then the 16px/500 title
+ * over its 14px/20px grey description (`RowIcon` + `font-medium` +
+ * `text-sm text-gray-500`). [footer] lands under the description, inside
+ * the text column, as the QR card's shortcut control does on the web.
+ */
+@Composable
+internal fun SettingsRowHeader(
+    title: String,
+    subtitle: String?,
+    themeId: String?,
+    dark: Boolean,
+    titleColor: Color,
+    icon: @Composable (Color) -> Unit,
+    modifier: Modifier = Modifier,
+    subtitleColor: Color = SettingsSubtleColor,
+    subtitleLink: SettingsInlineLink? = null,
+    iconAlignment: Alignment.Vertical = Alignment.CenterVertically,
+    footer: (@Composable () -> Unit)? = null,
+) {
+    Row(modifier = modifier, verticalAlignment = iconAlignment) {
+        SettingsRowIcon(themeId, dark, icon)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = titleColor, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            if (subtitle != null) {
+                val accent = WorkspaceTheme.accent(themeId, dark)
+                Text(
+                    buildAnnotatedString {
+                        append(subtitle)
+                        if (subtitleLink != null) {
+                            append(' ')
+                            withLink(
+                                LinkAnnotation.Url(
+                                    subtitleLink.url,
+                                    TextLinkStyles(SpanStyle(color = accent, textDecoration = TextDecoration.Underline)),
+                                ),
+                            ) { append(subtitleLink.label) }
+                        }
+                    },
+                    color = subtitleColor,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                )
+            }
+            footer?.invoke()
+        }
+    }
+}
+
+/** The panel's plain preference row: [SettingsRowHeader] and a switch
+ *  pinned to the right edge (`SettingsPanel.jsx:1067-1090` and every row
+ *  shaped like it). On a phone that switch is `self-end`: it sits on the
+ *  row's bottom edge while the header stays centred. */
 @Composable
 internal fun SettingsSwitchRow(
     title: String,
@@ -520,46 +594,42 @@ internal fun SettingsSwitchRow(
     titleColor: Color,
     icon: @Composable (Color) -> Unit,
     onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    switchAlignment: Alignment.Vertical = Alignment.Bottom,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            SettingsRowIcon(themeId, dark, icon)
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(
-                    title,
-                    color = titleColor,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-                if (subtitle != null) {
-                    Text(
-                        subtitle,
-                        color = SettingsSubtleColor,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                    )
-                }
-            }
-        }
+        SettingsRowHeader(
+            title = title,
+            subtitle = subtitle,
+            themeId = themeId,
+            dark = dark,
+            titleColor = titleColor,
+            icon = icon,
+            modifier = Modifier.weight(1f),
+        )
         Spacer(Modifier.width(12.dp))
         GkSwitch(
             checked = checked,
-            enabled = enabled,
             themeId = themeId,
             dark = dark,
             onCheckedChange = onCheckedChange,
+            modifier = Modifier.align(switchAlignment),
+            enabled = enabled,
         )
     }
 }
 
+/** The 8px-radius, 1px `--border-light` frame of a settings card. */
+internal fun Modifier.settingsCardBorder(color: Color): Modifier =
+    clip(RoundedCornerShape(8.dp)).border(1.dp, color, RoundedCornerShape(8.dp))
+
 /** The full-width bordered row card the panel uses for every action that
- *  opens something else (`SettingsPanel.jsx:400-412`). */
+ *  opens something else (`SettingsPanel.jsx:400-412`). Like the CSS box,
+ *  its 1px border adds to the 12px padding instead of eating into it. */
 @Composable
 internal fun SettingsCardButton(
     title: String,
@@ -569,41 +639,40 @@ internal fun SettingsCardButton(
     titleColor: Color,
     borderColor: Color,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
+    subtitleLink: SettingsInlineLink? = null,
+    iconAlignment: Alignment.Vertical = Alignment.CenterVertically,
     footer: (@Composable () -> Unit)? = null,
     icon: @Composable (Color) -> Unit,
     onClick: () -> Unit,
 ) {
-    Row(
+    SettingsRowHeader(
+        title = title,
+        subtitle = subtitle,
+        themeId = themeId,
+        dark = dark,
+        titleColor = titleColor,
+        icon = icon,
+        subtitleLink = subtitleLink,
+        iconAlignment = iconAlignment,
+        footer = footer,
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .settingsCardBorder(borderColor)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                enabled = enabled,
                 role = Role.Button,
             ) { onClick() }
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SettingsRowIcon(themeId, dark, icon)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, color = titleColor, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            if (subtitle != null) {
-                Text(subtitle, color = SettingsSubtleColor, fontSize = 14.sp, lineHeight = 20.sp)
-            }
-            footer?.invoke()
-        }
-    }
+            .padding(13.dp),
+    )
 }
 
 /**
  * The primary gradient button (`SettingsPanel.jsx:1543`, and every other
- * `btn-gradient` call site): 14px/600 white on the theme gradient, 8px
- * radius, no shadow at rest, `scale(0.98)` while pressed.
+ * `btn-gradient` call site): `text-sm` 14px/20px/600 white on the button
+ * gradient, 8px radius, no shadow at rest, `scale(0.98)` while pressed.
+ * A dialog's buttons, which carry no `text-sm`, pass the 16px/24px body
+ * size instead.
  */
 @Composable
 internal fun GkGradientButton(
@@ -613,6 +682,8 @@ internal fun GkGradientButton(
     enabled: Boolean = true,
     horizontalPadding: Dp = 16.dp,
     verticalPadding: Dp = 8.dp,
+    fontSize: TextUnit = 14.sp,
+    lineHeight: TextUnit = 20.sp,
     // Non-null only for the semantic variants that must not follow the
     // workspace accent (see GkConfirmVariant).
     gradient: Brush? = null,
@@ -632,7 +703,7 @@ internal fun GkGradientButton(
             .scale(scale)
             .alpha(if (enabled) 1f else 0.5f)
             .clip(RoundedCornerShape(8.dp))
-            .background(gradient ?: WorkspaceTheme.accentGradient(themeId))
+            .background(gradient ?: WorkspaceTheme.buttonGradient(themeId))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -650,7 +721,8 @@ internal fun GkGradientButton(
         Text(
             label,
             color = Color.White,
-            fontSize = 14.sp,
+            fontSize = fontSize,
+            lineHeight = lineHeight,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -662,16 +734,78 @@ internal fun GkGradientButton(
     }
 }
 
-/** The `Popover` list (`Popover.jsx` + `SettingsPanel.jsx:1544-1568`):
- *  no animation, a 12px card, and the selected option tinted with the
- *  theme accent. */
+/**
+ * The `Popover` list the panel opens under its pickers (`Popover.jsx` +
+ * `SettingsPanel.jsx:1535-1568`): no animation, a 12px card as wide as its
+ * widest option (and at least [minWidth]), whose left edge follows the
+ * button, kept 8px from the screen's right edge, 6px under the button or
+ * flipped above it when the screen ends first.
+ *
+ * Placed inside the button's own Box: Compose hands the position provider
+ * that Box's window bounds, what the web reads from `getBoundingClientRect()`.
+ */
+@Composable
+internal fun SettingsPopover(
+    dark: Boolean,
+    borderColor: Color,
+    minWidth: Dp,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val density = LocalDensity.current
+    val positionProvider = remember(density) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset {
+                val marginPx = with(density) { 8.dp.roundToPx() }
+                val gapPx = with(density) { 6.dp.roundToPx() }
+                val left = if (anchorBounds.left + popupContentSize.width + marginPx > windowSize.width) {
+                    (windowSize.width - popupContentSize.width - marginPx).coerceAtLeast(marginPx)
+                } else {
+                    anchorBounds.left
+                }
+                val below = anchorBounds.bottom + gapPx
+                val top = if (below + popupContentSize.height + marginPx > windowSize.height) {
+                    (anchorBounds.top - gapPx - popupContentSize.height).coerceAtLeast(marginPx)
+                } else {
+                    below
+                }
+                return IntOffset(left, top)
+            }
+        }
+    }
+    Popup(
+        popupPositionProvider = positionProvider,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
+    ) {
+        Column(
+            modifier = Modifier
+                .width(IntrinsicSize.Max)
+                .widthIn(min = minWidth)
+                .shadow(elevation = 12.dp, shape = RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (dark) PopoverBgDark else Color.White)
+                .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+                .padding(vertical = 6.dp),
+            content = content,
+        )
+    }
+}
+
+/** One option of a [SettingsPopover]: `text-gray-800`/`gray-100` 14px,
+ *  or the accent at 600 over the soft accent fill, with a 20px check,
+ *  when it is the current choice. */
 @Composable
 internal fun SettingsPopoverOption(
     label: String,
     selected: Boolean,
     themeId: String?,
     dark: Boolean,
-    titleColor: Color,
     onClick: () -> Unit,
 ) {
     val accent = WorkspaceTheme.accent(themeId, dark)
@@ -686,18 +820,21 @@ internal fun SettingsPopoverOption(
             ) { onClick() }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
             label,
-            color = if (selected) accent else titleColor,
+            color = when {
+                selected -> accent
+                dark -> PopoverTextDark
+                else -> PopoverTextLight
+            },
             fontSize = 14.sp,
+            lineHeight = 20.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            modifier = Modifier.weight(1f),
         )
-        if (selected) {
-            Spacer(Modifier.width(12.dp))
-            CheckmarkIcon(size = 16.dp, tint = accent)
-        }
+        if (selected) TablerCheckIcon(size = 20.dp, tint = accent)
     }
 }
 
@@ -705,9 +842,11 @@ internal fun SettingsPopoverOption(
  * The panel's own dialog shell (`ChangePasswordModal.jsx:55-60`,
  * `PasskeySettingsSection.jsx:540-600`): a 90%-wide card capped at
  * 448px, 12px radius, 24px padding, over a flat `rgba(0,0,0,0.6)`
- * scrim. No entrance animation, matching the web's plain conditional
- * render. The web also blurs the scrim by 8px; a dialog window can't
- * blur what is behind it here, so the scrim stays flat.
+ * scrim, the platform's own dialog dim. No entrance animation, matching
+ * the web's plain conditional render. The web also blurs the scrim by
+ * 8px; a dialog window can't blur what is behind it here, so the scrim
+ * stays flat. [scrimAlpha] replaces the dim for a web dialog drawn over
+ * a lighter `bg-black/40`.
  */
 @Composable
 internal fun GkDialog(
@@ -716,6 +855,9 @@ internal fun GkDialog(
     borderColor: Color,
     dismissOnClickOutside: Boolean = true,
     maxWidth: Dp = 448.dp,
+    background: Color = if (dark) DialogBgDark else Color.White,
+    elevation: Dp = 24.dp,
+    scrimAlpha: Float? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(
@@ -725,16 +867,48 @@ internal fun GkDialog(
             usePlatformDefaultWidth = false,
         ),
     ) {
+        if (scrimAlpha != null) {
+            val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+            SideEffect { window?.setDimAmount(scrimAlpha) }
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .widthIn(max = maxWidth)
-                .shadow(elevation = 24.dp, shape = RoundedCornerShape(12.dp))
+                .shadow(elevation = elevation, shape = RoundedCornerShape(12.dp))
                 .clip(RoundedCornerShape(12.dp))
-                .background(if (dark) DialogBgDark else Color.White)
+                .background(background)
                 .border(1.dp, borderColor, RoundedCornerShape(12.dp))
                 .padding(24.dp),
             content = content,
+        )
+    }
+}
+
+/**
+ * What the WebView showed for the web's `alert()` (its import results and
+ * failures, the secret-key confirmation): the message alone and an OK
+ * button, in the app's own dialog shell.
+ */
+@Composable
+internal fun GkAlertDialog(
+    message: String,
+    themeId: String?,
+    dark: Boolean,
+    borderColor: Color,
+    textColor: Color,
+    onDismiss: () -> Unit,
+) {
+    GkDialog(onDismissRequest = onDismiss, dark = dark, borderColor = borderColor, maxWidth = 384.dp) {
+        Text(message, color = textColor)
+        Spacer(Modifier.height(20.dp))
+        GkGradientButton(
+            label = stringResource(R.string.native_dialog_ok),
+            themeId = themeId,
+            fontSize = 16.sp,
+            lineHeight = 24.sp,
+            modifier = Modifier.align(Alignment.End),
+            onClick = onDismiss,
         )
     }
 }
@@ -805,7 +979,9 @@ internal fun GkConfirmDialog(
 }
 
 /** The bordered secondary button (Cancel, Test connection):
- *  `px-4 py-2 rounded-lg border border-[var(--border-light)]`. */
+ *  `px-4 py-2 rounded-lg border border-[var(--border-light)]`. A dialog's
+ *  Cancel, with no `text-sm font-semibold`, passes the 16px/24px normal
+ *  weight body text instead of the 14px/20px/600 default. */
 @Composable
 internal fun GkSecondaryButton(
     label: String,
@@ -813,6 +989,9 @@ internal fun GkSecondaryButton(
     textColor: Color,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    fontSize: TextUnit = 14.sp,
+    lineHeight: TextUnit = 20.sp,
+    fontWeight: FontWeight = FontWeight.SemiBold,
     onClick: () -> Unit,
 ) {
     Box(
@@ -826,9 +1005,10 @@ internal fun GkSecondaryButton(
                 enabled = enabled,
                 role = Role.Button,
             ) { onClick() }
+            .padding(1.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Text(label, color = textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = textColor, fontSize = fontSize, lineHeight = lineHeight, fontWeight = fontWeight)
     }
 }
 
@@ -861,8 +1041,10 @@ internal fun GkDangerButton(
 
 /**
  * The dialog text field (`ChangePasswordModal.jsx:78`): a transparent
- * 8px box with a 1px `--border-light` edge that becomes a 2px accent
- * ring while focused, and its label above it (14px/500, 4px gap).
+ * `px-3 py-2` box inside a 1px `--border-light` edge, with a 2px
+ * [focusRingColor] ring drawn outside that edge while focused (Tailwind's
+ * `ring-2`, a box-shadow), and its label above it (14px/500, 4px gap).
+ * The text is the page's 16px/24px unless the input is `text-sm`.
  */
 @Composable
 internal fun GkTextField(
@@ -875,39 +1057,52 @@ internal fun GkTextField(
     titleColor: Color,
     borderColor: Color,
     modifier: Modifier = Modifier,
+    focusRingColor: Color = WorkspaceTheme.accent(themeId, dark),
+    focusRequester: FocusRequester? = null,
+    fontSize: TextUnit = 16.sp,
+    lineHeight: TextUnit = 24.sp,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val accent = WorkspaceTheme.accent(themeId, dark)
     Column(modifier) {
         if (label != null) {
-            Text(label, color = titleColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(label, color = titleColor, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(4.dp))
         }
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
-            textStyle = TextStyle(color = titleColor, fontSize = 16.sp),
-            cursorBrush = SolidColor(accent),
+            textStyle = TextStyle(color = titleColor, fontSize = fontSize, lineHeight = lineHeight),
+            cursorBrush = SolidColor(WorkspaceTheme.accent(themeId, dark)),
             keyboardOptions = keyboardOptions,
             visualTransformation = visualTransformation,
             modifier = Modifier
                 .fillMaxWidth()
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .onFocusChanged { focused = it.isFocused }
-                .border(
-                    width = if (focused) 2.dp else 1.dp,
-                    color = if (focused) accent else borderColor,
-                    shape = RoundedCornerShape(8.dp),
-                )
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .drawBehind {
+                    if (focused) {
+                        val ring = 2.dp.toPx()
+                        drawRoundRect(
+                            color = focusRingColor,
+                            topLeft = Offset(-ring / 2f, -ring / 2f),
+                            size = Size(size.width + ring, size.height + ring),
+                            cornerRadius = CornerRadius(8.dp.toPx() + ring / 2f),
+                            style = Stroke(ring),
+                        )
+                    }
+                }
+                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                .padding(horizontal = 13.dp, vertical = 9.dp),
             decorationBox = { innerTextField ->
                 if (value.isEmpty()) {
                     Text(
                         placeholder,
-                        color = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
-                        fontSize = 16.sp,
+                        color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
+                        fontSize = fontSize,
+                        lineHeight = lineHeight,
                     )
                 }
                 innerTextField()
@@ -937,7 +1132,7 @@ internal fun FooterPopover(
     minWidth: Dp = 0.dp,
     cornerRadius: Dp = 16.dp,
     // Was 24.dp: much heavier than every other popover shadow in the app
-    // (SettingsPopoverCard uses 12.dp) and, being inside a Popup with no
+    // (SettingsPopover uses 12.dp) and, being inside a Popup with no
     // buffer around it (see shadowPad below), had nowhere to blur into -
     // together that read as one big, hard-edged, overly dark halo.
     elevation: Dp = 12.dp,
@@ -1211,18 +1406,4 @@ internal fun PopoverMenuItem(
         icon()
         Text(label, color = color, fontSize = 15.sp)
     }
-}
-
-@Composable
-internal fun SettingsPopoverCard(dark: Boolean, borderColor: Color, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier
-            .widthIn(min = 160.dp)
-            .shadow(elevation = 12.dp, shape = RoundedCornerShape(12.dp))
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (dark) PopoverBgDark else Color.White)
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-            .padding(vertical = 6.dp),
-        content = content,
-    )
 }
