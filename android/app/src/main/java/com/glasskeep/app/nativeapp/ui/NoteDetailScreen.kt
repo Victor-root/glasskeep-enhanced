@@ -551,6 +551,12 @@ fun NoteDetailScreen(
         }
     }
 
+    /** The trash button's confirm: permanent delete for a note already in
+     *  the trash, else the move to the trash. */
+    fun askTrash() {
+        if (note?.trashed == true) showPermanentDeleteConfirm = true else showTrashConfirm = true
+    }
+
     /** Archiving leaves the note; unarchiving keeps it open, the way the
      *  web's handleArchiveNote only closes the modal for the former. */
     fun toggleArchive() {
@@ -2312,7 +2318,8 @@ fun NoteDetailScreen(
                         showCollaborateButton = (viewMode || !edit.isTextType) &&
                             !(edit.isDrawType && !drawingCanvasMode && !viewMode) &&
                             (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty()),
-                        showTrashButton = (viewMode || !edit.isTextType) && !currentNote.trashed,
+                        showTrashButton = viewMode || !edit.isTextType,
+                        trashed = currentNote.trashed,
                         onColorClick = { showColorPicker = true },
                         onImageClick = { showImageMenu = true },
                         onLogoClick = { openLogoPicker() },
@@ -2326,7 +2333,7 @@ fun NoteDetailScreen(
                         },
                         onFormatClick = { showFormatSheet = !showFormatSheet },
                         onCollaborateClick = { onOpenCollaborators() },
-                        onTrashClick = { showTrashConfirm = true },
+                        onTrashClick = { askTrash() },
                         onKebabClick = { menuExpanded = true },
                         imagePanel = {
                             if (showImageMenu) {
@@ -2403,6 +2410,9 @@ fun NoteDetailScreen(
                                     borderColor = borderColor,
                                     onDismiss = { menuExpanded = false },
                                 ) {
+                                    // ModalFooter.jsx's order: reminder, archive or
+                                    // restore, convert, duplicate, download, AI,
+                                    // collaborate, trash.
                                     if (!currentNote.trashed) {
                                         PopoverMenuItem(
                                             label = stringResource(R.string.native_note_detail_reminder),
@@ -2411,9 +2421,9 @@ fun NoteDetailScreen(
                                             onClick = { menuExpanded = false; showReminderPicker = true },
                                         ) {
                                             if (currentNote.reminderAt != null) {
-                                                BellRingingFilledIcon(size = 20.dp, tint = reminderMenuColor)
+                                                BellRingingFilledIcon(size = 18.dp, tint = reminderMenuColor)
                                             } else {
-                                                BellIcon(size = 20.dp, tint = reminderMenuColor)
+                                                BellIcon(size = 18.dp, tint = reminderMenuColor)
                                             }
                                         }
                                     }
@@ -2428,7 +2438,7 @@ fun NoteDetailScreen(
                                                 enabled = !restoring,
                                                 onClick = { menuExpanded = false; restoreNote() },
                                             ) {
-                                                ArchiveIcon(size = 18.dp, tint = archiveMenuColor)
+                                                ArchiveIcon(size = 16.dp, tint = archiveMenuColor)
                                             }
                                         } else {
                                             PopoverMenuItem(
@@ -2440,18 +2450,8 @@ fun NoteDetailScreen(
                                                 enabled = !archiving,
                                                 onClick = { menuExpanded = false; toggleArchive() },
                                             ) {
-                                                ArchiveIcon(size = 18.dp, tint = archiveMenuColor)
+                                                ArchiveIcon(size = 16.dp, tint = archiveMenuColor)
                                             }
-                                        }
-                                    }
-                                    if (!currentNote.trashed) {
-                                        PopoverMenuItem(
-                                            label = stringResource(R.string.native_note_detail_duplicate),
-                                            color = duplicateColor,
-                                            enabled = !duplicating,
-                                            onClick = { menuExpanded = false; duplicateNote() },
-                                        ) {
-                                            DuplicateIcon(size = 18.dp, tint = duplicateColor)
                                         }
                                     }
                                     if (!currentNote.trashed && !isReadOnlyAccess &&
@@ -2467,28 +2467,37 @@ fun NoteDetailScreen(
                                             onClick = { menuExpanded = false; showConvertConfirm = true },
                                         ) {
                                             if (edit.isTextType) {
-                                                ChecklistIcon(size = 18.dp, tint = convertColor)
+                                                ChecklistIcon(size = 20.dp, tint = convertColor)
                                             } else {
-                                                TextNoteIcon(size = 18.dp, tint = convertColor)
+                                                TextNoteIcon(size = 20.dp, tint = convertColor)
                                             }
                                         }
                                     }
-                                    if (edit.isTextType || edit.isChecklistType || edit.isDrawType ||
-                                        (edit.isAudioType && audioClips.isNotEmpty())
-                                    ) {
+                                    if (!currentNote.trashed) {
+                                        PopoverMenuItem(
+                                            label = stringResource(R.string.native_note_detail_duplicate),
+                                            color = duplicateColor,
+                                            enabled = !duplicating,
+                                            onClick = { menuExpanded = false; duplicateNote() },
+                                        ) {
+                                            DuplicateIcon(size = 16.dp, tint = duplicateColor)
+                                        }
+                                    }
+                                    // Audio notes download from their own player menu.
+                                    if (!edit.isAudioType) {
                                         PopoverMenuItem(
                                             label = stringResource(R.string.native_note_detail_download),
                                             color = downloadColor,
                                             onClick = { menuExpanded = false; downloadNote() },
                                         ) {
-                                            DownloadIcon(size = 22.dp, tint = downloadColor)
+                                            DownloadIcon(size = 20.dp, tint = downloadColor)
                                         }
                                     }
                                     // Audio notes deliberately have no AI entry: there
                                     // is nothing to ask about a raw recording, and a
                                     // drawing being drawn has no text either
                                     // (NoteModal.jsx:522-525).
-                                    if (noteAiAvailable) {
+                                    if (noteAiAvailable && !currentNote.trashed) {
                                         PopoverMenuItem(
                                             label = stringResource(R.string.native_note_ai_menu),
                                             color = aiColor,
@@ -2510,30 +2519,25 @@ fun NoteDetailScreen(
                                         (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty())
                                     ) {
                                         PopoverMenuItem(
-                                            label = stringResource(R.string.native_collaborators_title),
+                                            label = stringResource(R.string.native_note_detail_collaborate),
                                             color = collaborateColor,
                                             onClick = { menuExpanded = false; onOpenCollaborators() },
                                         ) {
-                                            CollaborateIcon(size = 18.dp, tint = collaborateColor)
+                                            CollaborateIcon(size = 16.dp, tint = collaborateColor)
                                         }
                                     }
-                                    if (currentNote.trashed) {
-                                        if (isOwnerAccess) {
-                                            PopoverMenuItem(
-                                                label = stringResource(R.string.native_note_detail_delete_permanently),
-                                                color = trashMenuColor,
-                                                onClick = { menuExpanded = false; showPermanentDeleteConfirm = true },
-                                            ) {
-                                                TrashIcon(size = 22.dp, tint = trashMenuColor)
-                                            }
-                                        }
-                                    } else if (!viewMode && edit.isTextType) {
+                                    // The footer trash button folds in here while a
+                                    // text note is being edited.
+                                    if (!viewMode && edit.isTextType) {
                                         PopoverMenuItem(
-                                            label = stringResource(R.string.native_note_detail_move_to_trash),
+                                            label = stringResource(
+                                                if (currentNote.trashed) R.string.native_note_detail_delete_permanently
+                                                else R.string.native_trash_title
+                                            ),
                                             color = trashMenuColor,
-                                            onClick = { menuExpanded = false; showTrashConfirm = true },
+                                            onClick = { menuExpanded = false; askTrash() },
                                         ) {
-                                            TrashIcon(size = 22.dp, tint = trashMenuColor)
+                                            TrashIcon(size = 20.dp, tint = trashMenuColor)
                                         }
                                     }
                                 }
@@ -3484,6 +3488,7 @@ private fun NoteModalFooter(
     drawingCanvasMode: Boolean,
     showCollaborateButton: Boolean,
     showTrashButton: Boolean,
+    trashed: Boolean,
     onColorClick: () -> Unit,
     onImageClick: () -> Unit,
     onLogoClick: () -> Unit,
@@ -3637,7 +3642,9 @@ private fun NoteModalFooter(
             }
             if (showTrashButton) {
                 FooterIconButton(
-                    contentDescription = stringResource(R.string.native_note_detail_move_to_trash),
+                    contentDescription = stringResource(
+                        if (trashed) R.string.native_note_detail_delete_permanently else R.string.native_note_detail_move_to_trash,
+                    ),
                     onClick = onTrashClick,
                 ) {
                     TrashIcon(size = 20.dp, tint = trashColor)

@@ -416,6 +416,7 @@
     <string name="native_note_detail_converted_to_checklist">Note convertie en liste de tâches</string>
     <string name="native_note_detail_converted_to_text">Note convertie en texte</string>
     <string name="native_note_detail_duplicate_suffix">(copie)</string>
+    <string name="native_note_detail_collaborate">Collaborer</string>
     <string name="native_note_detail_download">Télécharger .md</string>
     <string name="native_note_detail_download_error">Impossible de démarrer le téléchargement</string>
     <string name="native_note_detail_restore">Restaurer</string>

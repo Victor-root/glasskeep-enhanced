@@ -421,6 +421,7 @@
     <string name="native_note_detail_converted_to_checklist">Note converted to checklist</string>
     <string name="native_note_detail_converted_to_text">Note converted to text</string>
     <string name="native_note_detail_duplicate_suffix">(copy)</string>
+    <string name="native_note_detail_collaborate">Collaborate</string>
     <string name="native_note_detail_download">Download .md</string>
     <string name="native_note_detail_download_error">Couldn\'t start the download</string>
     <string name="native_note_detail_restore">Restore</string>
