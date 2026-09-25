@@ -282,7 +282,7 @@ fun DrawingEditor(
  *  chain of quadratic Beziers through the midpoint of each consecutive
  *  pair (the last segment ends at the final point exactly, not its
  *  midpoint), so a freehand stroke reads just as smooth here as on web. */
-private fun DrawScope.drawStroke(points: List<Offset>, color: Color, width: Float) {
+internal fun DrawScope.drawStroke(points: List<Offset>, color: Color, width: Float) {
     if (points.isEmpty()) return
     if (points.size == 1) {
         drawCircle(color = color, radius = width / 2f, center = points[0])
@@ -347,7 +347,7 @@ private fun parseHexColor(hex: String): Color = try {
  *  (DrawingCanvas.jsx:88-95). Applied at paint time here rather than
  *  rewritten into the note, which keeps the stored drawing identical on
  *  both platforms. */
-private fun themedStrokeColor(hex: String, dark: Boolean): Color {
+internal fun themedStrokeColor(hex: String, dark: Boolean): Color {
     val normalized = hex.trim().uppercase()
     return when {
         dark && normalized == "#000000" -> Color.White

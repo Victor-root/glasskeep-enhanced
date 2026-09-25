@@ -17,6 +17,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -61,6 +62,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
@@ -150,8 +152,10 @@ import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.SyncState
 import com.glasskeep.app.nativeapp.data.AiClient
+import com.glasskeep.app.nativeapp.data.AudioContent
 import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.ChecklistItems
+import com.glasskeep.app.nativeapp.data.DrawingContent
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.NoteImageData
@@ -2444,16 +2448,10 @@ internal fun NoteCard(
 
             if (note.type == "checklist") {
                 ChecklistCardPreview(note = note, titleColor = titleColor, subtextColor = subtextColor)
-            } else if (note.type == "draw" || note.type == "audio") {
-                // Neither shape is NoteContent's rich-doc-or-plain-text JSON
-                // (draw's is {paths,dimensions,text}, audio's is its own
-                // metadata blob), so previewPlainText would just leak the raw
-                // JSON string here rather than a real preview. The web shows a
-                // real vector thumbnail for a drawing (DrawingPreview.jsx) and
-                // presumably something audio-specific; a generic type label
-                // is a safe, non-guessing fallback for both until either gets
-                // its own native preview renderer.
-                Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
+            } else if (note.type == "draw") {
+                DrawingCardPreview(note = note, dark = dark, typography = typography, taskStrike = taskStrike, titleColor = titleColor)
+            } else if (note.type == "audio") {
+                AudioCardPreview(note = note, dark = dark, titleColor = titleColor)
             } else {
                 val previewBlocks = remember(note.content) {
                     RichDoc.parsePreview(note.content, maxBlocks = 8) ?: run {
@@ -2521,6 +2519,172 @@ internal fun NoteCard(
                 dark = dark,
                 onToggle = { onToggleSelect?.invoke() },
                 modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+            )
+        }
+    }
+}
+
+/** NoteCard.jsx:320-336: the caption like a text preview, then
+ *  DrawingPreview.jsx: the first three pages' strokes cropped to their
+ *  bounds plus 10 units, in a centred box 90% wide. */
+@Composable
+private fun DrawingCardPreview(
+    note: NoteEntity,
+    dark: Boolean,
+    typography: TypographyProfile,
+    taskStrike: Boolean,
+    titleColor: Color,
+) {
+    val drawing = remember(note.content) { DrawingContent.parse(note.content) } ?: return
+    val caption = remember(drawing.text) {
+        drawing.text?.let { RichDoc.parsePreview(it, maxBlocks = 8) }.orEmpty()
+    }
+    if (caption.any { it.text.isNotBlank() }) {
+        RichTextReader(
+            blocks = caption,
+            typography = typography,
+            taskStrike = taskStrike,
+            dark = dark,
+            titleColor = titleColor,
+            compact = true,
+            modifier = Modifier.heightIn(max = 280.dp).clipToBounds(),
+        )
+        Spacer(Modifier.height(8.dp))
+    }
+    val dims = drawing.dimensions
+    val pageHeight = when {
+        dims == null -> Float.MAX_VALUE
+        dims.originalHeight != null -> dims.originalHeight
+        dims.height > 1000f -> dims.height / 2f
+        else -> dims.height
+    }
+    val strokes = drawing.paths.filter { stroke ->
+        stroke.tool != "eraser" && stroke.points.isNotEmpty() && stroke.points.first().y < pageHeight * 3f
+    }
+    val bounds = remember(strokes) {
+        if (strokes.isEmpty()) {
+            null
+        } else {
+            var left = Float.MAX_VALUE
+            var top = Float.MAX_VALUE
+            var right = -Float.MAX_VALUE
+            var bottom = -Float.MAX_VALUE
+            strokes.forEach { stroke ->
+                val half = stroke.size / 2f
+                stroke.points.forEach { p ->
+                    left = minOf(left, p.x - half)
+                    top = minOf(top, p.y - half)
+                    right = maxOf(right, p.x + half)
+                    bottom = maxOf(bottom, p.y + half)
+                }
+            }
+            androidx.compose.ui.geometry.Rect(
+                (left - 10f).coerceAtLeast(0f),
+                (top - 10f).coerceAtLeast(0f),
+                right + 10f,
+                bottom + 10f,
+            )
+        }
+    }
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        if (bounds == null) {
+            val emptyColor = Color(0xFFE5E7EB)
+            Box(
+                Modifier.fillMaxWidth(0.9f).aspectRatio(800f / 320f).clip(RoundedCornerShape(4.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val scale = size.width / 800f
+                    drawRect(
+                        color = emptyColor,
+                        topLeft = Offset(10f * scale, 10f * scale),
+                        size = Size(size.width - 20f * scale, size.height - 20f * scale),
+                        style = Stroke(width = 2f * scale, pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f * scale, 5f * scale))),
+                    )
+                }
+                Text(stringResource(R.string.native_card_drawing_empty), color = Color(0xFF9CA3AF), fontSize = 2.sp, lineHeight = 3.sp)
+            }
+        } else {
+            Canvas(
+                Modifier
+                    .fillMaxWidth(0.9f)
+                    .aspectRatio(bounds.width / bounds.height)
+                    .clip(RoundedCornerShape(4.dp)),
+            ) {
+                val scale = size.width / bounds.width
+                strokes.forEach { stroke ->
+                    val points = stroke.points.map { Offset((it.x - bounds.left) * scale, (it.y - bounds.top) * scale) }
+                    drawStroke(points, themedStrokeColor(stroke.color, dark), maxOf(1f, stroke.size) * scale)
+                }
+            }
+        }
+    }
+}
+
+/** NoteCard.jsx:428-467: up to ten recording rows, then "+N en plus". */
+@Composable
+private fun AudioCardPreview(note: NoteEntity, dark: Boolean, titleColor: Color) {
+    val clips = remember(note.content) { AudioContent.parse(note.content)?.clips.orEmpty() }
+    val subtle = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282)
+    if (clips.isEmpty()) {
+        Text(
+            stringResource(R.string.native_card_audio_empty),
+            color = subtle,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            fontStyle = FontStyle.Italic,
+        )
+        return
+    }
+    val badge = if (!dark && (note.color.isBlank() || note.color == "default")) Color(0xFFA78BFA) else noteColorFor(note.color, dark)
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        clips.take(10).forEachIndexed { index, clip ->
+            val rowShape = RoundedCornerShape(8.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(rowShape)
+                    .background(if (dark) Color.White.copy(alpha = 0.07f) else Color.Black.copy(alpha = 0.05f))
+                    .border(1.dp, if (dark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.06f), rowShape)
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+            ) {
+                Box(
+                    Modifier.size(24.dp).shadow(1.dp, CircleShape).clip(CircleShape).background(badge),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MicIcon(size = 14.dp, tint = Color.White)
+                }
+                Text(
+                    clip.name.ifBlank { stringResource(R.string.native_audio_clip_default_name, index + 1) },
+                    color = titleColor,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (clip.duration > 0f) {
+                    Text(
+                        formatDuration(clip.duration),
+                        color = titleColor.copy(alpha = 0.7f),
+                        fontSize = 11.sp,
+                        lineHeight = 16.5.sp,
+                        style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"),
+                    )
+                }
+            }
+        }
+        if (clips.size > 10) {
+            Text(
+                stringResource(R.string.native_card_audio_more, clips.size - 10),
+                color = subtle,
+                fontSize = 11.sp,
+                lineHeight = 16.5.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
             )
         }
     }

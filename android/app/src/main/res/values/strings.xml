@@ -781,6 +781,9 @@
     <string name="native_note_icon">Note icon</string>
     <string name="native_card_more_image">+%1$d Image</string>
     <string name="native_card_more_images">+%1$d Images</string>
+    <string name="native_card_drawing_empty">Empty</string>
+    <string name="native_card_audio_empty">No recording was captured.</string>
+    <string name="native_card_audio_more">+%1$d more recording</string>
     <string name="native_add_an_image">Add an image</string>
     <string name="native_add_logo">Add a logo</string>
     <string name="native_replace_logo">Replace logo</string>

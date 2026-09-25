@@ -1082,7 +1082,7 @@ private fun AudioClipRow(
     }
 }
 
-private fun formatDuration(seconds: Float): String {
+internal fun formatDuration(seconds: Float): String {
     val total = seconds.toInt().coerceAtLeast(0)
     val minutes = total / 60
     val secs = total % 60
