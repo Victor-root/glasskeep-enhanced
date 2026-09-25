@@ -293,7 +293,6 @@ fun NativeNotesListScreen(
     var searchFocusRequest by remember { mutableIntStateOf(0) }
     var headerMenuOpen by remember { mutableStateOf(false) }
     var notificationsOpen by remember { mutableStateOf(false) }
-    var unreadNotifications by remember { mutableStateOf(0) }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showBulkTrashConfirm by remember { mutableStateOf(false) }
@@ -733,23 +732,13 @@ fun NativeNotesListScreen(
         onPendingNewNoteTypeConsumed()
     }
 
-    // The bell's red dot: how many notifications are still pending, read
-    // once on load and again every time the panel closes (opening it is
-    // what marks them delivered).
-    LaunchedEffect(serverUrl, notificationsOpen) {
+    LaunchedEffect(notificationsOpen) {
         // The floating pill is suppressed for as long as the panel is up,
         // the same way the web hides it behind the notification centre
-        // (App.jsx:7933-7935).
+        // (App.jsx:7933-7935), and opening the bell dismisses every active
+        // notification.
         toasts.suppressed = notificationsOpen
-        if (notificationsOpen) return@LaunchedEffect
-        // Unreachable server: the dot keeps its last answer.
-        try {
-            unreadNotifications = repository.fetchPendingNotifications().size
-        } catch (t: CancellationException) {
-            throw t
-        } catch (t: Throwable) {
-            NativeDebug.e("Pending notifications read failed", t)
-        }
+        if (notificationsOpen) toasts.dismissAll()
     }
 
     // Once per session, for administrators (useUpdateCheck.js).
@@ -1161,7 +1150,9 @@ fun NativeNotesListScreen(
                 menuOpen = headerMenuOpen,
                 onMenuOpenChange = { headerMenuOpen = it },
                 notificationsOpen = notificationsOpen,
-                hasUnreadNotifications = unreadNotifications > 0,
+                // The web's dot: some notification is still active, i.e. a
+                // pill is showing or queued.
+                hasUnreadNotifications = toasts.queue.isNotEmpty(),
                 onOpenNotifications = { notificationsOpen = !notificationsOpen },
                 modifier = Modifier
                     .onSizeChanged { headerHeightPx = it.height }

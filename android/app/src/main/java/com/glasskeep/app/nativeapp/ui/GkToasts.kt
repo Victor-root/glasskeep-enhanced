@@ -1,6 +1,7 @@
 package com.glasskeep.app.nativeapp.ui
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,17 +11,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,21 +34,29 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material3.Text
 import com.glasskeep.app.nativeapp.EditorPrefsState
 import com.glasskeep.app.nativeapp.NotificationDing
 import com.glasskeep.app.nativeapp.data.NotifCategory
 import com.glasskeep.app.nativeapp.data.NotifVariantKey
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.nowIso
-import kotlinx.coroutines.delay
 
 /** The four variants a notification can carry, and the accent each paints
  *  with (globalCSS.js:5009-5048). Shared by the toast pill and the
@@ -70,8 +80,14 @@ fun toastPositionOf(raw: String?): ToastPosition =
 data class GkToast(
     val id: Long,
     val title: String?,
-    val message: String,
+    val message: AnnotatedString,
     val variant: NotifVariant,
+    /** A NotificationCard.jsx SEMANTIC_ICONS key, see [NotifGlyph]. */
+    val icon: String? = null,
+    /** The server row this pill echoes: tapping it deletes that row. */
+    val serverId: Int? = null,
+    /** Stays up, with no countdown, until tapped (reminders). */
+    val persistent: Boolean = false,
     val actionLabel: String? = null,
     val action: (() -> Unit)? = null,
     /** The bordered second button (Refuser next to Approuver). */
@@ -113,10 +129,14 @@ class ToastController {
     internal var serverHistory by mutableStateOf<List<NotificationDto>>(emptyList())
     internal val localHistory = mutableStateListOf<NotificationDto>()
 
+    /** Deletes a server row for good, once NativeNavHost has a session. */
+    var removeServerRow: ((Int) -> Unit)? = null
+
     fun show(
-        message: String,
+        message: CharSequence,
         variant: NotifVariant = NotifVariant.INFO,
         title: String? = null,
+        icon: String? = null,
         actionLabel: String? = null,
         action: (() -> Unit)? = null,
         /** The server's own notification type when this pill is echoing
@@ -126,10 +146,14 @@ class ToastController {
         durationMs: Long? = null,
         secondaryActionLabel: String? = null,
         secondaryAction: (() -> Unit)? = null,
+        serverId: Int? = null,
+        persistent: Boolean = false,
     ) {
         val category = NotifCategory.of(type, variant.categoryKey)
         val settings = prefs
         if (settings != null && !settings.allowsNotification(category)) return
+        // A row replayed at launch and pushed live again shows once.
+        if (serverId != null && queue.any { it.serverId == serverId }) return
         val id = nextId++
         // A pill echoing a server row is already in serverHistory.
         if (type == null) {
@@ -141,7 +165,8 @@ class ToastController {
                     type = "",
                     noteTitle = title.orEmpty(),
                     variant = variant.name.lowercase(),
-                    message = message,
+                    message = message.toString(),
+                    icon = icon,
                     createdAt = nowIso(),
                 ),
             )
@@ -151,8 +176,11 @@ class ToastController {
             GkToast(
                 id = id,
                 title = title,
-                message = message,
+                message = message as? AnnotatedString ?: AnnotatedString(message.toString()),
                 variant = variant,
+                icon = icon,
+                serverId = serverId,
+                persistent = persistent,
                 actionLabel = actionLabel,
                 action = action,
                 secondaryActionLabel = secondaryActionLabel,
@@ -169,6 +197,21 @@ class ToastController {
 
     internal fun dismiss(id: Long) {
         queue.removeAll { it.id == id }
+    }
+
+    /** Opening the bell dismisses every active notification (the web's
+     *  dismissAll), which is also what clears the bell's dot. */
+    internal fun dismissAll() {
+        queue.clear()
+    }
+
+    /** A tap on the pill or one of its actions: NotificationMobileToast.jsx
+     *  removes the notification, from the history and the server alike. */
+    internal fun resolve(toast: GkToast) {
+        dismiss(toast.id)
+        val serverId = toast.serverId ?: return
+        serverHistory = serverHistory.filterNot { it.id == serverId }
+        removeServerRow?.invoke(serverId)
     }
 }
 
@@ -201,27 +244,27 @@ fun GkToastHost(
 
     // A burst shares the configured duration between everything that
     // arrived together, never dropping below 800ms a piece.
-    val slice = (current.durationMs ?: durationMs)?.let { total ->
-        if (controller.queue.size > 1) maxOf(MinBurstSliceMs, total / controller.queue.size) else total
+    val slice = if (current.persistent) {
+        null
+    } else {
+        (current.durationMs ?: durationMs)?.let { total ->
+            if (controller.queue.size > 1) maxOf(MinBurstSliceMs, total / controller.queue.size) else total
+        }
     }
 
-    var progress by remember(current.id) { mutableStateOf(1f) }
+    val progress = remember(current.id) { Animatable(1f) }
     LaunchedEffect(current.id, slice) {
         if (slice == null) return@LaunchedEffect
-        val steps = 60
-        val step = slice / steps
-        repeat(steps) {
-            delay(step)
-            progress = 1f - (it + 1f) / steps
-        }
+        progress.animateTo(0f, tween(durationMillis = slice.toInt(), easing = LinearEasing))
         controller.dismiss(current.id)
     }
 
-    val entry by animateFloatAsState(
-        targetValue = 1f,
-        animationSpec = tween(durationMillis = 220, easing = GkNotifInEasing),
-        label = "toastIn",
-    )
+    // gkMobileToastIn plays when the pill mounts: the next pill of a
+    // burst swaps in place, like the web's kept DOM node.
+    val entry = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        entry.animateTo(1f, tween(durationMillis = 220, easing = GkNotifInEasing))
+    }
 
     val cardColor = if (dark) Color(0xFF12121C).copy(alpha = 0.97f) else Color(0xFFFCFCFF).copy(alpha = 0.97f)
     val textColor = if (dark) Color(0xFFF0F0F5) else Color(0xFF1D1D1F)
@@ -241,17 +284,14 @@ fun GkToastHost(
             modifier = Modifier
                 .widthIn(max = 420.dp)
                 .graphicsLayer {
-                    alpha = entry
-                    translationY = (1f - entry) * (if (position == ToastPosition.TOP) -24.dp.toPx() else 24.dp.toPx())
+                    alpha = entry.value
+                    translationY = (1f - entry.value) * (if (position == ToastPosition.TOP) -24.dp.toPx() else 24.dp.toPx())
                 }
-                .clip(shape)
-                .background(cardColor)
-                .background(current.variant.accent.copy(alpha = current.variant.tintAlpha))
-                .border(2.5.dp, current.variant.accent, shape)
+                .notifLedSurface(current.variant, dark, shape, cardColor)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                ) { controller.dismiss(current.id) },
+                ) { controller.resolve(current) },
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -259,7 +299,7 @@ fun GkToastHost(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
             ) {
                 Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
-                    ToastVariantIcon(current.variant)
+                    NotifGlyph(current.icon, current.variant, 18.dp)
                 }
                 Column(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -270,6 +310,7 @@ fun GkToastHost(
                             it,
                             color = textColor,
                             fontSize = 13.sp,
+                            lineHeight = 16.9.sp,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -299,7 +340,7 @@ fun GkToastHost(
                                 indication = null,
                             ) {
                                 current.action?.invoke()
-                                controller.dismiss(current.id)
+                                controller.resolve(current)
                             }
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                     )
@@ -318,36 +359,81 @@ fun GkToastHost(
                                     indication = null,
                                 ) {
                                     current.secondaryAction?.invoke()
-                                    controller.dismiss(current.id)
+                                    controller.resolve(current)
                                 }
                                 .padding(horizontal = 9.dp, vertical = 3.dp),
                         )
                     }
                 }
             }
-            // The countdown drains left to right along the bottom edge.
+            // The countdown, inside the border: a 14px strip clipped to the
+            // inner bottom corners, its 3.6px fill shrinking to the left.
             if (slice != null) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .fillMaxWidth(progress)
-                        .height(3.6.dp)
-                        .background(
-                            Brush.verticalGradient(listOf(Color.Transparent, current.variant.accent)),
-                        ),
-                )
+                        .padding(NotifBorderWidth)
+                        .fillMaxWidth()
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(bottomStart = 13.5.dp, bottomEnd = 13.5.dp)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .height(3.6.dp)
+                            .graphicsLayer {
+                                scaleX = progress.value
+                                transformOrigin = TransformOrigin(0f, 0.5f)
+                            }
+                            .background(Brush.verticalGradient(listOf(Color.Transparent, current.variant.accent))),
+                    )
+                }
             }
         }
     }
 }
 
-/** The filled variant glyph the pill falls back on when a notification
- *  carries no semantic icon of its own. */
-@Composable
-private fun ToastVariantIcon(variant: NotifVariant) {
-    when (variant) {
-        NotifVariant.SUCCESS -> CheckFilledIcon(size = 18.dp, tint = variant.accent)
-        NotifVariant.WARNING, NotifVariant.ERROR -> AlertFilledIcon(size = 18.dp, tint = variant.accent)
-        NotifVariant.INFO -> InfoFilledIcon(size = 18.dp, tint = variant.accent)
-    }
+/** CSS asks 2.5px; Chromium floors every border to whole pixels. */
+internal val NotifBorderWidth = 2.dp
+
+/**
+ * The LED-strip surface the pill and the centre's cards share
+ * (globalCSS.js .gk-notif-card / .gk-mobile-toast): a drop shadow, a soft
+ * accent bleed and a crisp 1px accent ring outside the border, the card
+ * fill under the variant tint, the `inset 0 1px 0` highlight, then the
+ * accent border itself.
+ */
+internal fun Modifier.notifLedSurface(variant: NotifVariant, dark: Boolean, shape: RoundedCornerShape, fill: Color): Modifier {
+    val accent = variant.accent
+    return this
+        .dropShadow(
+            shape,
+            Shadow(
+                radius = 14.dp,
+                color = if (dark) Color.Black.copy(alpha = 0.55f) else Color(0xFF0F172A).copy(alpha = 0.10f),
+                spread = (-2).dp,
+                offset = DpOffset(0.dp, 6.dp),
+            ),
+        )
+        .dropShadow(shape, Shadow(radius = if (dark) 5.dp else 4.dp, color = accent.copy(alpha = if (dark) 0.60f else 0.45f)))
+        .dropShadow(shape, Shadow(radius = 0.dp, color = accent.copy(alpha = if (dark) 0.45f else 0.32f), spread = 1.dp))
+        .clip(shape)
+        .background(fill)
+        .background(accent.copy(alpha = variant.tintAlpha))
+        .drawBehind {
+            val border = NotifBorderWidth.toPx()
+            val radius = CornerRadius(shape.topStart.toPx(size, this) - border)
+            val inner = Path().apply {
+                addRoundRect(RoundRect(border, border, size.width - border, size.height - border, radius))
+            }
+            val lowered = Path().apply {
+                addRoundRect(RoundRect(border, border + 1.dp.toPx(), size.width - border, size.height - border + 1.dp.toPx(), radius))
+            }
+            drawPath(
+                Path.combine(PathOperation.Difference, inner, lowered),
+                color = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.80f),
+            )
+        }
+        .border(NotifBorderWidth, accent, shape)
 }

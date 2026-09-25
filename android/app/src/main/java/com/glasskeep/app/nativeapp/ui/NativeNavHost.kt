@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -42,18 +43,20 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.core.content.ContextCompat
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
+import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
 import com.glasskeep.app.nativeapp.data.RealtimeClient
-import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
+import com.glasskeep.app.nativeapp.data.network.NotificationDto
+import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.data.renewSessionTokenIfStale
 import com.glasskeep.app.nativeapp.syncReminderAlarms
 import com.glasskeep.app.reminders.ReminderSyncWorker
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -335,11 +338,12 @@ fun NativeNavHost(
     toasts.prefs = container.editorPrefs
     val settingsActions = rememberSettingsActions(container, repository, toasts)
 
-    // Raised from the composition rather than from the SSE thread, so the
-    // pill's own strings resolve against the app's current language.
-    LaunchedEffect(liveNotification) {
-        val notification = liveNotification ?: return@LaunchedEffect
-        liveNotification = null
+    toasts.removeServerRow = { id -> scope.launch { repository.removeNotifications(listOf(id)) } }
+
+    // A server row as a pill (the web's showShareNotificationToast,
+    // App.jsx:3841), called from the composition rather than from the SSE
+    // thread so the pill's strings resolve against the app's language.
+    fun showNotificationPill(notification: NotificationDto) {
         val openLabel = notificationOpenLabelRes(notification.type)?.takeIf { notification.noteId != null }
         val pendingId = notification.message?.toIntOrNull()
             ?.takeIf { notification.type == "pending_user_registered" }
@@ -350,9 +354,10 @@ fun NativeNavHost(
             }
         }
         toasts.show(
-            message = notificationMessageText(context, notification).text,
+            message = notificationMessageText(context, notification),
             variant = variantOf(notification),
             title = notificationTitleText(context, notification, withFallback = false),
+            icon = notificationIconKey(notification),
             actionLabel = when {
                 openLabel != null -> context.getString(openLabel)
                 pendingId != null -> context.getString(R.string.native_admin_approve)
@@ -366,7 +371,14 @@ fun NativeNavHost(
             secondaryActionLabel = pendingId?.let { context.getString(R.string.native_admin_reject) },
             secondaryAction = pendingId?.let { { decide(approve = false) } },
             type = notification.type,
+            serverId = notification.id,
+            persistent = notification.persistent == 1 || notification.type == "reminder",
         )
+    }
+    LaunchedEffect(liveNotification) {
+        val notification = liveNotification ?: return@LaunchedEffect
+        liveNotification = null
+        showNotificationPill(notification)
     }
     // Same "one instance for the whole app" placement as the pill above,
     // and the same reason: the web keeps exactly one tooltip portal at its
@@ -390,6 +402,21 @@ fun NativeNavHost(
     val currentEntry by navController.currentBackStackEntryAsState()
     val route = currentEntry?.destination?.route ?: startDestination
     val signedIn = route != "login" && route != "login-secret" && route != "register"
+    // Every sign-in or launch replays the rows still pending as a burst of
+    // pills, oldest first, without acknowledging them: that is left to
+    // the bell (useShareNotifications.js:451-578).
+    LaunchedEffect(signedIn, serverUrl) {
+        if (!signedIn) return@LaunchedEffect
+        try {
+            repository.fetchPendingNotifications()
+                .sortedBy { parseIsoToEpochMillis(it.createdAt) ?: 0L }
+                .forEach { showNotificationPill(it) }
+        } catch (t: CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            NativeDebug.e("Pending notifications replay failed", t)
+        }
+    }
     val lock = container.lockState
     val showUnlockScreen = lock.isLocked && (!signedIn || lock.overlayOpen)
 

@@ -727,23 +727,14 @@ fun EyeIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color
     }
 }
 
+/** tabler/pencil.svg; stroke 2 where the web draws the bare svg, 1.75
+ *  as a `.tabler-icon`. */
 @Composable
-fun PencilIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    // tabler/pencil.svg, viewBox 24x24, stroke (not filled), strokeWidth 2,
-    // round caps/joins.
-    val path = remember {
-        PathParser().parsePathString(
-            "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4 " +
-                "M13.5 6.5l4 4"
-        ).toPath()
-    }
-    Canvas(modifier.size(size)) {
-        val scale = this.size.minDimension / 24f
-        scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        }
-    }
-}
+fun PencilIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, strokeWidth: Float = 2f) = TablerIcon(
+    "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4 " +
+        "M13.5 6.5l4 4",
+    modifier, size, tint, strokeWidth,
+)
 
 // The icons below back the note modal's own header and footer bars
 // (ModalHeader.jsx / ModalFooter.jsx). The web uses a different back
@@ -1872,6 +1863,94 @@ fun LogoIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Colo
         "M16 19.33h6 " +
         "M19 16.33v6",
     modifier, size, tint, strokeWidth = 2f,
+)
+
+// The rest of NotificationCard.jsx's SEMANTIC_ICONS, the outline Tabler
+// glyphs a notification names by key.
+
+/** tabler/trash-x.svg. */
+@Composable
+fun TrashXIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 7l16 0 M10 11l4 4m0 -4l-4 4 M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12 " +
+        "M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3",
+    modifier, size, tint,
+)
+
+/** tabler/arrow-back-up.svg. */
+@Composable
+fun ArrowBackUpIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M9 14l-4 -4l4 -4 M5 10h11a4 4 0 1 1 0 8h-1",
+    modifier, size, tint,
+)
+
+/** tabler/archive.svg. */
+@Composable
+fun TablerArchiveIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z " +
+        "M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10 M10 12l4 0",
+    modifier, size, tint,
+)
+
+/** tabler/archive-off.svg. */
+@Composable
+fun ArchiveOffIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 3l18 18 " +
+        "M16 4h3a2 2 0 0 1 2 2v0a2 2 0 0 1 -1.166 1.818m-3.834 .182h-13a2 2 0 0 1 -2 -2v0a2 2 0 0 1 2 -2h7 " +
+        "M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7m-4 -3h-6",
+    modifier, size, tint,
+)
+
+/** tabler/copy.svg. */
+@Composable
+fun CopyIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2 " +
+        "M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z",
+    modifier, size, tint,
+)
+
+/** tabler/device-floppy.svg. */
+@Composable
+fun DeviceFloppyIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2 " +
+        "M10 14a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M14 4l0 4l-6 0l0 -4",
+    modifier, size, tint,
+)
+
+/** tabler/user-plus.svg. */
+@Composable
+fun UserPlusIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0 M16 19h6 M19 16v6 M6 21v-2a4 4 0 0 1 4 -4h4",
+    modifier, size, tint,
+)
+
+/** tabler/user-check.svg. */
+@Composable
+fun UserCheckIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0 M6 21v-2a4 4 0 0 1 4 -4h4 M15 19l2 2l4 -4",
+    modifier, size, tint,
+)
+
+/** tabler/users.svg. */
+@Composable
+fun UsersIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0 M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2 " +
+        "M16 3.13a4 4 0 0 1 0 7.75 M21 21v-2a4 4 0 0 0 -3 -3.85",
+    modifier, size, tint,
+)
+
+/** tabler/camera.svg. */
+@Composable
+fun CameraIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M5 7h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2 " +
+        "M9 13a3 3 0 1 0 6 0a3 3 0 0 0 -6 0",
+    modifier, size, tint,
+)
+
+/** tabler/power.svg. */
+@Composable
+fun PowerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M7 6a7.75 7.75 0 1 0 10 0 M12 4l0 8",
+    modifier, size, tint,
 )
 
 /** tabler/trash.svg: the bed a swiped notification card slides off. */

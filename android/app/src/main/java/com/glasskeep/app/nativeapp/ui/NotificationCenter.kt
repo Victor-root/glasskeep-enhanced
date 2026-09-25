@@ -75,6 +75,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -550,10 +551,7 @@ private fun NotificationCard(
                     translationX = offsetX.value
                     alpha = if (exiting) exitAlpha.value else (1f - abs(offsetX.value) / fadeSpanPx).coerceIn(0f, 1f)
                 }
-                .clip(shape)
-                .background(cardColor)
-                .background(variant.accent.copy(alpha = variant.tintAlpha))
-                .border(2.dp, variant.accent, shape)
+                .notifLedSurface(variant, dark, shape, cardColor)
                 .pointerInput(notification.id) {
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { change, delta ->
@@ -707,45 +705,66 @@ private fun NotificationAction(label: String, primary: Boolean, dark: Boolean, t
  *  26px slot, except on info cards. */
 @Composable
 private fun NotificationIcon(notification: NotificationDto, variant: NotifVariant) {
-    val tint = variant.accent
-    val key = when (notification.type) {
-        "note_shared" -> null
-        "note_access_revoked", "note_access_revoked_with_copy",
-        "collaborator_removed", "collaborator_removed_with_copy",
-        "collaborator_left",
-        "shared_note_deleted", "shared_note_deleted_with_copy",
-        -> null
-        "reminder" -> "reminder"
-        "pending_user_registered" -> "user-clock"
-        "user_deleted" -> "user-x"
-        else -> notification.icon
-    }
-    val glyph = if (variant == NotifVariant.INFO) 26.dp else 30.dp
     Box(Modifier.size(26.dp).wrapContentSize(unbounded = true)) {
-        when (key) {
-            "reminder" -> BellRingingFilledIcon(size = glyph, tint = tint)
-            "user-clock" -> UserClockIcon(size = glyph, tint = tint)
-            "user-x", "unshare" -> UserXIcon(size = glyph, tint = tint)
-            "share" -> UserShareIcon(size = glyph, tint = tint)
-            "trash" -> TrashIcon(size = glyph, tint = tint)
-            "archive" -> ArchiveIcon(size = glyph, tint = tint)
-            "edit" -> PencilIcon(size = glyph, tint = tint)
-            "key" -> KeyIcon(size = glyph, tint = tint)
-            "shield" -> ShieldLockIcon(size = glyph, tint = tint)
-            "refresh" -> RefreshIcon(size = glyph, tint = tint)
-            else -> when (variant) {
-                NotifVariant.SUCCESS -> CircleCheckFilledIcon(size = glyph, tint = tint)
-                NotifVariant.WARNING -> AlertFilledIcon(size = glyph, tint = tint)
-                NotifVariant.ERROR -> AlertCircleFilledIcon(size = glyph, tint = tint)
-                NotifVariant.INFO -> InfoFilledIcon(size = glyph, tint = tint)
-            }
-        }
+        NotifGlyph(notificationIconKey(notification), variant, if (variant == NotifVariant.INFO) 26.dp else 30.dp)
     }
+}
+
+/** The semantic icon useShareNotifications.js gives a server type; a
+ *  generic row carries its own `icon` key. */
+internal fun notificationIconKey(notification: NotificationDto): String? = when (notification.type) {
+    "note_shared",
+    "note_access_revoked", "note_access_revoked_with_copy",
+    "collaborator_removed", "collaborator_removed_with_copy",
+    "collaborator_left",
+    "shared_note_deleted", "shared_note_deleted_with_copy",
+    -> null
+    "reminder" -> "reminder"
+    "pending_user_registered" -> "user-clock"
+    "user_deleted" -> "user-x"
+    else -> notification.icon
 }
 
 /** Which of the display filter's eight buckets this row falls in. The
  *  server's own `type` decides first; only a generic row falls back to
  *  its variant (filterCategoryFor, App.jsx:767-787). */
+/** VariantGlyph (NotificationCard.jsx): the outline Tabler glyph [key]
+ *  names in SEMANTIC_ICONS, else the variant's filled one. */
+@Composable
+internal fun NotifGlyph(key: String?, variant: NotifVariant, size: Dp) {
+    val tint = variant.accent
+    when (key) {
+        "trash" -> TablerTrashIcon(size = size, tint = tint)
+        "trash-x" -> TrashXIcon(size = size, tint = tint)
+        "restore" -> ArrowBackUpIcon(size = size, tint = tint)
+        "archive" -> TablerArchiveIcon(size = size, tint = tint)
+        "archive-off" -> ArchiveOffIcon(size = size, tint = tint)
+        "copy" -> CopyIcon(size = size, tint = tint)
+        "save" -> DeviceFloppyIcon(size = size, tint = tint)
+        "note" -> NoteTablerIcon(size = size, tint = tint)
+        "edit" -> PencilIcon(size = size, tint = tint, strokeWidth = 1.75f)
+        "share" -> UserShareIcon(size = size, tint = tint)
+        "unshare", "user-x" -> UserXIcon(size = size, tint = tint)
+        "user-plus" -> UserPlusIcon(size = size, tint = tint)
+        "user-check" -> UserCheckIcon(size = size, tint = tint)
+        "user-clock" -> UserClockIcon(size = size, tint = tint)
+        "users" -> UsersIcon(size = size, tint = tint)
+        "key" -> TablerKeyIcon(size = size, tint = tint)
+        "shield" -> ShieldLockIcon(size = size, tint = tint)
+        "qr" -> QrCodeIcon(size = size, tint = tint)
+        "camera" -> CameraIcon(size = size, tint = tint)
+        "refresh" -> RefreshIcon(size = size, tint = tint)
+        "power" -> PowerIcon(size = size, tint = tint)
+        "reminder" -> BellRingingFilledIcon(size = size, tint = tint)
+        else -> when (variant) {
+            NotifVariant.SUCCESS -> CircleCheckFilledIcon(size = size, tint = tint)
+            NotifVariant.WARNING -> AlertFilledIcon(size = size, tint = tint)
+            NotifVariant.ERROR -> AlertCircleFilledIcon(size = size, tint = tint)
+            NotifVariant.INFO -> InfoFilledIcon(size = size, tint = tint)
+        }
+    }
+}
+
 internal fun categoryOf(notification: NotificationDto): NotifCategory =
     NotifCategory.of(notification.type, variantOf(notification).categoryKey)
 
