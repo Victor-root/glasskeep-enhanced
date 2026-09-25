@@ -230,11 +230,15 @@ internal fun SyncStatusSheet(
                     titleColor = titleColor,
                 )
 
-                if (waiting.isNotEmpty() || retrying.isNotEmpty()) {
+                // The worker sends one item at a time: while it drains, that
+                // one is the web's "processing" and the rest stay "pending";
+                // retried items have their own list below.
+                val processing = if (status.syncing && queue.any { it.status == SyncQueueEntity.STATUS_PENDING }) 1 else 0
+                val pendingCount = (waiting.size - processing).coerceAtLeast(0)
+                if (pendingCount + processing > 0) {
                     SyncSheetQueueSummary(
-                        waiting = waiting.size,
-                        retrying = retrying.size,
-                        syncing = status.syncing,
+                        pending = pendingCount,
+                        processing = processing,
                         dark = dark,
                         divider = divider,
                     )
@@ -445,7 +449,7 @@ private fun SyncSheetHeader(
         if (locked) {
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                LockIcon(size = 14.dp, tint = if (dark) SyncRedDark else SyncRedLight, modifier = Modifier.padding(top = 2.dp))
+                LockBadgeIcon(size = 14.dp, tint = if (dark) SyncRedDark else SyncRedLight, modifier = Modifier.padding(top = 2.dp))
                 Text(
                     stringResource(R.string.native_sync_instance_locked),
                     color = if (dark) SyncRedDark else SyncRedLight,
@@ -485,12 +489,11 @@ private fun syncErrorDetailRes(kind: SyncErrorKind?): Int? = when (kind) {
 }
 
 /** Section 2: one line saying how much is waiting, with a dot that turns
- *  blue, pulsing, while a drain is actually running. */
+ *  blue, pulsing, while an item is being sent. */
 @Composable
 private fun SyncSheetQueueSummary(
-    waiting: Int,
-    retrying: Int,
-    syncing: Boolean,
+    pending: Int,
+    processing: Int,
     dark: Boolean,
     divider: Color,
 ) {
@@ -500,6 +503,7 @@ private fun SyncSheetQueueSummary(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            val syncing = processing > 0
             val pulse = if (syncing) rememberPulseAlpha() else null
             Box(
                 Modifier
@@ -510,9 +514,9 @@ private fun SyncSheetQueueSummary(
             )
             Text(
                 if (syncing) {
-                    String.format(stringResource(R.string.native_sync_queue_syncing), retrying, waiting)
+                    String.format(stringResource(R.string.native_sync_queue_syncing), processing, pending)
                 } else {
-                    String.format(stringResource(R.string.native_sync_queue_waiting), waiting + retrying)
+                    String.format(stringResource(R.string.native_sync_queue_waiting), pending)
                 },
                 color = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565),
                 fontSize = 12.sp,
@@ -660,11 +664,7 @@ internal fun SyncStatusButton(
             }
         }
         if (locked) {
-            LockIcon(
-                size = 12.dp,
-                tint = SyncRedLight,
-                modifier = Modifier.align(Alignment.TopEnd).offset(x = 1.dp, y = (-1).dp),
-            )
+            LockBadgeIcon(size = 14.dp, tint = SyncRedLight, modifier = Modifier.align(Alignment.TopEnd))
         }
     }
 }

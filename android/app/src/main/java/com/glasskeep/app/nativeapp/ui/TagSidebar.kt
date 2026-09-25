@@ -3,8 +3,8 @@ package com.glasskeep.app.nativeapp.ui
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +39,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -259,67 +262,78 @@ private fun SidebarNavItem(
     iconGap: Dp = 12.dp,
 ) {
     val shape = RoundedCornerShape(6.dp)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (active) {
-                    Modifier.dropShadow(
-                        shape,
-                        Shadow(radius = 10.dp, color = activeGlow, spread = (-4).dp, offset = DpOffset(0.dp, 2.dp)),
-                    )
-                } else {
-                    Modifier
-                },
-            )
-            .clip(shape)
-            .then(
-                if (active) {
-                    Modifier
-                        // TagSidebar.jsx paints the active background over
-                        // the full usable nav-row width (`nav p-2` is the
-                        // only outer inset). Keeping a second inner inset
-                        // made the colour stop too close to the icon.
-                        .drawBehind {
-                            drawRoundRect(
-                                brush = activeGradient,
-                                topLeft = Offset.Zero,
-                                size = size,
-                                cornerRadius = CornerRadius(6.dp.toPx()),
-                            )
-                        }
-                } else {
-                    Modifier
-                },
-            )
-            .combinedClickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
-                onLongClick = onLongClick,
-            )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        icon(if (active) Color.White else titleColor)
-        Spacer(Modifier.width(iconGap))
-        Text(
-            label,
-            color = if (active) Color.White else titleColor,
-            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-            fontSize = 16.sp,
-            maxLines = 1,
-            modifier = Modifier.weight(1f),
-        )
-        if (count != null) {
-            Spacer(Modifier.width(12.dp))
+    // TagSidebar.jsx starts its long press on a plain 500ms timer, with no
+    // vibration.
+    val baseConfiguration = LocalViewConfiguration.current
+    val webLongPress = remember(baseConfiguration) {
+        object : ViewConfiguration by baseConfiguration {
+            override val longPressTimeoutMillis = 500L
+        }
+    }
+    CompositionLocalProvider(LocalViewConfiguration provides webLongPress) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (active) {
+                        Modifier.dropShadow(
+                            shape,
+                            Shadow(radius = 10.dp, color = activeGlow, spread = (-4).dp, offset = DpOffset(0.dp, 2.dp)),
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
+                .clip(shape)
+                .then(
+                    if (active) {
+                        Modifier
+                            // TagSidebar.jsx paints the active background over
+                            // the full usable nav-row width (`nav p-2` is the
+                            // only outer inset). Keeping a second inner inset
+                            // made the colour stop too close to the icon.
+                            .drawBehind {
+                                drawRoundRect(
+                                    brush = activeGradient,
+                                    topLeft = Offset.Zero,
+                                    size = size,
+                                    cornerRadius = CornerRadius(6.dp.toPx()),
+                                )
+                            }
+                    } else {
+                        Modifier
+                    },
+                )
+                .combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    role = Role.Button,
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                    hapticFeedbackEnabled = false,
+                )
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            icon(if (active) Color.White else titleColor)
+            Spacer(Modifier.width(iconGap))
             Text(
-                count.toString(),
-                color = (if (active) Color.White else titleColor).copy(alpha = 0.7f),
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
+                label,
+                color = if (active) Color.White else titleColor,
+                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                fontSize = 16.sp,
+                maxLines = 1,
+                modifier = Modifier.weight(1f),
             )
+            if (count != null) {
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    count.toString(),
+                    color = (if (active) Color.White else titleColor).copy(alpha = 0.7f),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                )
+            }
         }
     }
 }

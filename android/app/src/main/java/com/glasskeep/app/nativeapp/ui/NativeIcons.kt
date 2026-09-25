@@ -1823,6 +1823,28 @@ fun SwapServerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color 
     modifier, size, tint,
 )
 
+/** SyncStatusIcon.jsx LockBadge: a solid padlock, its body filled and
+ *  outlined at 1.5, its shackle stroked at 2.5. */
+@Composable
+fun LockBadgeIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    val shackle = remember { PathParser().parsePathString("M8 11V8a4 4 0 1 1 8 0v3").toPath() }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            val body = Size(14f, 10f)
+            drawRoundRect(tint, topLeft = Offset(5f, 11f), size = body, cornerRadius = CornerRadius(2f))
+            drawRoundRect(
+                tint,
+                topLeft = Offset(5f, 11f),
+                size = body,
+                cornerRadius = CornerRadius(2f),
+                style = Stroke(width = 1.5f, join = StrokeJoin.Round),
+            )
+            drawPath(shackle, color = tint, style = Stroke(width = 2.5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
 /** icons/index.jsx LockIcon: the Tabler lock drawn by the web itself at
  *  stroke 2, the header menu's "lock the instance" entry. */
 @Composable
