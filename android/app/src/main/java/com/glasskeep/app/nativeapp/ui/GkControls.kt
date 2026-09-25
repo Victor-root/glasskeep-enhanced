@@ -133,6 +133,12 @@ import kotlin.math.sqrt
 internal val GkStandardEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 internal val GkEaseOut = CubicBezierEasing(0f, 0f, 0.2f, 1f)
 
+/** Plain CSS `ease-out`, the curve of the notification swipe. */
+internal val CssEaseOut = CubicBezierEasing(0f, 0f, 0.58f, 1f)
+
+/** `cubic-bezier(.22,.61,.36,1)`: gkNotifIn and gkMobileToastIn. */
+internal val GkNotifInEasing = CubicBezierEasing(0.22f, 0.61f, 0.36f, 1f)
+
 /** Tailwind's `animate-pulse`: opacity 1 → .5 → 1 every 2s on
  *  `cubic-bezier(0.4, 0, 0.6, 1)`. That curve is symmetric, so playing the
  *  first half back reproduces the second one exactly. */

@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,14 +52,15 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -86,6 +88,7 @@ import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import kotlin.math.abs
+import kotlin.math.sign
 import kotlinx.coroutines.launch
 
 internal val TopSheetEasing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
@@ -188,6 +191,7 @@ fun NotificationCenter(
     }
     val slide = slideAnim.value
 
+    val enteredIds = remember { mutableSetOf<Int>() }
     val maxHeight = configuration.screenHeightDp.dp
     val statusBar = WorkspaceTheme.statusBarColor(themeId, dark)
     val shape = RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp)
@@ -240,7 +244,20 @@ fun NotificationCenter(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(notifications, key = { it.id }) { notification ->
+                        // `.gk-notif-center__item--swipeable`'s gkNotifIn,
+                        // once per row while the sheet is up.
+                        val entry = remember { Animatable(if (notification.id in enteredIds) 1f else 0f) }
+                        LaunchedEffect(Unit) {
+                            enteredIds += notification.id
+                            entry.animateTo(1f, tween(220, easing = GkNotifInEasing))
+                        }
                         NotificationCard(
+                            modifier = Modifier.graphicsLayer {
+                                alpha = entry.value
+                                translationY = (1f - entry.value) * -8.dp.toPx()
+                                scaleX = 0.96f + 0.04f * entry.value
+                                scaleY = scaleX
+                            },
                             notification = notification,
                             dark = dark,
                             onOpen = { notification.noteId?.let(onOpenNote) },
@@ -460,6 +477,7 @@ internal fun TopSheetGrabber(
  */
 @Composable
 private fun NotificationCard(
+    modifier: Modifier,
     notification: NotificationDto,
     dark: Boolean,
     onOpen: () -> Unit,
@@ -472,18 +490,36 @@ private fun NotificationCard(
     val cardColor = if (dark) Color(0xFF12121C).copy(alpha = 0.97f) else Color(0xFFFCFCFF).copy(alpha = 0.97f)
     val textColor = if (dark) Color(0xFFF0F0F5) else Color(0xFF1D1D1F)
     val shape = RoundedCornerShape(12.dp)
-    var offsetX by remember(notification.id) { mutableStateOf(0f) }
+    val scope = rememberCoroutineScope()
+    val offsetX = remember(notification.id) { Animatable(0f) }
+    // Past the threshold the card fades out on its own 0.22s clock.
+    val exitAlpha = remember(notification.id) { Animatable(1f) }
+    var exiting by remember(notification.id) { mutableStateOf(false) }
+    var widthPx by remember { mutableIntStateOf(0) }
     val thresholdPx = with(density) { SwipeDismissThreshold.toPx() }
     val fadeSpanPx = with(density) { 220.dp.toPx() }
+    val release = {
+        scope.launch {
+            if (abs(offsetX.value) >= thresholdPx) {
+                exiting = true
+                exitAlpha.snapTo((1f - abs(offsetX.value) / fadeSpanPx).coerceIn(0f, 1f))
+                launch { exitAlpha.animateTo(0f, tween(220, easing = CssEaseOut)) }
+                offsetX.animateTo(sign(offsetX.value) * widthPx * 1.2f, tween(220, easing = CssEaseOut))
+                onDismissCard()
+            } else {
+                offsetX.animateTo(0f, tween(200, easing = CssEaseOut))
+            }
+        }
+    }
 
-    Box(Modifier.fillMaxWidth()) {
+    Box(modifier.fillMaxWidth().onSizeChanged { widthPx = it.width }) {
         // The red "delete" bed the card slides off, revealed in step with
         // how far it has travelled.
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .clip(shape)
-                .alpha((abs(offsetX) / with(density) { 80.dp.toPx() }).coerceIn(0f, 1f))
+                .clip(RoundedCornerShape(16.dp))
+                .graphicsLayer { alpha = if (exiting) 1f else (abs(offsetX.value) / thresholdPx).coerceIn(0f, 1f) }
                 .background(
                     Brush.horizontalGradient(
                         if (dark) {
@@ -503,16 +539,16 @@ private fun NotificationCard(
                 )
                 .padding(horizontal = 18.dp),
         ) {
-            TrashIcon(size = 22.dp, tint = Color.White, modifier = Modifier.align(Alignment.CenterStart))
-            TrashIcon(size = 22.dp, tint = Color.White, modifier = Modifier.align(Alignment.CenterEnd))
+            TablerTrashIcon(size = 22.dp, tint = Color.White, modifier = Modifier.align(Alignment.CenterStart))
+            TablerTrashIcon(size = 22.dp, tint = Color.White, modifier = Modifier.align(Alignment.CenterEnd))
         }
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .graphicsLayer {
-                    translationX = offsetX
-                    alpha = (1f - abs(offsetX) / fadeSpanPx).coerceIn(0f, 1f)
+                    translationX = offsetX.value
+                    alpha = if (exiting) exitAlpha.value else (1f - abs(offsetX.value) / fadeSpanPx).coerceIn(0f, 1f)
                 }
                 .clip(shape)
                 .background(cardColor)
@@ -522,12 +558,10 @@ private fun NotificationCard(
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { change, delta ->
                             change.consume()
-                            offsetX += delta
+                            scope.launch { offsetX.snapTo(offsetX.value + delta) }
                         },
-                        onDragEnd = {
-                            if (abs(offsetX) > thresholdPx) onDismissCard() else offsetX = 0f
-                        },
-                        onDragCancel = { offsetX = 0f },
+                        onDragEnd = { release() },
+                        onDragCancel = { release() },
                     )
                 },
         ) {

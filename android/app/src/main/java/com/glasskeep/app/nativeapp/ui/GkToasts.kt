@@ -1,6 +1,5 @@
 package com.glasskeep.app.nativeapp.ui
 
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -220,7 +219,7 @@ fun GkToastHost(
 
     val entry by animateFloatAsState(
         targetValue = 1f,
-        animationSpec = tween(durationMillis = 220, easing = CubicBezierEasing(0.22f, 0.61f, 0.36f, 1f)),
+        animationSpec = tween(durationMillis = 220, easing = GkNotifInEasing),
         label = "toastIn",
     )
 
