@@ -102,6 +102,7 @@ fun NativeNavHost(
     // screen, and to a note being trashed/restored, not just the one
     // action that happens to be on screen right now. See ReminderSync.kt.
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
+    val api = remember(serverUrl) { container.api(serverUrl) }
     val notes by repository.observeNotes().collectAsState(initial = null)
     LaunchedEffect(notes) {
         val hasUpcomingReminder = notes?.let { syncReminderAlarms(context, it) } ?: false
@@ -341,7 +342,14 @@ fun NativeNavHost(
         liveNotification = null
         val noteTitle = notification.noteTitle.ifBlank { context.getString(R.string.native_notes_untitled) }
         val template = notificationMessageRes(notification.type, notification.variant)
-        val opensAdmin = notification.type == "pending_user_registered"
+        val pendingId = notification.message?.toIntOrNull()
+            ?.takeIf { notification.type == "pending_user_registered" }
+        fun decide(approve: Boolean) {
+            val id = pendingId ?: return
+            scope.launch {
+                decidePendingRegistration(context, api, repository, toasts, id, notification.id, approve)
+            }
+        }
         toasts.show(
             message = template
                 ?.let { context.getString(it, notification.senderName, noteTitle) }
@@ -350,14 +358,16 @@ fun NativeNavHost(
             title = context.getString(notificationTitleRes(notification.type)),
             actionLabel = when {
                 notification.noteId != null -> context.getString(R.string.native_notifications_open)
-                opensAdmin -> context.getString(R.string.native_admin_title)
+                pendingId != null -> context.getString(R.string.native_admin_approve)
                 else -> null
             },
             action = when {
                 notification.noteId != null -> { { navController.navigate("notes/${notification.noteId}") } }
-                opensAdmin -> { { navController.navigate("admin") } }
+                pendingId != null -> { { decide(approve = true) } }
                 else -> null
             },
+            secondaryActionLabel = pendingId?.let { context.getString(R.string.native_admin_reject) },
+            secondaryAction = pendingId?.let { { decide(approve = false) } },
             type = notification.type,
         )
     }

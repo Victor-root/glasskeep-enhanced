@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -72,6 +73,9 @@ data class GkToast(
     val variant: NotifVariant,
     val actionLabel: String? = null,
     val action: (() -> Unit)? = null,
+    /** The bordered second button (Refuser next to Approuver). */
+    val secondaryActionLabel: String? = null,
+    val secondaryAction: (() -> Unit)? = null,
     /** Overrides the user's configured duration for this one pill. */
     val durationMs: Long? = null,
 )
@@ -112,11 +116,25 @@ class ToastController {
          *  categorised by its variant alone. */
         type: String? = null,
         durationMs: Long? = null,
+        secondaryActionLabel: String? = null,
+        secondaryAction: (() -> Unit)? = null,
     ) {
         val category = NotifCategory.of(type, variant.categoryKey)
         val settings = prefs
         if (settings != null && !settings.allowsNotification(category)) return
-        queue.add(GkToast(nextId++, title, message, variant, actionLabel, action, durationMs))
+        queue.add(
+            GkToast(
+                id = nextId++,
+                title = title,
+                message = message,
+                variant = variant,
+                actionLabel = actionLabel,
+                action = action,
+                secondaryActionLabel = secondaryActionLabel,
+                secondaryAction = secondaryAction,
+                durationMs = durationMs,
+            ),
+        )
         if (settings != null && settings.ringsFor(category)) NotificationDing.play()
     }
 
@@ -237,7 +255,11 @@ fun GkToastHost(
                         lineHeight = 16.25.sp,
                     )
                 }
-                if (current.actionLabel != null) {
+                if (current.actionLabel != null) Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.offset(x = 4.dp),
+                ) {
                     Text(
                         current.actionLabel,
                         color = current.variant.accent,
@@ -254,6 +276,26 @@ fun GkToastHost(
                             }
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                     )
+                    if (current.secondaryActionLabel != null) {
+                        val secondaryShape = RoundedCornerShape(8.dp)
+                        Text(
+                            current.secondaryActionLabel,
+                            color = textColor,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clip(secondaryShape)
+                                .border(1.dp, if (dark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.18f), secondaryShape)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) {
+                                    current.secondaryAction?.invoke()
+                                    controller.dismiss(current.id)
+                                }
+                                .padding(horizontal = 9.dp, vertical = 3.dp),
+                        )
+                    }
                 }
             }
             // The countdown drains left to right along the bottom edge.

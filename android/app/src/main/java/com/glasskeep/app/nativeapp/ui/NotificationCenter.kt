@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.content.Context
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
@@ -68,7 +69,9 @@ import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.NotifCategory
+import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import kotlin.math.abs
@@ -246,14 +249,8 @@ fun NotificationCenter(
                             onApprovePending = notification.message?.toIntOrNull()?.let { pendingId ->
                                 {
                                     scope.launch {
-                                        try {
-                                            val response = api.approvePendingUser(pendingId)
-                                            if (!response.isSuccessful) error("HTTP ${response.code()}")
+                                        if (decidePendingRegistration(context, api, repository, toasts, pendingId, notification.id, approve = true)) {
                                             notifications = notifications.filterNot { it.id == notification.id }
-                                            repository.removeNotifications(listOf(notification.id))
-                                            toasts.success(context.getString(R.string.native_admin_registration_approved))
-                                        } catch (t: Throwable) {
-                                            toasts.error(t.message ?: context.getString(R.string.native_admin_action_failed))
                                         }
                                     }
                                 }
@@ -261,14 +258,8 @@ fun NotificationCenter(
                             onRejectPending = notification.message?.toIntOrNull()?.let { pendingId ->
                                 {
                                     scope.launch {
-                                        try {
-                                            val response = api.rejectPendingUser(pendingId)
-                                            if (!response.isSuccessful) error("HTTP ${response.code()}")
+                                        if (decidePendingRegistration(context, api, repository, toasts, pendingId, notification.id, approve = false)) {
                                             notifications = notifications.filterNot { it.id == notification.id }
-                                            repository.removeNotifications(listOf(notification.id))
-                                            toasts.show(context.getString(R.string.native_admin_registration_rejected))
-                                        } catch (t: Throwable) {
-                                            toasts.error(t.message ?: context.getString(R.string.native_admin_action_failed))
                                         }
                                     }
                                 }
@@ -565,17 +556,23 @@ private fun NotificationCard(
                     }
                 }
                 if (notification.type == "pending_user_registered" && onApprovePending != null && onRejectPending != null) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NotificationAction(
-                            label = stringResource(R.string.native_admin_reject),
-                            color = Color(0xFFDC2626),
-                            onClick = onRejectPending,
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    ) {
                         NotificationAction(
                             label = stringResource(R.string.native_admin_approve),
-                            color = Color(0xFF16A34A),
+                            primary = true,
+                            dark = dark,
+                            textColor = textColor,
                             onClick = onApprovePending,
+                        )
+                        NotificationAction(
+                            label = stringResource(R.string.native_admin_reject),
+                            primary = false,
+                            dark = dark,
+                            textColor = textColor,
+                            onClick = onRejectPending,
                         )
                     }
                 }
@@ -584,18 +581,59 @@ private fun NotificationCard(
     }
 }
 
+/** Approves or rejects a pending registration from a notification (card
+ *  or pill), then drops that notification. False when the call failed. */
+internal suspend fun decidePendingRegistration(
+    context: Context,
+    api: GlassKeepApi,
+    repository: NotesRepository,
+    toasts: ToastController,
+    pendingId: Int,
+    notificationId: Int,
+    approve: Boolean,
+): Boolean = try {
+    val response = if (approve) api.approvePendingUser(pendingId) else api.rejectPendingUser(pendingId)
+    if (!response.isSuccessful) error("HTTP ${response.code()}")
+    repository.removeNotifications(listOf(notificationId))
+    if (approve) {
+        toasts.success(context.getString(R.string.native_admin_registration_approved))
+    } else {
+        toasts.show(context.getString(R.string.native_admin_registration_rejected))
+    }
+    true
+} catch (t: Throwable) {
+    toasts.error(t.message ?: context.getString(R.string.native_admin_action_failed))
+    false
+}
+
+/** The card's action pills (globalCSS.js .gk-notif-card__action): a
+ *  tinted primary and a bordered secondary, both in the card's text colour. */
 @Composable
-private fun NotificationAction(label: String, color: Color, onClick: () -> Unit) {
+private fun NotificationAction(label: String, primary: Boolean, dark: Boolean, textColor: Color, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(999.dp)
     Text(
         label,
-        color = Color.White,
-        fontSize = 12.sp,
+        color = textColor,
+        fontSize = 12.5.sp,
+        lineHeight = 18.75.sp,
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(color).clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null,
-            role = Role.Button,
-        ) { onClick() }.padding(horizontal = 14.dp, vertical = 6.dp),
+        modifier = Modifier
+            .clip(shape)
+            .then(
+                if (primary) {
+                    Modifier
+                        .background(if (dark) Color.White.copy(alpha = 0.13f) else Color.Black.copy(alpha = 0.07f))
+                        .padding(horizontal = 14.dp, vertical = 5.dp)
+                } else {
+                    Modifier.border(1.dp, if (dark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.18f), shape)
+                },
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) { onClick() }
+            .then(if (primary) Modifier else Modifier.padding(horizontal = 13.dp, vertical = 4.dp)),
     )
 }
 
