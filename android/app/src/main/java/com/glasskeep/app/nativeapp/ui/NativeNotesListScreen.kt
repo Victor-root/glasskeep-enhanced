@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -2453,11 +2455,19 @@ internal fun NoteCard(
                 }
             }
 
-            // Its own row, same as NoteCardFooter.jsx: a reminder's date/time
-            // stays readable instead of competing with the preview above it.
-            note.reminderAt?.let { reminderAt ->
-                Spacer(Modifier.height(6.dp))
-                ReminderChip(reminderAt = reminderAt, dark = dark)
+            val tags = remember(note.tagsJson) { TagsJson.parse(note.tagsJson) }
+            if (note.reminderAt != null || tags.isNotEmpty()) {
+                // .note-card-footer (NoteCardFooter.jsx:40): mt-2 pt-1, rows
+                // space-y-2 in the order reminder, tags.
+                Column(
+                    modifier = Modifier.padding(top = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    note.reminderAt?.let { reminderAt ->
+                        ReminderChip(reminderAt = reminderAt, dark = dark)
+                    }
+                    if (tags.isNotEmpty()) CardTagChips(tags = tags, dark = dark)
+                }
             }
         }
 
@@ -2487,6 +2497,47 @@ internal fun NoteCard(
                 dark = dark,
                 onToggle = { onToggleSelect?.invoke() },
                 modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+            )
+        }
+    }
+}
+
+/** NoteCardFooter.jsx:49-70: at most three tag pills, then a "+N" pill. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CardTagChips(tags: List<String>, dark: Boolean) {
+    val chipBg = if (dark) Color(0xFF364153) else Color(0xFFE5E7EB)
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        tags.take(3).forEach { tag ->
+            Text(
+                tag,
+                color = if (dark) Color(0xFFE5E7EB) else Color(0xFF364153),
+                fontSize = 11.sp,
+                lineHeight = 16.5.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .widthIn(max = 140.dp)
+                    .clip(CircleShape)
+                    .background(chipBg)
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+            )
+        }
+        if (tags.size > 3) {
+            Text(
+                "+${tags.size - 3}",
+                color = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565),
+                fontSize = 11.sp,
+                lineHeight = 16.5.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(chipBg.copy(alpha = 0.7f))
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
             )
         }
     }
