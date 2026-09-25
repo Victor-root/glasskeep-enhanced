@@ -93,6 +93,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
@@ -564,6 +569,20 @@ fun NoteDetailScreen(
                 toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 pinning = false
+            }
+        }
+    }
+
+    /** Where Enter in the title lands: the end of the body, or a
+     *  checklist's first row (NoteModal.jsx:717-734). */
+    fun focusBodyFromTitle() {
+        val edit = editability ?: return
+        if (edit.isChecklistType) {
+            edit.checklistItems?.firstOrNull { it is ChecklistItemData }?.let { pendingChecklistFocus = it.id }
+        } else {
+            richBlocks?.lastOrNull()?.let { last ->
+                pendingRichSelections[last.id] = TextRange(last.text.length)
+                pendingRichFocus = last.id
             }
         }
     }
@@ -2046,11 +2065,12 @@ fun NoteDetailScreen(
                                     titleColor = titleColor,
                                     placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
                                     onValueChange = { raw ->
-                                        // Every incoming value gets its newlines
-                                        // flattened, same defensive sanitising as
-                                        // ModalHeader.jsx: a title is single-line
-                                        // everywhere else in the app.
-                                        titleText = raw.replace(TitleNewlines, " ")
+                                        // Enter alone jumps to the body, typing
+                                        // nothing (ModalHeader.jsx:65-80); any other
+                                        // newline, a pasted one, is flattened to a
+                                        // space: a title is single-line everywhere.
+                                        val enterOnly = raw.count { it == '\n' } == 1 && raw.replace("\n", "") == titleText
+                                        if (enterOnly) focusBodyFromTitle() else titleText = raw.replace(TitleNewlines, " ")
                                     },
                                 )
                             }
@@ -2480,7 +2500,11 @@ fun NoteDetailScreen(
                                     },
                                     onToggle = { tag -> toggleTag(tag) },
                                     onCreate = { raw -> addTagsFromInput(raw); tagInput = "" },
-                                    onDismiss = { showTagsPicker = false; tagInput = "" },
+                                    // Backspace in the empty field drops the last tag,
+                                    // and leaving the panel keeps what was typed
+                                    // (ModalFooter.jsx's keydown, useModalState.js's blur).
+                                    onBackspaceEmpty = { currentNote.tags.lastOrNull()?.let { toggleTag(it) } },
+                                    onDismiss = { addTagsFromInput(tagInput); showTagsPicker = false; tagInput = "" },
                                 )
                             }
                         },
@@ -3003,6 +3027,7 @@ private fun NoteTagsPopover(
     onInputChange: (String) -> Unit,
     onToggle: (String) -> Unit,
     onCreate: (String) -> Unit,
+    onBackspaceEmpty: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val trimmed = input.trim()
@@ -3054,10 +3079,15 @@ private fun NoteTagsPopover(
                     textStyle = TextStyle(color = rowFg, fontSize = 14.sp, lineHeight = 20.sp),
                     cursorBrush = SolidColor(accent),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { if (isNewTag) onCreate(trimmed) }),
+                    keyboardActions = KeyboardActions(onDone = { if (trimmed.isNotEmpty()) onCreate(trimmed) }),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .onFocusChanged { focused = it.isFocused },
+                        .onFocusChanged { focused = it.isFocused }
+                        .onPreviewKeyEvent { event ->
+                            val eraseOnEmpty = event.type == KeyEventType.KeyDown && event.key == Key.Backspace && input.isEmpty()
+                            if (eraseOnEmpty) onBackspaceEmpty()
+                            eraseOnEmpty
+                        },
                     decorationBox = { innerTextField ->
                         if (input.isEmpty()) {
                             Text(
