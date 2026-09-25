@@ -3278,6 +3278,7 @@ private fun NoteTitleField(
  * space-evenly (globalCSS.js:1863-1889), over a translucent black veil
  * on top of the note color.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NoteModalFooter(
     dark: Boolean,
