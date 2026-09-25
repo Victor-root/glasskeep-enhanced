@@ -3,6 +3,7 @@ package com.glasskeep.app.nativeapp.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -44,19 +46,19 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -69,7 +71,6 @@ import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.NotifCategory
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
-import androidx.compose.foundation.Image
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
@@ -487,7 +488,8 @@ private fun NotificationCard(
         }
 
         Row(
-            verticalAlignment = Alignment.Top,
+            // Centred on the card, except a card carrying Approve/Reject.
+            verticalAlignment = if (notification.type == "pending_user_registered") Alignment.Top else Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(9.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -514,7 +516,7 @@ private fun NotificationCard(
                 .padding(horizontal = 12.dp, vertical = 9.dp),
         ) {
             Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
-                NotificationIcon(notification.type, variant.accent)
+                NotificationIcon(notification, variant)
             }
             Column(Modifier.weight(1f)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -597,19 +599,45 @@ private fun NotificationAction(label: String, color: Color, onClick: () -> Unit)
     )
 }
 
-/** SEMANTIC_ICONS (NotificationCard.jsx:34-58), for the types this app
- *  actually receives; anything else falls back to the bell. */
+/** VariantGlyph (NotificationCard.jsx:34-79): the row's semantic icon
+ *  (useShareNotifications.js gives each server type one) or its stored
+ *  `icon` key, else the variant's filled glyph; 30px, overflowing the
+ *  26px slot, except on info cards. */
 @Composable
-private fun NotificationIcon(type: String, accent: Color) {
-    when (type) {
-        "note_shared" -> CollaborateIcon(size = 22.dp, tint = accent)
+private fun NotificationIcon(notification: NotificationDto, variant: NotifVariant) {
+    val tint = variant.accent
+    val key = when (notification.type) {
+        "note_shared" -> null
         "note_access_revoked", "note_access_revoked_with_copy",
         "collaborator_removed", "collaborator_removed_with_copy",
         "collaborator_left",
-        -> PeopleIcon(size = 22.dp, tint = accent)
-        "shared_note_deleted", "shared_note_deleted_with_copy" -> TrashIcon(size = 22.dp, tint = accent)
-        "reminder" -> BellRingingFilledIcon(size = 22.dp, tint = accent)
-        else -> BellIcon(size = 22.dp, tint = accent)
+        "shared_note_deleted", "shared_note_deleted_with_copy",
+        -> null
+        "reminder" -> "reminder"
+        "pending_user_registered" -> "user-clock"
+        "user_deleted" -> "user-x"
+        else -> notification.icon
+    }
+    val glyph = if (variant == NotifVariant.INFO) 26.dp else 30.dp
+    Box(Modifier.size(26.dp).wrapContentSize(unbounded = true)) {
+        when (key) {
+            "reminder" -> BellRingingFilledIcon(size = glyph, tint = tint)
+            "user-clock" -> UserClockIcon(size = glyph, tint = tint)
+            "user-x", "unshare" -> UserXIcon(size = glyph, tint = tint)
+            "share" -> UserShareIcon(size = glyph, tint = tint)
+            "trash" -> TrashIcon(size = glyph, tint = tint)
+            "archive" -> ArchiveIcon(size = glyph, tint = tint)
+            "edit" -> PencilIcon(size = glyph, tint = tint)
+            "key" -> KeyIcon(size = glyph, tint = tint)
+            "shield" -> ShieldLockIcon(size = glyph, tint = tint)
+            "refresh" -> RefreshIcon(size = glyph, tint = tint)
+            else -> when (variant) {
+                NotifVariant.SUCCESS -> CircleCheckFilledIcon(size = glyph, tint = tint)
+                NotifVariant.WARNING -> AlertFilledIcon(size = glyph, tint = tint)
+                NotifVariant.ERROR -> AlertCircleFilledIcon(size = glyph, tint = tint)
+                NotifVariant.INFO -> InfoFilledIcon(size = glyph, tint = tint)
+            }
+        }
     }
 }
 

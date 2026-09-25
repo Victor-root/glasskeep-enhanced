@@ -1541,6 +1541,16 @@ fun UserShareIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color =
     modifier, size, tint,
 )
 
+/** tabler/user-clock.svg. */
+@Composable
+fun UserClockIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0 " +
+        "M6 21v-2a4 4 0 0 1 4 -4h4.5 " +
+        "M18 18m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0 " +
+        "M18 16.496v1.504l1 1",
+    modifier, size, tint,
+)
+
 /** tabler/user-x.svg. */
 @Composable
 fun UserXIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
