@@ -779,6 +779,8 @@
     <!-- Note icon and the account's logo library: modal/AddImageMenu.jsx
          and modal/LogoPickerPopover.jsx. -->
     <string name="native_note_icon">Note icon</string>
+    <string name="native_card_more_image">+%1$d Image</string>
+    <string name="native_card_more_images">+%1$d Images</string>
     <string name="native_add_an_image">Add an image</string>
     <string name="native_add_logo">Add a logo</string>
     <string name="native_replace_logo">Replace logo</string>

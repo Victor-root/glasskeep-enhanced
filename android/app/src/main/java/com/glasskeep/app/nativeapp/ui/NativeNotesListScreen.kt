@@ -38,6 +38,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -72,6 +74,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -151,6 +154,8 @@ import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.NoteContent
+import com.glasskeep.app.nativeapp.data.NoteImageData
+import com.glasskeep.app.nativeapp.data.NoteImages
 import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
@@ -161,6 +166,7 @@ import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.local.SyncQueueEntity
 import com.glasskeep.app.nativeapp.data.matchesAnyTag
 import com.glasskeep.app.nativeapp.data.matchesSearchQuery
+import com.glasskeep.app.nativeapp.data.network.CollaboratorDto
 import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.NoteIconDto
@@ -931,6 +937,7 @@ fun NativeNotesListScreen(
                                     },
                                     typography = container.editorPrefs.typography.activeProfile,
                                     taskStrike = container.editorPrefs.taskStrike,
+                                    loadDetail = repository::cachedNoteDetailOrNull,
                                     isDragged = note.id == draggedNoteId,
                                     isDragOver = note.id == dragOverNoteId,
                                     onBoundsChanged = { bounds ->
@@ -2225,6 +2232,7 @@ private fun ReorderableNoteCard(
     onToggleSelect: () -> Unit,
     typography: TypographyProfile,
     taskStrike: Boolean,
+    loadDetail: suspend (String) -> NoteDto?,
     isDragged: Boolean,
     isDragOver: Boolean,
     onBoundsChanged: (Rect?) -> Unit,
@@ -2310,6 +2318,7 @@ private fun ReorderableNoteCard(
             onToggleSelect = onToggleSelect,
             typography = typography,
             taskStrike = taskStrike,
+            loadDetail = loadDetail,
         )
     }
 }
@@ -2386,8 +2395,17 @@ internal fun NoteCard(
     onToggleSelect: (() -> Unit)? = null,
     typography: TypographyProfile = TypographyPresets.DEFAULT.activeProfile,
     taskStrike: Boolean = false,
+    loadDetail: (suspend (String) -> NoteDto?)? = null,
 ) {
     val borderColor = if (dark) CardBorderDark else CardBorderLight
+    // The list cache keeps only light columns; images and collaborators
+    // live in the cached full note.
+    val detail by produceState<NoteDto?>(null, note.id, note.updatedAt, loadDetail) {
+        value = loadDetail?.invoke(note.id)
+    }
+    val images = remember(detail) { detail?.let { NoteImages.parse(it.images) }.orEmpty() }
+    val collaborators = detail?.collaborators.orEmpty()
+    val showCollaborators = detail != null && (collaborators.isNotEmpty() || detail?.access != "owner")
     val shape = RoundedCornerShape(12.dp)
     Box(Modifier.fillMaxWidth()) {
         Column(
@@ -2417,6 +2435,11 @@ internal fun NoteCard(
                     modifier = Modifier.padding(end = if (selectionMode || note.iconSrc != null) 30.dp else 0.dp),
                 )
                 Spacer(Modifier.height(8.dp))
+            }
+
+            if (images.isNotEmpty()) {
+                CardImageGrid(images = images, subtextColor = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282))
+                Spacer(Modifier.height(12.dp))
             }
 
             if (note.type == "checklist") {
@@ -2456,7 +2479,7 @@ internal fun NoteCard(
             }
 
             val tags = remember(note.tagsJson) { TagsJson.parse(note.tagsJson) }
-            if (note.reminderAt != null || tags.isNotEmpty()) {
+            if (note.reminderAt != null || tags.isNotEmpty() || showCollaborators) {
                 // .note-card-footer (NoteCardFooter.jsx:40): mt-2 pt-1, rows
                 // space-y-2 in the order reminder, tags.
                 Column(
@@ -2467,6 +2490,7 @@ internal fun NoteCard(
                         ReminderChip(reminderAt = reminderAt, dark = dark)
                     }
                     if (tags.isNotEmpty()) CardTagChips(tags = tags, dark = dark)
+                    if (showCollaborators) CardCollaborators(collaborators = collaborators, dark = dark)
                 }
             }
         }
@@ -2498,6 +2522,116 @@ internal fun NoteCard(
                 onToggle = { onToggleSelect?.invoke() },
                 modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
             )
+        }
+    }
+}
+
+/** NoteCard.jsx:280-304: up to six thumbnails, one full width or two per
+ *  row, each capped at 200dp high and letterboxed, then a "+N" line. */
+@Composable
+private fun CardImageGrid(images: List<NoteImageData>, subtextColor: Color) {
+    val shown = images.take(6)
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        shown.chunked(if (shown.size == 1) 1 else 2).forEach { row ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.height(IntrinsicSize.Max),
+            ) {
+                row.forEach { image ->
+                    val bitmap = rememberDecodedImage(image.src)
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(8.dp)),
+                    ) {
+                        if (bitmap != null) {
+                            Image(
+                                bitmap = bitmap,
+                                contentDescription = image.name,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 200.dp)
+                                    .aspectRatio(bitmap.width.toFloat() / bitmap.height, matchHeightConstraintsFirst = false),
+                            )
+                        }
+                    }
+                }
+                if (row.size == 1 && shown.size > 1) Spacer(Modifier.weight(1f))
+            }
+        }
+        if (images.size > 6) {
+            val extra = images.size - 6
+            Text(
+                stringResource(if (extra == 1) R.string.native_card_more_image else R.string.native_card_more_images, extra),
+                color = subtextColor,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            )
+        }
+    }
+}
+
+/** NoteCardFooter.jsx:72-101: people glyph then up to two overlapping
+ *  24dp avatars and a "+N" disc, right-aligned. */
+@Composable
+private fun CardCollaborators(collaborators: List<CollaboratorDto>, dark: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CollaborateIcon(size = 16.dp, tint = if (dark) Color(0xFF7C86FF) else Color(0xFF615FFF))
+        Spacer(Modifier.width(4.dp))
+        collaborators.take(2).forEachIndexed { index, person ->
+            val photo = person.avatarUrl?.takeIf { it.startsWith("data:") }?.let { rememberDecodedImage(it) }
+            Box(
+                modifier = Modifier
+                    .offset(x = (-6 * index).dp)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(
+                        when {
+                            photo != null -> Color.White
+                            dark -> Color(0x406060FF)
+                            else -> Color(0xFFE0E7FF)
+                        },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (photo != null) {
+                    Image(photo, contentDescription = person.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                } else {
+                    Text(
+                        person.name.trim().take(1).uppercase(),
+                        color = if (dark) Color(0xFFA3B3FF) else Color(0xFF432DD7),
+                        fontSize = 8.sp,
+                        lineHeight = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+        if (collaborators.size > 2) {
+            Box(
+                modifier = Modifier
+                    .offset(x = (-12).dp)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(if (dark) Color(0xFF4A5565) else Color(0xFFE5E7EB)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "+${collaborators.size - 2}",
+                    color = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565),
+                    fontSize = 11.sp,
+                    lineHeight = 16.5.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
     }
 }

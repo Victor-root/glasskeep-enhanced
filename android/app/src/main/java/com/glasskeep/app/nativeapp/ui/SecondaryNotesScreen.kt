@@ -444,6 +444,7 @@ fun SecondaryNotesScreen(
                             onToggleSelect = {
                                 selectedIds = if (note.id in selectedIds) selectedIds - note.id else selectedIds + note.id
                             },
+                            loadDetail = repository::cachedNoteDetailOrNull,
                         )
                     }
                 }
