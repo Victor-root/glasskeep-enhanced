@@ -1903,8 +1903,10 @@ fun NoteDetailScreen(
     val imageButtonColor = if (dark) Color(0xFF7dd3fc) else Color(0xFF0284c7)
 
     // The panel is a .glass-card: a 1px border at the screen edges, with
-    // everything inside inset by it.
-    Box(Modifier.fillMaxSize().background(modalBg).border(1.dp, borderColor).padding(1.dp)) {
+    // everything inside inset by it, and its background eases over 300ms
+    // when the colour changes (the sticky header switches at once).
+    val panelBg by animateColorAsState(modalBg, tween(durationMillis = 300, easing = CssEase), label = "panelBg")
+    Box(Modifier.fillMaxSize().background(panelBg).border(1.dp, borderColor).padding(1.dp)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1918,6 +1920,7 @@ fun NoteDetailScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(modalBg)
                     .then(
                         // ModalHeader.jsx's draw-edit bar: 4px all round and a
                         // bottom border (black 10% / white 15%).

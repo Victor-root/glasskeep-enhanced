@@ -1305,9 +1305,6 @@ private val SelectionShim = 44.dp
 private val PullRefreshTrigger = 64.dp
 private val PullRefreshRest = 104.dp
 
-// CSS `ease`.
-private val CssEase = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)
-
 /** The web's empty and loading lines: 16px, centred, gray-500 / gray-400. */
 @Composable
 private fun EmptyListText(text: String, color: Color, modifier: Modifier = Modifier) {

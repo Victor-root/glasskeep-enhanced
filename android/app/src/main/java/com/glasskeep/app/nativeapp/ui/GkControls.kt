@@ -133,6 +133,9 @@ import kotlin.math.sqrt
 internal val GkStandardEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 internal val GkEaseOut = CubicBezierEasing(0f, 0f, 0.2f, 1f)
 
+/** Plain CSS `ease`. */
+internal val CssEase = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)
+
 /** Plain CSS `ease-out`, the curve of the notification swipe. */
 internal val CssEaseOut = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 
