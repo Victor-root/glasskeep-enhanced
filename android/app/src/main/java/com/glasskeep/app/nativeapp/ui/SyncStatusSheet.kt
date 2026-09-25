@@ -61,19 +61,20 @@ import kotlinx.coroutines.delay
 /** MAX_RETRIES (syncEngine.js:15, echoed by SyncStatusIcon.jsx:75). */
 private const val MaxRetries = 5
 
-// The five status tints, dark then light (SyncStatusIcon.jsx:80-137).
-private val SyncGrayDark = Color(0xFF9CA3AF)
-private val SyncGrayLight = Color(0xFF6B7280)
-private val SyncGreenDark = Color(0xFF34D399)
-private val SyncGreenLight = Color(0xFF059669)
-private val SyncAmberDark = Color(0xFFFBBF24)
-private val SyncAmberLight = Color(0xFFD97706)
-private val SyncBlueDark = Color(0xFF60A5FA)
-private val SyncBlueLight = Color(0xFF2563EB)
-private val SyncRedDark = Color(0xFFF87171)
-private val SyncRedLight = Color(0xFFDC2626)
+// The five status tints, dark then light (SyncStatusIcon.jsx:80-137), in
+// the Tailwind v4 values the web actually paints.
+private val SyncGrayDark = Color(0xFF99A1AF)
+private val SyncGrayLight = Color(0xFF6A7282)
+private val SyncGreenDark = Color(0xFF00D492)
+private val SyncGreenLight = Color(0xFF009966)
+private val SyncAmberDark = Color(0xFFFFB900)
+private val SyncAmberLight = Color(0xFFE17100)
+private val SyncBlueDark = Color(0xFF51A2FF)
+private val SyncBlueLight = Color(0xFF155DFC)
+private val SyncRedDark = Color(0xFFFF6467)
+private val SyncRedLight = Color(0xFFE7000B)
 
-private val SyncBadgeAmber = Color(0xFFF59E0B)
+private val SyncBadgeAmber = Color(0xFFFE9A00)
 private val SyncDotGray = Color(0xFF9CA3AF)
 private val SyncDotGreen = Color(0xFF10B981)
 private val SyncDotAmber = Color(0xFFF59E0B)
@@ -485,6 +486,8 @@ private fun SyncSheetItemList(
  * The header's cloud button: the state's own glyph and colour, the queue
  * count as an amber badge, and a red padlock over it when the instance is
  * locked (which replaces the count, since nothing is going to sync anyway).
+ * While the server is being checked or a sync runs, the whole button
+ * pulses, badge included.
  */
 @Composable
 internal fun SyncStatusButton(
@@ -495,13 +498,15 @@ internal fun SyncStatusButton(
     onClick: () -> Unit,
 ) {
     val face = syncStatusFace(state, dark)
+    val pulse = if (state == SyncState.CHECKING || state == SyncState.SYNCING) rememberPulseAlpha() else null
     Box(
         modifier = Modifier
             .gkTooltip(face.label)
             // p-2 + a 20px glyph in SyncStatusIcon.jsx: the badge must
             // align against this whole 36px button, not against the glyph's
             // content box (which made it sit squarely over the cloud).
-            .size(36.dp),
+            .size(36.dp)
+            .graphicsLayer { alpha = pulse?.value ?: 1f },
     ) {
         Box(
             modifier = Modifier

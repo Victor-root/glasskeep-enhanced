@@ -1,7 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
@@ -352,15 +351,14 @@ object WorkspaceTheme {
     fun statusBarColor(id: String?, dark: Boolean): Color = colorsFor(id, dark).statusBar
 
     /** --gk-app-bg (+ --gk-app-bg-image in light mode): the page fill
-     *  every screen sits on. CSS draws the light gradient at 135deg, i.e.
-     *  top-left to bottom-right. */
+     *  every screen sits on. CSS draws the light gradient at 135deg. */
     fun appBackground(id: String?, dark: Boolean): Brush {
         val c = colorsFor(id, dark)
         val stops = c.appBgGradient
         return if (stops == null) {
             SolidBrushOf(c.appBg)
         } else {
-            Brush.linearGradient(stops, start = Offset.Zero, end = Offset.Infinite)
+            cssAngleGradient(135f, stops)
         }
     }
 

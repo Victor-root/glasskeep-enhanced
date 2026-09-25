@@ -61,14 +61,16 @@
     <string name="native_settings_passkeys_delete_confirm_title">Remove this passkey?</string>
     <string name="native_settings_passkeys_delete_confirm_body">This passkey can no longer be used to sign in. If it could unlock the encrypted instance, that authorisation will be revoked too.</string>
     <string name="native_header_notes_label">Notes</string>
+    <string name="native_header_offline">Offline</string>
     <string name="native_sidebar_notes_all">Notes (All)</string>
     <string name="native_sidebar_archived_notes">Archived Notes</string>
     <string name="native_notes_refresh">Refresh</string>
-    <string name="native_notes_empty">No notes yet.</string>
+    <string name="native_notes_empty">No notes yet. Add one to get started!</string>
+    <string name="native_notes_loading">Loading Notes…</string>
+    <string name="native_notes_offline_view_not_loaded">Server is unreachable, this view could not be loaded. It will update automatically when the connection is restored.</string>
     <string name="native_note_detail_edited_prefix">Edited: %1$s</string>
     <string name="native_notes_section_pinned">Pinned</string>
     <string name="native_notes_section_others">Others</string>
-    <string name="native_notes_error_sync">Couldn\'t sync: %1$s</string>
     <string name="native_notes_create_error">Couldn\'t create the note: %1$s</string>
     <string name="native_notes_untitled">Untitled</string>
     <string name="native_notes_more_items">+%1$d more…</string>
@@ -110,16 +112,17 @@
     <string name="native_note_ai_back">Back to note</string>
     <string name="native_note_ai_scroll_down">Scroll to bottom</string>
     <string name="native_note_ai_error">AI request failed.</string>
-    <string name="native_notes_search_or_ask">Search or Ask AI…</string>
+    <string name="native_notes_search_or_ask">Search or Ask AI...</string>
     <string name="native_notes_ask_ai">Ask AI</string>
     <string name="native_notes_ai_assistant">AI Assistant</string>
-    <string name="native_notes_ai_thinking">AI Assistant is thinking…</string>
+    <string name="native_notes_ai_thinking">AI Assistant is thinking...</string>
     <string name="native_notes_ai_cited">Notes used</string>
     <string name="native_notes_ai_clear">Clear response</string>
     <string name="native_notes_ai_error">Sorry, I encountered an error while processing your request.</string>
-    <string name="native_notes_search_placeholder">Search notes…</string>
-    <string name="native_notes_search_close">Close search</string>
-    <string name="native_notes_search_empty">No notes match your search.</string>
+    <string name="native_notes_search_placeholder">Search...</string>
+    <string name="native_notes_search_clear">Clear search</string>
+    <string name="native_notes_search_empty">No matching notes found.</string>
+    <string name="native_notes_no_reminders">No reminders yet.</string>
     <string name="native_notes_select_mode">Multi select</string>
     <string name="native_notes_list_view">List View</string>
     <string name="native_notes_grid_view">Grid View</string>
@@ -142,14 +145,14 @@
     <string name="native_bulk_icon_success">Icon applied to %1$d note(s)</string>
     <string name="native_bulk_icon_error">Couldn\'t apply the icon to %1$d note(s)</string>
 
-    <string name="native_sidebar_open">Open menu</string>
+    <string name="native_sidebar_open">Open tags</string>
     <string name="native_sidebar_all_images">All Images</string>
     <string name="native_sidebar_reminders">Reminders</string>
     <string name="native_sidebar_tags_title">Tags</string>
     <string name="native_sidebar_tags_empty">No tags yet</string>
-    <string name="native_sidebar_active_tags">%1$d active tags</string>
+    <string name="native_sidebar_active_tags">%1$d active tag filters</string>
     <string name="native_sidebar_clear_tags">Clear</string>
-    <string name="native_notes_more_options">More options</string>
+    <string name="native_header_menu">Menu</string>
 
     <string name="native_archived_title">Archived</string>
     <string name="native_archived_empty">No archived notes.</string>
@@ -696,10 +699,10 @@
     <!-- Header sync status: src/sync/SyncStatusIcon.jsx. -->
     <string name="native_sync_status_synced">All changes saved to cloud</string>
     <string name="native_sync_status_pending">Local changes waiting to sync</string>
-    <string name="native_sync_status_syncing">Syncing with server\u2026</string>
+    <string name="native_sync_status_syncing">Syncing with server...</string>
     <string name="native_sync_status_offline">Server unavailable, saved locally</string>
     <string name="native_sync_status_error">Sync error, some changes not saved</string>
-    <string name="native_sync_server_checking">Checking server\u2026</string>
+    <string name="native_sync_server_checking">Checking server...</string>
     <string name="native_sync_server_reachable">Server reachable</string>
     <string name="native_sync_server_unreachable">Server unreachable</string>
     <string name="native_sync_instance_locked">Instance locked, sync paused, waiting for an admin to unlock</string>
@@ -759,7 +762,7 @@
     <string name="native_register_back">Back to sign in</string>
 
     <string name="native_admin_title">Administration</string>
-    <string name="native_notes_admin_panel">Administration Panel</string>
+    <string name="native_notes_admin_panel">Admin Panel</string>
     <string name="native_admin_tab_users">Users</string>
     <string name="native_admin_tab_branding">Branding</string>
     <string name="native_admin_tab_ai">Server AI</string>

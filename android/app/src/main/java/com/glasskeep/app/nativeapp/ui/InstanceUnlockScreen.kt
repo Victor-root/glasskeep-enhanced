@@ -10,9 +10,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -79,14 +82,16 @@ private val AmberTextDark = Color(0xFFFDE68A)
 
 // The banner is a stronger amber than the panel: bg amber-100 /
 // amber-900 at 80%, a 2px amber-500 / amber-600 bottom rule, text
-// amber-900 / amber-100, and an amber-600 CTA.
-private val BannerBgLight = Color(0xFFFEF3C7)
-private val BannerBgDark = Color(0xCC78350F)
-private val BannerRuleLight = Color(0xFFF59E0B)
-private val BannerRuleDark = Color(0xFFD97706)
-private val BannerTextLight = Color(0xFF78350F)
-private val BannerTextDark = Color(0xFFFEF3C7)
-private val BannerCtaBg = Color(0xFFD97706)
+// amber-900 / amber-100, an amber-600 CTA and an amber-800 / amber-100
+// dismiss link, in the Tailwind v4 values the web paints.
+private val BannerBgLight = Color(0xFFFEF3C6)
+private val BannerBgDark = Color(0xCC7B3306)
+private val BannerRuleLight = Color(0xFFFE9A00)
+private val BannerRuleDark = Color(0xFFE17100)
+private val BannerTextLight = Color(0xFF7B3306)
+private val BannerTextDark = Color(0xFFFEF3C6)
+private val BannerCtaBg = Color(0xFFE17100)
+private val BannerDismissLight = Color(0xFF973C00)
 
 // The inactive tab: black at 5% / white at 10%, with gray-700 /
 // gray-200 text.
@@ -409,32 +414,29 @@ fun InstanceUnlockScreen(
 
 /**
  * LockedBanner.jsx: the heads-up a signed-in user gets instead of the full
- * screen, since their local cache is still perfectly readable. Rendered
- * above the whole app so it pushes the screen below it down, the same
- * in-flow placement the web uses (App.jsx:7495).
- *
- * The web's own banner then scrolls away with the page, which no native
- * screen's own scroll container can do from up here; the dismiss button is
- * the same way out and is what the web offers for it anyway.
+ * screen, since their local cache is still perfectly readable. The notes
+ * list draws it at the top of its own scrolling page, above the header, so
+ * it scrolls away with the notes exactly like the web's in-flow banner
+ * (App.jsx:7495). On a phone the web stacks glyph, message and buttons,
+ * and tops the banner with its own `max(safe-top, 12px)` padding even
+ * though the page already starts under the status bar.
  */
 @Composable
-internal fun LockedBanner(dark: Boolean, onUnlock: () -> Unit, onDismiss: () -> Unit) {
+internal fun LockedBanner(dark: Boolean, onUnlock: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val textColor = if (dark) BannerTextDark else BannerTextLight
-    Column(Modifier.fillMaxWidth().background(if (dark) BannerBgDark else BannerBgLight)) {
-        // sm:flex-row: the phone stacks the message and keeps the two
-        // buttons on their own row, right-aligned (self-end).
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LockIcon(size = 20.dp, tint = textColor)
-                Text(
-                    stringResource(R.string.native_locked_banner_message),
-                    fontSize = 14.sp,
-                    lineHeight = 18.sp,
-                    color = textColor,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Spacer(Modifier.height(8.dp))
+    val safeTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    Column(modifier.fillMaxWidth().background(if (dark) BannerBgDark else BannerBgLight)) {
+        Column(
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = maxOf(safeTop, 12.dp), bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            PadlockIcon(size = 20.dp, tint = textColor)
+            Text(
+                stringResource(R.string.native_locked_banner_message),
+                fontSize = 14.sp,
+                lineHeight = 19.25.sp,
+                color = textColor,
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
@@ -442,6 +444,7 @@ internal fun LockedBanner(dark: Boolean, onUnlock: () -> Unit, onDismiss: () -> 
                 Text(
                     stringResource(R.string.native_locked_banner_unlock),
                     fontSize = 12.sp,
+                    lineHeight = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White,
                     modifier = Modifier
@@ -457,7 +460,8 @@ internal fun LockedBanner(dark: Boolean, onUnlock: () -> Unit, onDismiss: () -> 
                 Text(
                     stringResource(R.string.native_dismiss),
                     fontSize = 12.sp,
-                    color = textColor,
+                    lineHeight = 16.sp,
+                    color = if (dark) BannerTextDark else BannerDismissLight,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
                         .clickable(

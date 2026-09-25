@@ -3,9 +3,13 @@ package com.glasskeep.app.nativeapp.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -38,6 +42,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -106,6 +111,20 @@ import com.glasskeep.app.ui.ButtonGradient
  */
 internal val GkStandardEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 internal val GkEaseOut = CubicBezierEasing(0f, 0f, 0.2f, 1f)
+
+/** Tailwind's `animate-pulse`: opacity 1 → .5 → 1 every 2s on
+ *  `cubic-bezier(0.4, 0, 0.6, 1)`. That curve is symmetric, so playing the
+ *  first half back reproduces the second one exactly. */
+@Composable
+internal fun rememberPulseAlpha(): State<Float> = rememberInfiniteTransition(label = "pulse").animateFloat(
+    initialValue = 1f,
+    targetValue = 0.5f,
+    animationSpec = infiniteRepeatable(
+        animation = tween(durationMillis = 1_000, easing = CubicBezierEasing(0.4f, 0f, 0.6f, 1f)),
+        repeatMode = RepeatMode.Reverse,
+    ),
+    label = "pulseAlpha",
+)
 
 /** `text-gray-500`, the sub-label colour, which the web keeps in both
  *  modes for these rows (no `dark:` variant on any of them). */

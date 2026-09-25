@@ -15,7 +15,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
-import androidx.core.graphics.ColorUtils
 import com.glasskeep.app.nativeapp.ui.LocalGkDark
 import com.glasskeep.app.nativeapp.ui.NativeNavHost
 import com.glasskeep.app.nativeapp.ui.WorkspaceTheme
@@ -72,12 +71,12 @@ class NativeAppActivity : ComponentActivity() {
             val signedIn = container.tokenStore.token != null
 
             // Handles dark/theme/signed-in changes: this SideEffect reruns
-            // whenever this scope itself recomposes for one of those (as
-            // before). It does NOT reliably react to container.scrimActive
+            // whenever this scope itself recomposes for one of those. It
+            // does NOT reliably react to container.statusBarOverride
             // changing on its own - that's written from a screen further
-            // down the tree (the FAB's dimming overlay), which doesn't by
-            // itself cause this scope to recompose. See the snapshotFlow
-            // below for that case.
+            // down the tree (an open note), which doesn't by itself cause
+            // this scope to recompose. See the snapshotFlow below for that
+            // case.
             SideEffect {
                 // NoteDetailScreen sets this while a note is open so the
                 // bars match that note's own color; this just needs to
@@ -94,32 +93,28 @@ class NativeAppActivity : ComponentActivity() {
                 (view.context as ComponentActivity).applyThemedSystemBars(dark, baseColor)
             }
 
-            // Dedicated, guaranteed-reactive path for the scrim: a coroutine
-            // subscribed directly to container.scrimActive's own writes via
-            // snapshotFlow, independent of whether the composable scope
-            // above happens to recompose for some other reason.
+            // Dedicated, guaranteed-reactive path for the note override: a
+            // coroutine subscribed directly to container.statusBarOverride's
+            // own writes via snapshotFlow, independent of whether the
+            // composable scope above happens to recompose for some other
+            // reason.
             val currentDark = rememberUpdatedState(dark)
             val currentThemeId = rememberUpdatedState(themeId)
             val currentSignedIn = rememberUpdatedState(signedIn)
             LaunchedEffect(view) {
-                snapshotFlow { container.scrimActive.value to container.statusBarOverride.value }
-                    .collect { (scrimActive, noteOverrideArgb) ->
+                snapshotFlow { container.statusBarOverride.value }
+                    .collect { noteOverrideArgb ->
                         val baseColor = if (currentSignedIn.value) {
                             noteOverrideArgb ?: WorkspaceTheme.statusBarColor(currentThemeId.value, currentDark.value).toArgb()
                         } else {
                             null
                         }
-                        val overrideColor = if (scrimActive) {
-                            baseColor?.let { ColorUtils.blendARGB(it, android.graphics.Color.BLACK, 0.3f) }
-                        } else {
-                            baseColor
-                        }
                         NativeDebug.d(
                             "NativeAppActivity system bars: dark=${currentDark.value} signedIn=${currentSignedIn.value} " +
-                                "scrimActive=$scrimActive noteOverride=${noteOverrideArgb?.let { "#%08X".format(it) }} " +
-                                "baseColor=${baseColor?.let { "#%08X".format(it) }} overrideColor=${overrideColor?.let { "#%08X".format(it) }}",
+                                "noteOverride=${noteOverrideArgb?.let { "#%08X".format(it) }} " +
+                                "baseColor=${baseColor?.let { "#%08X".format(it) }}",
                         )
-                        (view.context as ComponentActivity).applyThemedSystemBars(currentDark.value, overrideColor)
+                        (view.context as ComponentActivity).applyThemedSystemBars(currentDark.value, baseColor)
                     }
             }
             GlassKeepWebTheme(darkTheme = dark, accent = WorkspaceTheme.accent(themeId, dark)) {
