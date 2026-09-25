@@ -665,7 +665,6 @@
     <string name="native_collaborators_access_for_new_hint">Appliqué à l\'ajout, modifiable ensuite pour chacun.</string>
 
     <string name="native_notifications_title">Notifications</string>
-    <string name="native_notifications_error">Impossible de charger les notifications : %1$s</string>
     <string name="native_notifications_empty">Aucune notification</string>
     <string name="native_notifications_note_shared">%1$s a partagé la note %2$s avec vous</string>
     <string name="native_notifications_note_shared_read_only">%1$s a partagé la note %2$s avec vous en lecture seule</string>

@@ -45,6 +45,8 @@ import com.glasskeep.app.nativeapp.EditorPrefsState
 import com.glasskeep.app.nativeapp.NotificationDing
 import com.glasskeep.app.nativeapp.data.NotifCategory
 import com.glasskeep.app.nativeapp.data.NotifVariantKey
+import com.glasskeep.app.nativeapp.data.network.NotificationDto
+import com.glasskeep.app.nativeapp.data.nowIso
 import kotlinx.coroutines.delay
 
 /** The four variants a notification can carry, and the accent each paints
@@ -105,6 +107,13 @@ class ToastController {
      */
     var prefs: EditorPrefsState? = null
 
+    /** The notification centre's feed for this session, like the web
+     *  provider's history (NotificationProvider.jsx, MAX_HISTORY 100): the
+     *  server rows as last fetched, so the centre opens on them at once and
+     *  refreshes silently, plus every message the app raised itself. */
+    internal var serverHistory by mutableStateOf<List<NotificationDto>>(emptyList())
+    internal val localHistory = mutableStateListOf<NotificationDto>()
+
     fun show(
         message: String,
         variant: NotifVariant = NotifVariant.INFO,
@@ -122,9 +131,26 @@ class ToastController {
         val category = NotifCategory.of(type, variant.categoryKey)
         val settings = prefs
         if (settings != null && !settings.allowsNotification(category)) return
+        val id = nextId++
+        // A pill echoing a server row is already in serverHistory.
+        if (type == null) {
+            localHistory.add(
+                0,
+                NotificationDto(
+                    id = -id.toInt(),
+                    senderUserId = 0,
+                    type = "",
+                    noteTitle = title.orEmpty(),
+                    variant = variant.name.lowercase(),
+                    message = message,
+                    createdAt = nowIso(),
+                ),
+            )
+            while (localHistory.size > MaxLocalHistory) localHistory.removeAt(localHistory.lastIndex)
+        }
         queue.add(
             GkToast(
-                id = nextId++,
+                id = id,
                 title = title,
                 message = message,
                 variant = variant,
@@ -152,6 +178,8 @@ val LocalGkToasts = staticCompositionLocalOf { ToastController() }
 
 @Composable
 fun rememberToastController(): ToastController = remember { ToastController() }
+
+private const val MaxLocalHistory = 100
 
 /** MIN_BURST_SLICE / the default duration (NotificationProvider.jsx:179). */
 private const val MinBurstSliceMs = 800L

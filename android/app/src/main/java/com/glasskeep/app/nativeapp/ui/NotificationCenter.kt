@@ -32,7 +32,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -131,32 +130,33 @@ fun NotificationCenter(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
 
-    var notifications by remember { mutableStateOf<List<NotificationDto>>(emptyList()) }
-    var loading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableStateOf(0f) }
 
-    val errorTemplate = stringResource(R.string.native_notifications_error)
-
+    // Like the web panel, which lists its in-memory history at once and
+    // works offline: the last fetched rows show straight away and a failed
+    // refresh just keeps them.
     LaunchedEffect(open, serverUrl) {
         if (!open) return@LaunchedEffect
-        loading = true
-        errorMessage = null
         try {
             val pending = repository.fetchPendingNotifications()
             val history = repository.fetchNotificationHistory()
             // The web drops a muted category before it ever reaches its
             // store (App.jsx:792-801), so it never shows here either.
-            notifications = (pending + history)
+            toasts.serverHistory = (pending + history)
                 .distinctBy { it.id }
                 .filter { container.editorPrefs.allowsNotification(categoryOf(it)) }
-                .sortedByDescending { it.createdAt }
             if (pending.isNotEmpty()) repository.markNotificationsDelivered(pending.map { it.id })
         } catch (t: Throwable) {
             NativeDebug.e("NotificationCenter load failed", t)
-            errorMessage = String.format(errorTemplate, t.message ?: t.javaClass.simpleName)
-        } finally {
-            loading = false
+        }
+    }
+    val notifications = (toasts.serverHistory + toasts.localHistory)
+        .sortedByDescending { parseIsoToEpochMillis(it.createdAt) ?: 0L }
+    val removeRow = { row: NotificationDto ->
+        if (row.id < 0) {
+            toasts.localHistory.removeAll { it.id == row.id }
+        } else {
+            toasts.serverHistory = toasts.serverHistory.filterNot { it.id == row.id }
         }
     }
 
@@ -219,29 +219,15 @@ fun NotificationCenter(
                 brandingLogo = container.branding.logo,
                 showClear = notifications.isNotEmpty(),
                 onClear = {
-                    notifications = emptyList()
+                    toasts.serverHistory = emptyList()
+                    toasts.localHistory.clear()
                     scope.launch { repository.clearNotifications() }
                 },
                 onClose = onDismiss,
             )
 
-            errorMessage?.let {
-                Text(
-                    it,
-                    color = NotifVariant.ERROR.accent,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                )
-            }
-
             when {
-                loading && notifications.isEmpty() -> Box(
-                    modifier = Modifier.fillMaxWidth().padding(24.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = titleColor.copy(alpha = 0.6f))
-                }
-                notifications.isEmpty() && errorMessage == null -> Text(
+                notifications.isEmpty() -> Text(
                     stringResource(R.string.native_notifications_empty),
                     color = titleColor.copy(alpha = 0.7f),
                     fontSize = 13.6.sp,
@@ -259,14 +245,14 @@ fun NotificationCenter(
                             dark = dark,
                             onOpen = { notification.noteId?.let(onOpenNote) },
                             onDismissCard = {
-                                notifications = notifications.filterNot { it.id == notification.id }
-                                scope.launch { repository.removeNotifications(listOf(notification.id)) }
+                                removeRow(notification)
+                                if (notification.id >= 0) scope.launch { repository.removeNotifications(listOf(notification.id)) }
                             },
                             onApprovePending = notification.message?.toIntOrNull()?.let { pendingId ->
                                 {
                                     scope.launch {
                                         if (decidePendingRegistration(context, api, repository, toasts, pendingId, notification.id, approve = true)) {
-                                            notifications = notifications.filterNot { it.id == notification.id }
+                                            removeRow(notification)
                                         }
                                     }
                                 }
@@ -275,7 +261,7 @@ fun NotificationCenter(
                                 {
                                     scope.launch {
                                         if (decidePendingRegistration(context, api, repository, toasts, pendingId, notification.id, approve = false)) {
-                                            notifications = notifications.filterNot { it.id == notification.id }
+                                            removeRow(notification)
                                         }
                                     }
                                 }

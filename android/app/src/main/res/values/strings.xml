@@ -676,7 +676,6 @@
     <string name="native_collaborators_access_for_new_hint">Applied on add, changeable per person afterwards.</string>
 
     <string name="native_notifications_title">Notifications</string>
-    <string name="native_notifications_error">Couldn\'t load notifications: %1$s</string>
     <string name="native_notifications_empty">No notifications yet</string>
     <string name="native_notifications_note_shared">%1$s shared the note %2$s with you</string>
     <string name="native_notifications_note_shared_read_only">%1$s shared the note %2$s with you in read-only</string>
