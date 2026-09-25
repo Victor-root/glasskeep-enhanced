@@ -51,6 +51,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -97,8 +98,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -2732,7 +2735,7 @@ private fun TagChipsRow(
                     .padding(horizontal = 8.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(tag, color = chipFg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Text(tag, color = chipFg, fontSize = 11.sp, lineHeight = 16.5.sp, fontWeight = FontWeight.SemiBold)
                 Box(
                     modifier = Modifier
                         .size(12.dp)
@@ -2746,7 +2749,7 @@ private fun TagChipsRow(
                         ) { onRemove(tag) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    CloseIcon(size = 8.dp, tint = accent.copy(alpha = 0.65f))
+                    Text("\u00D7", color = accent.copy(alpha = 0.65f), fontSize = 11.sp, lineHeight = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -2757,32 +2760,32 @@ private fun TagChipsRow(
  *  (ModalFooter.jsx:695) rather than through a Tailwind class. */
 private val KebabBgDark = Color(0xFF222222)
 private val ColorPanelBgLight = Color(0xFAFFFFFF)
-private val ColorPanelBgDark = Color(0xFA111827)
+private val ColorPanelBgDark = Color(0xFA101828)
 private val ColorPanelBorderLight = Color(0xCCF3F4F6)
-private val ColorPanelBorderDark = Color(0x80374151)
-private val ColorDotDefaultBorderLight = Color(0xFFD1D5DB)
-private val ColorDotDefaultBorderDark = Color(0xFF6B7280)
+private val ColorPanelBorderDark = Color(0x80364153)
+private val ColorDotDefaultBorderLight = Color(0xFFD1D5DC)
+private val ColorDotDefaultBorderDark = Color(0xFF6A7282)
 private val ColorDotDefaultInnerDark = Color(0xFF1F2937)
 // Tailwind v4 indigo-500, and the ring-offset gap in white / gray-900.
 private val ColorSelectionRing = Color(0xFF615FFF)
 private val ColorRingOffsetDark = Color(0xFF101828)
 private val TagPanelBgLight = Color(0xFFFFFFFF)
-private val TagPanelBgDark = Color(0xFF111827)
+private val TagPanelBgDark = Color(0xFF101828)
 private val TagSearchBgLight = Color(0xFFF9FAFB)
-private val TagSearchBgDark = Color(0xCC1F2937)
+private val TagSearchBgDark = Color(0xCC1E2939)
 private val TagSearchBorderLight = Color(0xCCE5E7EB)
-private val TagSearchBorderDark = Color(0x99374151)
-private val TagMutedLight = Color(0xFF9CA3AF)
-private val TagMutedDark = Color(0xFF6B7280)
-private val TagRowFgLight = Color(0xFF374151)
+private val TagSearchBorderDark = Color(0x99364153)
+private val TagMutedLight = Color(0xFF99A1AF)
+private val TagMutedDark = Color(0xFF6A7282)
+private val TagRowFgLight = Color(0xFF364153)
 private val TagRowFgDark = Color(0xFFE5E7EB)
 private val TagDividerLight = Color(0xFFF3F4F6)
-private val TagDividerDark = Color(0xFF1F2937)
-private val TagCreateBgLight = Color(0xCCD1FAE5)
-private val TagCreateBgDark = Color(0x66065F46)
-private val TagCreateFgLight = Color(0xFF059669)
-private val TagCreateFgDark = Color(0xFF34D399)
-private val TagCreateIconLight = Color(0xFF10B981)
+private val TagDividerDark = Color(0xFF1E2939)
+private val TagCreateBgLight = Color(0xCCD0FAE5)
+private val TagCreateBgDark = Color(0x66006045)
+private val TagCreateFgLight = Color(0xFF009966)
+private val TagCreateFgDark = Color(0xFF00D492)
+private val TagCreateIconLight = Color(0xFF00BC7D)
 
 /**
  * ColorPickerPanel.jsx: a 256px card opening upward from the palette
@@ -2958,7 +2961,8 @@ private fun NoteTagsPopover(
                         color = if (focused) accent else if (dark) TagSearchBorderDark else TagSearchBorderLight,
                         shape = RoundedCornerShape(12.dp),
                     )
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    // px-2.5 py-1.5 inside the 1px border.
+                    .padding(horizontal = 11.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SearchIcon(size = 12.dp, tint = muted)
@@ -2968,7 +2972,7 @@ private fun NoteTagsPopover(
                     onValueChange = onInputChange,
                     singleLine = true,
                     enabled = enabled,
-                    textStyle = TextStyle(color = rowFg, fontSize = 14.sp),
+                    textStyle = TextStyle(color = rowFg, fontSize = 14.sp, lineHeight = 20.sp),
                     cursorBrush = SolidColor(accent),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { if (isNewTag) onCreate(trimmed) }),
@@ -2981,6 +2985,7 @@ private fun NoteTagsPopover(
                                 stringResource(R.string.native_note_detail_tags_search_placeholder),
                                 color = muted,
                                 fontSize = 14.sp,
+                                lineHeight = 20.sp,
                             )
                         }
                         innerTextField()
@@ -2994,6 +2999,7 @@ private fun NoteTagsPopover(
                 stringResource(R.string.native_note_detail_tags_existing).uppercase(),
                 color = muted,
                 fontSize = 10.sp,
+                lineHeight = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.5.sp,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
@@ -3041,12 +3047,13 @@ private fun NoteTagsPopover(
                             if (checked) CheckmarkIcon(size = 12.dp, tint = Color.White)
                         }
                         Spacer(Modifier.width(10.dp))
-                        TagIcon(size = 12.dp, tint = rowFg.copy(alpha = 0.5f))
-                        Spacer(Modifier.width(10.dp))
+                        SmallTagFilledIcon(size = 12.dp, tint = rowFg.copy(alpha = 0.5f))
+                        Spacer(Modifier.width(8.dp))
                         Text(
                             entry.tag,
                             color = rowFg,
                             fontSize = 14.sp,
+                            lineHeight = 20.sp,
                             fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -3056,7 +3063,9 @@ private fun NoteTagsPopover(
                             entry.count.toString(),
                             color = muted,
                             fontSize = 10.sp,
+                            lineHeight = 15.sp,
                             fontWeight = FontWeight.Medium,
+                            style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"),
                         )
                     }
                 }
@@ -3066,6 +3075,7 @@ private fun NoteTagsPopover(
                 stringResource(R.string.native_note_detail_tags_none_found),
                 color = muted,
                 fontSize = 14.sp,
+                lineHeight = 20.sp,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
                 textAlign = TextAlign.Center,
             )
@@ -3098,12 +3108,21 @@ private fun NoteTagsPopover(
                 ) {
                     PlusIcon(size = 12.dp, tint = if (dark) TagCreateFgDark else TagCreateIconLight)
                 }
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(8.dp))
+                // Only the new tag's name is semibold.
+                val createLabel = String.format(stringResource(R.string.native_note_detail_tags_create), trimmed)
+                val nameStart = createLabel.lastIndexOf(trimmed)
                 Text(
-                    String.format(stringResource(R.string.native_note_detail_tags_create), trimmed),
+                    buildAnnotatedString {
+                        append(createLabel)
+                        if (nameStart >= 0) {
+                            addStyle(SpanStyle(fontWeight = FontWeight.SemiBold), nameStart, nameStart + trimmed.length)
+                        }
+                    },
                     color = if (dark) TagCreateFgDark else TagCreateFgLight,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

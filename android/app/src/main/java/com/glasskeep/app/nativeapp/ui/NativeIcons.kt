@@ -188,6 +188,25 @@ fun TagIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color
     }
 }
 
+/** The tag panel rows' small filled tag (ModalFooter.jsx), viewBox 16x16,
+ *  with the arc flags written out for PathParser. */
+@Composable
+fun SmallTagFilledIcon(modifier: Modifier = Modifier, size: Dp = 16.dp, tint: Color = Color.Black) {
+    val path = remember {
+        PathParser().parsePathString(
+            "M2 2.5A.5 .5 0 0 1 2.5 2h5.086a.5 .5 0 0 1 .353 .146l5.915 5.915a.5 .5 0 0 1 0 .707" +
+                "l-4.586 4.586a.5 .5 0 0 1 -.707 0L3.146 7.939A.5 .5 0 0 1 3 7.586V2.5z" +
+                "M5 5a1 1 0 1 0 0 -2a1 1 0 0 0 0 2z"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 16f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint)
+        }
+    }
+}
+
 @Composable
 fun CheckmarkIcon(modifier: Modifier = Modifier, size: Dp = 16.dp, tint: Color = Color.White) {
     // src/components/modal/ModalFooter.jsx's checked tag checkbox glyph:
