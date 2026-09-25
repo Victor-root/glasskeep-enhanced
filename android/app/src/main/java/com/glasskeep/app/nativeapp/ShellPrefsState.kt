@@ -6,18 +6,26 @@ import androidx.compose.runtime.setValue
 import com.glasskeep.app.nativeapp.data.TokenStore
 
 /**
- * App-shell preferences: the two "Interface" switches the web keeps in
- * its own UI section (SettingsPanel.jsx:606-652). Same two-tier design as
- * [ThemeState] and [EditorPrefsState]: each value starts from TokenStore's
- * cached copy so the shell is right from the first frame, then
- * NativeNavHost reconciles it against the server's settings blob once per
- * session.
+ * App-shell preferences: the switches the web keeps in its own UI section
+ * (SettingsPanel.jsx:511-652). Same two-tier design as [ThemeState] and
+ * [EditorPrefsState]: each value starts from TokenStore's cached copy so
+ * the shell is right from the first frame, then NativeNavHost reconciles
+ * it against the server's settings blob once per session.
  */
 class ShellPrefsState(private val tokenStore: TokenStore) {
     var edgeToEdgeLandscape: Boolean by mutableStateOf(tokenStore.edgeToEdgeLandscape)
         private set
 
     var floatingCards: Boolean by mutableStateOf(tokenStore.floatingCardsEnabled)
+        private set
+
+    /** The desktop tag sidebar's pinning and the screen width, in px, from
+     *  which it applies. A phone never pins it, but its Settings edits the
+     *  account's choice like the web's own panel does. */
+    var alwaysShowSidebarOnWide: Boolean by mutableStateOf(tokenStore.alwaysShowSidebarOnWide)
+        private set
+
+    var sidebarBreakpoint: Int by mutableStateOf(tokenStore.sidebarBreakpoint)
         private set
 
     var listView: Boolean by mutableStateOf(tokenStore.listView)
@@ -83,5 +91,18 @@ class ShellPrefsState(private val tokenStore: TokenStore) {
     fun applyFloatingCards(enabled: Boolean) {
         floatingCards = enabled
         tokenStore.floatingCardsEnabled = enabled
+    }
+
+    fun applyAlwaysShowSidebarOnWide(enabled: Boolean) {
+        alwaysShowSidebarOnWide = enabled
+        tokenStore.alwaysShowSidebarOnWide = enabled
+    }
+
+    /** Anything outside the web's own 600..3000 range falls back to the
+     *  default, as its setSidebarBreakpoint does (App.jsx:239-244). */
+    fun applySidebarBreakpoint(widthPx: Int) {
+        val resolved = if (widthPx in 600..3000) widthPx else TokenStore.DEFAULT_SIDEBAR_BREAKPOINT
+        sidebarBreakpoint = resolved
+        tokenStore.sidebarBreakpoint = resolved
     }
 }

@@ -34,6 +34,7 @@ import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
 import com.glasskeep.app.nativeapp.data.network.RemoveCollaboratorRequest
 import com.glasskeep.app.nativeapp.data.network.ReorderNotesRequest
+import com.glasskeep.app.nativeapp.data.network.SetAlwaysShowSidebarOnWideRequest
 import com.glasskeep.app.nativeapp.data.network.SetAvatarRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistInsertPositionRequest
 import com.glasskeep.app.nativeapp.data.network.SetNoteIconRequest
@@ -51,9 +52,11 @@ import com.glasskeep.app.nativeapp.data.network.SetLanguageRequest
 import com.glasskeep.app.nativeapp.data.network.SetNotificationsFilterTypesRequest
 import com.glasskeep.app.nativeapp.data.network.SetNotificationsSoundRequest
 import com.glasskeep.app.nativeapp.data.network.SetNotificationsSoundTypesRequest
+import com.glasskeep.app.nativeapp.data.network.SetPasteModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetReadModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetQrQuickRequest
+import com.glasskeep.app.nativeapp.data.network.SetSidebarBreakpointRequest
 import com.glasskeep.app.nativeapp.data.network.SetTaskStrikeRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderTimeChipsRequest
@@ -1084,8 +1087,7 @@ class NotesRepository(
                 shellTheme = body.shellTheme,
                 editorToolbarMode = body.editorToolbarMode,
                 typography = TypographyPresets.normalize(body.typographyPresets),
-                language = profile?.language,
-                isAdmin = profile?.isAdmin,
+                profile = profile,
                 toastPosition = body.notificationsPositionMobile,
                 notificationsSound = body.notificationsSound,
                 notificationsSoundTypes = body.notificationsSoundTypes,
@@ -1099,6 +1101,9 @@ class NotesRepository(
                 edgeToEdgeLandscape = body.edgeToEdgeLandscape,
                 floatingCardsEnabled = body.floatingCardsEnabled,
                 viewMode = body.viewMode,
+                alwaysShowSidebarOnWide = body.alwaysShowSidebarOnWide,
+                sidebarBreakpoint = body.sidebarBreakpoint,
+                pasteMode = body.pasteMode,
             )
         } catch (t: Throwable) {
             NativeDebug.e("NotesRepository.fetchWorkspacePreferences failed", t)
@@ -1275,6 +1280,39 @@ class NotesRepository(
         val response = api.setFloatingCards(SetFloatingCardsRequest(enabled))
         if (!response.isSuccessful) {
             val error = "PATCH /api/user/settings (floatingCardsEnabled) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Sets whether the tag sidebar stays pinned on wide screens. */
+    suspend fun setAlwaysShowSidebarOnWide(enabled: Boolean) {
+        NativeDebug.d("NotesRepository.setAlwaysShowSidebarOnWide enabled=$enabled")
+        val response = api.setAlwaysShowSidebarOnWide(SetAlwaysShowSidebarOnWideRequest(enabled))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (alwaysShowSidebarOnWide) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Sets the screen width, in px, from which that sidebar stays pinned. */
+    suspend fun setSidebarBreakpoint(widthPx: Int) {
+        NativeDebug.d("NotesRepository.setSidebarBreakpoint widthPx=$widthPx")
+        val response = api.setSidebarBreakpoint(SetSidebarBreakpointRequest(widthPx))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (sidebarBreakpoint) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Sets what a plain paste keeps in the rich-text editor ("rich" or "plain"). */
+    suspend fun setPasteMode(mode: String) {
+        NativeDebug.d("NotesRepository.setPasteMode mode=$mode")
+        val response = api.setPasteMode(SetPasteModeRequest(mode))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (pasteMode) failed: HTTP ${response.code()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }
