@@ -30,7 +30,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.ui.DarkBorderColor
@@ -111,52 +110,19 @@ internal fun LogoPickerPopover(
     onUploadNew: () -> Unit,
     onDelete: (LogoDto) -> Unit,
     onDismiss: () -> Unit,
+    below: Boolean = false,
 ) {
     val accent = if (dark) MenuVioletDark else MenuVioletLight
     val tileBorder = if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f)
     FooterPopover(
         width = 248.dp,
         gap = 8.dp,
+        below = below,
         background = if (dark) MenuBgDark else Color.White,
         borderColor = if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.10f),
         onDismiss = onDismiss,
     ) {
         LogoPickerGrid(logos, selectedSrc, dark, onPick, onUploadNew, onDelete)
-    }
-}
-
-/** Dialog-shaped host for the multi-selection toolbar, which has no
- *  stable footer button to anchor the arrowed popover to. */
-@Composable
-internal fun BulkLogoPickerDialog(
-    logos: List<LogoDto>,
-    dark: Boolean,
-    onPick: (LogoDto) -> Unit,
-    onUploadNew: () -> Unit,
-    onDelete: (LogoDto) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            Modifier
-                .width(280.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(if (dark) MenuBgDark else Color.White)
-                .border(
-                    1.dp,
-                    if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.10f),
-                    RoundedCornerShape(18.dp),
-                ),
-        ) {
-            Text(
-                stringResource(R.string.native_note_icon),
-                color = if (dark) Color(0xFFF3F4F6) else Color(0xFF1F2937),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(start = 16.dp, top = 14.dp),
-            )
-            LogoPickerGrid(logos, null, dark, onPick, onUploadNew, onDelete)
-        }
     }
 }
 

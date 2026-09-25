@@ -541,6 +541,29 @@ fun SecondaryNotesScreen(
                             tone = BulkTone.CYAN,
                             icon = { LogoIcon(size = 18.dp, tint = BulkTone.CYAN.foreground(dark)) },
                             enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                            anchored = {
+                                if (showBulkLogoPicker) {
+                                    LogoPickerPopover(
+                                        logos = bulkLogos,
+                                        dark = dark,
+                                        onPick = { logo -> bulkSetIcon(NoteIconDto(id = logo.id, src = logo.src, name = logo.name)) },
+                                        onUploadNew = {
+                                            showBulkLogoPicker = false
+                                            bulkLogoPickerLauncher.launch(
+                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                            )
+                                        },
+                                        onDelete = { logo ->
+                                            scope.launch {
+                                                if (repository.deleteLogo(logo.id)) bulkLogos = bulkLogos.filterNot { it.id == logo.id }
+                                            }
+                                        },
+                                        onDismiss = { showBulkLogoPicker = false },
+                                        selectedSrc = null,
+                                        below = true,
+                                    )
+                                }
+                            },
                             onClick = { openBulkLogoPicker() },
                         ),
                     )
@@ -596,24 +619,5 @@ fun SecondaryNotesScreen(
         }
 
 
-        if (showBulkLogoPicker) {
-            BulkLogoPickerDialog(
-                logos = bulkLogos,
-                dark = dark,
-                onPick = { logo -> bulkSetIcon(NoteIconDto(id = logo.id, src = logo.src, name = logo.name)) },
-                onUploadNew = {
-                    showBulkLogoPicker = false
-                    bulkLogoPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
-                },
-                onDelete = { logo ->
-                    scope.launch {
-                        if (repository.deleteLogo(logo.id)) bulkLogos = bulkLogos.filterNot { it.id == logo.id }
-                    }
-                },
-                onDismiss = { showBulkLogoPicker = false },
-            )
-        }
     }
 }
