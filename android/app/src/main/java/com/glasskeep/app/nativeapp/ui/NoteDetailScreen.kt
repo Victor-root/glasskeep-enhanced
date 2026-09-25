@@ -73,7 +73,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -421,7 +423,6 @@ fun NoteDetailScreen(
     val aiErrorMessage = stringResource(R.string.native_note_ai_error)
     val imageAddErrorMessage = stringResource(R.string.native_note_detail_add_image_error)
     val iconErrorMessage = stringResource(R.string.native_note_icon_error)
-    val editedPrefix = stringResource(R.string.native_note_detail_edited_prefix)
     val todayLabel = stringResource(R.string.native_note_detail_today)
     val yesterdayLabel = stringResource(R.string.native_note_detail_yesterday)
 
@@ -1869,7 +1870,9 @@ fun NoteDetailScreen(
         editability?.isAudioType != true && editability?.isDrawType != true
     val imageButtonColor = if (dark) Color(0xFF7dd3fc) else Color(0xFF0284c7)
 
-    Box(Modifier.fillMaxSize().background(modalBg)) {
+    // The panel is a .glass-card: a 1px border at the screen edges, with
+    // everything inside inset by it.
+    Box(Modifier.fillMaxSize().background(modalBg).border(1.dp, borderColor).padding(1.dp)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1953,280 +1956,271 @@ fun NoteDetailScreen(
                 else -> {
                     val currentNote = note!!
                     val edit = editability!!
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState()),
-                    ) {
-                        // Outside the sticky bar on purpose: the title
-                        // scrolls away with the content, which is what
-                        // ModalHeader.jsx does on a phone (and only there).
-                        // Its 20dp side padding against the body's 24dp is
-                        // the web's own deliberate 4px offset.
-                        NoteTitleField(
-                            value = titleText,
-                            enabled = !isNoteReadOnly &&
-                                (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType),
-                            // The web drops the field entirely and prints the
-                            // title as text whenever the note shows its read
-                            // face (ModalHeader.jsx:265). Checklists are its
-                            // documented exception: their body stays
-                            // interactive, so their title does too.
-                            asText = (edit.isRichEditableType && viewMode) ||
-                                (edit.isDrawType && !drawingCanvasMode && viewMode) ||
-                                (isNoteReadOnly && !edit.isChecklistType),
-                            titleColor = titleColor,
-                            placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
-                            onValueChange = { raw ->
-                                // Every incoming value gets its newlines
-                                // flattened, same defensive sanitising as
-                                // ModalHeader.jsx: a title is single-line
-                                // everywhere else in the app.
-                                titleText = raw.replace(TitleNewlines, " ")
-                            },
-                        )
-
-                        if (edit.isTextType || edit.isChecklistType || (edit.isDrawType && !drawingCanvasMode)) {
-                            NoteImagesSection(
-                                images = images,
-                                borderColor = borderColor,
-                                onImageClick = { index -> viewerIndex = index },
-                            )
-                        }
-
-                        // The two warnings that sit between the images and
-                        // the content on the web (NoteModal.jsx:750): a
-                        // shared note being edited with the server down,
-                        // and a mirrored note whose own server is away.
-                        if (isCollaborativeNote && container.syncStatus.serverReachable == false) {
-                            NoteWarningBanner(
-                                message = stringResource(R.string.native_offline_collab_warning),
-                                tone = NoteBannerTone.AMBER,
-                                dark = dark,
-                            ) { tint -> WifiOffIcon(size = 16.dp, tint = tint) }
-                        }
-                        currentNote.federation?.takeIf { it.readOnly }?.let { federation ->
-                            val peer = federation.peerLabel
-                                ?: stringResource(R.string.native_fed_remote_server)
-                            NoteWarningBanner(
-                                message = String.format(
-                                    stringResource(
-                                        when (federation.state) {
-                                            "offline" -> R.string.native_fed_read_only_offline
-                                            "locked" -> R.string.native_fed_read_only_locked
-                                            "incompatible" -> R.string.native_fed_read_only_incompatible
-                                            else -> R.string.native_fed_read_only_unknown
-                                        },
-                                    ),
-                                    peer,
-                                ),
-                                // Offline is red (the peer is down); locked
-                                // and out-of-date are amber (actionable).
-                                tone = if (federation.state == "offline") NoteBannerTone.ROSE else NoteBannerTone.AMBER,
-                                dark = dark,
-                            ) { tint -> ServerIcon(size = 16.dp, tint = tint) }
-                        }
-
+                    val contentScroll = rememberScrollState()
+                    val stamp = editedStampText(currentNote, todayLabel, yesterdayLabel)
+                        ?.takeIf { !(edit.isDrawType && drawingCanvasMode) }
+                    // NoteModal.jsx: inline after the content when the note
+                    // scrolls, pinned bottom-right of the viewport when it does not.
+                    val stampInline = contentScroll.maxValue > 0
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
                         Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    when {
-                                        edit.isDrawType -> PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp)
-                                        edit.isAudioType -> PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp)
-                                        else -> PaddingValues(start = 24.dp, top = 4.dp, end = 24.dp, bottom = 16.dp)
-                                    },
-                                ),
+                                .fillMaxSize()
+                                .verticalScroll(contentScroll),
                         ) {
-                            if (edit.isChecklistType) {
-                                val checklistEntries = edit.checklistItems.orEmpty()
-                                if (isNoteReadOnly) {
-                                    ChecklistReadOnlyPreview(
-                                        items = currentNote.items,
+                            // Outside the sticky bar on purpose: the title
+                            // scrolls away with the content, which is what
+                            // ModalHeader.jsx does on a phone (and only there).
+                            // Its 20dp side padding against the body's 24dp is
+                            // the web's own deliberate 4px offset.
+                            NoteTitleField(
+                                value = titleText,
+                                enabled = !isNoteReadOnly &&
+                                    (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType),
+                                // The web drops the field entirely and prints the
+                                // title as text whenever the note shows its read
+                                // face (ModalHeader.jsx:265). Checklists are its
+                                // documented exception: their body stays
+                                // interactive, so their title does too.
+                                asText = (edit.isRichEditableType && viewMode) ||
+                                    (edit.isDrawType && !drawingCanvasMode && viewMode) ||
+                                    (isNoteReadOnly && !edit.isChecklistType),
+                                titleColor = titleColor,
+                                placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
+                                onValueChange = { raw ->
+                                    // Every incoming value gets its newlines
+                                    // flattened, same defensive sanitising as
+                                    // ModalHeader.jsx: a title is single-line
+                                    // everywhere else in the app.
+                                    titleText = raw.replace(TitleNewlines, " ")
+                                },
+                            )
+
+                            if (edit.isTextType || edit.isChecklistType || (edit.isDrawType && !drawingCanvasMode)) {
+                                NoteImagesSection(
+                                    images = images,
+                                    borderColor = borderColor,
+                                    onImageClick = { index -> viewerIndex = index },
+                                )
+                            }
+
+                            // The two warnings that sit between the images and
+                            // the content on the web (NoteModal.jsx:750): a
+                            // shared note being edited with the server down,
+                            // and a mirrored note whose own server is away.
+                            if (isCollaborativeNote && container.syncStatus.serverReachable == false) {
+                                NoteWarningBanner(
+                                    message = stringResource(R.string.native_offline_collab_warning),
+                                    tone = NoteBannerTone.AMBER,
+                                    dark = dark,
+                                ) { tint -> WifiOffIcon(size = 16.dp, tint = tint) }
+                            }
+                            currentNote.federation?.takeIf { it.readOnly }?.let { federation ->
+                                val peer = federation.peerLabel
+                                    ?: stringResource(R.string.native_fed_remote_server)
+                                NoteWarningBanner(
+                                    message = String.format(
+                                        stringResource(
+                                            when (federation.state) {
+                                                "offline" -> R.string.native_fed_read_only_offline
+                                                "locked" -> R.string.native_fed_read_only_locked
+                                                "incompatible" -> R.string.native_fed_read_only_incompatible
+                                                else -> R.string.native_fed_read_only_unknown
+                                            },
+                                        ),
+                                        peer,
+                                    ),
+                                    // Offline is red (the peer is down); locked
+                                    // and out-of-date are amber (actionable).
+                                    tone = if (federation.state == "offline") NoteBannerTone.ROSE else NoteBannerTone.AMBER,
+                                    dark = dark,
+                                ) { tint -> ServerIcon(size = 16.dp, tint = tint) }
+                            }
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        when {
+                                            edit.isDrawType -> PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp)
+                                            edit.isAudioType -> PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp)
+                                            else -> PaddingValues(start = 24.dp, top = 4.dp, end = 24.dp, bottom = 16.dp)
+                                        },
+                                    ),
+                            ) {
+                                if (edit.isChecklistType) {
+                                    val checklistEntries = edit.checklistItems.orEmpty()
+                                    if (isNoteReadOnly) {
+                                        ChecklistReadOnlyPreview(
+                                            items = currentNote.items,
+                                            titleColor = titleColor,
+                                            subtextColor = subtextColor,
+                                        )
+                                    } else {
+                                        ChecklistEditorBody(
+                                            entries = checklistEntries,
+                                            insertPosition = container.editorPrefs.checklistInsertPosition,
+                                            removeSectionBehavior = container.editorPrefs.checklistRemoveSectionBehavior,
+                                            dark = dark,
+                                            titleColor = titleColor,
+                                            subtextColor = subtextColor,
+                                            borderColor = borderColor,
+                                            doneCollapsed = doneSectionCollapsed,
+                                            focusRequesterFor = { id -> checklistFocusRequesters.getOrPut(id) { FocusRequester() } },
+                                            onEntriesChange = { updated, persist -> updateChecklistEntries(updated, persist) },
+                                            onFocusItem = { id -> pendingChecklistFocus = id },
+                                            onDoneCollapsedChange = { collapsed -> setDoneSectionCollapsed(collapsed) },
+                                        )
+                                    }
+                                } else if (edit.isDrawType) {
+                                    if (!drawingCanvasMode) {
+                                        if (viewMode) {
+                                            RichTextReader(
+                                                blocks = richBlocks.orEmpty(),
+                                                typography = container.editorPrefs.typography.activeProfile,
+                                                taskStrike = container.editorPrefs.taskStrike,
+                                                dark = dark,
+                                                titleColor = titleColor,
+                                                noteColor = currentNote.color,
+                                            )
+                                        } else {
+                                            RichTextEditor(
+                                                blocks = richBlocks.orEmpty(),
+                                                state = richEditorState,
+                                                typography = container.editorPrefs.typography.activeProfile,
+                                                taskStrike = container.editorPrefs.taskStrike,
+                                                dark = dark,
+                                                noteColor = currentNote.color,
+                                                titleColor = titleColor,
+                                                focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
+                                                onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
+                                                onEnter = { id, position -> splitRichBlock(id, position) },
+                                                onToggleChecked = { id -> toggleRichChecked(id) },
+                                                onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
+                                                pendingSelectionFor = { id -> pendingRichSelections[id] },
+                                                onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
+                                                suppressKeyboard = showFormatSheet,
+                                            )
+                                        }
+                                        if (richBlocks.orEmpty().any { it.text.isNotBlank() }) Spacer(Modifier.height(14.dp))
+                                    }
+                                    DrawingEditor(
+                                        paths = drawingPaths,
+                                        canvasWidthDp = drawingDimensions?.width,
+                                        canvasHeightDp = drawingDimensions?.height,
+                                        originalHeightDp = drawingDimensions?.originalHeight,
+                                        dark = dark,
                                         titleColor = titleColor,
                                         subtextColor = subtextColor,
+                                        canUndo = drawingUndoStack.isNotEmpty(),
+                                        canRedo = drawingRedoStack.isNotEmpty(),
+                                        onCommit = { newPaths, w, h -> commitDrawingChange(newPaths, w, h) },
+                                        onUndo = { undoDrawing() },
+                                        onRedo = { redoDrawing() },
+                                        readOnly = !drawingCanvasMode || isNoteReadOnly,
                                     )
-                                } else {
-                                    ChecklistEditorBody(
-                                        entries = checklistEntries,
-                                        insertPosition = container.editorPrefs.checklistInsertPosition,
-                                        removeSectionBehavior = container.editorPrefs.checklistRemoveSectionBehavior,
+                                } else if (edit.isAudioType) {
+                                    AudioClipsSection(
+                                        clips = audioClips,
+                                        accent = audioAccentColor(currentNote.color, dark),
                                         dark = dark,
                                         titleColor = titleColor,
                                         subtextColor = subtextColor,
                                         borderColor = borderColor,
-                                        doneCollapsed = doneSectionCollapsed,
-                                        focusRequesterFor = { id -> checklistFocusRequesters.getOrPut(id) { FocusRequester() } },
-                                        onEntriesChange = { updated, persist -> updateChecklistEntries(updated, persist) },
-                                        onFocusItem = { id -> pendingChecklistFocus = id },
-                                        onDoneCollapsedChange = { collapsed -> setDoneSectionCollapsed(collapsed) },
+                                        enabled = true,
+                                        onClipAdded = { clip -> addAudioClip(clip) },
+                                        onClipRemoved = { id -> removeAudioClip(id) },
+                                        onClipRenamed = { id, newName -> renameAudioClip(id, newName) },
+                                        onClipDownload = { clip ->
+                                            scope.launch(Dispatchers.IO) {
+                                                val ok = NoteExporter.exportAudio(
+                                                    context,
+                                                    clip,
+                                                    clip.name.ifBlank { titleText },
+                                                )
+                                                if (!ok) withContext(Dispatchers.Main) {
+                                                    toasts.error(downloadErrorMessage)
+                                                }
+                                            }
+                                        },
                                     )
-                                }
-                            } else if (edit.isDrawType) {
-                                if (!drawingCanvasMode) {
-                                    if (viewMode) {
-                                        RichTextReader(
-                                            blocks = richBlocks.orEmpty(),
-                                            typography = container.editorPrefs.typography.activeProfile,
-                                            taskStrike = container.editorPrefs.taskStrike,
-                                            dark = dark,
-                                            titleColor = titleColor,
-                                            noteColor = currentNote.color,
-                                        )
-                                    } else {
-                                        RichTextEditor(
-                                            blocks = richBlocks.orEmpty(),
-                                            state = richEditorState,
-                                            typography = container.editorPrefs.typography.activeProfile,
-                                            taskStrike = container.editorPrefs.taskStrike,
-                                            dark = dark,
-                                            noteColor = currentNote.color,
-                                            titleColor = titleColor,
-                                            focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
-                                            onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
-                                            onEnter = { id, position -> splitRichBlock(id, position) },
-                                            onToggleChecked = { id -> toggleRichChecked(id) },
-                                            onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
-                                            pendingSelectionFor = { id -> pendingRichSelections[id] },
-                                            onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
-                                            suppressKeyboard = showFormatSheet,
+                                } else if (!edit.isTextType) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(999.dp))
+                                            .background(subtextColor.copy(alpha = 0.14f))
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    ) {
+                                        Text(
+                                            String.format(
+                                                stringResource(R.string.native_note_detail_type_unsupported),
+                                                noteTypeLabel(currentNote.type),
+                                            ),
+                                            color = titleColor,
+                                            fontSize = 13.sp,
                                         )
                                     }
-                                    if (richBlocks.orEmpty().any { it.text.isNotBlank() }) Spacer(Modifier.height(14.dp))
-                                }
-                                DrawingEditor(
-                                    paths = drawingPaths,
-                                    canvasWidthDp = drawingDimensions?.width,
-                                    canvasHeightDp = drawingDimensions?.height,
-                                    originalHeightDp = drawingDimensions?.originalHeight,
-                                    dark = dark,
-                                    titleColor = titleColor,
-                                    subtextColor = subtextColor,
-                                    canUndo = drawingUndoStack.isNotEmpty(),
-                                    canRedo = drawingRedoStack.isNotEmpty(),
-                                    onCommit = { newPaths, w, h -> commitDrawingChange(newPaths, w, h) },
-                                    onUndo = { undoDrawing() },
-                                    onRedo = { redoDrawing() },
-                                    readOnly = !drawingCanvasMode || isNoteReadOnly,
-                                )
-                            } else if (edit.isAudioType) {
-                                AudioClipsSection(
-                                    clips = audioClips,
-                                    accent = audioAccentColor(currentNote.color, dark),
-                                    dark = dark,
-                                    titleColor = titleColor,
-                                    subtextColor = subtextColor,
-                                    borderColor = borderColor,
-                                    enabled = true,
-                                    onClipAdded = { clip -> addAudioClip(clip) },
-                                    onClipRemoved = { id -> removeAudioClip(id) },
-                                    onClipRenamed = { id, newName -> renameAudioClip(id, newName) },
-                                    onClipDownload = { clip ->
-                                        scope.launch(Dispatchers.IO) {
-                                            val ok = NoteExporter.exportAudio(
-                                                context,
-                                                clip,
-                                                clip.name.ifBlank { titleText },
-                                            )
-                                            if (!ok) withContext(Dispatchers.Main) {
-                                                toasts.error(downloadErrorMessage)
-                                            }
-                                        }
-                                    },
-                                )
-                            } else if (!edit.isTextType) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .background(subtextColor.copy(alpha = 0.14f))
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                ) {
-                                    Text(
-                                        String.format(
-                                            stringResource(R.string.native_note_detail_type_unsupported),
-                                            noteTypeLabel(currentNote.type),
-                                        ),
-                                        color = titleColor,
-                                        fontSize = 13.sp,
+                                } else if (edit.isRichEditableType && viewMode) {
+                                    RichTextReader(
+                                        blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
+                                        typography = container.editorPrefs.typography.activeProfile,
+                                        taskStrike = container.editorPrefs.taskStrike,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        noteColor = currentNote.color,
                                     )
-                                }
-                            } else if (edit.isRichEditableType && viewMode) {
-                                RichTextReader(
-                                    blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
-                                    typography = container.editorPrefs.typography.activeProfile,
-                                    taskStrike = container.editorPrefs.taskStrike,
-                                    dark = dark,
-                                    titleColor = titleColor,
-                                    noteColor = currentNote.color,
-                                )
-                            } else if (edit.isRichEditableType) {
-                                RichTextEditor(
-                                    blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
-                                    state = richEditorState,
-                                    typography = container.editorPrefs.typography.activeProfile,
-                                    taskStrike = container.editorPrefs.taskStrike,
-                                    dark = dark,
-                                    noteColor = currentNote.color,
-                                    titleColor = titleColor,
-                                    focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
-                                    onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
-                                    onEnter = { id, position -> splitRichBlock(id, position) },
-                                    onToggleChecked = { id -> toggleRichChecked(id) },
-                                    onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
-                                    pendingSelectionFor = { id -> pendingRichSelections[id] },
-                                    onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
-                                    suppressKeyboard = showFormatSheet,
-                                )
-                            } else {
-                                if (!edit.bodyEditable) {
-                                    Text(
-                                        stringResource(R.string.native_note_detail_formatted_notice),
-                                        color = subtextColor,
-                                        fontSize = 12.sp,
+                                } else if (edit.isRichEditableType) {
+                                    RichTextEditor(
+                                        blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
+                                        state = richEditorState,
+                                        typography = container.editorPrefs.typography.activeProfile,
+                                        taskStrike = container.editorPrefs.taskStrike,
+                                        dark = dark,
+                                        noteColor = currentNote.color,
+                                        titleColor = titleColor,
+                                        focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
+                                        onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
+                                        onEnter = { id, position -> splitRichBlock(id, position) },
+                                        onToggleChecked = { id -> toggleRichChecked(id) },
+                                        onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
+                                        pendingSelectionFor = { id -> pendingRichSelections[id] },
+                                        onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
+                                        suppressKeyboard = showFormatSheet,
                                     )
-                                    Spacer(Modifier.height(10.dp))
-                                    Text(edit.bodyPlainText, color = titleColor, fontSize = 16.sp)
                                 } else {
-                                    BasicTextField(
-                                        value = bodyText,
-                                        onValueChange = { bodyText = it },
-                                        readOnly = isNoteReadOnly,
-                                        textStyle = TextStyle(color = titleColor, fontSize = 16.sp),
-                                        cursorBrush = SolidColor(accentColor),
-                                        modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
-                                    )
+                                    if (!edit.bodyEditable) {
+                                        Text(
+                                            stringResource(R.string.native_note_detail_formatted_notice),
+                                            color = subtextColor,
+                                            fontSize = 12.sp,
+                                        )
+                                        Spacer(Modifier.height(10.dp))
+                                        Text(edit.bodyPlainText, color = titleColor, fontSize = 16.sp)
+                                    } else {
+                                        BasicTextField(
+                                            value = bodyText,
+                                            onValueChange = { bodyText = it },
+                                            readOnly = isNoteReadOnly,
+                                            textStyle = TextStyle(color = titleColor, fontSize = 16.sp),
+                                            cursorBrush = SolidColor(accentColor),
+                                            modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
+                                        )
+                                    }
                                 }
-                            }
 
-                            // "Edited:" stamp, right-aligned at the end of the
-                            // content, 24dp above it (NoteModal.jsx's own
-                            // scrollable placement).
-                            editedStampText(currentNote, todayLabel, yesterdayLabel)?.let { stamp ->
-                                Spacer(Modifier.height(24.dp))
-                                val stampColor = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565)
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        String.format(editedPrefix, stamp),
-                                        color = stampColor,
-                                        fontSize = 12.sp,
-                                        lineHeight = 16.sp,
-                                    )
-                                    Text(
-                                        " \u24D8",
-                                        color = stampColor.copy(alpha = 0.3f),
-                                        fontSize = 12.sp,
-                                        lineHeight = 16.sp,
-                                        modifier = Modifier.gkTooltip(
-                                            String.format(stringResource(R.string.native_note_detail_note_id), currentNote.id),
-                                        ),
-                                    )
+                                if (stamp != null && stampInline) {
+                                    Spacer(Modifier.height(24.dp))
+                                    EditedStamp(stamp, currentNote.id, dark, Modifier.fillMaxWidth())
                                 }
                             }
+                        }
+                        if (stamp != null && !stampInline) {
+                            EditedStamp(
+                                stamp,
+                                currentNote.id,
+                                dark,
+                                Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp),
+                            )
                         }
                     }
                 }
@@ -3244,6 +3238,52 @@ private val DialogBodyDark = Color(0xFFD1D5DB)
  *  single-line everywhere else, and a stray "\n" silently breaks layout. */
 private val TitleNewlines = Regex("[\\r\\n]+")
 
+/** `.modal-footer-toolbar`'s `box-shadow: 0 -1px 3px`: the soft strip it
+ *  casts above its top edge (the box moved up 1px, blurred with a standard
+ *  deviation of 1.5px). */
+private fun Modifier.footerShadow(dark: Boolean): Modifier = drawBehind {
+    val alpha = if (dark) 0.20f else 0.06f
+    val depth = 4.dp.toPx()
+    val px = 1.dp.toPx()
+    val stops = Array(FooterShadowSteps + 1) { step ->
+        val fraction = step.toFloat() / FooterShadowSteps
+        val distance = (1f - fraction) * depth
+        fraction to Color.Black.copy(alpha = alpha * gaussianCdf((px - distance) / (1.5f * px)))
+    }
+    drawRect(
+        brush = Brush.verticalGradient(*stops, startY = -depth, endY = 0f),
+        topLeft = Offset(0f, -depth),
+        size = Size(size.width, depth),
+    )
+}
+
+private const val FooterShadowSteps = 8
+
+/** The "Edited:" line and its ⓘ, whose tooltip names the note id. */
+@Composable
+private fun EditedStamp(stamp: String, noteId: String, dark: Boolean, modifier: Modifier) {
+    val color = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565)
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            String.format(stringResource(R.string.native_note_detail_edited_prefix), stamp),
+            color = color,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+        )
+        Text(
+            "\u24D8",
+            color = color.copy(alpha = 0.3f),
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            modifier = Modifier.gkTooltip(String.format(stringResource(R.string.native_note_detail_note_id), noteId)),
+        )
+    }
+}
+
 /** "Edited:" stamp value. The web prints a locale date-time; this is the
  *  device-locale equivalent. */
 /** NoteModal.jsx's "Modifie" line: who last touched a shared note and
@@ -3462,9 +3502,20 @@ private fun NoteModalFooter(
     tagsPanel: @Composable () -> Unit,
     menu: @Composable () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth()) {
+    val imeVisible = WindowInsets.isImeVisible
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .footerShadow(dark)
+            // The root Column's own imePadding() already reserves room for
+            // the keyboard, and that space reaches past where the nav bar
+            // sits - so adding navigationBarsPadding on top of it while the
+            // keyboard is up doubled the gap instead of matching it. Only
+            // add it back once the keyboard closes. Outside the veil: the
+            // web leaves the nav bar strip in the plain note colour.
+            .then(if (imeVisible) Modifier else Modifier.navigationBarsPadding()),
+    ) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
-        val imeVisible = WindowInsets.isImeVisible
         if (BuildConfig.DEBUG) {
             SideEffect { Log.d("GKIme", "NoteModalFooter imeVisible=$imeVisible") }
         }
@@ -3472,12 +3523,6 @@ private fun NoteModalFooter(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(if (dark) Color.Black.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.04f))
-                // The root Column's own imePadding() already reserves room
-                // for the keyboard, and that space reaches past where the
-                // nav bar sits - so adding navigationBarsPadding on top of
-                // it while the keyboard is up doubled the gap instead of
-                // matching it. Only add it back once the keyboard closes.
-                .then(if (imeVisible) Modifier else Modifier.navigationBarsPadding())
                 .padding(vertical = 6.dp),
             // ModalFooter.jsx's desktop layout splits into two clusters
             // held apart by a flex-1 spacer, but its own mobile media query
@@ -3622,9 +3667,9 @@ private fun NoteModalFooter(
                     onClick = onModeClick,
                 ) {
                     if (viewMode) {
-                        PencilFilledIcon(size = 18.dp, tint = Color.White)
+                        PencilFilledIcon(size = 16.dp, tint = Color.White)
                     } else {
-                        EyeFilledIcon(size = 18.dp, tint = Color.White)
+                        EyeFilledIcon(size = 16.dp, tint = Color.White)
                     }
                 }
             }
@@ -3637,8 +3682,8 @@ private fun NoteModalFooter(
                     backgroundBrush = ModeButtonGradient,
                     onClick = onDrawModeClick,
                 ) {
-                    if (drawingCanvasMode) EyeFilledIcon(size = 18.dp, tint = Color.White)
-                    else PencilFilledIcon(size = 18.dp, tint = Color.White)
+                    if (drawingCanvasMode) EyeFilledIcon(size = 16.dp, tint = Color.White)
+                    else PencilFilledIcon(size = 16.dp, tint = Color.White)
                 }
             }
         }
