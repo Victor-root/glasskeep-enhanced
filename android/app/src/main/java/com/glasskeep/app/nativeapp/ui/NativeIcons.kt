@@ -1158,9 +1158,9 @@ fun WorldIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Col
 )
 
 @Composable
-fun ChevronDownIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+fun ChevronDownIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, strokeWidth: Float = 1.75f) = TablerIcon(
     "M6 9l6 6l6 -6",
-    modifier, size, tint,
+    modifier, size, tint, strokeWidth,
 )
 
 @Composable

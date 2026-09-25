@@ -179,7 +179,6 @@ import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.FloatingCardsBackground
-import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
@@ -940,6 +939,7 @@ fun NativeNotesListScreen(
                                     typography = container.editorPrefs.typography.activeProfile,
                                     taskStrike = container.editorPrefs.taskStrike,
                                     loadDetail = repository::cachedNoteDetailOrNull,
+                                    themeId = themeId,
                                     isDragged = note.id == draggedNoteId,
                                     isDragOver = note.id == dragOverNoteId,
                                     onBoundsChanged = { bounds ->
@@ -2256,6 +2256,7 @@ private fun ReorderableNoteCard(
     typography: TypographyProfile,
     taskStrike: Boolean,
     loadDetail: suspend (String) -> NoteDto?,
+    themeId: String?,
     isDragged: Boolean,
     isDragOver: Boolean,
     onBoundsChanged: (Rect?) -> Unit,
@@ -2342,6 +2343,7 @@ private fun ReorderableNoteCard(
             typography = typography,
             taskStrike = taskStrike,
             loadDetail = loadDetail,
+            themeId = themeId,
         )
     }
 }
@@ -2419,6 +2421,7 @@ internal fun NoteCard(
     typography: TypographyProfile = TypographyPresets.DEFAULT.activeProfile,
     taskStrike: Boolean = false,
     loadDetail: (suspend (String) -> NoteDto?)? = null,
+    themeId: String? = null,
 ) {
     val borderColor = if (dark) CardBorderDark else CardBorderLight
     // The list cache keeps only light columns; images and collaborators
@@ -2447,7 +2450,7 @@ internal fun NoteCard(
                     role = Role.Button,
                     onClick = { if (selectionMode) onToggleSelect?.invoke() else onClick() },
                 )
-                .padding(8.dp),
+                .padding(9.dp),
         ) {
             if (note.title.isNotBlank()) {
                 Text(
@@ -2455,7 +2458,8 @@ internal fun NoteCard(
                     color = titleColor,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    modifier = Modifier.padding(end = if (selectionMode || note.iconSrc != null) 30.dp else 0.dp),
+                    lineHeight = 20.sp,
+                    modifier = Modifier.padding(end = if (!selectionMode && note.iconSrc != null) 32.dp else 0.dp),
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -2466,7 +2470,7 @@ internal fun NoteCard(
             }
 
             if (note.type == "checklist") {
-                ChecklistCardPreview(note = note, titleColor = titleColor, subtextColor = subtextColor)
+                ChecklistCardPreview(note = note, titleColor = titleColor, dark = dark)
             } else if (note.type == "draw") {
                 DrawingCardPreview(note = note, dark = dark, typography = typography, taskStrike = taskStrike, titleColor = titleColor)
             } else if (note.type == "audio") {
@@ -2504,7 +2508,7 @@ internal fun NoteCard(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     note.reminderAt?.let { reminderAt ->
-                        ReminderChip(reminderAt = reminderAt, dark = dark)
+                        ReminderChip(reminderAt = reminderAt, dark = dark, accent = WorkspaceTheme.accent(themeId, false))
                     }
                     if (tags.isNotEmpty()) CardTagChips(tags = tags, dark = dark)
                     if (showCollaborators) CardCollaborators(collaborators = collaborators, dark = dark)
@@ -2523,7 +2527,7 @@ internal fun NoteCard(
                         contentDescription = note.iconName?.takeIf { it.isNotBlank() }
                             ?: stringResource(R.string.native_note_icon),
                         contentScale = ContentScale.Fit,
-                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(28.dp),
+                        modifier = Modifier.align(Alignment.TopEnd).padding(9.dp).size(28.dp),
                     )
                 }
             }
@@ -2537,7 +2541,7 @@ internal fun NoteCard(
                 selected = selected,
                 dark = dark,
                 onToggle = { onToggleSelect?.invoke() },
-                modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+                modifier = Modifier.align(Alignment.TopEnd).padding(13.dp),
             )
         }
     }
@@ -2863,14 +2867,18 @@ private fun CardTagChips(tags: List<String>, dark: Boolean) {
 /** Mirrors NoteReminderChip.jsx: a neutral pill, bell glyph, muted once the
  *  instant has passed, an accent tint while it's still upcoming. */
 @Composable
-private fun ReminderChip(reminderAt: String, dark: Boolean) {
+private fun ReminderChip(reminderAt: String, dark: Boolean, accent: Color) {
     val label = formatReminderLabel(reminderAt)
     if (label.isBlank()) return
     val past = isReminderPast(reminderAt)
-    val bg = if (dark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.06f)
+    val bg = when {
+        !dark -> Color.Black.copy(alpha = 0.06f)
+        past -> Color.White.copy(alpha = 0.08f)
+        else -> Color.White.copy(alpha = 0.10f)
+    }
     val fg = when {
-        past -> if (dark) Color(0xFF9ca3af) else Color(0xFF6b7280)
-        else -> if (dark) Color(0xFFa5b4fc) else Indigo
+        past -> if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282)
+        else -> if (dark) Color(0xFFA3B3FF) else accent
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -2878,10 +2886,12 @@ private fun ReminderChip(reminderAt: String, dark: Boolean) {
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
             .background(bg)
-            .padding(horizontal = 8.dp, vertical = 3.dp),
+            .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
-        BellIcon(size = 12.dp, tint = fg)
-        Text(label, color = fg, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // The .tabler-icon rule (globalCSS.js:3322-3339) beats the chip's
+        // w-3 h-3, so the bell really renders 20px.
+        BellIcon(size = 20.dp, tint = fg)
+        Text(label, color = fg, fontSize = 11.sp, lineHeight = 16.5.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -2897,7 +2907,7 @@ private fun ReminderChip(reminderAt: String, dark: Boolean) {
 private fun formatReminderLabel(reminderAt: String): String {
     val ms = parseIsoToEpochMillis(reminderAt) ?: return ""
     val isFrench = Locale.getDefault().language == "fr"
-    val time = SimpleDateFormat(if (isFrench) "HH:mm" else "h:mm a", Locale.getDefault()).format(Date(ms))
+    val time = SimpleDateFormat(if (isFrench) "HH:mm" else "hh:mm a", Locale.getDefault()).format(Date(ms))
 
     val target = Calendar.getInstance().apply { timeInMillis = ms }
     val now = Calendar.getInstance()
@@ -2909,7 +2919,13 @@ private fun formatReminderLabel(reminderAt: String): String {
         sameDay(target, now) -> stringResource(R.string.native_reminder_chip_today, time)
         sameDay(target, tomorrow) -> stringResource(R.string.native_reminder_chip_tomorrow, time)
         else -> {
-            val datePattern = if (target.get(Calendar.YEAR) != now.get(Calendar.YEAR)) "d MMM yyyy" else "d MMM"
+            val sameYear = target.get(Calendar.YEAR) == now.get(Calendar.YEAR)
+            val datePattern = when {
+                isFrench && sameYear -> "d MMM"
+                isFrench -> "d MMM yyyy"
+                sameYear -> "MMM d"
+                else -> "MMM d, yyyy"
+            }
             val date = SimpleDateFormat(datePattern, Locale.getDefault()).format(Date(ms))
             stringResource(R.string.native_reminder_chip_date, date, time)
         }
@@ -2920,7 +2936,7 @@ private fun formatReminderLabel(reminderAt: String): String {
  *  listed (what's left to do), capped at a handful, checked ones only
  *  count toward the "done/total" footer. */
 @Composable
-private fun ChecklistCardPreview(note: NoteEntity, titleColor: Color, subtextColor: Color) {
+private fun ChecklistCardPreview(note: NoteEntity, titleColor: Color, dark: Boolean) {
     val entries = remember(note.itemsJson) { ChecklistItems.parseJson(note.itemsJson) }
     val items = remember(entries) { entries.filterIsInstance<ChecklistItemData>() }
     val total = items.size
@@ -2942,51 +2958,50 @@ private fun ChecklistCardPreview(note: NoteEntity, titleColor: Color, subtextCol
     val extra = (uncheckedTotal - shownCount).coerceAtLeast(0)
     val hasTitledSection = previewBlocks.any { it.section?.title?.isNotBlank() == true }
 
+    val footerColor = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (block in previewBlocks) {
             val section = block.section
             val accent = ChecklistSectionColors.firstOrNull { it.first == section?.color }?.second
-            if (hasTitledSection && section != null && section.title.isNotBlank()) {
-                ChecklistSectionCardHeader(section.title, section.collapsed, accent, subtextColor)
-            }
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = if (accent != null && block.items.isNotEmpty()) {
-                    Modifier
-                        .fillMaxWidth()
-                        .background(accent.copy(alpha = 0.04f))
-                        .drawBehind {
-                            drawRect(
-                                color = accent.copy(alpha = 0.60f),
-                                size = Size(3.dp.toPx(), size.height),
-                            )
-                        }
-                        .padding(start = 8.dp)
-                } else Modifier,
-            ) {
-                for (item in block.items) {
-                    Row(
-                        verticalAlignment = Alignment.Top,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = if (item.indent == 1) Modifier.padding(start = 20.dp) else Modifier,
-                    ) {
-                        Box(
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (hasTitledSection && section != null && section.title.isNotBlank()) {
+                    ChecklistSectionCardHeader(section.title, section.collapsed, accent, titleColor, dark)
+                }
+                if (block.items.isNotEmpty()) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = if (accent != null) {
                             Modifier
-                                .padding(top = 3.dp)
-                                .size(14.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(Color.White.copy(alpha = 0.65f))
-                                .border(1.dp, Color(0xFF9CA3AF).copy(alpha = 0.65f), RoundedCornerShape(3.dp)),
-                        )
-                        Text(
-                            item.text,
-                            color = titleColor,
-                            fontSize = 14.sp,
-                            lineHeight = 20.sp,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
+                                .fillMaxWidth()
+                                .background(accent.copy(alpha = if (dark) 0.09f else 0.04f))
+                                .drawBehind {
+                                    drawRect(
+                                        color = accent.copy(alpha = if (dark) 0.80f else 0.60f),
+                                        size = Size(3.dp.toPx(), size.height),
+                                    )
+                                }
+                                .padding(start = 11.dp)
+                        } else Modifier,
+                    ) {
+                        for (item in block.items) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = if (item.indent == 1) Modifier.padding(start = 20.dp) else Modifier,
+                            ) {
+                                GkCheckbox(checked = false, onCheckedChange = null, size = 14.dp)
+                                Text(
+                                    item.text,
+                                    color = titleColor,
+                                    fontSize = 14.sp,
+                                    lineHeight = 20.sp,
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                    // pb-0.5 plus the 1px transparent border.
+                                    modifier = Modifier.weight(1f).padding(bottom = 3.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -2994,20 +3009,22 @@ private fun ChecklistCardPreview(note: NoteEntity, titleColor: Color, subtextCol
         if (extra > 0) {
             Text(
                 String.format(stringResource(R.string.native_notes_more_items), extra),
-                color = subtextColor,
+                color = footerColor,
                 fontSize = 12.sp,
+                lineHeight = 16.sp,
             )
         }
         Text(
             String.format(stringResource(R.string.native_notes_completed_fraction), done, total),
-            color = subtextColor,
+            color = footerColor,
             fontSize = 12.sp,
+            lineHeight = 16.sp,
         )
     }
 }
 
 @Composable
-private fun ChecklistSectionCardHeader(title: String, collapsed: Boolean, accent: Color?, fallback: Color) {
+private fun ChecklistSectionCardHeader(title: String, collapsed: Boolean, accent: Color?, fallback: Color, dark: Boolean) {
     val tint = accent ?: fallback
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -3015,26 +3032,29 @@ private fun ChecklistSectionCardHeader(title: String, collapsed: Boolean, accent
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(4.dp))
-            .background(accent?.copy(alpha = 0.10f) ?: Color.Transparent)
+            .background(accent?.copy(alpha = if (dark) 0.18f else 0.10f) ?: Color.Transparent)
             .drawBehind {
                 if (accent != null) {
                     drawRect(
-                        color = accent.copy(alpha = 0.35f),
+                        color = accent.copy(alpha = if (dark) 0.50f else 0.35f),
                         size = Size(2.dp.toPx(), size.height),
                     )
                 }
             }
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .padding(start = if (accent != null) 8.dp else 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
     ) {
         ChevronDownIcon(
             size = 10.dp,
             tint = tint,
+            strokeWidth = 2.5f,
             modifier = Modifier.rotate(if (collapsed) -90f else 0f),
         )
         Text(
             title,
             color = tint,
             fontSize = 12.sp,
+            lineHeight = 16.sp,
+            letterSpacing = 0.3.sp,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
         )

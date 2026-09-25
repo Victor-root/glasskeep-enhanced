@@ -61,7 +61,6 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.ui.DarkBgColor
-import com.glasskeep.app.ui.Indigo
 
 /** One bulk-selection run over several note ids: which ones succeeded and
  *  how many failed. Every action() call now enqueues onto the offline
@@ -106,13 +105,15 @@ suspend fun runBulkAction(context: Context, ids: Collection<String>, action: sus
  *  as one directly rather than sourced from an SVG file). */
 @Composable
 internal fun SelectionCheckbox(selected: Boolean, dark: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
-    val borderColor = if (dark) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.3f)
+    // NoteCard.jsx:225-256, Tailwind v4 colours.
+    val selectedColor = Color(0xFF615FFF)
+    val shape = RoundedCornerShape(6.dp)
     Box(
         modifier = modifier
             .size(24.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (selected) Indigo else if (dark) Color(0xFF374151).copy(alpha = 0.8f) else Color.White.copy(alpha = 0.8f))
-            .border(width = 2.dp, color = if (selected) Indigo else borderColor, shape = RoundedCornerShape(6.dp))
+            .clip(shape)
+            .background(if (selected) selectedColor else if (dark) Color(0xCC364152) else Color.White.copy(alpha = 0.8f))
+            .border(width = 2.dp, color = if (selected) selectedColor else if (dark) Color(0xFF6A7282) else Color(0xFFD1D5DC), shape = shape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -121,7 +122,7 @@ internal fun SelectionCheckbox(selected: Boolean, dark: Boolean, onToggle: () ->
         contentAlignment = Alignment.Center,
     ) {
         if (selected) {
-            CheckSquareIcon(size = 16.dp, tint = Color.White)
+            SaveCheckIcon(size = 16.dp, tint = Color.White)
         }
     }
 }
