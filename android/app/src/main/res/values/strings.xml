@@ -75,7 +75,6 @@
     <string name="native_notes_section_pinned">Pinned</string>
     <string name="native_notes_section_others">Others</string>
     <string name="native_notes_create_error">Couldn\'t create the note: %1$s</string>
-    <string name="native_notes_untitled">Untitled</string>
     <string name="native_notes_more_items">+%1$d more ...</string>
     <string name="native_notes_completed_fraction">%1$d/%2$d completed</string>
     <string name="native_note_type_text">Text</string>
@@ -687,7 +686,7 @@
     <string name="native_notifications_collaborator_removed_with_copy">You removed %1$s from the note %2$s, they kept a copy</string>
     <string name="native_notifications_collaborator_left">%1$s left the collaboration on the note %2$s</string>
     <string name="native_notifications_shared_note_deleted">%1$s deleted the note %2$s that was shared with you</string>
-    <string name="native_notifications_shared_note_deleted_with_copy">%1$s deleted the note %2$s that was shared with you and left you a copy</string>
+    <string name="native_notifications_shared_note_deleted_with_copy">%1$s deleted the shared note %2$s and left you a copy</string>
     <string name="native_notifications_clear_all">Clear</string>
     <string name="native_notifications_open">Open</string>
     <string name="native_notifications_title_note_shared">Note shared</string>
@@ -696,7 +695,12 @@
     <string name="native_notifications_title_collaborator_left">Collaborator left</string>
     <string name="native_notifications_title_shared_note_deleted">Shared note deleted</string>
     <string name="native_notifications_title_reminder">Reminder</string>
-    <string name="native_notifications_title_generic">Notification</string>
+    <string name="native_notifications_untitled">(untitled)</string>
+    <string name="native_notifications_open_note">Open note</string>
+    <string name="native_notif_fallback_info">Information</string>
+    <string name="native_notif_fallback_success">Success</string>
+    <string name="native_notif_fallback_warning">Warning</string>
+    <string name="native_notif_fallback_error">Error</string>
     <string name="native_relative_just_now">just now</string>
     <string name="native_relative_minutes">%1$d min ago</string>
     <string name="native_relative_hours">%1$d h ago</string>
@@ -903,12 +907,12 @@
     <string name="native_admin_update_confirm_title">Install the server update?</string>
     <string name="native_admin_update_confirm_body">GlassKeep will become temporarily unavailable while the update is installed and the service restarts.</string>
     <string name="native_admin_power_confirm">Connected clients will be disconnected. Continue?</string>
-    <string name="native_admin_registration_request">Registration request</string>
-    <string name="native_admin_registration_notification">%1$s requested an account using %2$s.</string>
+    <string name="native_notifications_title_pending_user">New registration</string>
+    <string name="native_notifications_pending_user">%1$s (%2$s) is asking to create an account</string>
     <string name="native_admin_registration_approved">Registration approved.</string>
     <string name="native_admin_registration_rejected">Registration rejected.</string>
-    <string name="native_admin_user_deleted">User deleted</string>
-    <string name="native_admin_user_deleted_notification">%1$s deleted %2$s.</string>
+    <string name="native_notifications_title_user_deleted">User deleted</string>
+    <string name="native_notifications_user_deleted">%1$s was deleted by %2$s</string>
     <string name="native_admin_action_failed">The administrative action failed.</string>
     <string name="native_admin_saving">Working…</string>
 </resources>

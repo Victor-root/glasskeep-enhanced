@@ -73,7 +73,6 @@
     <string name="native_notes_section_pinned">Épinglées</string>
     <string name="native_notes_section_others">Autres</string>
     <string name="native_notes_create_error">Impossible de créer la note : %1$s</string>
-    <string name="native_notes_untitled">Sans titre</string>
     <string name="native_notes_more_items">+%1$d de plus ...</string>
     <string name="native_notes_completed_fraction">%1$d/%2$d terminés</string>
     <string name="native_note_type_text">Texte</string>
@@ -676,7 +675,7 @@
     <string name="native_notifications_collaborator_removed_with_copy">Vous avez retiré %1$s de la note %2$s, une copie lui a été conservée</string>
     <string name="native_notifications_collaborator_left">%1$s a quitté la collaboration sur la note %2$s</string>
     <string name="native_notifications_shared_note_deleted">%1$s a supprimé la note %2$s qui était partagée avec vous</string>
-    <string name="native_notifications_shared_note_deleted_with_copy">%1$s a supprimé la note %2$s qui était partagée avec vous et vous en a laissé une copie</string>
+    <string name="native_notifications_shared_note_deleted_with_copy">%1$s a supprimé la note partagée %2$s et vous en a laissé une copie</string>
     <string name="native_notifications_clear_all">Effacer</string>
     <string name="native_notifications_open">Ouvrir</string>
     <string name="native_notifications_title_note_shared">Note partagée</string>
@@ -685,7 +684,12 @@
     <string name="native_notifications_title_collaborator_left">Collaborateur parti</string>
     <string name="native_notifications_title_shared_note_deleted">Note partagée supprimée</string>
     <string name="native_notifications_title_reminder">Rappel</string>
-    <string name="native_notifications_title_generic">Notification</string>
+    <string name="native_notifications_untitled">(sans titre)</string>
+    <string name="native_notifications_open_note">Ouvrir la note</string>
+    <string name="native_notif_fallback_info">Information</string>
+    <string name="native_notif_fallback_success">Succès</string>
+    <string name="native_notif_fallback_warning">Attention</string>
+    <string name="native_notif_fallback_error">Erreur</string>
     <string name="native_relative_just_now">à l\'instant</string>
     <string name="native_relative_minutes">il y a %1$d min</string>
     <string name="native_relative_hours">il y a %1$d h</string>
@@ -892,12 +896,12 @@
     <string name="native_admin_update_confirm_title">Installer la mise à jour serveur ?</string>
     <string name="native_admin_update_confirm_body">GlassKeep sera temporairement indisponible pendant l’installation et le redémarrage du service.</string>
     <string name="native_admin_power_confirm">Les clients connectés seront déconnectés. Continuer ?</string>
-    <string name="native_admin_registration_request">Demande d’inscription</string>
-    <string name="native_admin_registration_notification">%1$s demande un compte avec l’identifiant %2$s.</string>
+    <string name="native_notifications_title_pending_user">Nouvelle inscription</string>
+    <string name="native_notifications_pending_user">%1$s (%2$s) souhaite créer un compte</string>
     <string name="native_admin_registration_approved">Inscription approuvée.</string>
     <string name="native_admin_registration_rejected">Inscription refusée.</string>
-    <string name="native_admin_user_deleted">Utilisateur supprimé</string>
-    <string name="native_admin_user_deleted_notification">%1$s a supprimé %2$s.</string>
+    <string name="native_notifications_title_user_deleted">Utilisateur supprimé</string>
+    <string name="native_notifications_user_deleted">%1$s a été supprimé par %2$s</string>
     <string name="native_admin_action_failed">L’action administrative a échoué.</string>
     <string name="native_admin_saving">Traitement…</string>
 </resources>

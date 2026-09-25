@@ -340,8 +340,7 @@ fun NativeNavHost(
     LaunchedEffect(liveNotification) {
         val notification = liveNotification ?: return@LaunchedEffect
         liveNotification = null
-        val noteTitle = notification.noteTitle.ifBlank { context.getString(R.string.native_notes_untitled) }
-        val template = notificationMessageRes(notification.type, notification.variant)
+        val openLabel = notificationOpenLabelRes(notification.type)?.takeIf { notification.noteId != null }
         val pendingId = notification.message?.toIntOrNull()
             ?.takeIf { notification.type == "pending_user_registered" }
         fun decide(approve: Boolean) {
@@ -351,18 +350,16 @@ fun NativeNavHost(
             }
         }
         toasts.show(
-            message = template
-                ?.let { context.getString(it, notification.senderName, noteTitle) }
-                ?: notification.message.orEmpty().ifBlank { noteTitle },
+            message = notificationMessageText(context, notification).text,
             variant = variantOf(notification),
-            title = context.getString(notificationTitleRes(notification.type)),
+            title = notificationTitleText(context, notification, withFallback = false),
             actionLabel = when {
-                notification.noteId != null -> context.getString(R.string.native_notifications_open)
+                openLabel != null -> context.getString(openLabel)
                 pendingId != null -> context.getString(R.string.native_admin_approve)
                 else -> null
             },
             action = when {
-                notification.noteId != null -> { { navController.navigate("notes/${notification.noteId}") } }
+                openLabel != null -> { { navController.navigate("notes/${notification.noteId}") } }
                 pendingId != null -> { { decide(approve = true) } }
                 else -> null
             },
