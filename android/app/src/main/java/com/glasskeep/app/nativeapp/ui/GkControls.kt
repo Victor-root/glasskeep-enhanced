@@ -1,12 +1,11 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -20,7 +19,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,9 +33,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -56,7 +56,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -64,13 +63,15 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -85,6 +86,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
@@ -125,7 +127,7 @@ private val PopoverBgDark = Color(0xFF222222)
 private val DialogBgDark = Color(0xFF282828)
 
 /** `red-600`, the one red the workspace themes never retint. */
-internal val DangerRed = Color(0xFFDC2626)
+internal val DangerRed = Color(0xFFE7000B)
 
 /** What an `<input type="checkbox">` without `accent-color` fills with. */
 internal val ChromiumCheckboxAccent = Color(0xFF0075FF)
@@ -600,6 +602,14 @@ internal fun SettingsCardButton(
     }
 }
 
+/** Most web buttons' label: Tailwind `text-sm font-semibold`. */
+internal val GkButtonLabelSmall = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+
+/** The confirmation dialogs' labels (GenericConfirmDialog.jsx,
+ *  ConfirmDeleteDialog.jsx) carry no size class: the body's 16px/24px, in
+ *  regular weight unless the button adds `font-semibold`. */
+internal val GkButtonLabelBase = TextStyle(fontSize = 16.sp, lineHeight = 24.sp)
+
 /**
  * The primary gradient button (`SettingsPanel.jsx:1543`, and every other
  * `btn-gradient` call site): 14px/600 white on the theme gradient, 8px
@@ -616,6 +626,7 @@ internal fun GkGradientButton(
     // Non-null only for the semantic variants that must not follow the
     // workspace accent (see GkConfirmVariant).
     gradient: Brush? = null,
+    labelStyle: TextStyle = GkButtonLabelSmall,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
@@ -650,8 +661,7 @@ internal fun GkGradientButton(
         Text(
             label,
             color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
+            style = LocalTextStyle.current.merge(labelStyle),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -708,6 +718,9 @@ internal fun SettingsPopoverOption(
  * scrim. No entrance animation, matching the web's plain conditional
  * render. The web also blurs the scrim by 8px; a dialog window can't
  * blur what is behind it here, so the scrim stays flat.
+ *
+ * [dimAmount] replaces the window's own dim for the dialogs whose scrim
+ * is lighter (`bg-black/40`); null keeps the platform's.
  */
 @Composable
 internal fun GkDialog(
@@ -716,6 +729,7 @@ internal fun GkDialog(
     borderColor: Color,
     dismissOnClickOutside: Boolean = true,
     maxWidth: Dp = 448.dp,
+    dimAmount: Float? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(
@@ -725,6 +739,13 @@ internal fun GkDialog(
             usePlatformDefaultWidth = false,
         ),
     ) {
+        if (dimAmount != null) {
+            val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+            SideEffect {
+                window?.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                window?.setDimAmount(dimAmount)
+            }
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
@@ -746,11 +767,20 @@ internal fun GkDialog(
  *  reason): a delete button stays red whatever the accent colour is. */
 enum class GkConfirmVariant { DEFAULT, DANGER, SUCCESS }
 
+/** GenericConfirmDialog.jsx's `from-indigo-500 to-violet-600` confirm
+ *  button: the GlassKeep theme has no theme class on the web, so its
+ *  `.btn-gradient` keeps these Tailwind v4 stops instead of the theme's
+ *  own gradient tokens. */
+private val ConfirmGradientGlassKeep = Brush.horizontalGradient(listOf(Color(0xFF615FFF), Color(0xFF7F22FE)))
+
+/** `bg-black/40`, the scrim of the web's confirmation dialogs. */
+internal const val ConfirmDialogDim = 0.4f
+
 /**
  * GenericConfirmDialog.jsx: the one confirmation used all over the web app
  * (converting a note, resetting the note order, restarting the server).
  * Title 18sp semibold, message 14sp muted, then Cancel and the confirm
- * button right-aligned 20dp below.
+ * button right-aligned 20dp below, both at the body's 16px.
  */
 @Composable
 internal fun GkConfirmDialog(
@@ -767,8 +797,15 @@ internal fun GkConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    GkDialog(onDismissRequest = onDismiss, dark = dark, borderColor = borderColor, maxWidth = 384.dp) {
-        Text(title, color = titleColor, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+    val confirmLabelStyle = GkButtonLabelBase.copy(fontWeight = FontWeight.SemiBold)
+    GkDialog(
+        onDismissRequest = onDismiss,
+        dark = dark,
+        borderColor = borderColor,
+        maxWidth = 384.dp,
+        dimAmount = ConfirmDialogDim,
+    ) {
+        Text(title, color = titleColor, fontSize = 18.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         Text(message, color = subtextColor, fontSize = 14.sp, lineHeight = 20.sp)
         Spacer(Modifier.height(20.dp))
@@ -781,22 +818,29 @@ internal fun GkConfirmDialog(
                 label = cancelLabel,
                 borderColor = borderColor,
                 textColor = titleColor,
+                labelStyle = GkButtonLabelBase,
                 onClick = onDismiss,
             )
             when (variant) {
                 GkConfirmVariant.DANGER -> GkDangerButton(
                     label = confirmLabel,
+                    labelStyle = confirmLabelStyle,
                     onClick = { onDismiss(); onConfirm() },
                 )
                 GkConfirmVariant.SUCCESS -> GkGradientButton(
                     label = confirmLabel,
                     themeId = null,
                     gradient = Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF16A34A))),
+                    labelStyle = confirmLabelStyle,
                     onClick = { onDismiss(); onConfirm() },
                 )
                 GkConfirmVariant.DEFAULT -> GkGradientButton(
                     label = confirmLabel,
                     themeId = themeId,
+                    gradient = ConfirmGradientGlassKeep.takeIf {
+                        WorkspaceTheme.forId(themeId).id == WorkspaceTheme.DEFAULT_ID
+                    },
+                    labelStyle = confirmLabelStyle,
                     onClick = { onDismiss(); onConfirm() },
                 )
             }
@@ -813,6 +857,7 @@ internal fun GkSecondaryButton(
     textColor: Color,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    labelStyle: TextStyle = GkButtonLabelSmall,
     onClick: () -> Unit,
 ) {
     Box(
@@ -827,8 +872,9 @@ internal fun GkSecondaryButton(
                 role = Role.Button,
             ) { onClick() }
             .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = textColor, style = LocalTextStyle.current.merge(labelStyle))
     }
 }
 
@@ -840,6 +886,7 @@ internal fun GkDangerButton(
     label: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    labelStyle: TextStyle = GkButtonLabelSmall,
     onClick: () -> Unit,
 ) {
     Box(
@@ -854,8 +901,9 @@ internal fun GkDangerButton(
                 role = Role.Button,
             ) { onClick() }
             .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = Color.White, style = LocalTextStyle.current.merge(labelStyle))
     }
 }
 
@@ -916,12 +964,38 @@ internal fun GkTextField(
     }
 }
 
+/** The anchor button's window bounds and the window's width, as the popup
+ *  reports them: everything [FooterPopover] needs to place its panel. */
+private data class FooterPopoverAnchor(val bounds: IntRect, val windowWidth: Int)
+
+/** Where a footer popover's panel lands, in window pixels, once both its
+ *  anchor and its own natural width are known. [arrowLeft] is the arrow
+ *  square's CSS `left`, measured from the panel's padding edge. */
+private data class FooterPopoverPlacement(
+    val left: Int,
+    val width: Int,
+    val arrowLeft: Int,
+    val squareBottomStart: Boolean,
+    val squareBottomEnd: Boolean,
+)
+
+/** The corner radius the web drops to next to an arrow sitting close to
+ *  the panel's edge (Popover.jsx:43-48, ColorPickerPanel.jsx:51-66). */
+private val FooterPopoverArrowCorner = 4.dp
+
 /**
- * The note footer's popovers (`ColorPickerPanel.jsx:14-65` and
- * `ModalFooter.jsx:384-417`): a fixed-width card that opens upwards from
- * the tapped footer button, kept 8px away from the screen edges, with a
- * 12x6 arrow pointing back down at the button's centre. Neither panel
- * has any open or close animation on the web.
+ * The note footer's popovers (`Popover.jsx`, `ColorPickerPanel.jsx` and
+ * `ModalFooter.jsx:379-417`): a card that opens upwards from the tapped
+ * footer button, [gap] above it, kept 8px from the screen edges, with the
+ * web's rotated-square arrow pointing back down at the button. None of
+ * them animates: the web only reveals them once they are positioned.
+ *
+ * [width] fixes the card's width. Without it the card follows Popover.jsx:
+ * measured where the button starts ([minWidth] at least), shifted left
+ * when it overflows the screen, then re-flowed in the room left there.
+ * [arrowEndInset] is the distance from the right edge under which the
+ * arrow squares that bottom corner (32px in Popover.jsx, 36px in the
+ * colour panel).
  *
  * The caller places this inside the button's own Box: Compose hands the
  * position provider that button's window bounds, which is exactly what
@@ -941,25 +1015,27 @@ internal fun FooterPopover(
     // buffer around it (see shadowPad below), had nowhere to blur into -
     // together that read as one big, hard-edged, overly dark halo.
     elevation: Dp = 12.dp,
+    // The arrow's two outer edges are always drawn in `--border-light`,
+    // whatever border the card itself has.
+    arrowBorderColor: Color = borderColor,
+    arrowEndInset: Dp = 32.dp,
+    // Tailwind's `ring-1`: a hairline just outside the card's border.
+    ringColor: Color? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val density = LocalDensity.current
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     // Compose's Popup sizes its window tightly around its content, with no
     // allowance for a shadow's blur to bleed past that content's own laid
     // out bounds - so Modifier.shadow() inside a Popup, unlike inside a
     // normal layout, gets a hard, uneven cut wherever the blur would have
-    // extended past the window edge. Different footer popovers sit at
-    // different screen positions, so each one lost a different amount to
-    // this - which is why they looked inconsistent with each other on top
-    // of each being cut. Padding the whole popup content (panel and arrow
-    // together) by more than the blur can reach reserves that room; the
+    // extended past the window edge. Padding the whole popup content by
+    // more than the blur (or the arrow) can reach reserves that room; the
     // position math below shifts the window itself back by the same
-    // amount so the visible panel still lands exactly where it did.
+    // amount so the visible panel still lands exactly where it should.
     val shadowPad = 16.dp
-    var arrowLeft by remember { mutableStateOf(0.dp) }
-    var panelWidth by remember { mutableStateOf(width ?: minWidth) }
-    val positionProvider = remember(density, width, gap, shadowPad) {
+    var anchor by remember { mutableStateOf<FooterPopoverAnchor?>(null) }
+    var placement by remember { mutableStateOf<FooterPopoverPlacement?>(null) }
+    val positionProvider = remember(density, gap, placement) {
         object : PopupPositionProvider {
             override fun calculatePosition(
                 anchorBounds: IntRect,
@@ -967,20 +1043,11 @@ internal fun FooterPopover(
                 layoutDirection: LayoutDirection,
                 popupContentSize: IntSize,
             ): IntOffset {
+                anchor = FooterPopoverAnchor(anchorBounds, windowSize.width)
                 val shadowPadPx = with(density) { shadowPad.roundToPx() }
-                val widthPx = width?.let { with(density) { it.roundToPx() } }
-                    ?: (popupContentSize.width - 2 * shadowPadPx)
-                val marginPx = with(density) { 8.dp.roundToPx() }
                 val gapPx = with(density) { gap.roundToPx() }
-                val left = minOf(anchorBounds.left, windowSize.width - widthPx - marginPx)
-                    .coerceAtLeast(marginPx)
-                // Half the arrow's width, so its tip lands on the
-                // button's centre.
-                val halfArrowPx = with(density) { 6.dp.roundToPx() }
-                arrowLeft = with(density) { (anchorBounds.center.x - left - halfArrowPx).toDp() }
-                panelWidth = with(density) { widthPx.toDp() }
                 return IntOffset(
-                    left - shadowPadPx,
+                    (placement?.left ?: anchorBounds.left) - shadowPadPx,
                     anchorBounds.top - gapPx - popupContentSize.height + shadowPadPx,
                 )
             }
@@ -991,70 +1058,93 @@ internal fun FooterPopover(
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
-        // Pops open with a quick fade + grow from the arrow's end (the
-        // anchor button it points at) instead of snapping to full size
-        // on the first frame.
-        var visible by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) { visible = true }
-        val scale by animateFloatAsState(
-            targetValue = if (visible) 1f else 0.9f,
-            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-            label = "popoverScale",
+        val placed = placement
+        val shape = RoundedCornerShape(
+            topStart = cornerRadius,
+            topEnd = cornerRadius,
+            bottomEnd = if (placed?.squareBottomEnd == true) FooterPopoverArrowCorner else cornerRadius,
+            bottomStart = if (placed?.squareBottomStart == true) FooterPopoverArrowCorner else cornerRadius,
         )
-        val alpha by animateFloatAsState(
-            targetValue = if (visible) 1f else 0f,
-            animationSpec = tween(120),
-            label = "popoverAlpha",
-        )
-        Column(
-            Modifier.padding(shadowPad).then(if (width != null) {
-                Modifier.width(width)
-            } else {
-                // No fixed width means "hug the widest row" (the note
-                // kebab's own case): without IntrinsicSize.Max here, each
-                // row's fillMaxWidth() would pull this out to the full
-                // available width instead of its content's actual size,
-                // same fix as the notes-list header's own kebab menu. The
-                // max keeps a very long label (a longer translation) from
-                // ever spanning edge to edge.
-                Modifier.width(IntrinsicSize.Max).widthIn(min = minWidth, max = screenWidth - 32.dp)
-            }).graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                this.alpha = alpha
-                transformOrigin = TransformOrigin(0.5f, 1f)
-                // Default Auto strategy offscreen-buffers this layer while
-                // alpha < 1, which the child Column's own shadow (below)
-                // renders into wrong - a large flat blurry rectangle
-                // instead of a soft drop shadow. ModulateAlpha folds alpha
-                // into each draw call instead, so the shadow keeps its
-                // normal outline-based blur through the whole fade.
-                compositingStrategy = CompositingStrategy.ModulateAlpha
-            },
+        Box(
+            Modifier
+                .padding(shadowPad)
+                .layout { measurable, constraints ->
+                    val fixedWidth = width?.roundToPx()
+                    val minWidthPx = minWidth.roundToPx()
+                    val natural = if (fixedWidth == null) measurable.maxIntrinsicWidth(constraints.maxHeight) else 0
+                    val current = anchor
+                    val panelWidth = if (current == null) {
+                        fixedWidth ?: maxOf(minWidthPx, minOf(natural, constraints.maxWidth))
+                    } else {
+                        val margin = 8.dp.roundToPx()
+                        val windowWidth = current.windowWidth
+                        val anchorLeft = current.bounds.left
+                        val firstWidth = fixedWidth ?: maxOf(minWidthPx, minOf(natural, windowWidth - anchorLeft))
+                        val left = (
+                            if (anchorLeft + firstWidth + margin > windowWidth) windowWidth - firstWidth - margin
+                            else anchorLeft
+                            ).coerceAtLeast(margin)
+                        val finalWidth = fixedWidth ?: maxOf(minWidthPx, minOf(natural, windowWidth - left))
+                        val arrowLeft = current.bounds.center.x - left - 6.dp.roundToPx()
+                        val next = FooterPopoverPlacement(
+                            left = left,
+                            width = finalWidth,
+                            arrowLeft = arrowLeft,
+                            squareBottomStart = arrowLeft < 20.dp.roundToPx(),
+                            squareBottomEnd = arrowLeft > firstWidth - arrowEndInset.roundToPx(),
+                        )
+                        if (next != placement) placement = next
+                        finalWidth
+                    }
+                    val clamped = panelWidth.coerceAtMost(constraints.maxWidth)
+                    val placeable = measurable.measure(constraints.copy(minWidth = clamped, maxWidth = clamped))
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                }
+                .drawWithContent {
+                    if (placed == null) return@drawWithContent
+                    drawContent()
+                    drawFooterPopoverArrow(placed.arrowLeft, background, arrowBorderColor)
+                },
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .shadow(elevation = elevation, shape = RoundedCornerShape(cornerRadius))
-                    .clip(RoundedCornerShape(cornerRadius))
+                    .shadow(elevation = elevation, shape = shape)
+                    .then(if (ringColor != null) Modifier.outsideRing(ringColor, shape) else Modifier)
+                    .clip(shape)
                     .background(background)
-                    .border(1.dp, borderColor, RoundedCornerShape(cornerRadius)),
+                    .border(1.dp, borderColor, shape),
                 content = content,
             )
-            Canvas(
-                modifier = Modifier
-                    .padding(start = arrowLeft.coerceIn(12.dp, (panelWidth - 24.dp).coerceAtLeast(12.dp)))
-                    .size(width = 12.dp, height = 6.dp),
-            ) {
-                val arrow = Path().apply {
-                    moveTo(0f, 0f)
-                    lineTo(size.width, 0f)
-                    lineTo(size.width / 2f, size.height)
-                    close()
-                }
-                drawPath(arrow, color = background)
-            }
         }
+    }
+}
+
+/**
+ * The `[data-arrow="down"]::after` square (globalCSS.js:2587-2607): 12px,
+ * border-box, rotated 45deg, filled with the card's own colour and edged
+ * on its two outer sides, its bottom 6px under the card's padding edge.
+ * Drawn over the card, so it covers the card's own border where they
+ * meet, exactly as the pseudo-element does.
+ */
+private fun DrawScope.drawFooterPopoverArrow(arrowLeft: Int, fill: Color, edge: Color) {
+    val border = 1.dp.toPx()
+    val side = 12.dp.toPx()
+    val topLeft = Offset(border + arrowLeft, size.height - border + 6.dp.toPx() - side)
+    rotate(45f, pivot = Offset(topLeft.x + side / 2f, topLeft.y + side / 2f)) {
+        drawRect(fill, topLeft, Size(side, side))
+        drawRect(edge, Offset(topLeft.x + side - border, topLeft.y), Size(border, side))
+        drawRect(edge, Offset(topLeft.x, topLeft.y + side - border), Size(side, border))
+    }
+}
+
+/** Tailwind's `ring-1` (`box-shadow: 0 0 0 1px`): a 1px band hugging the
+ *  outside of [shape]. Placed before any clip so it is not cut away. */
+private fun Modifier.outsideRing(color: Color, shape: Shape): Modifier = drawBehind {
+    val ring = 1.dp.toPx()
+    val outline = shape.createOutline(Size(size.width + ring, size.height + ring), layoutDirection, this)
+    translate(-ring / 2f, -ring / 2f) {
+        drawOutline(outline, color, style = Stroke(width = ring))
     }
 }
 
@@ -1182,20 +1272,20 @@ internal fun ToolbarPopover(
     }
 }
 
-/** One entry of the note footer's kebab menu (`ModalFooter.jsx:700-807`).
- *  Sized up a step past the web's own 12/8px padding, 8px gap and 14px
- *  text: a touch target this dense on a real phone risked hitting the
- *  wrong row. */
+/** One entry of the note footer's kebab menu (`ModalFooter.jsx:700-815`)
+ *  and of the image sub-menu (AddImageMenu.jsx): `px-3 py-2 text-sm
+ *  gap-2`, the label wrapping when the card is too narrow for it. */
 @Composable
 internal fun PopoverMenuItem(
     label: String,
     color: Color,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onClick: () -> Unit,
     icon: @Composable () -> Unit,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .alpha(if (enabled) 1f else 0.5f)
             .clickable(
@@ -1204,12 +1294,12 @@ internal fun PopoverMenuItem(
                 enabled = enabled,
                 role = Role.Button,
             ) { onClick() }
-            .padding(horizontal = 14.dp, vertical = 11.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         icon()
-        Text(label, color = color, fontSize = 15.sp)
+        Text(label, color = color, fontSize = 14.sp, lineHeight = 20.sp)
     }
 }
 

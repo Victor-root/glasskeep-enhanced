@@ -1037,15 +1037,16 @@ fun LogOutIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Co
 // Tabler icons used by the settings panel's section headers and rows,
 // taken from the same src/icons/editor/tabler/*.svg files the web
 // imports. `.tabler-icon` renders them at strokeWidth 1.75 with round
-// caps/joins (globalCSS.js:3322-3340), which is what these use.
+// caps/joins (globalCSS.js:3322-3340), which is what these use. The few
+// round-capped glyphs the web draws as bare svgs pass their own stroke.
 
 @Composable
-private fun TablerIcon(pathData: String, modifier: Modifier, size: Dp, tint: Color) {
+private fun TablerIcon(pathData: String, modifier: Modifier, size: Dp, tint: Color, strokeWidth: Float = 1.75f) {
     val path = remember(pathData) { PathParser().parsePathString(pathData).toPath() }
     Canvas(modifier.size(size)) {
         val scale = this.size.minDimension / 24f
         scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint, style = Stroke(width = 1.75f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawPath(path, color = tint, style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
     }
 }
@@ -1663,7 +1664,8 @@ fun ServerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Co
 )
 
 /** tabler/photo-circle-plus, the web's own LogoIcon (icons/index.jsx:504):
- *  the note's icon, in the footer and in the image sub-menu. */
+ *  the note's icon, in the footer and in the image sub-menu. Drawn as a
+ *  bare svg there, so at its own stroke 2, not `.tabler-icon`'s 1.75. */
 @Composable
 fun LogoIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
     "M15 8h.01 " +
@@ -1672,5 +1674,13 @@ fun LogoIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Colo
         "M14 14l1 -1c.928 -.893 2.072 -.893 3 0 " +
         "M16 19.33h6 " +
         "M19 16.33v6",
-    modifier, size, tint,
+    modifier, size, tint, strokeWidth = 2f,
+)
+
+/** AddImageMenu.jsx's own inline trash for "Retirer le logo": lid, handle
+ *  and a tapered bin, viewBox 24x24, stroke 1.8, round caps/joins. */
+@Composable
+fun TrashOutlineIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 6h18 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2 M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6",
+    modifier, size, tint, strokeWidth = 1.8f,
 )

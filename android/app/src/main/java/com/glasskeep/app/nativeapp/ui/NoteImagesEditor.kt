@@ -4,17 +4,17 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -46,56 +47,70 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.NoteImageData
 
+/** ModalImagesGrid.jsx's `max-height: 360px` on every image. */
+private val NoteImageMaxHeight = 360.dp
+
 /**
- * Content-image grid, matching ModalImagesGrid.jsx's own layout rule
- * exactly: a single image goes full width, two or more wrap two per row.
- * ModalImagesGrid.jsx renders nothing at all when there are no images
- * (`if (!images.length) return null`) - adding one is footer-only there,
- * never an inline prompt in the note body, so this mirrors that instead
- * of showing its own "add image" row. Note icons aren't part of this:
- * they're a separate per-user, per-note feature server-side (its own
- * table and endpoints), not a native feature yet, see NoteImages.kt.
+ * ModalImagesGrid.jsx: a centred, wrapping row of tiles 8px apart, inset
+ * 8px at the sides and bottom. One image spans the whole width, more go
+ * two per row (`calc(50% - 4px)`), an odd last one centred. A tile is
+ * outlined in `--border-light` with a 6px radius and shows its image at
+ * the tile's width and its own aspect ratio, capped at 360px tall; two
+ * tiles on a row stretch to the taller one, images staying at the top.
+ * Nothing at all is drawn when the note has no image. Note icons aren't
+ * part of this: they are a separate per-user feature (see NoteImages.kt).
  */
 @Composable
 fun NoteImagesSection(
     images: List<NoteImageData>,
+    borderColor: Color,
     onImageClick: (Int) -> Unit,
 ) {
     if (images.isEmpty()) return
-    Column {
-        if (images.size == 1) {
-            NoteImageThumbnail(
-                image = images[0],
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 300.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Button,
-                    ) { onImageClick(0) },
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                images.chunked(2).forEachIndexed { rowIndex, pair ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        pair.forEachIndexed { colIndex, image ->
-                            val index = rowIndex * 2 + colIndex
-                            NoteImageThumbnail(
-                                image = image,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(max = 180.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        role = Role.Button,
-                                    ) { onImageClick(index) },
-                            )
+    val bitmaps = images.map { rememberDecodedImage(it.src) }
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp)) {
+        val gap = 8.dp
+        val tileWidth = if (images.size == 1) maxWidth else (maxWidth - gap) / 2
+        // The image's own height inside a tile's 1px border.
+        fun imageHeight(bitmap: ImageBitmap?): Dp {
+            if (bitmap == null || bitmap.width == 0) return 0.dp
+            return ((tileWidth - 2.dp) * (bitmap.height.toFloat() / bitmap.width)).coerceAtMost(NoteImageMaxHeight)
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(gap),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            images.indices.chunked(if (images.size == 1) 1 else 2).forEach { row ->
+                val rowHeight = row.maxOf { imageHeight(bitmaps[it]) } + 2.dp
+                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    row.forEach { index ->
+                        val bitmap = bitmaps[index]
+                        Box(
+                            modifier = Modifier
+                                .width(tileWidth)
+                                .height(rowHeight)
+                                .clip(RoundedCornerShape(6.dp))
+                                .border(1.dp, borderColor, RoundedCornerShape(6.dp))
+                                .padding(1.dp),
+                            contentAlignment = Alignment.TopCenter,
+                        ) {
+                            if (bitmap != null) {
+                                Image(
+                                    bitmap = bitmap,
+                                    contentDescription = images[index].name.ifBlank { null },
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(imageHeight(bitmap))
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                            role = Role.Button,
+                                        ) { onImageClick(index) },
+                                )
+                            }
                         }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
