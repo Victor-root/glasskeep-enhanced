@@ -48,6 +48,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -82,6 +83,7 @@ import com.glasskeep.app.nativeapp.data.TypographyProfile
 import com.glasskeep.app.nativeapp.data.isHeading
 import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.Indigo
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -199,6 +201,7 @@ fun RichTextEditor(
     onMergeWithPrevious: (id: String) -> Unit,
     pendingSelectionFor: (id: String) -> TextRange? = { null },
     onPendingSelectionConsumed: (id: String) -> Unit = {},
+    suppressKeyboard: Boolean = false,
 ) {
     // The web numbers ordered lists with its own `gk-ol` counter, reset by
     // a paragraph, a heading, a quote, a bullet/task list or a rule, but
@@ -220,46 +223,56 @@ fun RichTextEditor(
         map
     }
 
-    Column {
-        for (block in blocks) {
-            RichBlockRow(
-                block = block,
-                typography = typography,
-                taskStrike = taskStrike,
-                dark = dark,
-                noteColor = noteColor,
-                titleColor = titleColor,
-                numberedPosition = numberedPositions[block.id],
-                focusRequester = focusRequesterFor(block.id),
-                pendingMarks = if (state.focusedId == block.id) state.pendingMarks else emptyList(),
-                onConsumePending = { state.clearAllPending() },
-                onFocusGained = { selection ->
-                    state.focusedId = block.id
-                    state.selection = selection
-                    state.clearAllPending()
-                },
-                onFocusLost = {
-                    if (state.focusedId == block.id) {
-                        state.focusedId = null
-                        state.clearAllPending()
-                    }
-                },
-                onSelectionChanged = { selection ->
-                    if (state.focusedId == block.id) {
+    // While the formatting sheet is open the web sets inputmode="none" on
+    // the editor (NoteModal.jsx:416-442): taps still move the caret and
+    // select, but the keyboard stays down. Changing the flag restarts the
+    // input session with the new rule.
+    InterceptPlatformTextInput(
+        interceptor = { request, nextHandler ->
+            if (suppressKeyboard) awaitCancellation() else nextHandler.startInputMethod(request)
+        },
+    ) {
+        Column {
+            for (block in blocks) {
+                RichBlockRow(
+                    block = block,
+                    typography = typography,
+                    taskStrike = taskStrike,
+                    dark = dark,
+                    noteColor = noteColor,
+                    titleColor = titleColor,
+                    numberedPosition = numberedPositions[block.id],
+                    focusRequester = focusRequesterFor(block.id),
+                    pendingMarks = if (state.focusedId == block.id) state.pendingMarks else emptyList(),
+                    onConsumePending = { state.clearAllPending() },
+                    onFocusGained = { selection ->
+                        state.focusedId = block.id
                         state.selection = selection
                         state.clearAllPending()
-                    }
-                },
-                onTextEdited = { newText, newMarks, newSelection ->
-                    onTextEdited(block.id, newText, newMarks)
-                    if (state.focusedId == block.id) state.selection = newSelection
-                },
-                onEnter = { position -> onEnter(block.id, position) },
-                onToggleChecked = { onToggleChecked(block.id) },
-                onMerge = { onMergeWithPrevious(block.id) },
-                pendingSelection = pendingSelectionFor(block.id),
-                onPendingSelectionConsumed = { onPendingSelectionConsumed(block.id) },
-            )
+                    },
+                    onFocusLost = {
+                        if (state.focusedId == block.id) {
+                            state.focusedId = null
+                            state.clearAllPending()
+                        }
+                    },
+                    onSelectionChanged = { selection ->
+                        if (state.focusedId == block.id) {
+                            state.selection = selection
+                            state.clearAllPending()
+                        }
+                    },
+                    onTextEdited = { newText, newMarks, newSelection ->
+                        onTextEdited(block.id, newText, newMarks)
+                        if (state.focusedId == block.id) state.selection = newSelection
+                    },
+                    onEnter = { position -> onEnter(block.id, position) },
+                    onToggleChecked = { onToggleChecked(block.id) },
+                    onMerge = { onMergeWithPrevious(block.id) },
+                    pendingSelection = pendingSelectionFor(block.id),
+                    onPendingSelectionConsumed = { onPendingSelectionConsumed(block.id) },
+                )
+            }
         }
     }
 }
