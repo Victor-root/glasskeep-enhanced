@@ -354,6 +354,9 @@ fun NoteDetailScreen(
     var noteAiLoading by remember { mutableStateOf(false) }
     var noteAiError by remember { mutableStateOf<String?>(null) }
     var noteAiSaved by remember { mutableStateOf(false) }
+    // The header's AI toggle shows once the panel has been opened, or when
+    // the note already has a kept conversation, until the panel's X.
+    var noteAiHasBeenOpened by remember { mutableStateOf(false) }
     var noteAiJob by remember { mutableStateOf<Job?>(null) }
     val aiClient = remember(serverUrl) { AiClient(serverUrl, container.tokenStore) }
     var showLinkDialog by remember { mutableStateOf(false) }
@@ -1241,8 +1244,21 @@ fun NoteDetailScreen(
         return AiNoteDto(id = current.id, title = titleText, content = body, tags = current.tags)
     }
 
+    // App.jsx pre-loads a kept conversation when the note opens, so its
+    // header toggle is there from the start.
+    LaunchedEffect(noteId) {
+        if (!container.shellPrefs.aiAssistantEnabled) return@LaunchedEffect
+        val stored = container.noteAiStore.load(noteId)
+        if (stored.isNotEmpty()) {
+            noteAiMessages = stored
+            noteAiSaved = true
+            noteAiHasBeenOpened = true
+        }
+    }
+
     fun openNoteAi() {
         noteAiOpen = true
+        noteAiHasBeenOpened = true
         noteAiError = null
         if (noteAiMessages.isNotEmpty()) return
         // Re-open a kept conversation, or start a fresh one.
@@ -2015,6 +2031,13 @@ fun NoteDetailScreen(
                         ),
                         onClick = { save() },
                     )
+                    if (noteAiAvailable && noteAiHasBeenOpened && !drawingCanvasMode) {
+                        NoteAiHeaderToggle(
+                            dark = dark,
+                            hasMessages = noteAiMessages.isNotEmpty(),
+                            onClick = { openNoteAi() },
+                        )
+                    }
                 }
             }
 
@@ -2788,6 +2811,7 @@ fun NoteDetailScreen(
                 onClose = {
                     stopNoteAi()
                     noteAiOpen = false
+                    noteAiHasBeenOpened = false
                     if (!noteAiSaved) {
                         noteAiMessages = emptyList()
                         noteAiError = null
@@ -3391,6 +3415,49 @@ private val DialogBodyDark = Color(0xFFD1D5DB)
  *  flattened to a space, same guard ModalHeader.jsx keeps: titles are
  *  single-line everywhere else, and a stray "\n" silently breaks layout. */
 private val TitleNewlines = Regex("[\\r\\n]+")
+
+/** ModalHeader.jsx's mobile AI toggle, after a 1x16 separator: the
+ *  message-search glyph and a chevron, with an indigo dot while the
+ *  hidden thread has messages. */
+@Composable
+private fun NoteAiHeaderToggle(dark: Boolean, hasMessages: Boolean, onClick: () -> Unit) {
+    val label = stringResource(R.string.native_note_ai_menu)
+    val tint = if (dark) Color(0xFFA5B4FC) else Color(0xFF6366F1)
+    Spacer(Modifier.width(4.dp))
+    Box(Modifier.size(width = 1.dp, height = 16.dp).background(if (dark) Color(0xFF4A5565) else Color(0xFFD1D5DC)))
+    Spacer(Modifier.width(4.dp))
+    Box(
+        modifier = Modifier
+            .height(32.dp)
+            .clip(CircleShape)
+            .semantics { contentDescription = label }
+            .gkTooltip(label)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) { onClick() }
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MessageSearchIcon(size = 26.dp, tint = tint)
+            ChevronRightIcon(size = 22.dp, tint = tint, modifier = Modifier.offset(x = (-4).dp))
+        }
+        if (hasMessages) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 2.dp, y = (-2).dp)
+                    .border(1.5.dp, if (dark) Color(0xFF1E2939) else Color.White, CircleShape)
+                    .padding(1.5.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF615FFF)),
+            )
+        }
+    }
+}
 
 /** `.modal-footer-toolbar`'s `box-shadow: 0 -1px 3px`: the soft strip it
  *  casts above its top edge (the box moved up 1px, blurred with a standard

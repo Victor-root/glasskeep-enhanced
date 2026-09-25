@@ -1448,6 +1448,13 @@ fun SidebarTrashIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Colo
     modifier, size, tint, strokeWidth = 1.8f,
 )
 
+/** tabler/chevron-right.svg. */
+@Composable
+fun ChevronRightIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M9 6l6 6l-6 6",
+    modifier, size, tint,
+)
+
 /** tabler/message-search.svg: the note's own AI conversation. */
 @Composable
 fun MessageSearchIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
