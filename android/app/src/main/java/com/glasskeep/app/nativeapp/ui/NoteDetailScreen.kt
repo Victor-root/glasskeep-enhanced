@@ -2784,16 +2784,18 @@ private val TagCreateIconLight = Color(0xFF10B981)
  * at all - it simply appears.
  */
 @Composable
-private fun NoteColorPopover(
-    currentColorKey: String,
+internal fun NoteColorPopover(
+    currentColorKey: String?,
     dark: Boolean,
     enabled: Boolean,
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
+    below: Boolean = false,
 ) {
     FooterPopover(
         width = 256.dp,
         gap = 8.dp,
+        below = below,
         background = if (dark) ColorPanelBgDark else ColorPanelBgLight,
         borderColor = if (dark) ColorPanelBorderDark else ColorPanelBorderLight,
         onDismiss = onDismiss,

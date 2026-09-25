@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,7 +24,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LocalTextStyle
@@ -54,13 +52,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
-import com.glasskeep.app.ui.DarkBgColor
 
 /** One bulk-selection run over several note ids: which ones succeeded and
  *  how many failed. Every action() call now enqueues onto the offline
@@ -167,6 +163,8 @@ data class BulkActionButton(
     val gradient: Brush? = null,
     /** Text colour of the entry once folded into the overflow menu. */
     val menuColor: Color = Color.Unspecified,
+    /** A popover anchored to the button (the colour picker). */
+    val anchored: (@Composable () -> Unit)? = null,
     val onClick: () -> Unit,
 )
 
@@ -325,6 +323,7 @@ private fun DockActionButton(action: BulkActionButton, dark: Boolean) {
         contentAlignment = Alignment.Center,
     ) {
         action.icon()
+        action.anchored?.invoke()
     }
 }
 
@@ -419,44 +418,3 @@ internal fun ConfirmActionDialog(
     )
 }
 
-/** Bulk color picker: same NOTE_COLOR_ORDER grid as NoteDetailScreen's
- *  single-note version (NoteColors.kt), minus the current-color ring,
- *  since a mixed selection has no single current color to highlight. */
-@Composable
-internal fun BulkColorPickerDialog(dark: Boolean, titleColor: Color, borderColor: Color, onPick: (String) -> Unit, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(if (dark) DarkBgColor else Color.White)
-                .padding(20.dp),
-        ) {
-            Text(
-                stringResource(R.string.native_note_detail_color_title),
-                color = titleColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-            )
-            Spacer(Modifier.height(16.dp))
-            NOTE_COLOR_ORDER.chunked(4).forEach { rowKeys ->
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    rowKeys.forEach { colorKey ->
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(noteColorFor(colorKey, dark))
-                                .border(width = 1.dp, color = borderColor, shape = CircleShape)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    role = Role.Button,
-                                ) { onPick(colorKey) },
-                        ) {}
-                    }
-                }
-                Spacer(Modifier.height(14.dp))
-            }
-        }
-    }
-}

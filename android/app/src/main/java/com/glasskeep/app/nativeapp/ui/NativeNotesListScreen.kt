@@ -1014,6 +1014,18 @@ fun NativeNotesListScreen(
                         tone = BulkTone.VIOLET,
                         icon = { Text("\uD83C\uDFA8", fontSize = 16.sp, lineHeight = 16.sp) },
                         enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                        anchored = {
+                            if (showBulkColorPicker) {
+                                NoteColorPopover(
+                                    currentColorKey = null,
+                                    dark = dark,
+                                    enabled = !bulkActionRunning,
+                                    onSelect = { colorKey -> bulkColor(colorKey) },
+                                    onDismiss = { showBulkColorPicker = false },
+                                    below = true,
+                                )
+                            }
+                        },
                         onClick = { showBulkColorPicker = true },
                     ),
                     BulkActionButton(
@@ -1239,15 +1251,6 @@ fun NativeNotesListScreen(
             )
         }
 
-        if (showBulkColorPicker) {
-            BulkColorPickerDialog(
-                dark = dark,
-                titleColor = titleColor,
-                borderColor = borderColor,
-                onPick = { colorKey -> bulkColor(colorKey) },
-                onDismiss = { showBulkColorPicker = false },
-            )
-        }
 
         if (showBulkLogoPicker) {
             BulkLogoPickerDialog(

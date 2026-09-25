@@ -1224,6 +1224,9 @@ internal fun FooterPopover(
     arrowEndInset: Dp = 32.dp,
     // Tailwind's `ring-1`: a hairline just outside the card's border.
     ringColor: Color? = null,
+    // Opens under the anchor with the arrow on top, for anchors near the
+    // top of the screen (the selection dock).
+    below: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val density = LocalDensity.current
@@ -1238,7 +1241,7 @@ internal fun FooterPopover(
     val shadowPad = 16.dp
     var anchor by remember { mutableStateOf<FooterPopoverAnchor?>(null) }
     var placement by remember { mutableStateOf<FooterPopoverPlacement?>(null) }
-    val positionProvider = remember(density, gap, placement) {
+    val positionProvider = remember(density, gap, placement, below) {
         object : PopupPositionProvider {
             override fun calculatePosition(
                 anchorBounds: IntRect,
@@ -1251,7 +1254,8 @@ internal fun FooterPopover(
                 val gapPx = with(density) { gap.roundToPx() }
                 return IntOffset(
                     (placement?.left ?: anchorBounds.left) - shadowPadPx,
-                    anchorBounds.top - gapPx - popupContentSize.height + shadowPadPx,
+                    if (below) anchorBounds.bottom + gapPx - shadowPadPx
+                    else anchorBounds.top - gapPx - popupContentSize.height + shadowPadPx,
                 )
             }
         }
@@ -1262,12 +1266,13 @@ internal fun FooterPopover(
         properties = PopupProperties(focusable = true),
     ) {
         val placed = placement
-        val shape = RoundedCornerShape(
-            topStart = cornerRadius,
-            topEnd = cornerRadius,
-            bottomEnd = if (placed?.squareBottomEnd == true) FooterPopoverArrowCorner else cornerRadius,
-            bottomStart = if (placed?.squareBottomStart == true) FooterPopoverArrowCorner else cornerRadius,
-        )
+        val arrowStart = if (placed?.squareBottomStart == true) FooterPopoverArrowCorner else cornerRadius
+        val arrowEnd = if (placed?.squareBottomEnd == true) FooterPopoverArrowCorner else cornerRadius
+        val shape = if (below) {
+            RoundedCornerShape(topStart = arrowStart, topEnd = arrowEnd, bottomEnd = cornerRadius, bottomStart = cornerRadius)
+        } else {
+            RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius, bottomEnd = arrowEnd, bottomStart = arrowStart)
+        }
         Box(
             Modifier
                 .padding(shadowPad)
@@ -1306,7 +1311,7 @@ internal fun FooterPopover(
                 .drawWithContent {
                     if (placed == null) return@drawWithContent
                     drawContent()
-                    drawFooterPopoverArrow(placed.arrowLeft, background, arrowBorderColor)
+                    drawFooterPopoverArrow(placed.arrowLeft, background, arrowBorderColor, pointsUp = below)
                 },
         ) {
             Column(
@@ -1330,14 +1335,20 @@ internal fun FooterPopover(
  * Drawn over the card, so it covers the card's own border where they
  * meet, exactly as the pseudo-element does.
  */
-private fun DrawScope.drawFooterPopoverArrow(arrowLeft: Int, fill: Color, edge: Color) {
+private fun DrawScope.drawFooterPopoverArrow(arrowLeft: Int, fill: Color, edge: Color, pointsUp: Boolean) {
     val border = 1.dp.toPx()
     val side = 12.dp.toPx()
-    val topLeft = Offset(border + arrowLeft, size.height - border + 6.dp.toPx() - side)
+    val top = if (pointsUp) border - 6.dp.toPx() else size.height - border + 6.dp.toPx() - side
+    val topLeft = Offset(border + arrowLeft, top)
     rotate(45f, pivot = Offset(topLeft.x + side / 2f, topLeft.y + side / 2f)) {
         drawRect(fill, topLeft, Size(side, side))
-        drawRect(edge, Offset(topLeft.x + side - border, topLeft.y), Size(border, side))
-        drawRect(edge, Offset(topLeft.x, topLeft.y + side - border), Size(side, border))
+        if (pointsUp) {
+            drawRect(edge, topLeft, Size(border, side))
+            drawRect(edge, topLeft, Size(side, border))
+        } else {
+            drawRect(edge, Offset(topLeft.x + side - border, topLeft.y), Size(border, side))
+            drawRect(edge, Offset(topLeft.x, topLeft.y + side - border), Size(side, border))
+        }
     }
 }
 

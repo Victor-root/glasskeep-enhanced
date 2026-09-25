@@ -520,7 +520,19 @@ fun SecondaryNotesScreen(
                             tone = BulkTone.VIOLET,
                             icon = { PaletteIcon(size = 18.dp) },
                             enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
-                            onClick = { showBulkColorPicker = true },
+                            anchored = {
+                            if (showBulkColorPicker) {
+                                NoteColorPopover(
+                                    currentColorKey = null,
+                                    dark = dark,
+                                    enabled = !bulkActionRunning,
+                                    onSelect = { colorKey -> bulkColor(colorKey) },
+                                    onDismiss = { showBulkColorPicker = false },
+                                    below = true,
+                                )
+                            }
+                        },
+                        onClick = { showBulkColorPicker = true },
                         ),
                     )
                     add(
@@ -583,15 +595,6 @@ fun SecondaryNotesScreen(
             )
         }
 
-        if (showBulkColorPicker) {
-            BulkColorPickerDialog(
-                dark = dark,
-                titleColor = titleColor,
-                borderColor = borderColor,
-                onPick = { colorKey -> bulkColor(colorKey) },
-                onDismiss = { showBulkColorPicker = false },
-            )
-        }
 
         if (showBulkLogoPicker) {
             BulkLogoPickerDialog(
