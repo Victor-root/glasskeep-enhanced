@@ -187,11 +187,9 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1822,14 +1820,6 @@ private fun Modifier.headerDropShadow(color: Color): Modifier = drawBehind {
 
 private val HeaderShadowDepth = 16.dp
 private const val HeaderShadowSteps = 16
-
-/** Standard normal CDF, through Abramowitz and Stegun's 7.1.26 erf. */
-private fun gaussianCdf(x: Float): Float {
-    val z = abs(x) / sqrt(2f)
-    val t = 1f / (1f + 0.3275911f * z)
-    val erf = 1f - ((((1.0614054f * t - 1.4531521f) * t + 1.4214137f) * t - 0.28449672f) * t + 0.2548296f) * t * exp(-z * z)
-    return if (x >= 0f) 0.5f * (1f + erf) else 0.5f * (1f - erf)
-}
 
 /**
  * The assistant's answer, above the notes (NotesComposer.jsx:89-160): a

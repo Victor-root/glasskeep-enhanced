@@ -168,7 +168,7 @@ fun CloseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Col
 }
 
 @Composable
-fun TagIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+fun TagIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, dotRadius: Float = 1.25f) {
     // src/components/modal/ModalFooter.jsx's own inline tag glyph (kept
     // inline there too): a label outline plus a small hole dot, viewBox
     // 24x24, stroke (not filled), strokeWidth 1.8, round caps/joins. The
@@ -183,7 +183,7 @@ fun TagIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color
         val scale = this.size.minDimension / 24f
         scale(scale, scale, pivot = Offset.Zero) {
             drawPath(path, color = tint, style = Stroke(width = 1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-            drawCircle(color = tint, radius = 1.25f, center = Offset(7f, 7f))
+            drawCircle(color = tint, radius = dotRadius, center = Offset(7f, 7f))
         }
     }
 }
@@ -1404,7 +1404,7 @@ fun SidebarImagesIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Col
     "M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z " +
         "M8.5 7a1.5 1.5 0 1 0 0 3a1.5 1.5 0 1 0 0 -3 " +
         "M21 15l-5 -5l-11 11",
-    modifier, size, tint,
+    modifier, size, tint, strokeWidth = 1.8f,
 )
 
 /** sidebarIcons.jsx RemindersSidebarIcon: the drawer's "Reminders"
@@ -1413,7 +1413,28 @@ fun SidebarImagesIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Col
 fun SidebarRemindersIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
     "M18 8a6 6 0 0 0 -12 0c0 7 -3 9 -3 9h18s-3 -2 -3 -9 " +
         "M13.73 21a2 2 0 0 1 -3.46 0",
-    modifier, size, tint,
+    modifier, size, tint, strokeWidth = 1.8f,
+)
+
+/** sidebarIcons.jsx ArchiveSidebarIcon: square-cornered box, unlike the
+ *  rounded [ArchiveIcon] of the note menus. */
+@Composable
+fun SidebarArchiveIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M21 8L21 21L3 21L3 8 " +
+        "M1 3h22v5h-22z " +
+        "M10 12L14 12",
+    modifier, size, tint, strokeWidth = 1.8f,
+)
+
+/** sidebarIcons.jsx TrashSidebarIcon (Feather trash-2). */
+@Composable
+fun SidebarTrashIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 6L5 6L21 6 " +
+        "M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6 " +
+        "M10 11v6 " +
+        "M14 11v6 " +
+        "M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2",
+    modifier, size, tint, strokeWidth = 1.8f,
 )
 
 /** tabler/message-search.svg: the note's own AI conversation. */

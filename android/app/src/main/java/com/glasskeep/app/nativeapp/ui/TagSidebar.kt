@@ -1,15 +1,10 @@
 package com.glasskeep.app.nativeapp.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,12 +31,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
@@ -61,9 +59,10 @@ internal const val SidebarReminders = "__REMINDERS__"
 
 /**
  * Notes drawer, ported from TagSidebar.jsx's own non-permanent (mobile)
- * mode: a 288dp panel sliding in from the left over a plain, non-animated
- * scrim, matching the web's own tap-outside-to-close / no-swipe-to-close
- * behaviour.
+ * mode: a 288dp panel over a plain scrim, both shown and hidden without
+ * any transition (Tailwind v4's translate utilities are not covered by the
+ * aside's transition list, so the web's drawer pops too), matching the
+ * web's own tap-outside-to-close / no-swipe-to-close behaviour.
  */
 @Composable
 fun TagSidebar(
@@ -94,11 +93,7 @@ fun TagSidebar(
         )
     }
 
-    AnimatedVisibility(
-        visible = open,
-        enter = slideInHorizontally(animationSpec = tween(200)) { -it },
-        exit = slideOutHorizontally(animationSpec = tween(200)) { -it },
-    ) {
+    if (open) {
         val titleColor = if (dark) DarkTitleColor else LightTitleColor
         val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
         // Mobile web keeps this an opaque --gk-statusbar surface, rather
@@ -108,6 +103,7 @@ fun TagSidebar(
         // They belong to the selected workspace theme, not to GlassKeep's
         // violet default.
         val activeGradient = WorkspaceTheme.accentGradient(themeId)
+        val chrome = WorkspaceTheme.colorsFor(themeId, dark)
         val closeLabel = stringResource(R.string.native_common_close)
 
         Column(
@@ -151,8 +147,10 @@ fun TagSidebar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .sidebarBodyEdge(chrome.chromeBorder, chrome.chromeShadow)
                     .verticalScroll(rememberScrollState())
-                    .padding(8.dp),
+                    // The 1dp border sits inside the nav box, before its padding.
+                    .padding(start = 8.dp, top = 8.dp, end = 9.dp, bottom = 8.dp),
             ) {
                 if (activeTags.size > 1) {
                     Row(
@@ -199,7 +197,7 @@ fun TagSidebar(
                 )
                 Spacer(Modifier.height(8.dp))
                 SidebarNavItem(
-                    icon = { tint -> ArchiveIcon(size = 20.dp, tint = tint) },
+                    icon = { tint -> SidebarArchiveIcon(size = 20.dp, tint = tint) },
                     label = stringResource(R.string.native_sidebar_archived_notes),
                     active = false,
                     titleColor = titleColor,
@@ -217,7 +215,7 @@ fun TagSidebar(
                 )
                 Spacer(Modifier.height(8.dp))
                 SidebarNavItem(
-                    icon = { tint -> TrashIcon(size = 20.dp, tint = tint) },
+                    icon = { tint -> SidebarTrashIcon(size = 20.dp, tint = tint) },
                     label = stringResource(R.string.native_trash_title),
                     active = false,
                     titleColor = titleColor,
@@ -236,13 +234,13 @@ fun TagSidebar(
                 } else {
                     tags.forEachIndexed { index, (tag, count) ->
                         SidebarNavItem(
-                            icon = { tint -> TagIcon(size = 20.dp, tint = tint) },
+                            icon = { tint -> TagIcon(size = 20.dp, tint = tint, dotRadius = 0.9f) },
                             label = tag,
                             count = count,
                             active = activeTags.any { it.equals(tag, ignoreCase = true) },
                             titleColor = titleColor,
                             activeGradient = activeGradient,
-                            subtextColor = subtextColor,
+                            iconGap = 8.dp,
                             onClick = { onSelectTag(tag, false) },
                             onLongClick = { onSelectTag(tag, true) },
                         )
@@ -263,11 +261,11 @@ private fun SidebarNavItem(
     label: String,
     active: Boolean,
     titleColor: Color,
-    activeGradient: androidx.compose.ui.graphics.Brush,
+    activeGradient: Brush,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     count: Int? = null,
-    subtextColor: Color = titleColor,
+    iconGap: Dp = 12.dp,
 ) {
     val shape = RoundedCornerShape(6.dp)
     Row(
@@ -302,9 +300,9 @@ private fun SidebarNavItem(
                 onLongClick = onLongClick,
             )
             .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         icon(if (active) Color.White else titleColor)
+        Spacer(Modifier.width(iconGap))
         Text(
             label,
             color = if (active) Color.White else titleColor,
@@ -314,11 +312,39 @@ private fun SidebarNavItem(
             modifier = Modifier.weight(1f),
         )
         if (count != null) {
+            Spacer(Modifier.width(12.dp))
             Text(
                 count.toString(),
-                color = if (active) Color.White.copy(alpha = 0.85f) else subtextColor.copy(alpha = 0.7f),
+                color = (if (active) Color.White else titleColor).copy(alpha = 0.7f),
                 fontSize = 12.sp,
+                lineHeight = 16.sp,
             )
         }
     }
 }
+
+/**
+ * `.gk-sidebar-body`'s `border-right: 1px` and its
+ * `box-shadow: 8px 0 24px -16px` (globalCSS.js:667-670): the line inside
+ * the right edge, then the strip the shadow casts past it. The shadow's box
+ * ends 8dp short of that edge (8dp offset, 16dp inset), blurred with a
+ * standard deviation of 12dp.
+ */
+private fun Modifier.sidebarBodyEdge(border: Color, shadow: Color): Modifier = drawBehind {
+    val stops = Array(SidebarShadowSteps + 1) { step ->
+        val fraction = step.toFloat() / SidebarShadowSteps
+        val distance = fraction * SidebarShadowDepth.value
+        fraction to shadow.copy(alpha = shadow.alpha * gaussianCdf(-(distance + 8f) / 12f))
+    }
+    val depthPx = SidebarShadowDepth.toPx()
+    drawRect(
+        brush = Brush.horizontalGradient(*stops, startX = size.width, endX = size.width + depthPx),
+        topLeft = Offset(size.width, 0f),
+        size = Size(depthPx, size.height),
+    )
+    val stroke = 1.dp.toPx()
+    drawRect(color = border, topLeft = Offset(size.width - stroke, 0f), size = Size(stroke, size.height))
+}
+
+private val SidebarShadowDepth = 24.dp
+private const val SidebarShadowSteps = 12

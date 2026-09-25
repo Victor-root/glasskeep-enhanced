@@ -112,6 +112,9 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.sqrt
 
 /**
  * The web app's own controls, rebuilt natively.
@@ -1365,8 +1368,16 @@ private fun Modifier.outsideRing(color: Color, shape: Shape): Modifier = drawBeh
     }
 }
 
-/** Lets a block spill past its parent's horizontal padding, the way the
- *  checklist deliberately does on a phone (`max-sm:-mx-4`). */
+/** Standard normal CDF, through Abramowitz and Stegun's 7.1.26 erf: the
+ *  profile of a CSS box-shadow edge, whose blur is a Gaussian with a
+ *  standard deviation of half the blur radius. */
+internal fun gaussianCdf(x: Float): Float {
+    val z = abs(x) / sqrt(2f)
+    val t = 1f / (1f + 0.3275911f * z)
+    val erf = 1f - ((((1.0614054f * t - 1.4531521f) * t + 1.4214137f) * t - 0.28449672f) * t + 0.2548296f) * t * exp(-z * z)
+    return if (x >= 0f) 0.5f * (1f + erf) else 0.5f * (1f - erf)
+}
+
 /** The web's capturing outside-pointerdown on its top sheets: any touch
  *  here closes the sheet and the whole gesture is swallowed, so nothing
  *  underneath is activated. Put it behind the sheet itself. */
@@ -1381,6 +1392,8 @@ internal fun Modifier.dismissOnOutsideTouch(onDismiss: () -> Unit): Modifier = p
     }
 }
 
+/** Lets a block spill past its parent's horizontal padding, the way the
+ *  checklist deliberately does on a phone (`max-sm:-mx-4`). */
 internal fun Modifier.bleedHorizontally(amount: Dp): Modifier = layout { measurable, constraints ->
     val extra = amount.roundToPx() * 2
     val placeable = measurable.measure(
