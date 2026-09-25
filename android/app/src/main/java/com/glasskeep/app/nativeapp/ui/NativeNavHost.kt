@@ -8,9 +8,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.EaseIn
+import androidx.compose.animation.core.EaseOut
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -33,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -343,6 +352,7 @@ fun NativeNavHost(
 
     // One pill for the whole app, over every screen: the web has exactly
     // one too, and it is what replaces the platform's own Toast here.
+    val density = LocalDensity.current
     val toasts = rememberToastController()
     toasts.prefs = container.editorPrefs
     val settingsActions = rememberSettingsActions(container, repository, toasts)
@@ -507,17 +517,33 @@ fun NativeNavHost(
                 // while the panel slides in, and is simply there again,
                 // with no scrim, the moment the panel starts sliding out
                 // (SettingsPanel.jsx:286-295).
+                // An open note leaves it in place too, under the web's
+                // `scrimFadeIn` 50% black (200ms in, 180ms out).
                 composable(
                     route = "notes",
                     exitTransition = {
-                        if (targetState.destination.route == "settings") ExitTransition.KeepUntilTransitionsFinished else null
+                        if (targetState.destination.route in ListOverlayRoutes) ExitTransition.KeepUntilTransitionsFinished else null
                     },
                     popEnterTransition = {
-                        if (initialState.destination.route == "settings") EnterTransition.None else null
+                        if (initialState.destination.route in ListOverlayRoutes) EnterTransition.None else null
                     },
                 ) {
                     val nextRoute = navController.currentBackStackEntryAsState().value?.destination?.route
                     val coveredBySettings = transition.targetState == EnterExitState.PostExit && nextRoute == "settings"
+                    // Which overlay last covered the list, kept after it pops
+                    // so its scrim can fade back out.
+                    var coveringRoute by remember { mutableStateOf<String?>(null) }
+                    LaunchedEffect(nextRoute) {
+                        if (nextRoute != null && nextRoute != "notes") coveringRoute = nextRoute
+                    }
+                    val noteScrim by transition.animateFloat(
+                        transitionSpec = {
+                            if (targetState == EnterExitState.PostExit) tween(200, easing = EaseOut) else tween(180, easing = EaseIn)
+                        },
+                        label = "noteScrim",
+                    ) { state ->
+                        if (state != EnterExitState.Visible && coveringRoute == NoteRoute) 0.5f else 0f
+                    }
                     Box {
                         NativeNotesListScreen(
                             container = container,
@@ -540,6 +566,9 @@ fun NativeNavHost(
                         )
                         if (coveredBySettings) {
                             Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f)))
+                        }
+                        if (noteScrim > 0f) {
+                            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = noteScrim)))
                         }
                     }
                 }
@@ -584,7 +613,27 @@ fun NativeNavHost(
                         onBack = { navController.popBackStack() },
                     )
                 }
-                composable("notes/{noteId}") { backStackEntry ->
+                // noteModalIn / noteModalOut on a phone: a fade plus a 14px
+                // rise, 200ms ease-out in, 180ms ease-in out.
+                composable(
+                    route = NoteRoute,
+                    enterTransition = {
+                        if (initialState.destination.route == "notes") {
+                            fadeIn(tween(200, easing = EaseOut)) +
+                                slideInVertically(tween(200, easing = EaseOut)) { with(density) { NoteRise.roundToPx() } }
+                        } else {
+                            null
+                        }
+                    },
+                    popExitTransition = {
+                        if (targetState.destination.route == "notes") {
+                            fadeOut(tween(180, easing = EaseIn)) +
+                                slideOutVertically(tween(180, easing = EaseIn)) { with(density) { NoteRise.roundToPx() } }
+                        } else {
+                            null
+                        }
+                    },
+                ) { backStackEntry ->
                     val noteId = backStackEntry.arguments?.getString("noteId") ?: return@composable
                     NoteDetailScreen(
                         container = container,
@@ -690,6 +739,11 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
 // read above follows: it is both this app's reachability probe and its
 // lock-status poll, so the tighter of the two schedules wins. The web
 // polls the lock endpoint at 3s while locked too (useInstanceLockStatus.js).
+private const val NoteRoute = "notes/{noteId}"
+private val NoteRise = 14.dp
+
+/** Overlays the notes list stays in place under, rather than fading. */
+private val ListOverlayRoutes = setOf("settings", NoteRoute)
 private const val HEALTH_IDLE_MS = 10_000L
 private const val HEALTH_PENDING_MS = 5_000L
 private const val HEALTH_OFFLINE_MS = 3_000L
