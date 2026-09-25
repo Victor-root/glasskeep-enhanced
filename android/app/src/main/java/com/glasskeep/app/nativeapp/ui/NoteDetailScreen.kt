@@ -8,8 +8,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -57,10 +58,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,14 +72,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -91,7 +97,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -1491,6 +1496,12 @@ fun NoteDetailScreen(
         if (showFormatSheet) keyboardController?.hide()
     }
 
+    // The read face has no editor for the sheet to act on: switching to
+    // it closes the sheet (useModalState.js:364-366).
+    LaunchedEffect(viewMode) {
+        if (viewMode) showFormatSheet = false
+    }
+
     // Read only when the picker actually opens: the chips are useless
     // anywhere else on this screen, and most notes are opened without
     // ever touching the reminder.
@@ -1975,6 +1986,7 @@ fun NoteDetailScreen(
                                             onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
                                             pendingSelectionFor = { id -> pendingRichSelections[id] },
                                             onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
+                                            suppressKeyboard = showFormatSheet,
                                         )
                                     }
                                     if (richBlocks.orEmpty().any { it.text.isNotBlank() }) Spacer(Modifier.height(14.dp))
@@ -2060,6 +2072,7 @@ fun NoteDetailScreen(
                                     onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
                                     pendingSelectionFor = { id -> pendingRichSelections[id] },
                                     onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
+                                    suppressKeyboard = showFormatSheet,
                                 )
                             } else {
                                 if (!edit.bodyEditable) {
@@ -2113,7 +2126,7 @@ fun NoteDetailScreen(
             // and the footer (NoteModal.jsx:927-948), so opening it shrinks
             // the note above instead of covering it.
             editability?.let { edit ->
-                if ((edit.isRichEditableType || (edit.isDrawType && !drawingCanvasMode)) && !isReadOnlyAccess) {
+                if ((edit.isRichEditableType || (edit.isDrawType && !drawingCanvasMode)) && !isReadOnlyAccess && !viewMode) {
                     FormatSheet(
                         open = showFormatSheet,
                         dark = dark,
@@ -3516,7 +3529,8 @@ private fun NoteModalFooter(
  * The grabber drags the height 1:1 with the finger - the editor above
  * grows back as it shrinks, so the note stays readable during the
  * gesture - and lets go past 60px to close, exactly as NoteModal.jsx's
- * own pointer handlers do.
+ * own pointer handlers do: below the threshold the sheet animates back to
+ * its open height, past it the close continues from the dragged height.
  */
 @Composable
 private fun FormatSheet(
@@ -3528,35 +3542,29 @@ private fun FormatSheet(
 ) {
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
+    val scope = rememberCoroutineScope()
+    val currentOnClose by rememberUpdatedState(onClose)
     val maxHeight = remember(configuration.screenHeightDp) {
         minOf(configuration.screenHeightDp * 0.58f, 460f).dp
     }
-    // The web's own cap (globalCSS.js: `.mobile-fmt-sheet.is-open {
-    // max-height: min(58vh, 460px) }`) is a ceiling, not a fixed target -
-    // the sheet is a flex column that only grows as tall as its content
-    // actually needs, scrolling past the cap rather than always claiming
-    // it. Animating straight to maxHeight (as this used to) left a dead
-    // gap under a toolbar shorter than the cap (the common case: SIMPLE
-    // mode, or ADVANCED with few groups visible). naturalContentHeightPx
-    // is measured by an invisible zero-size probe below that lays out
-    // `content()` at this sheet's real width but with no height
-    // constraint, so open state can target min(natural height, cap)
-    // instead of always the cap.
-    var naturalContentHeightPx by remember { mutableStateOf(0) }
-    val openHeight = with(density) { naturalContentHeightPx.toDp() }.coerceAtMost(maxHeight)
+    // `max-height: min(58vh, 460px)` is a ceiling, not a target: the sheet
+    // is as tall as its grabber strip, top border and toolbar (the toolbar's
+    // own bottom padding included), and only scrolls past the cap.
+    var contentHeightPx by remember { mutableIntStateOf(0) }
+    val openHeight = (with(density) { contentHeightPx.toDp() } + FormatSheetGrabberHeight + FormatSheetBorder)
+        .coerceAtMost(maxHeight)
     val easing = remember { CubicBezierEasing(0.32f, 0.72f, 0f, 1f) }
-    var dragHeight by remember { mutableStateOf<Dp?>(null) }
-    val animatedHeight by animateDpAsState(
-        targetValue = if (open) openHeight else 0.dp,
-        animationSpec = tween(durationMillis = 320, easing = easing),
-        label = "formatSheetHeight",
-    )
+    val height = remember { Animatable(0.dp, Dp.VectorConverter) }
+    var dragging by remember { mutableStateOf(false) }
+    LaunchedEffect(open, openHeight, dragging) {
+        if (!dragging) height.animateTo(if (open) openHeight else 0.dp, tween(durationMillis = 320, easing = easing))
+    }
     if (BuildConfig.DEBUG) {
         SideEffect {
             Log.d(
                 "GKSheet",
-                "open=$open maxHeight=$maxHeight naturalContentHeightPx=$naturalContentHeightPx " +
-                    "openHeight=$openHeight animatedHeight=$animatedHeight dragHeight=$dragHeight",
+                "open=$open maxHeight=$maxHeight contentHeightPx=$contentHeightPx " +
+                    "openHeight=$openHeight height=${height.value} dragging=$dragging",
             )
         }
     }
@@ -3565,8 +3573,7 @@ private fun FormatSheet(
         animationSpec = tween(durationMillis = 220, easing = easing),
         label = "formatSheetAlpha",
     )
-    val height = dragHeight ?: animatedHeight
-    if (!open && dragHeight == null && height <= 0.dp) return
+    if (!open && !dragging && height.value <= 0.dp) return
 
     var grabberPressed by remember { mutableStateOf(false) }
     val grabberColor by animateColorAsState(
@@ -3585,58 +3592,68 @@ private fun FormatSheet(
         label = "grabberScale",
     )
 
-    val shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+    val topBorder = if (dark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.15f)
+    val sideBorder = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.1f)
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(height)
+            .height(height.value)
             .graphicsLayer { this.alpha = alpha }
-            .clip(shape)
+            .clip(RoundedCornerShape(topStart = FormatSheetRadius, topEnd = FormatSheetRadius))
             .background(background)
             // The sheet reads one shade darker than the note itself: a
             // flat veil over its colour, not a different colour.
             .background(Color.Black.copy(alpha = if (dark) 0.18f else 0.07f))
-            .border(
-                width = 1.dp,
-                color = if (dark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.15f),
-                shape = shape,
-            ),
+            .drawBehind { drawFormatSheetFrame(topBorder, sideBorder) },
     ) {
-        Column(Modifier.fillMaxWidth()) {
+        // The ::before shadow band, inside the top border and under the
+        // grabber and the toolbar (z-index 1 against their 2).
+        Box(
+            modifier = Modifier
+                .padding(start = FormatSheetBorder, end = FormatSheetBorder, top = FormatSheetBorder)
+                .fillMaxWidth()
+                .height(16.dp)
+                .background(
+                    if (dark) {
+                        SolidColor(Color.White.copy(alpha = 0.32f))
+                    } else {
+                        Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.12f), Color.Transparent))
+                    },
+                ),
+        )
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = FormatSheetBorder, end = FormatSheetBorder, top = FormatSheetBorder),
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(10.dp)
-                    .pointerInput(open) {
+                    .height(FormatSheetGrabberHeight)
+                    .pointerInput(Unit) {
                         var dragged = 0f
-                        var base = 0.dp
+                        var base = 0f
                         detectVerticalDragGestures(
                             onDragStart = {
                                 grabberPressed = true
+                                dragging = true
                                 dragged = 0f
-                                // The height the sheet is actually showing
-                                // right now (open height, capped to
-                                // content, not the theoretical ceiling),
-                                // so a shorter toolbar's grabber doesn't
-                                // travel through empty space before it
-                                // starts visibly shrinking anything.
-                                base = animatedHeight
-                                dragHeight = animatedHeight
+                                base = height.value.toPx()
                             },
                             onVerticalDrag = { change, delta ->
                                 change.consume()
                                 dragged = (dragged + delta).coerceAtLeast(0f)
-                                dragHeight = (base - with(density) { dragged.toDp() }).coerceAtLeast(0.dp)
+                                val target = (base - dragged).coerceAtLeast(0f).toDp()
+                                scope.launch { height.snapTo(target) }
                             },
                             onDragEnd = {
                                 grabberPressed = false
-                                val closed = with(density) { dragged.toDp() } > 60.dp
-                                dragHeight = null
-                                if (closed) onClose()
+                                if (dragged.toDp() > 60.dp) currentOnClose()
+                                dragging = false
                             },
                             onDragCancel = {
                                 grabberPressed = false
-                                dragHeight = null
+                                dragging = false
                             },
                         )
                     },
@@ -3651,43 +3668,51 @@ private fun FormatSheet(
                         .background(grabberColor),
                 )
             }
+            // verticalScroll measures what it wraps with no height limit,
+            // so onSizeChanged below it reports the toolbar's natural height.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .onSizeChanged { contentHeightPx = it.height },
             ) {
                 content()
             }
         }
-        // Invisible zero-size probe: lays out a second copy of `content()`
-        // at this sheet's real width but with no height constraint, purely
-        // to read its natural height into naturalContentHeightPx above.
-        // verticalScroll() on the visible copy always measures its child
-        // at full natural height too, but reports back whatever height ITS
-        // OWN parent constrains it to (the very value this is computing),
-        // so that copy can't be reused to measure itself.
-        Layout(
-            content = { Box(Modifier.fillMaxWidth()) { content() } },
-            modifier = Modifier.fillMaxWidth(),
-        ) { measurables, constraints ->
-            val placeable = measurables.first().measure(Constraints(maxWidth = constraints.maxWidth))
-            naturalContentHeightPx = placeable.height
-            layout(0, 0) {}
-        }
-        // The ::before shadow band under the top edge.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(16.dp)
-                .background(
-                    if (dark) {
-                        SolidColor(Color.White.copy(alpha = 0.32f))
-                    } else {
-                        Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.12f), Color.Transparent))
-                    },
-                ),
-        )
     }
+}
+
+private val FormatSheetRadius = 12.dp
+private val FormatSheetBorder = 1.dp
+private val FormatSheetGrabberHeight = 10.dp
+
+/** The sheet's hairline frame: a darker top edge following the rounded
+ *  corners, lighter sides, and no bottom edge. The colours change halfway
+ *  round each corner, where CSS splits two differently coloured borders. */
+private fun DrawScope.drawFormatSheetFrame(top: Color, side: Color) {
+    val stroke = FormatSheetBorder.toPx()
+    val inset = stroke / 2f
+    val radius = FormatSheetRadius.toPx()
+    val w = size.width
+    val leftCorner = Rect(inset, inset, 2 * radius - inset, 2 * radius - inset)
+    val rightCorner = Rect(w - 2 * radius + inset, inset, w - inset, 2 * radius - inset)
+    val left = Path().apply {
+        moveTo(inset, size.height)
+        lineTo(inset, radius)
+        arcTo(leftCorner, 180f, 45f, false)
+    }
+    val topEdge = Path().apply {
+        arcTo(leftCorner, 225f, 45f, true)
+        lineTo(w - radius, inset)
+        arcTo(rightCorner, 270f, 45f, false)
+    }
+    val right = Path().apply {
+        arcTo(rightCorner, 315f, 45f, true)
+        lineTo(w - inset, size.height)
+    }
+    drawPath(left, side, style = Stroke(stroke))
+    drawPath(topEdge, top, style = Stroke(stroke))
+    drawPath(right, side, style = Stroke(stroke))
 }
 
 /** .modal-footer-btn--mode's fixed indigo-to-violet fill (globalCSS.js:1919),
