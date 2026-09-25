@@ -1454,16 +1454,22 @@ internal fun Modifier.dashedUnderline(color: Color): Modifier = drawBehind {
     )
 }
 
-internal fun Modifier.dashedBorder(color: Color, shape: Shape): Modifier = drawBehind {
+/** A CSS `border-style: dashed`, drawn inside the box like any CSS
+ *  border. */
+internal fun Modifier.dashedBorder(color: Color, shape: Shape, width: Dp = 1.dp, dash: Dp = 4.dp): Modifier = drawBehind {
+    val strokeWidth = width.toPx()
     val stroke = Stroke(
-        width = 1.dp.toPx(),
-        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())),
+        width = strokeWidth,
+        pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash.toPx(), dash.toPx())),
     )
-    val outline = shape.createOutline(size, layoutDirection, this)
-    when (outline) {
-        is Outline.Rounded -> drawPath(Path().apply { addRoundRect(outline.roundRect) }, color, style = stroke)
-        is Outline.Generic -> drawPath(outline.path, color, style = stroke)
-        is Outline.Rectangle -> drawRect(color, style = stroke)
+    val inset = strokeWidth / 2f
+    val outline = shape.createOutline(Size(size.width - strokeWidth, size.height - strokeWidth), layoutDirection, this)
+    translate(inset, inset) {
+        when (outline) {
+            is Outline.Rounded -> drawPath(Path().apply { addRoundRect(outline.roundRect) }, color, style = stroke)
+            is Outline.Generic -> drawPath(outline.path, color, style = stroke)
+            is Outline.Rectangle -> drawRect(color, size = outline.rect.size, style = stroke)
+        }
     }
 }
 

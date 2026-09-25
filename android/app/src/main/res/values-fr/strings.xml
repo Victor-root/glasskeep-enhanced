@@ -788,7 +788,7 @@
     <string name="native_replace_logo">Remplacer le logo</string>
     <string name="native_remove_logo">Retirer le logo</string>
     <string name="native_delete_logo">Supprimer le logo</string>
-    <string name="native_no_logos_yet">Aucun logo, touchez + pour en importer un</string>
+    <string name="native_no_logos_yet">Aucun logo, cliquez sur + pour en importer un</string>
     <string name="native_note_icon_error">Impossible de changer l\'ic\u00f4ne de la note.</string>
     <!-- Inscription native et administration complète de l’instance. -->
     <string name="native_register_create_account">Créer un nouveau compte</string>

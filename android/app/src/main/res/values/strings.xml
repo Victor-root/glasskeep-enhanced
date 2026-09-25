@@ -799,7 +799,7 @@
     <string name="native_replace_logo">Replace logo</string>
     <string name="native_remove_logo">Remove logo</string>
     <string name="native_delete_logo">Delete logo</string>
-    <string name="native_no_logos_yet">No logos yet, tap + to upload one</string>
+    <string name="native_no_logos_yet">No logos yet, click + to upload one</string>
     <string name="native_note_icon_error">Couldn\'t change the note icon.</string>
     <!-- Native registration and complete instance administration. -->
     <string name="native_register_create_account">Create a new account</string>

@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,10 +9,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,11 +24,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
@@ -112,21 +125,21 @@ internal fun LogoPickerPopover(
     onDismiss: () -> Unit,
     below: Boolean = false,
 ) {
-    val accent = if (dark) MenuVioletDark else MenuVioletLight
-    val tileBorder = if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f)
     FooterPopover(
-        width = 248.dp,
+        width = 256.dp,
         gap = 8.dp,
         below = below,
-        background = if (dark) MenuBgDark else Color.White,
-        borderColor = if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.10f),
+        background = if (dark) LogoPanelBgDark else Color.White,
+        borderColor = if (dark) LogoPanelBorderDark else LogoPanelBorderLight,
+        ringColor = if (dark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f),
         onDismiss = onDismiss,
     ) {
         LogoPickerGrid(logos, selectedSrc, dark, onPick, onUploadNew, onDelete)
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/** LogoPickerPopover.jsx's grid: four 48px columns 12px apart, the
+ *  library then the dashed upload tile, and the empty hint under them. */
 @Composable
 private fun LogoPickerGrid(
     logos: List<LogoDto>,
@@ -136,85 +149,146 @@ private fun LogoPickerGrid(
     onUploadNew: () -> Unit,
     onDelete: (LogoDto) -> Unit,
 ) {
-    val accent = if (dark) MenuVioletDark else MenuVioletLight
-    val tileBorder = if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f)
-    Column(Modifier.padding(12.dp)) {
-        if (logos.isEmpty()) {
-            Text(
-                stringResource(R.string.native_no_logos_yet),
-                color = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
-                fontSize = 12.sp,
-            )
-            Spacer(Modifier.size(8.dp))
-        }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            for (logo in logos) {
-                Box {
-                    val selected = logo.src == selectedSrc
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(
-                                width = if (selected) 2.dp else 1.dp,
-                                color = if (selected) accent else tileBorder,
-                                shape = RoundedCornerShape(12.dp),
-                            )
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                role = Role.Button,
-                            ) { onPick(logo) }
-                            .padding(6.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        rememberDecodedImage(logo.src)?.let { bitmap ->
-                            Image(
-                                bitmap = bitmap,
-                                contentDescription = logo.name.ifBlank {
-                                    stringResource(R.string.native_note_icon)
-                                },
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
-                    val deleteLabel = stringResource(R.string.native_delete_logo)
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .size(18.dp)
-                            .clip(CircleShape)
-                            .background(if (dark) MenuRedDark else MenuRedLight)
-                            .gkTooltip(deleteLabel)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                role = Role.Button,
-                            ) { onDelete(logo) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CloseIcon(size = 12.dp, tint = Color.White)
+    val tileShape = RoundedCornerShape(12.dp)
+    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        val tiles: List<LogoDto?> = logos + null
+        tiles.chunked(4).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                for (logo in row) {
+                    if (logo == null) {
+                        LogoUploadTile(dark, tileShape, onUploadNew)
+                    } else {
+                        LogoTile(logo, logo.src == selectedSrc, dark, tileShape, onPick, onDelete)
                     }
                 }
             }
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .dashedBorder(tileBorder, RoundedCornerShape(12.dp))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Button,
-                    ) { onUploadNew() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("+", color = accent, fontSize = 22.sp, fontWeight = FontWeight.Light)
-            }
+        }
+        if (logos.isEmpty()) {
+            Text(
+                stringResource(R.string.native_no_logos_yet),
+                color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
+
+@Composable
+private fun LogoTile(
+    logo: LogoDto,
+    selected: Boolean,
+    dark: Boolean,
+    shape: RoundedCornerShape,
+    onPick: (LogoDto) -> Unit,
+    onDelete: (LogoDto) -> Unit,
+) {
+    val label = logo.name.ifBlank { stringResource(R.string.native_note_icon) }
+    Box {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                // ring-[3px] ring-indigo-500 ring-offset-2, the offset in
+                // the panel's own colour.
+                .drawBehind {
+                    if (!selected) return@drawBehind
+                    val offset = 2.dp.toPx()
+                    val ring = 3.dp.toPx()
+                    val radius = 12.dp.toPx()
+                    drawRoundRect(
+                        color = if (dark) LogoPanelBgDark else Color.White,
+                        topLeft = Offset(-offset / 2f, -offset / 2f),
+                        size = Size(size.width + offset, size.height + offset),
+                        cornerRadius = CornerRadius(radius + offset / 2f),
+                        style = Stroke(width = offset),
+                    )
+                    drawRoundRect(
+                        color = LogoSelectionRing,
+                        topLeft = Offset(-offset - ring / 2f, -offset - ring / 2f),
+                        size = Size(size.width + 2 * offset + ring, size.height + 2 * offset + ring),
+                        cornerRadius = CornerRadius(radius + offset + ring / 2f),
+                        style = Stroke(width = ring),
+                    )
+                }
+                .clip(shape)
+                .background(if (dark) Color.White.copy(alpha = 0.05f) else Color(0xFFF3F4F6))
+                .semantics { contentDescription = label }
+                .gkTooltip(label)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    role = Role.Button,
+                ) { onPick(logo) },
+            contentAlignment = Alignment.Center,
+        ) {
+            rememberDecodedImage(logo.src)?.let { bitmap ->
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        // The web only reveals it on hover; touch has none, so it stays.
+        val deleteLabel = stringResource(R.string.native_delete_logo)
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = 4.dp, y = (-4).dp)
+                .size(16.dp)
+                .dropShadow(CircleShape, Shadow(radius = 2.dp, color = Color.Black.copy(alpha = 0.05f), offset = DpOffset(0.dp, 1.dp)))
+                .clip(CircleShape)
+                .background(Color(0xFFFB2C36))
+                .semantics { contentDescription = deleteLabel }
+                .gkTooltip(deleteLabel)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    role = Role.Button,
+                ) { onDelete(logo) },
+            contentAlignment = Alignment.Center,
+        ) {
+            LogoDeleteCross(size = 10.dp, tint = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun LogoUploadTile(dark: Boolean, shape: RoundedCornerShape, onUploadNew: () -> Unit) {
+    val label = stringResource(R.string.native_add_logo)
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(shape)
+            .dashedBorder(if (dark) Color(0xFF6A7282) else Color(0xFFD1D5DC), shape, width = 2.dp, dash = 6.dp)
+            .semantics { contentDescription = label }
+            .gkTooltip(label)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) { onUploadNew() },
+        contentAlignment = Alignment.Center,
+    ) {
+        LogoIcon(size = 24.dp, tint = Color(0xFF99A1AF), strokeWidth = 1.8f)
+    }
+}
+
+/** The delete badge's cross: two strokes of 3 on a 24 grid. */
+@Composable
+private fun LogoDeleteCross(size: Dp, tint: Color) {
+    Canvas(Modifier.size(size)) {
+        val unit = this.size.minDimension / 24f
+        drawLine(tint, Offset(6f * unit, 6f * unit), Offset(18f * unit, 18f * unit), strokeWidth = 3f * unit, cap = StrokeCap.Round)
+        drawLine(tint, Offset(6f * unit, 18f * unit), Offset(18f * unit, 6f * unit), strokeWidth = 3f * unit, cap = StrokeCap.Round)
+    }
+}
+
+// bg-gray-900 / border-gray-100/80 / border-gray-700/50 / ring-indigo-500 (v4).
+private val LogoPanelBgDark = Color(0xFF101828)
+private val LogoPanelBorderLight = Color(0xCCF3F4F6)
+private val LogoPanelBorderDark = Color(0x80364153)
+private val LogoSelectionRing = Color(0xFF615FFF)
