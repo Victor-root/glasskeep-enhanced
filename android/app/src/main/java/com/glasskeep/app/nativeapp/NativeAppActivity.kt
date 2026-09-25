@@ -20,7 +20,7 @@ import com.glasskeep.app.nativeapp.ui.LocalGkDark
 import com.glasskeep.app.nativeapp.ui.NativeNavHost
 import com.glasskeep.app.nativeapp.ui.WorkspaceTheme
 import com.glasskeep.app.ui.applyThemedSystemBars
-import com.glasskeep.app.ui.theme.GlassKeepTheme
+import com.glasskeep.app.ui.theme.GlassKeepWebTheme
 
 /**
  * Entry point for the native app: every screen in
@@ -122,7 +122,7 @@ class NativeAppActivity : ComponentActivity() {
                         (view.context as ComponentActivity).applyThemedSystemBars(currentDark.value, overrideColor)
                     }
             }
-            GlassKeepTheme {
+            GlassKeepWebTheme(darkTheme = dark, accent = WorkspaceTheme.accent(themeId, dark)) {
                 CompositionLocalProvider(LocalGkDark provides dark) {
                     NativeNavHost(
                         container = container,

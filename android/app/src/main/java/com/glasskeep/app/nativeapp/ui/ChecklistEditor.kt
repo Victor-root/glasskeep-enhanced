@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -762,11 +761,7 @@ private fun ChecklistRowView(
                 ChecklistDragHandle(dark = dark)
             }
             Spacer(Modifier.width(8.dp))
-            Checkbox(
-                checked = item.done,
-                onCheckedChange = onToggle,
-                modifier = Modifier.size(20.dp),
-            )
+            GkCheckbox(checked = item.done, onCheckedChange = onToggle)
             Spacer(Modifier.width(6.dp))
             BasicTextField(
                 value = item.text,
@@ -1254,7 +1249,7 @@ private fun ChecklistDoneRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(start = if (item.indent == 1) IndentStep else 0.dp),
     ) {
-        Checkbox(checked = true, onCheckedChange = onToggle, modifier = Modifier.size(20.dp))
+        GkCheckbox(checked = true, onCheckedChange = onToggle)
         Spacer(Modifier.width(6.dp))
         Text(
             item.text,

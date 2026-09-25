@@ -51,6 +51,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -61,9 +62,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -122,6 +126,90 @@ private val DialogBgDark = Color(0xFF282828)
 
 /** `red-600`, the one red the workspace themes never retint. */
 internal val DangerRed = Color(0xFFDC2626)
+
+/** What an `<input type="checkbox">` without `accent-color` fills with. */
+internal val ChromiumCheckboxAccent = Color(0xFF0075FF)
+
+private val ChromiumCheckboxBorder = Color(0xFF767676)
+private val ChromiumCheckboxDisabledFill = Color(0xADF5F5F5)
+private val ChromiumCheckboxDisabledBorder = Color(0x4D767676)
+private val ChromiumCheckboxDisabledCheck = Color(0x99FFFFFF)
+private val ChromiumCheckboxDarkCheck = Color(0xFF3B3B3B)
+
+/**
+ * The WebView's own `<input type="checkbox">`, which the web never
+ * restyles beyond `accent-color`: white box in a 1px #767676 frame, the
+ * accent fill and Chromium's check once checked, translucent greys when
+ * disabled, identical in dark mode. Measured on the same engine, down to
+ * the check path and the rule that draws the check white or dark,
+ * whichever contrasts more with the accent. A null [onCheckedChange]
+ * draws it without making it tappable.
+ */
+@Composable
+internal fun GkCheckbox(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    accent: Color = ChromiumCheckboxAccent,
+    size: Dp = 16.dp,
+) {
+    val toggle = if (onCheckedChange != null && enabled) {
+        Modifier.toggleable(
+            value = checked,
+            role = Role.Checkbox,
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onValueChange = onCheckedChange,
+        )
+    } else {
+        Modifier
+    }
+    Canvas(modifier.then(toggle).size(size)) {
+        val radius = CornerRadius(2.dp.toPx())
+        val border = 1.dp.toPx()
+        val frameTopLeft = Offset(border / 2f, border / 2f)
+        val frameSize = Size(this.size.width - border, this.size.height - border)
+        val frameRadius = CornerRadius(radius.x - border / 2f)
+        when {
+            enabled && checked -> drawRoundRect(accent, cornerRadius = radius)
+            enabled -> {
+                drawRoundRect(Color.White, cornerRadius = radius)
+                drawRoundRect(ChromiumCheckboxBorder, frameTopLeft, frameSize, frameRadius, Stroke(border))
+            }
+            checked -> {
+                drawRoundRect(ChromiumCheckboxDisabledFill, cornerRadius = radius)
+                drawRoundRect(ChromiumCheckboxDisabledBorder, cornerRadius = radius)
+            }
+            else -> {
+                drawRoundRect(ChromiumCheckboxDisabledFill, cornerRadius = radius)
+                drawRoundRect(ChromiumCheckboxDisabledBorder, frameTopLeft, frameSize, frameRadius, Stroke(border))
+            }
+        }
+        if (checked) {
+            val w = this.size.width
+            val h = this.size.height
+            val check = Path().apply {
+                moveTo(w * 0.2f, h * 0.5f)
+                lineTo(w * 0.4f, h * 0.7f)
+                lineTo(w * 0.8f, h * 0.2f)
+            }
+            val checkColor = when {
+                !enabled -> ChromiumCheckboxDisabledCheck
+                contrastRatio(Color.White, accent) >= contrastRatio(ChromiumCheckboxDarkCheck, accent) -> Color.White
+                else -> ChromiumCheckboxDarkCheck
+            }
+            drawPath(check, checkColor, style = Stroke(width = h * 0.16f, cap = StrokeCap.Butt, join = StrokeJoin.Miter))
+        }
+    }
+}
+
+/** WCAG contrast ratio, the measure Chromium uses to pick the check colour. */
+private fun contrastRatio(a: Color, b: Color): Float {
+    val la = a.luminance()
+    val lb = b.luminance()
+    return (maxOf(la, lb) + 0.05f) / (minOf(la, lb) + 0.05f)
+}
 
 /**
  * The 44x24 track / 16px knob switch used by every main settings row
