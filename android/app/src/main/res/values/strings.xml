@@ -152,7 +152,7 @@
     <string name="native_sidebar_all_images">All Images</string>
     <string name="native_sidebar_reminders">Reminders</string>
     <string name="native_sidebar_tags_title">Tags</string>
-    <string name="native_sidebar_tags_empty">No tags yet</string>
+    <string name="native_sidebar_tags_empty">No tags yet. Add tags to your notes!</string>
     <string name="native_sidebar_active_tags">%1$d active tag filters</string>
     <string name="native_sidebar_clear_tags">Clear</string>
     <string name="native_header_menu">Menu</string>

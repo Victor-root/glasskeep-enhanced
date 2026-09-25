@@ -182,6 +182,7 @@ import com.glasskeep.app.ui.FloatingCardsBackground
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
+import java.text.Collator
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -346,10 +347,13 @@ fun NativeNotesListScreen(
         val counts = LinkedHashMap<String, Int>()
         for (note in notes) {
             for (tag in TagsJson.parse(note.tagsJson)) {
-                counts[tag] = (counts[tag] ?: 0) + 1
+                val key = tag.trim()
+                if (key.isEmpty()) continue
+                counts[key] = (counts[key] ?: 0) + 1
             }
         }
-        counts.toList().sortedBy { it.first.lowercase() }
+        val collator = Collator.getInstance()
+        counts.toList().sortedWith(compareBy(collator) { it.first.lowercase() })
     }
 
     // Manual drag reorder (see NotesRepository.reorderQueued), on any view

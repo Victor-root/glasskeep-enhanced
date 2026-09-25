@@ -1535,6 +1535,13 @@ fun EyeOffIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Co
     modifier, size, tint,
 )
 
+/** TagSidebar.jsx's multi-tag filter funnel (Feather filter), stroke 2. */
+@Composable
+fun FunnelIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M22 3L2 3L10 12.46L10 19L14 21L14 12.46z",
+    modifier, size, tint, strokeWidth = 2f,
+)
+
 /** tabler/filter-2-question.svg. */
 @Composable
 fun FilterQuestionIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(

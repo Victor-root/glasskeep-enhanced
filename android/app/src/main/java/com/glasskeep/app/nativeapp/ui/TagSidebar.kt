@@ -2,9 +2,11 @@ package com.glasskeep.app.nativeapp.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,25 +31,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
-import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
-import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
-import com.glasskeep.app.ui.Indigo
 
 /** The two entries that are not folders but lenses over the notes
  *  already loaded: only those carrying an image, and only those carrying
@@ -95,7 +97,6 @@ fun TagSidebar(
 
     if (open) {
         val titleColor = if (dark) DarkTitleColor else LightTitleColor
-        val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
         // Mobile web keeps this an opaque --gk-statusbar surface, rather
         // than the generic white card background.
         val panelBg = WorkspaceTheme.statusBarColor(themeId, dark)
@@ -103,6 +104,7 @@ fun TagSidebar(
         // They belong to the selected workspace theme, not to GlassKeep's
         // violet default.
         val activeGradient = WorkspaceTheme.accentGradient(themeId)
+        val activeGlow = WorkspaceTheme.gradTo(themeId).copy(alpha = 0.55f)
         val chrome = WorkspaceTheme.colorsFor(themeId, dark)
         val closeLabel = stringResource(R.string.native_common_close)
 
@@ -153,30 +155,11 @@ fun TagSidebar(
                     .padding(start = 8.dp, top = 8.dp, end = 9.dp, bottom = 8.dp),
             ) {
                 if (activeTags.size > 1) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 4.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Indigo.copy(alpha = if (dark) 0.18f else 0.12f))
-                            .padding(horizontal = 12.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            stringResource(R.string.native_sidebar_active_tags, activeTags.size),
-                            color = if (dark) Color(0xFFC7D2FE) else Color(0xFF3730A3),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            stringResource(R.string.native_sidebar_clear_tags),
-                            color = if (dark) Color(0xFFA5B4FC) else Color(0xFF4F46E5),
-                            fontSize = 12.sp,
-                            modifier = Modifier.clickable(role = Role.Button) { onClearTagFilters() },
-                        )
-                    }
-                    Spacer(Modifier.height(6.dp))
+                    MultiTagBanner(
+                        count = activeTags.size,
+                        dark = dark,
+                        onClear = onClearTagFilters,
+                    )
                 }
                 SidebarNavItem(
                     icon = { tint -> NotesIcon(size = 20.dp, tint = tint) },
@@ -184,6 +167,7 @@ fun TagSidebar(
                     active = activeTag == null && activeTags.isEmpty(),
                     titleColor = titleColor,
                     activeGradient = activeGradient,
+                    activeGlow = activeGlow,
                     onClick = onSelectNotes,
                 )
                 Spacer(Modifier.height(4.dp))
@@ -193,6 +177,7 @@ fun TagSidebar(
                     active = activeTag == SidebarAllImages,
                     titleColor = titleColor,
                     activeGradient = activeGradient,
+                    activeGlow = activeGlow,
                     onClick = onSelectImages,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -202,6 +187,7 @@ fun TagSidebar(
                     active = false,
                     titleColor = titleColor,
                     activeGradient = activeGradient,
+                    activeGlow = activeGlow,
                     onClick = onOpenArchived,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -211,6 +197,7 @@ fun TagSidebar(
                     active = activeTag == SidebarReminders,
                     titleColor = titleColor,
                     activeGradient = activeGradient,
+                    activeGlow = activeGlow,
                     onClick = onSelectReminders,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -220,6 +207,7 @@ fun TagSidebar(
                     active = false,
                     titleColor = titleColor,
                     activeGradient = activeGradient,
+                    activeGlow = activeGlow,
                     onClick = onOpenTrash,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -227,9 +215,10 @@ fun TagSidebar(
                 if (tags.isEmpty()) {
                     Text(
                         stringResource(R.string.native_sidebar_tags_empty),
-                        color = subtextColor,
+                        color = Color(0xFF6A7282),
                         fontSize = 14.sp,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        lineHeight = 20.sp,
+                        modifier = Modifier.padding(top = 8.dp),
                     )
                 } else {
                     tags.forEachIndexed { index, (tag, count) ->
@@ -240,6 +229,7 @@ fun TagSidebar(
                             active = activeTags.any { it.equals(tag, ignoreCase = true) },
                             titleColor = titleColor,
                             activeGradient = activeGradient,
+                            activeGlow = activeGlow,
                             iconGap = 8.dp,
                             onClick = { onSelectTag(tag, false) },
                             onLongClick = { onSelectTag(tag, true) },
@@ -262,6 +252,7 @@ private fun SidebarNavItem(
     active: Boolean,
     titleColor: Color,
     activeGradient: Brush,
+    activeGlow: Color,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     count: Int? = null,
@@ -272,6 +263,16 @@ private fun SidebarNavItem(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (active) {
+                    Modifier.dropShadow(
+                        shape,
+                        Shadow(radius = 10.dp, color = activeGlow, spread = (-4).dp, offset = DpOffset(0.dp, 2.dp)),
+                    )
+                } else {
+                    Modifier
+                },
+            )
             .clip(shape)
             .then(
                 if (active) {
@@ -320,6 +321,46 @@ private fun SidebarNavItem(
                 lineHeight = 16.sp,
             )
         }
+    }
+}
+
+/** TagSidebar.jsx's multi-tag filter indicator, shown once two or more
+ *  tags are selected: funnel, count, then its "clear" button. */
+@Composable
+private fun MultiTagBanner(count: Int, dark: Boolean, onClear: () -> Unit) {
+    val shape = RoundedCornerShape(8.dp)
+    val fg = if (dark) Color(0xFFC6D2FF) else Color(0xFF372AAC)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, end = 4.dp, bottom = 12.dp)
+            .clip(shape)
+            .background(if (dark) Color(0x26615FFF) else Color(0xE6E0E7FF))
+            .border(1.dp, if (dark) Color(0x667C86FF) else Color(0xFFA3B3FF), shape)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FunnelIcon(size = 16.dp, tint = fg)
+        Text(
+            stringResource(R.string.native_sidebar_active_tags, count),
+            color = fg,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            stringResource(R.string.native_sidebar_clear_tags),
+            color = if (dark) Color(0xFFC6D2FF) else Color(0xFF432DD7),
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(role = Role.Button) { onClear() }
+                .padding(horizontal = 8.dp, vertical = 2.dp),
+        )
     }
 }
 

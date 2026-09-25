@@ -147,9 +147,9 @@
     <string name="native_sidebar_all_images">Toutes les images</string>
     <string name="native_sidebar_reminders">Rappels</string>
     <string name="native_sidebar_tags_title">Tags</string>
-    <string name="native_sidebar_tags_empty">Aucun tag pour le moment</string>
+    <string name="native_sidebar_tags_empty">Pas encore de tags. Ajoutez des tags à vos notes !</string>
     <string name="native_sidebar_active_tags">%1$d tags actifs</string>
-    <string name="native_sidebar_clear_tags">Effacer</string>
+    <string name="native_sidebar_clear_tags">Tout effacer</string>
     <string name="native_header_menu">Menu</string>
 
     <string name="native_archived_title">Archivées</string>
