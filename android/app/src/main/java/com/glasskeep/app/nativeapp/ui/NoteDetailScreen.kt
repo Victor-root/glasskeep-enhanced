@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp.ui
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -68,7 +69,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
@@ -2760,7 +2763,9 @@ private val ColorPanelBorderDark = Color(0x80374151)
 private val ColorDotDefaultBorderLight = Color(0xFFD1D5DB)
 private val ColorDotDefaultBorderDark = Color(0xFF6B7280)
 private val ColorDotDefaultInnerDark = Color(0xFF1F2937)
-private val ColorSelectionRing = Color(0xFF6366F1)
+// Tailwind v4 indigo-500, and the ring-offset gap in white / gray-900.
+private val ColorSelectionRing = Color(0xFF615FFF)
+private val ColorRingOffsetDark = Color(0xFF101828)
 private val TagPanelBgLight = Color(0xFFFFFFFF)
 private val TagPanelBgDark = Color(0xFF111827)
 private val TagSearchBgLight = Color(0xFFF9FAFB)
@@ -2799,6 +2804,7 @@ internal fun NoteColorPopover(
         below = below,
         background = if (dark) ColorPanelBgDark else ColorPanelBgLight,
         borderColor = if (dark) ColorPanelBorderDark else ColorPanelBorderLight,
+        ringColor = if (dark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f),
         onDismiss = onDismiss,
     ) {
         Column(
@@ -2842,6 +2848,12 @@ private fun NoteColorDot(
             .drawBehind {
                 if (!selected) return@drawBehind
                 val stroke = 3.dp.toPx()
+                val offset = 2.dp.toPx()
+                drawCircle(
+                    color = if (dark) ColorRingOffsetDark else Color.White,
+                    radius = size.minDimension / 2f + offset / 2f,
+                    style = Stroke(width = offset),
+                )
                 drawCircle(
                     color = ColorSelectionRing,
                     radius = size.minDimension / 2f + 2.dp.toPx() + stroke / 2f,
@@ -2879,6 +2891,14 @@ private fun NoteColorDot(
                     .background(if (dark) ColorDotDefaultInnerDark else Color.White),
             )
         } else if (selected) {
+            // drop-shadow-sm: 0 1px 2px black 15%, where the platform can blur.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                CheckFilledIcon(
+                    size = 20.dp,
+                    tint = Color.Black.copy(alpha = 0.15f),
+                    modifier = Modifier.offset(y = 1.dp).blur(cssBlur(1.dp), BlurredEdgeTreatment.Unbounded),
+                )
+            }
             CheckFilledIcon(size = 20.dp, tint = Color.White)
         }
     }

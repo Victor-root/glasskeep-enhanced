@@ -1374,6 +1374,10 @@ private fun Modifier.outsideRing(color: Color, shape: Shape): Modifier = drawBeh
     }
 }
 
+// Android turns a blur radius r into a standard deviation of 0.57735 r,
+// where CSS blur() takes the standard deviation itself.
+internal fun cssBlur(sigma: Dp): Dp = sigma / 0.57735f
+
 /** Standard normal CDF, through Abramowitz and Stegun's 7.1.26 erf: the
  *  profile of a CSS box-shadow edge, whose blur is a Gaussian with a
  *  standard deviation of half the blur radius. */
