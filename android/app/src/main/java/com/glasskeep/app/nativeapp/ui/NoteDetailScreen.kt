@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -2078,9 +2079,25 @@ fun NoteDetailScreen(
                                 ) { tint -> ServerIcon(size = 16.dp, tint = tint) }
                             }
 
+                            // .modal-content-fade: the content area is re-keyed on
+                            // view / edit / draw, and fades in 4px from below
+                            // (200ms ease-out) each time, drawing excepted.
+                            val contentFade = remember { Animatable(0f) }
+                            LaunchedEffect(viewMode, drawingCanvasMode) {
+                                if (drawingCanvasMode) {
+                                    contentFade.snapTo(1f)
+                                } else {
+                                    contentFade.snapTo(0f)
+                                    contentFade.animateTo(1f, tween(durationMillis = 200, easing = EaseOut))
+                                }
+                            }
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .graphicsLayer {
+                                        alpha = contentFade.value
+                                        translationY = (1f - contentFade.value) * 4.dp.toPx()
+                                    }
                                     .padding(
                                         when {
                                             edit.isDrawType -> PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp)
