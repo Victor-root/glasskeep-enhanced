@@ -2737,7 +2737,9 @@ fun NoteDetailScreen(
             FullscreenImageViewer(
                 images = images,
                 initialIndex = index,
-                removeEnabled = !changingImages && !isReadOnlyAccess,
+                dark = dark,
+                // NoteModal.jsx: `mType === "checklist" || !viewMode`.
+                canRemove = !changingImages && !isNoteReadOnly && (editability?.isChecklistType == true || !viewMode),
                 onClose = { viewerIndex = null },
                 onRemove = { image -> removeImage(image) },
                 onDownload = { image -> downloadImage(image) },

@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -1928,6 +1929,30 @@ fun DrawWavesIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color =
     "M3 17c2-3 4-6 6-3s4 3 6 0 4-3 6 0 M3 10c2-3 4-6 6-3s4 3 6 0 4-3 6 0",
     modifier, size, tint, strokeWidth = 2.2f,
 )
+
+/** Heroicons' solid trash (FullscreenImageViewer.jsx's remove), viewBox
+ *  20x20, even-odd, with the arc flags written out for PathParser. */
+@Composable
+fun TrashSolidIcon(modifier: Modifier = Modifier, size: Dp = 20.dp, tint: Color = Color.Black) {
+    val path = remember {
+        PathParser().parsePathString(
+            "M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795 .077 -1.584 .176 -2.365 .298a.75 .75 0 1 0 .23 1.482" +
+                "l.149 -.022 .841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742 -2.53" +
+                "l.841 -10.52 .149 .023a.75 .75 0 0 0 .23 -1.482A41.03 41.03 0 0 0 14 4.193V3.75" +
+                "A2.75 2.75 0 0 0 11.25 1h-2.5z" +
+                "M10 4c.84 0 1.673 .025 2.5 .075V3.75c0 -.69 -.56 -1.25 -1.25 -1.25h-2.5c-.69 0 -1.25 .56 -1.25 1.25" +
+                "v.325C8.327 4.025 9.16 4 10 4z" +
+                "M8.58 7.72a.75 .75 0 0 0 -1.5 .06l.3 7.5a.75 .75 0 1 0 1.5 -.06l-.3 -7.5z" +
+                "m4.34 .06a.75 .75 0 1 0 -1.5 -.06l-.3 7.5a.75 .75 0 1 0 1.5 .06l.3 -7.5z"
+        ).toPath().apply { fillType = PathFillType.EvenOdd }
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 20f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint)
+        }
+    }
+}
 
 // The rest of NotificationCard.jsx's SEMANTIC_ICONS, the outline Tabler
 // glyphs a notification names by key.

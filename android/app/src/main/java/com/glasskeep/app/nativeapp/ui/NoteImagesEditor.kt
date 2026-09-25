@@ -1,7 +1,11 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.util.Base64
+import android.view.WindowManager
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -9,19 +13,27 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,23 +41,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.NoteImageData
+import kotlinx.coroutines.delay
 
 /** ModalImagesGrid.jsx's `max-height: 360px` on every image. */
 private val NoteImageMaxHeight = 360.dp
@@ -134,16 +155,19 @@ private fun NoteImageThumbnail(image: NoteImageData, modifier: Modifier = Modifi
 }
 
 /**
- * Fullscreen lightbox: matches FullscreenImageViewer.jsx's own controls
- * (close, download, remove, prev/next, name + index/total caption).
- * Closes itself once the last image is removed instead of showing an
- * empty viewer.
+ * FullscreenImageViewer.jsx on a phone: the note stays visible behind a
+ * frosted 30% black scrim, the image at its natural size (at most 92% of
+ * the screen, never upscaled) on a white or black backing, the download,
+ * remove and close buttons top right, the "i/n" caption top centre, and
+ * prev/next circles that fade out 3s after the last touch. Tapping the
+ * scrim closes; the viewer closes itself once the last image is removed.
  */
 @Composable
 fun FullscreenImageViewer(
     images: List<NoteImageData>,
     initialIndex: Int,
-    removeEnabled: Boolean,
+    dark: Boolean,
+    canRemove: Boolean,
     onClose: () -> Unit,
     onRemove: (NoteImageData) -> Unit,
     onDownload: (NoteImageData) -> Unit,
@@ -159,6 +183,17 @@ fun FullscreenImageViewer(
     }
     if (images.isEmpty()) return
 
+    // useModalState.js's mobileNavVisible: shown on every touch, hidden
+    // 3s after the last one.
+    var navTouches by remember { mutableIntStateOf(0) }
+    var navVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(navTouches) {
+        navVisible = true
+        delay(3_000)
+        navVisible = false
+    }
+    val navAlpha by animateFloatAsState(if (navVisible) 1f else 0f, tween(300), label = "viewerNav")
+
     val current = images[index]
     val closeLabel = stringResource(R.string.native_note_detail_image_close)
     val downloadLabel = stringResource(R.string.native_note_detail_image_download)
@@ -167,88 +202,157 @@ fun FullscreenImageViewer(
     val nextLabel = stringResource(R.string.native_note_detail_image_next)
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.94f))) {
-            NoteImageThumbnail(
-                image = current,
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 64.dp),
-            )
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+        val density = LocalDensity.current
+        SideEffect {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window?.setDimAmount(0.30f)
+            // backdrop-blur-md, where the platform can blur what is behind.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                window?.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                window?.attributes = window?.attributes?.apply {
+                    blurBehindRadius = with(density) { cssBlur(12.dp).roundToPx() }
+                }
+            }
+        }
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { onClose() },
+            contentAlignment = Alignment.Center,
+        ) {
+            val bitmap = rememberDecodedImage(current.src)
+            if (bitmap != null) {
+                val maxW = maxWidth * 0.92f
+                val maxH = maxHeight * 0.92f
+                val naturalW = bitmap.width.dp
+                val naturalH = bitmap.height.dp
+                val scale = minOf(1f, maxW / naturalW, maxH / naturalH)
+                val shape = RoundedCornerShape(8.dp)
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = current.name.ifBlank { null },
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .size(naturalW * scale, naturalH * scale)
+                        // shadow-2xl
+                        .dropShadow(shape, Shadow(radius = 50.dp, color = Color.Black.copy(alpha = 0.25f), spread = (-12).dp, offset = DpOffset(0.dp, 25.dp)))
+                        .clip(shape)
+                        .background(if (dark) Color.Black else Color.White)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { navTouches++ },
+                )
+            }
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, alignment = Alignment.End),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.End))
+                    .padding(top = 16.dp, end = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                ViewerIconButton(contentDescription = downloadLabel, onClick = { onDownload(current) }) {
+                ViewerButton(downloadLabel, onClick = { onDownload(current) }) {
                     DownloadIcon(size = 20.dp, tint = Color.White)
                 }
-                ViewerIconButton(
-                    contentDescription = removeLabel,
-                    enabled = removeEnabled,
-                    onClick = { onRemove(current) },
-                ) {
-                    TrashIcon(size = 20.dp, tint = Color.White)
+                if (canRemove) {
+                    ViewerButton(removeLabel, background = Color(0xCCE7000B), onClick = { onRemove(current) }) {
+                        TrashSolidIcon(size = 20.dp, tint = Color.White)
+                    }
                 }
-                ViewerIconButton(contentDescription = closeLabel, onClick = onClose) {
-                    CloseIcon(size = 20.dp, tint = Color.White)
+                ViewerButton(closeLabel, onClick = onClose) {
+                    CloseIcon(size = 24.dp, tint = Color.White)
                 }
             }
 
             if (images.size > 1) {
-                ViewerIconButton(
-                    contentDescription = prevLabel,
-                    onClick = { index = (index - 1 + images.size) % images.size },
-                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp),
+                Text(
+                    "${index + 1}/${images.size}",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                        .padding(top = 16.dp),
+                )
+                ViewerNavButton(
+                    label = prevLabel,
+                    alpha = navAlpha,
+                    enabled = navVisible,
+                    onClick = { index = (index - 1 + images.size) % images.size; navTouches++ },
+                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp),
                 ) {
-                    BackArrowIcon(size = 22.dp, tint = Color.White)
+                    BackArrowIcon(size = 24.dp, tint = Color.White)
                 }
-                ViewerIconButton(
-                    contentDescription = nextLabel,
-                    onClick = { index = (index + 1) % images.size },
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
+                ViewerNavButton(
+                    label = nextLabel,
+                    alpha = navAlpha,
+                    enabled = navVisible,
+                    onClick = { index = (index + 1) % images.size; navTouches++ },
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
                 ) {
-                    BackArrowIcon(size = 22.dp, tint = Color.White, modifier = Modifier.rotate(180f))
-                }
-            }
-
-            Column(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                if (current.name.isNotBlank()) {
-                    Text(current.name, color = Color.White, fontSize = 13.sp)
-                }
-                if (images.size > 1) {
-                    Text(
-                        "${index + 1}/${images.size}",
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 12.sp,
-                    )
+                    BackArrowIcon(size = 24.dp, tint = Color.White, modifier = Modifier.rotate(180f))
                 }
             }
         }
     }
 }
 
+/** The viewer's top-right buttons: `px-3 py-2 rounded-lg`, white 10%. */
 @Composable
-private fun ViewerIconButton(
-    contentDescription: String,
+private fun ViewerButton(
+    label: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
+    background: Color = Color.White.copy(alpha = 0.10f),
+    icon: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(background)
+            .semantics { contentDescription = label }
+            .gkTooltip(label)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) { onClick() }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        icon()
+    }
+}
+
+/** Prev / next: `p-3 rounded-full`, white 10%, fading with the nav. */
+@Composable
+private fun ViewerNavButton(
+    label: String,
+    alpha: Float,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
     icon: @Composable () -> Unit,
 ) {
     Box(
         modifier = modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(999.dp))
-            .background(Color.White.copy(alpha = 0.12f))
-            .semantics { this.contentDescription = contentDescription }
-            .gkTooltip(contentDescription)
+            .graphicsLayer { this.alpha = alpha }
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.10f))
+            .semantics { contentDescription = label }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 enabled = enabled,
                 role = Role.Button,
-            ) { onClick() },
+            ) { onClick() }
+            .padding(12.dp),
         contentAlignment = Alignment.Center,
     ) {
         icon()
