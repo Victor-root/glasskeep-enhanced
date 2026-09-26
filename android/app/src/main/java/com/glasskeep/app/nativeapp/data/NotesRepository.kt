@@ -1548,32 +1548,20 @@ class NotesRepository(
         NativeDebug.d("NotesRepository.fetchDeviceLinkInfo")
         val response = api.deviceLinkInfo(token)
         val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "GET /api/device-link/info failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        if (!response.isSuccessful || body == null) throw response.refusal("GET /api/device-link/info")
         return body
     }
 
     suspend fun approveDeviceLink(token: String) {
         NativeDebug.d("NotesRepository.approveDeviceLink")
         val response = api.approveDeviceLink(DeviceLinkTokenRequest(token))
-        if (!response.isSuccessful) {
-            val error = "POST /api/device-link/approve failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        if (!response.isSuccessful) throw response.refusal("POST /api/device-link/approve")
     }
 
     suspend fun rejectDeviceLink(token: String) {
         NativeDebug.d("NotesRepository.rejectDeviceLink")
         val response = api.rejectDeviceLink(DeviceLinkTokenRequest(token))
-        if (!response.isSuccessful) {
-            val error = "POST /api/device-link/reject failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        if (!response.isSuccessful) throw response.refusal("POST /api/device-link/reject")
     }
 
     /** Full participant roster of a note, owner first, the open note's

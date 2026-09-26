@@ -26,6 +26,15 @@ internal fun Context.requestErrorText(t: Throwable): String = when (t) {
     else -> t.message.orEmpty()
 }
 
+/** What the web's bare fetch() helpers (deviceLinkClient.js) throw as the
+ *  message: the server's `error` text or `HTTP <code>`, and Chromium's own
+ *  "Failed to fetch" when the server can't be reached. */
+internal fun fetchErrorText(t: Throwable): String = when (t) {
+    is ServerRefusal -> t.error ?: "HTTP ${t.status}"
+    is IOException -> "Failed to fetch"
+    else -> t.message.orEmpty()
+}
+
 /** serverErrors.js's localizeServerError(): the server's English text,
  *  reworded when one of its known needles is in it (the first one wins),
  *  shown as the server wrote it otherwise, and [fallback] when there is

@@ -233,8 +233,8 @@
     <string name="native_qr_scan_wrong_origin_title">QR from another server</string>
     <string name="native_qr_scan_wrong_origin_body">This QR points to %1$s, it does not belong to your GlassKeep server. Sign-in refused for safety.</string>
     <string name="native_qr_scan_close">Close</string>
-    <string name="native_qr_scan_permission_denied">Camera access is required to scan a QR code.</string>
-    <string name="native_qr_scan_error_generic">Couldn\'t complete the sign-in: %1$s</string>
+    <string name="native_qr_scan_info_failed">Could not fetch the other device\'s details.</string>
+    <string name="native_qr_scan_approve_failed">Approval failed. The QR may have expired.</string>
     <string name="native_secret_login_title">Sign In with Secret Key</string>
     <string name="native_secret_login_placeholder">Paste your secret key here</string>
     <string name="native_secret_login_back">Sign in with email &amp; password</string>

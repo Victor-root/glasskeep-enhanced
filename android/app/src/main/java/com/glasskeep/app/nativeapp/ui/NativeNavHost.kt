@@ -93,6 +93,8 @@ fun NativeNavHost(
     // on a cold start, i.e. before the NavHost has ever composed: the
     // forced password change that sign-in carries opens once it has.
     var unlockedIntoForcedPasswordChange by remember { mutableStateOf(false) }
+    // QrScannerModal, over whichever screen opened it (App.jsx:7913).
+    var qrScannerOpen by remember { mutableStateOf(false) }
     val startDestination = if (container.tokenStore.token != null) "notes" else "login"
     val context = LocalContext.current
 
@@ -312,7 +314,7 @@ fun NativeNavHost(
     // doing nothing today.
     LaunchedEffect(pendingOpenQrScanner, startDestination) {
         if (pendingOpenQrScanner) {
-            if (startDestination == "notes") navController.navigate("qr-scan")
+            if (startDestination == "notes") qrScannerOpen = true
             onPendingOpenQrScannerConsumed()
         }
     }
@@ -572,7 +574,7 @@ fun NativeNavHost(
                             onOpenTrash = { navController.navigate("trash") },
                             onOpenSettings = { navController.navigate("settings") },
                             onOpenAdmin = { navController.navigate("admin") },
-                            onOpenQrScanner = { navController.navigate("qr-scan") },
+                            onOpenQrScanner = { qrScannerOpen = true },
                             onOpenSideBySide = { first, second -> navController.navigate("compare/$first/$second") },
                             pendingNewNoteType = pendingNewNoteType,
                             onPendingNewNoteTypeConsumed = onPendingNewNoteTypeConsumed,
@@ -616,7 +618,7 @@ fun NativeNavHost(
                         actions = settingsActions,
                         aiSettingsPokes = aiSettingsPokes,
                         onBack = { navController.popBackStack() },
-                        onOpenQrScanner = { navController.navigate("qr-scan") },
+                        onOpenQrScanner = { qrScannerOpen = true },
                         // The web closes the panel and opens the admin one
                         // on the section holding the field.
                         onOpenPasskeyDomainSetting = {
@@ -634,13 +636,6 @@ fun NativeNavHost(
                         container = container,
                         serverUrl = serverUrl,
                         focus = backStackEntry.arguments?.getString("focus"),
-                        onBack = { navController.popBackStack() },
-                    )
-                }
-                composable("qr-scan") {
-                    QrScanScreen(
-                        container = container,
-                        serverUrl = serverUrl,
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -716,6 +711,9 @@ fun NativeNavHost(
             )
             GkTooltipHost(tooltips)
             SettingsActionDialogs(settingsActions, container.themeState.themeId, LocalGkDark.current)
+            if (qrScannerOpen) {
+                QrScannerModal(container = container, serverUrl = serverUrl, onClose = { qrScannerOpen = false })
+            }
         }
     }
 }

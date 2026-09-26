@@ -47,14 +47,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
-import com.glasskeep.app.nativeapp.data.ServerRefusal
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.data.refusal
 import io.nayuki.qrcodegen.QrCode
 import io.nayuki.qrcodegen.QrSegmentAdvanced
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import java.io.IOException
 import kotlin.math.roundToInt
 
 /** QrLoginPanel.jsx's states. */
@@ -62,10 +60,6 @@ private enum class QrLoginStatus { LOADING, PENDING, APPROVED, EXPIRED, REJECTED
 
 /** Never poll faster than this, whatever the server asks for. */
 private const val MinPollIntervalMs = 1000L
-
-/** What Chromium's fetch() rejects with when the server can't be reached,
- *  the text the web's panel then shows as is. */
-private const val FetchFailedMessage = "Failed to fetch"
 
 /** The QR's quiet zone, `margin: 1` like the web's QRCode.toDataURL. */
 private const val QrMargin = 1
@@ -113,11 +107,7 @@ internal fun QrLoginPanel(
         } catch (t: CancellationException) {
             throw t
         } catch (t: Throwable) {
-            errorText = when (t) {
-                is ServerRefusal -> t.error ?: "HTTP ${t.status}"
-                is IOException -> FetchFailedMessage
-                else -> t.message.orEmpty()
-            }.ifEmpty { "Network error" }
+            errorText = fetchErrorText(t).ifEmpty { "Network error" }
             status = QrLoginStatus.ERROR
         }
     }

@@ -228,8 +228,8 @@
     <string name="native_qr_scan_wrong_origin_title">QR code étranger</string>
     <string name="native_qr_scan_wrong_origin_body">Ce QR pointe vers %1$s, il ne provient pas de votre serveur GlassKeep. Connexion refusée par sécurité.</string>
     <string name="native_qr_scan_close">Fermer</string>
-    <string name="native_qr_scan_permission_denied">L\'accès à la caméra est nécessaire pour scanner un QR code.</string>
-    <string name="native_qr_scan_error_generic">Impossible de terminer la connexion : %1$s</string>
+    <string name="native_qr_scan_info_failed">Impossible de récupérer les informations de l\'autre appareil.</string>
+    <string name="native_qr_scan_approve_failed">L\'approbation a échoué. Le QR a peut-être expiré.</string>
     <string name="native_secret_login_title">Connexion avec clé secrète</string>
     <string name="native_secret_login_placeholder">Collez votre clé secrète ici</string>
     <string name="native_secret_login_back">Connexion avec e-mail et mot de passe</string>

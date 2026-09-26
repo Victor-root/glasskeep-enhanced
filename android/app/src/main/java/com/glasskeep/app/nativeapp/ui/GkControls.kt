@@ -896,7 +896,9 @@ internal fun SettingsPopoverOption(
  * the web's plain conditional render. The web also blurs the scrim by
  * 8px; a dialog window can't blur what is behind it here, so the scrim
  * stays flat. [scrimAlpha] replaces the dim for a web dialog drawn over
- * a lighter `bg-black/40`.
+ * a lighter `bg-black/40`. [screenPadding], [widthFraction], [cornerRadius]
+ * and [contentPadding] fit a modal with other proportions, such as the QR
+ * scanner's `p-4` backdrop around a `w-[94%] rounded-2xl p-5` card.
  */
 @Composable
 internal fun GkDialog(
@@ -908,6 +910,10 @@ internal fun GkDialog(
     background: Color = if (dark) DialogBgDark else Color.White,
     elevation: Dp = 24.dp,
     scrimAlpha: Float? = null,
+    screenPadding: Dp = 0.dp,
+    widthFraction: Float = 0.9f,
+    cornerRadius: Dp = 12.dp,
+    contentPadding: Dp = 24.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(
@@ -925,15 +931,17 @@ internal fun GkDialog(
                 window?.setDimAmount(scrimAlpha)
             }
         }
+        val shape = RoundedCornerShape(cornerRadius)
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
+                .padding(screenPadding)
+                .fillMaxWidth(widthFraction)
                 .widthIn(max = maxWidth)
-                .shadow(elevation = elevation, shape = RoundedCornerShape(12.dp))
-                .clip(RoundedCornerShape(12.dp))
+                .shadow(elevation = elevation, shape = shape)
+                .clip(shape)
                 .background(background)
-                .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-                .padding(24.dp),
+                .border(1.dp, borderColor, shape)
+                .padding(contentPadding),
             content = content,
         )
     }

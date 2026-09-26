@@ -1655,7 +1655,7 @@ interface GlassKeepApi {
     // Cross-device QR sign-in. The login screen creates a challenge and
     // polls it while its QR is shown (QrLoginPanel.kt); a phone that
     // already has a session scans such a QR, fetches who is asking, then
-    // approves or rejects (QrScanScreen.kt).
+    // approves or rejects (QrScannerModal.kt).
     @POST("api/device-link/create")
     suspend fun createDeviceLink(): Response<DeviceLinkCreateResponse>
 
