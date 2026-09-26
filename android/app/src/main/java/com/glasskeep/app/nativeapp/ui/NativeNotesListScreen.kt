@@ -740,13 +740,6 @@ fun NativeNotesListScreen(
         if (notificationsOpen) toasts.dismissAll()
     }
 
-    // Once per session, for administrators (useUpdateCheck.js).
-    LaunchedEffect(container.shellPrefs.isAdmin) {
-        if (container.shellPrefs.isAdmin && container.shellPrefs.serverUpdateAvailable == null) {
-            repository.fetchServerUpdateAvailable()?.let { container.shellPrefs.applyServerUpdateAvailable(it) }
-        }
-    }
-
     // The web's header auto-hide on phones (NotesUI.jsx:173-195): scrolling
     // down more than 4px in one step hides it, scrolling up more than 4px or
     // coming within 10px of the top shows it again.

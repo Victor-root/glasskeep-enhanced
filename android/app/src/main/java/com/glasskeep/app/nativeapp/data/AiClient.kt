@@ -51,6 +51,9 @@ private data class AiNoteChatRequest(
 )
 
 @Serializable
+private data class ChangelogTranslateRequest(val content: String, val lang: String)
+
+@Serializable
 private data class AiStreamFrame(
     val delta: String? = null,
     val finishReason: String? = null,
@@ -58,11 +61,12 @@ private data class AiStreamFrame(
 )
 
 /**
- * The two AI calls the app makes, ported from src/ai.js.
+ * The AI calls the app makes, ported from src/ai.js, plus the changelog's
+ * translation.
  *
  * They do not go through Retrofit like everything else: the per-note
- * chat is a Server-Sent Events stream the answer arrives in piece by
- * piece, which Retrofit's suspend functions cannot express, and the
+ * chat and the translation are Server-Sent Events streams the answer
+ * arrives in piece by piece, which Retrofit's suspend functions cannot express, and the
  * search-bar question can take a model over a minute to answer, well
  * past the shared client's own timeouts. Same reasoning, and the same
  * hand-rolled SSE reader, as RealtimeClient.kt.
@@ -115,20 +119,31 @@ class AiClient(private val serverUrl: String, private val tokenStore: TokenStore
         question: String,
         language: String,
         onDelta: (String) -> Unit,
-    ): String? = withContext(Dispatchers.IO) {
-        val payload = AiNoteChatRequest(note, history, question, language)
-        val request = post(
-            "api/ai/note-chat",
-            json.encodeToString(AiNoteChatRequest.serializer(), payload),
-            stream = true,
-        )
-        val call = client.newCall(request)
+    ): String? = stream(
+        "api/ai/note-chat",
+        json.encodeToString(AiNoteChatRequest.serializer(), AiNoteChatRequest(note, history, question, language)),
+        onDelta,
+    )
+
+    /**
+     * The changelog in [language], streamed a release at a time
+     * (ChangelogModal.jsx); the server keeps each translated section, so
+     * asking again answers at once. Same contract as [askAboutNote].
+     */
+    suspend fun translateChangelog(content: String, language: String, onDelta: (String) -> Unit): String? = stream(
+        "api/ai/translate-changelog",
+        json.encodeToString(ChangelogTranslateRequest.serializer(), ChangelogTranslateRequest(content, language)),
+        onDelta,
+    )
+
+    private suspend fun stream(path: String, body: String, onDelta: (String) -> Unit): String? = withContext(Dispatchers.IO) {
+        val call = client.newCall(post(path, body, stream = true))
         try {
             call.execute().use { response ->
                 if (!response.isSuccessful) {
-                    val body = response.body?.string().orEmpty()
-                    NativeDebug.e("POST /api/ai/note-chat failed: HTTP ${response.code} $body")
-                    return@use errorOf(body) ?: "HTTP ${response.code}"
+                    val errorBody = response.body?.string().orEmpty()
+                    NativeDebug.e("POST /$path failed: HTTP ${response.code} $errorBody")
+                    return@use errorOf(errorBody) ?: "HTTP ${response.code}"
                 }
                 val source = response.body?.source() ?: return@use "empty response"
                 var frameError: String? = null
@@ -154,7 +169,7 @@ class AiClient(private val serverUrl: String, private val tokenStore: TokenStore
             call.cancel()
             throw t
         } catch (t: Throwable) {
-            NativeDebug.e("AiClient.askAboutNote failed", t)
+            NativeDebug.e("AiClient stream on /$path failed", t)
             t.message ?: t.javaClass.simpleName
         }
     }

@@ -41,13 +41,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -57,7 +55,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -241,8 +238,7 @@ fun FullscreenImageViewer(
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .size(naturalW * scale, naturalH * scale)
-                        // shadow-2xl
-                        .dropShadow(shape, Shadow(radius = 50.dp, color = Color.Black.copy(alpha = 0.25f), spread = (-12).dp, offset = DpOffset(0.dp, 25.dp)))
+                        .tailwindShadow2xl(shape)
                         .clip(shape)
                         .background(if (dark) Color.Black else Color.White)
                         .clickable(

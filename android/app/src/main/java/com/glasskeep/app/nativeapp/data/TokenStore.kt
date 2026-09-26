@@ -239,6 +239,23 @@ class TokenStore(context: Context) {
             prefs.edit().putString(KEY_BRANDING_LOGIN_THEME, value).apply()
         }
 
+    /** Set by the update window's Reload just before the app starts over,
+     *  read and cleared on the next launch, which then opens the changelog:
+     *  the web's localStorage["glass-keep-show-changelog-next-mount"]. */
+    var showChangelogOnLaunch: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_CHANGELOG, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_SHOW_CHANGELOG, value).apply()
+        }
+
+    /** "Already done" on the changelog's GitHub star line, which then never
+     *  shows again (localStorage["glass-keep-star-cta-dismissed"]). */
+    var starPromptDismissed: Boolean
+        get() = prefs.getBoolean(KEY_STAR_PROMPT_DISMISSED, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_STAR_PROMPT_DISMISSED, value).apply()
+        }
+
     /** Server switching must be durable before MainActivity is restarted. */
     fun clear(): Boolean {
         NativeDebug.d("TokenStore.clear")
@@ -284,6 +301,8 @@ class TokenStore(context: Context) {
         private const val KEY_BRANDING_APP_NAME = "branding_app_name"
         private const val KEY_BRANDING_LOGO = "branding_logo"
         private const val KEY_BRANDING_LOGIN_THEME = "branding_login_theme"
+        private const val KEY_SHOW_CHANGELOG = "show_changelog_on_launch"
+        private const val KEY_STAR_PROMPT_DISMISSED = "star_prompt_dismissed"
 
         /** notificationsDuration's own default (App.jsx:478-487). */
         const val DEFAULT_TOAST_DURATION_MS = 10_000L

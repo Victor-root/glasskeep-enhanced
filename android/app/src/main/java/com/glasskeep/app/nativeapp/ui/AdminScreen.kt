@@ -92,7 +92,8 @@ const val AdminFocusPasskeyDomain = "passkeyDomain"
  * server version, the pending registrations while there are any, and the
  * accordion sections, every one closed on arrival. [focus] opens it where
  * that setting lives; [liveEvents] are the server frames its lists follow
- * while it is open; [encryption] outlives it, as the web's section does.
+ * while it is open; [encryption] and [serverUpdate] outlive it, as the
+ * web's own state does.
  */
 @Composable
 internal fun AdminScreen(
@@ -101,6 +102,8 @@ internal fun AdminScreen(
     focus: String?,
     liveEvents: SharedFlow<String>,
     encryption: AdminEncryptionState,
+    serverUpdate: ServerUpdateState,
+    onOpenChangelog: () -> Unit,
     onBack: () -> Unit,
 ) {
     val dark = LocalGkDark.current
@@ -184,9 +187,15 @@ internal fun AdminScreen(
                     .onGloballyPositioned { content.value = it }
                     .padding(16.dp),
             ) {
-                Box(Modifier.padding(bottom = 24.dp)) {
-                    LegacyAdminUpdateBlock(state.api, dark, titleColor, SettingsSubtleColor, borderColor)
-                }
+                AdminUpdateSection(
+                    update = serverUpdate,
+                    themeId = themeId,
+                    dark = dark,
+                    titleColor = titleColor,
+                    borderColor = borderColor,
+                    onOpenChangelog = onOpenChangelog,
+                )
+                Spacer(Modifier.height(24.dp))
                 if (state.pending.isNotEmpty()) {
                     AdminPendingSection(
                         state = state,

@@ -61,10 +61,10 @@ class ShellPrefsState(private val tokenStore: TokenStore) {
     }
 
     /**
-     * Whether the server reports a newer GlassKeep release, read once per
-     * session for administrators (useUpdateCheck.js): the header's kebab
-     * and admin entry then carry a green dot. Null until that read has
-     * answered; like [isAdmin], a server fact, never cached.
+     * Whether the server reports a newer GlassKeep release, read at each
+     * administrator's sign-in (useUpdateCheck.js, see ServerUpdateState):
+     * the header's kebab and admin entry then carry a green dot. Null until
+     * that read has answered; like [isAdmin], a server fact, never cached.
      */
     var serverUpdateAvailable: Boolean? by mutableStateOf(null)
         private set

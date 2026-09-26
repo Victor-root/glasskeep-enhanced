@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -378,27 +379,36 @@ data class FederationRenameRequest(val label: String)
 @Serializable
 data class FederationActionResponse(val ok: Boolean = false, val link: FederationLinkDto? = null)
 
+/** GET /api/update-check: [notificationShownCount] is how many times this
+ *  administrator was already told about [latestVersion]. */
 @Serializable
 data class UpdateCheckDto(
     val currentVersion: String? = null,
     val latestVersion: String? = null,
     val updateAvailable: Boolean = false,
-    val releaseUrl: String? = null,
-    val publishedAt: String? = null,
-    val stale: Boolean = false,
+    val notificationShownCount: Int = 0,
 )
 
 @Serializable
 data class SelfUpdateModeDto(val mode: String? = null, val oneClickAvailable: Boolean = false, val reason: String? = null)
 
+/** The self-update status file, plus the server's [inProgress] verdict and
+ *  its own [runningVersion] (selfUpdateRoutes.js:279-295). */
 @Serializable
 data class SelfUpdateStatusDto(
     val state: String? = null,
-    val step: String? = null,
+    val step: Int = 0,
+    val totalSteps: Int = 0,
     val message: String? = null,
+    val mode: String? = null,
     val fromVersion: String? = null,
     val toVersion: String? = null,
     val runningVersion: String? = null,
+    val startedAt: String? = null,
+    val endedAt: String? = null,
+    val acknowledgedAt: String? = null,
+    val error: String? = null,
+    val rolledBack: Boolean = false,
     val inProgress: Boolean = false,
 )
 
@@ -406,7 +416,25 @@ data class SelfUpdateStatusDto(
 data class StartSelfUpdateRequest(val latestVersion: String)
 
 @Serializable
-data class SelfUpdateActionResponse(val queued: Boolean = false, val cancelled: Boolean = false)
+data class AcknowledgeSelfUpdateRequest(val endedAt: String)
+
+@Serializable
+data class UpdateNotificationShownRequest(val version: String)
+
+/** GET /api/admin/self-update/system: the host's memory, its swap when it
+ *  has any, and its CPU load once the server has two samples to compare. */
+@Serializable
+data class SelfUpdateSystemDto(
+    val mem: MemoryUsageDto = MemoryUsageDto(),
+    val swap: MemoryUsageDto? = null,
+    val cpu: CpuUsageDto = CpuUsageDto(),
+)
+
+@Serializable
+data class MemoryUsageDto(val total: Double = 0.0, val used: Double = 0.0, val percent: Double = 0.0)
+
+@Serializable
+data class CpuUsageDto(val count: Int = 1, val percent: Double? = null)
 
 @Serializable
 data class HealthDto(val startedAt: Long? = null)
@@ -1339,20 +1367,44 @@ interface GlassKeepApi {
     @POST("api/admin/federation/links/{id}/recheck")
     suspend fun recheckFederation(@Path("id") id: String): Response<FederationActionResponse>
 
+    // The self-update calls keep the web's own timeouts (useUpdateCheck.js,
+    // useSelfUpdate.js, SelfUpdateProgress.jsx): a server busy building or
+    // restarting must not hold a poll for long.
+    @Headers("$REQUEST_TIMEOUT_HEADER: 8000")
     @GET("api/update-check")
     suspend fun checkServerUpdate(): Response<UpdateCheckDto>
 
+    @POST("api/update-check/mark-shown")
+    suspend fun markUpdateNotificationShown(@Body body: UpdateNotificationShownRequest): Response<Unit>
+
+    @Headers("$REQUEST_TIMEOUT_HEADER: 4000")
     @GET("api/admin/self-update/mode")
     suspend fun selfUpdateMode(): Response<SelfUpdateModeDto>
 
+    @Headers("$REQUEST_TIMEOUT_HEADER: 4000")
     @GET("api/admin/self-update/status")
     suspend fun selfUpdateStatus(): Response<SelfUpdateStatusDto>
 
-    @POST("api/admin/self-update/start")
-    suspend fun startSelfUpdate(@Body body: StartSelfUpdateRequest): Response<SelfUpdateActionResponse>
+    @Headers("$REQUEST_TIMEOUT_HEADER: 5000")
+    @GET("api/admin/self-update/system")
+    suspend fun selfUpdateSystem(): Response<SelfUpdateSystemDto>
 
+    /** Plain text, 204 while no update ever ran. */
+    @Headers("$REQUEST_TIMEOUT_HEADER: 5000")
+    @GET("api/admin/self-update/log")
+    suspend fun selfUpdateLog(): Response<ResponseBody>
+
+    @Headers("$REQUEST_TIMEOUT_HEADER: 10000")
+    @POST("api/admin/self-update/start")
+    suspend fun startSelfUpdate(@Body body: StartSelfUpdateRequest): Response<Unit>
+
+    @Headers("$REQUEST_TIMEOUT_HEADER: 15000")
     @POST("api/admin/self-update/cancel")
-    suspend fun cancelSelfUpdate(): Response<SelfUpdateActionResponse>
+    suspend fun cancelSelfUpdate(): Response<Unit>
+
+    @Headers("$REQUEST_TIMEOUT_HEADER: 4000")
+    @POST("api/admin/self-update/acknowledge")
+    suspend fun acknowledgeSelfUpdate(@Body body: AcknowledgeSelfUpdateRequest): Response<Unit>
 
     @POST("api/admin/restart")
     suspend fun restartServer(): Response<OkResponse>

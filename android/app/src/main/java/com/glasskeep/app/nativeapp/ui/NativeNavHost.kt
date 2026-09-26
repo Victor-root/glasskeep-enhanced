@@ -1,6 +1,7 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -43,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -68,6 +70,7 @@ import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.data.renewSessionTokenIfStale
+import com.glasskeep.app.nativeapp.restartApp
 import com.glasskeep.app.nativeapp.syncErrorKindOf
 import com.glasskeep.app.nativeapp.syncReminderAlarms
 import com.glasskeep.app.reminders.ReminderSyncWorker
@@ -101,6 +104,7 @@ fun NativeNavHost(
     var qrScannerOpen by remember { mutableStateOf(false) }
     val startDestination = if (container.tokenStore.token != null) "notes" else "login"
     val context = LocalContext.current
+    val activity = LocalView.current.context as Activity
 
     // Existing installs skip onboarding, so the first native reconciliation
     // that finds a live reminder also inherits the WebView's old contextual
@@ -484,6 +488,45 @@ fun NativeNavHost(
         federationWatcher.catchUp()
         federationEvents.collect { federationWatcher.onEvent(it) }
     }
+    // useUpdateCheck.js and useSelfUpdate.js, which the web runs at its
+    // root for administrators: the header's dots, the admin panel's
+    // version card and the update window all read this one.
+    val serverUpdate = remember(serverUrl, signedIn) { ServerUpdateState(context, api, scope) }
+    // Told once per launch about a given version, and three times in all
+    // (the server keeps the count, across devices).
+    var updateNoticeVersion by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(serverUpdate, isAdmin) {
+        if (!signedIn || !isAdmin) return@LaunchedEffect
+        launch { serverUpdate.recover() }
+        val info = serverUpdate.checkForUpdate() ?: return@LaunchedEffect
+        container.shellPrefs.applyServerUpdateAvailable(info.updateAvailable)
+        val latest = info.latestVersion
+        if (!info.updateAvailable || latest == null || latest == updateNoticeVersion || info.notificationShownCount >= 3) {
+            return@LaunchedEffect
+        }
+        updateNoticeVersion = latest
+        serverUpdate.markNotificationShown(latest)
+        toasts.show(
+            message = context.getString(R.string.native_update_notice_message, latest),
+            variant = NotifVariant.SUCCESS,
+            title = context.getString(R.string.native_update_notice_title),
+            icon = "refresh",
+            actionLabel = context.getString(R.string.native_update_now),
+            action = { serverUpdate.askToUpdate(latest) },
+            type = "update_available",
+            durationMs = UpdateNoticeDurationMs,
+            stacked = true,
+        )
+    }
+    // ChangelogModal.jsx's open state, lifted to the root as the web lifts
+    // it; the launch right after a successful update opens it at once.
+    var changelogOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (container.tokenStore.showChangelogOnLaunch) {
+            container.tokenStore.showChangelogOnLaunch = false
+            changelogOpen = true
+        }
+    }
 
     CompositionLocalProvider(
         LocalGkToasts provides toasts,
@@ -685,6 +728,8 @@ fun NativeNavHost(
                         focus = backStackEntry.arguments?.getString("focus"),
                         liveEvents = adminEvents,
                         encryption = adminEncryption,
+                        serverUpdate = serverUpdate,
+                        onOpenChangelog = { changelogOpen = true },
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -758,12 +803,38 @@ fun NativeNavHost(
                 dark = LocalGkDark.current,
                 durationMs = container.editorPrefs.toastDurationMs,
             )
+            // Over the pills, which the web keeps under its modals.
+            if (changelogOpen) {
+                ChangelogModal(
+                    container = container,
+                    serverUrl = serverUrl,
+                    version = serverUpdate.info?.currentVersion,
+                    themeId = container.themeState.themeId,
+                    dark = LocalGkDark.current,
+                    onClose = { changelogOpen = false },
+                )
+            }
             GkTooltipHost(tooltips)
             SettingsActionDialogs(settingsActions, container.themeState.themeId, LocalGkDark.current)
             GkAlertHost(alerts, container.themeState.themeId, LocalGkDark.current)
             if (qrScannerOpen) {
                 QrScannerModal(container = container, serverUrl = serverUrl, onClose = { qrScannerOpen = false })
             }
+            ServerUpdateConfirmation(serverUpdate, container.themeState.themeId, LocalGkDark.current)
+            SelfUpdateProgress(
+                update = serverUpdate,
+                themeId = container.themeState.themeId,
+                dark = LocalGkDark.current,
+                // The web reloads the page on the new version, the
+                // changelog opening once it is back.
+                onReload = {
+                    scope.launch {
+                        serverUpdate.acknowledge()
+                        container.tokenStore.showChangelogOnLaunch = true
+                        restartApp(activity)
+                    }
+                },
+            )
         }
     }
 }
@@ -848,6 +919,10 @@ private const val HEALTH_PENDING_MS = 5_000L
 private const val HEALTH_OFFLINE_MS = 3_000L
 
 private val SignedOutRoutes = setOf("login", "register", "login-secret")
+
+/** The "update available" notice stays its 30s whatever the user's own
+ *  notification duration (App.jsx:870-873). */
+private const val UpdateNoticeDurationMs = 30_000L
 
 /** The instance's public branding and its admin's sign-in slogan
  *  (App.jsx:4885), both read without a session. */

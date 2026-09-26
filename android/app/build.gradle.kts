@@ -112,6 +112,25 @@ android {
 
 }
 
+// The repository's CHANGELOG.md, shipped as an asset for the changelog
+// window, the same file the web bundles into its own page at build time.
+abstract class BundleChangelog : DefaultTask() {
+    @get:InputFile
+    abstract val changelog: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        changelog.get().asFile.copyTo(outputDirectory.get().file("CHANGELOG.md").asFile, overwrite = true)
+    }
+}
+
+val bundleChangelog = tasks.register<BundleChangelog>("bundleChangelog") {
+    changelog.set(rootProject.layout.projectDirectory.file("../CHANGELOG.md"))
+}
+
 // Rename the output APK so Android Studio's Build → Build Bundle(s) /
 // APK(s) → Build APK(s) drops a "GlassKeep-v<versionName>.apk" file
 // (debug builds get a "-debug" suffix) instead of the default
@@ -131,6 +150,7 @@ androidComponents {
             val suffix = if (variant.buildType == "debug") "-debug" else ""
             output.outputFileName.set("GlassKeep-v${android.defaultConfig.versionName}$suffix.apk")
         }
+        variant.sources.assets?.addGeneratedSourceDirectory(bundleChangelog, BundleChangelog::outputDirectory)
     }
 }
 

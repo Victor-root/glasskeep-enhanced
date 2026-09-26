@@ -1580,7 +1580,7 @@ private fun DrawScope.drawRichDecorations(layout: TextLayoutResult, block: RichB
 
 /** Calls [draw] with the left edge, right edge and baseline of every line
  *  the text range `[start, end)` covers. */
-private inline fun forEachLineSegment(layout: TextLayoutResult, start: Int, end: Int, draw: (Float, Float, Float) -> Unit) {
+internal inline fun forEachLineSegment(layout: TextLayoutResult, start: Int, end: Int, draw: (Float, Float, Float) -> Unit) {
     val firstLine = layout.getLineForOffset(start)
     val lastLine = layout.getLineForOffset(end - 1)
     for (line in firstLine..lastLine) {

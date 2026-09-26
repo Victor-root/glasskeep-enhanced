@@ -1686,6 +1686,10 @@ internal fun Modifier.tailwindShadowXl(shape: Shape): Modifier = this
     .dropShadow(shape, Shadow(radius = 25.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-5).dp, offset = DpOffset(0.dp, 20.dp)))
     .dropShadow(shape, Shadow(radius = 10.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-6).dp, offset = DpOffset(0.dp, 8.dp)))
 
+/** `shadow-2xl`: 0 25px 50px -12px, black 25%. */
+internal fun Modifier.tailwindShadow2xl(shape: Shape): Modifier = this
+    .dropShadow(shape, Shadow(radius = 50.dp, color = Color.Black.copy(alpha = 0.25f), spread = (-12).dp, offset = DpOffset(0.dp, 25.dp)))
+
 /** How the WebView shell opened a link leaving the app: a Custom Tab of
  *  the default browser over the app, Back returning to it. Nothing
  *  happens when no app opens it, as a web page would simply stay put.
