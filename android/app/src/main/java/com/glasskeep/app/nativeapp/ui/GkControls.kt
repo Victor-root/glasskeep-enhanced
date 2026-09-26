@@ -1586,13 +1586,15 @@ internal fun Modifier.topHairline(color: Color): Modifier = drawBehind {
 }
 
 /** `border-bottom: 1px dashed`: the rule under the typography modal's
- *  live preview (globalCSS.js:4470-4476). */
+ *  live preview (globalCSS.js:4470-4476), drawn in the box's last 1dp
+ *  like a CSS border, which the caller's bottom padding leaves free. */
 internal fun Modifier.dashedUnderline(color: Color): Modifier = drawBehind {
+    val stroke = 1.dp.toPx()
     drawLine(
         color = color,
-        start = Offset(0f, size.height),
-        end = Offset(size.width, size.height),
-        strokeWidth = 1.dp.toPx(),
+        start = Offset(0f, size.height - stroke / 2f),
+        end = Offset(size.width, size.height - stroke / 2f),
+        strokeWidth = stroke,
         pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx())),
     )
 }

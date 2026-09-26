@@ -1,5 +1,10 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.app.AlertDialog
+import android.view.ContextThemeWrapper
+import android.widget.ArrayAdapter
+import android.widget.ListView
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,31 +19,43 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -48,15 +65,17 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.TypographyBlock
 import com.glasskeep.app.nativeapp.data.TypographyPresets
+import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.Indigo
+import com.glasskeep.app.ui.LightTitleColor
 
 /**
  * TypographyModal.jsx, ported: the full-screen editor for the three
@@ -66,7 +85,9 @@ import com.glasskeep.app.ui.Indigo
  *
  * Full-screen on purpose, not a floating card: the web's own `max-width:
  * 560px` media query drops the radius and stretches it to 100dvh on a
- * phone, which is every screen this app runs on.
+ * phone, which is every screen this app runs on. A layer over the
+ * settings rather than a dialog window: the WebView painted it under the
+ * system bars, whose theme-coloured scrim stayed on top, undimmed.
  */
 @Composable
 fun TypographyModal(
@@ -76,99 +97,105 @@ fun TypographyModal(
     onChange: (TypographyPresets) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val titleColor = if (dark) Color(0xFFF3F4F6) else Color(0xFF111827)
+    val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val divider = if (dark) RtDividerDark else RtDividerLight
     val activeProfile = presets.activeProfile
+    // `max(32px, safe-top + 12px)` above the title and `max(16px,
+    // safe-bottom)` under the last card, both measured from the screen
+    // edges, which this layer stops short of by the bars themselves.
+    val density = LocalDensity.current
+    val headerTop = max(32.dp - with(density) { WindowInsets.statusBars.getTop(this).toDp() }, 12.dp)
+    val bodyBottom = (16.dp - with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }).coerceAtLeast(0.dp)
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    BackHandler(onBack = onDismiss)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.systemBars)
+            .background(if (dark) Color(0xFF1F2937) else Color.White)
+            .blockTouchesBelow(),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(if (dark) Color(0xFF1F2937) else Color.White),
-        ) {
-            // Header: title, description, profile tabs, then the reset CTA
-            // on its own row with the close button pinned to the corner
-            // (the phone layout of .typo-modal-header).
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, top = 32.dp, bottom = 14.dp),
-            ) {
-                Column(Modifier.fillMaxWidth()) {
-                    Text(
-                        stringResource(R.string.native_typography_title),
-                        color = titleColor,
-                        fontSize = 16.8.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        stringResource(R.string.native_typography_desc),
-                        color = titleColor.copy(alpha = 0.7f),
-                        fontSize = 13.6.sp,
-                        lineHeight = 18.4.sp,
-                        modifier = Modifier.padding(top = 2.dp, end = 40.dp),
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    ProfileTabs(
-                        active = presets.active,
-                        dark = dark,
-                        titleColor = titleColor,
-                        divider = divider,
-                        onSwitch = { key -> if (key != presets.active) onChange(presets.copy(active = key)) },
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        GkGradientButton(
-                            label = stringResource(R.string.native_typography_reset_active),
-                            themeId = themeId,
-                            onClick = {
-                                onChange(presets.withProfile(presets.active, TypographyPresets.DEFAULT_PROFILE))
-                            },
-                        )
-                    }
-                }
-                val closeLabel = stringResource(R.string.native_common_close)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .semantics { contentDescription = closeLabel }
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onDismiss() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CloseIcon(size = 20.dp, tint = titleColor)
-                }
-            }
-            Box(Modifier.fillMaxWidth().height(1.dp).background(divider))
-
+        // Header: title, description, profile tabs, then the reset CTA
+        // on its own row with the close button pinned to the corner
+        // (the phone layout of .typo-modal-header).
+        Box(Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier
+                Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(start = 20.dp, end = 20.dp, top = headerTop, bottom = 14.dp),
             ) {
-                for (key in TypographyPresets.BLOCK_KEYS) {
-                    TypographyBlockCard(
-                        blockKey = key,
-                        block = activeProfile.byKey(key),
+                Text(
+                    stringResource(R.string.native_typography_title),
+                    color = titleColor,
+                    fontSize = 16.8.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    stringResource(R.string.native_typography_desc),
+                    color = titleColor.copy(alpha = 0.7f),
+                    fontSize = 13.6.sp,
+                    lineHeight = 1.35.em,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+                Spacer(Modifier.height(12.dp))
+                ProfileTabs(
+                    active = presets.active,
+                    themeId = themeId,
+                    dark = dark,
+                    titleColor = titleColor,
+                    divider = divider,
+                    onSwitch = { key -> if (key != presets.active) onChange(presets.copy(active = key)) },
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    GkGradientButton(
+                        label = stringResource(R.string.native_typography_reset_active),
                         themeId = themeId,
-                        dark = dark,
-                        titleColor = titleColor,
-                        divider = divider,
-                        onUpdate = { updated ->
-                            onChange(presets.withProfile(presets.active, activeProfile.withBlock(key, updated)))
+                        onClick = {
+                            onChange(presets.withProfile(presets.active, TypographyPresets.DEFAULT_PROFILE))
                         },
                     )
                 }
+            }
+            val closeLabel = stringResource(R.string.native_common_close)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = headerTop, end = 12.dp)
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .semantics { contentDescription = closeLabel }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onDismiss() },
+                contentAlignment = Alignment.Center,
+            ) {
+                CloseIcon(size = 24.dp, tint = titleColor)
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(divider))
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = bodyBottom),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            for (key in TypographyPresets.BLOCK_KEYS) {
+                TypographyBlockCard(
+                    blockKey = key,
+                    block = activeProfile.byKey(key),
+                    themeId = themeId,
+                    dark = dark,
+                    titleColor = titleColor,
+                    divider = divider,
+                    onUpdate = { updated ->
+                        onChange(presets.withProfile(presets.active, activeProfile.withBlock(key, updated)))
+                    },
+                )
             }
         }
     }
@@ -178,6 +205,7 @@ fun TypographyModal(
 @Composable
 private fun ProfileTabs(
     active: String,
+    themeId: String?,
     dark: Boolean,
     titleColor: Color,
     divider: Color,
@@ -194,12 +222,21 @@ private fun ProfileTabs(
     ) {
         for ((index, key) in TypographyPresets.PROFILE_KEYS.withIndex()) {
             val selected = key == active
+            val shape = RoundedCornerShape(6.dp)
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
+                    .then(
+                        if (selected && !dark) {
+                            Modifier.dropShadow(shape, Shadow(radius = 2.dp, color = Color(0x1F111827), offset = DpOffset(0.dp, 1.dp)))
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .clip(shape)
                     .background(
                         when {
                             !selected -> Color.Transparent
+                            // The dark tab keeps the default indigo in every theme.
                             dark -> Indigo.copy(alpha = 0.22f)
                             else -> Color.White
                         },
@@ -222,7 +259,7 @@ private fun ProfileTabs(
                     color = when {
                         !selected -> titleColor
                         dark -> Color(0xFFC4B5FD)
-                        else -> Indigo
+                        else -> WorkspaceTheme.rtAccent(themeId)
                     },
                     fontSize = 13.12.sp,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
@@ -256,7 +293,7 @@ private fun TypographyBlockCard(
             stringResource(blockLabel(blockKey)),
             color = richColorOf(block.color, dark) ?: titleColor,
             fontSize = (block.size * 16f).sp,
-            lineHeight = (block.size * 16f * 1.2f).sp,
+            lineHeight = 1.2.em,
             fontWeight = FontWeight(block.weight),
             fontStyle = if (block.italic) FontStyle.Italic else FontStyle.Normal,
             textDecoration = if (block.underline) TextDecoration.Underline else TextDecoration.None,
@@ -264,17 +301,19 @@ private fun TypographyBlockCard(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 2.dp, bottom = 6.dp)
-                .dashedUnderline(divider),
+                .dashedUnderline(divider)
+                // `padding: 2px 0 6px`, then the dashed border's own pixel.
+                .padding(top = 2.dp, bottom = 7.dp),
         )
         Text(
             stringResource(R.string.native_typography_card_hint),
             color = titleColor.copy(alpha = 0.6f),
             fontSize = 11.52.sp,
-            lineHeight = 15.sp,
+            lineHeight = 1.3.em,
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            val sizeLabels = TypographyPresets.SIZE_PRESETS.map(::sizeLabel)
             TypographyField(
                 label = stringResource(R.string.native_typography_field_size),
                 titleColor = titleColor,
@@ -282,14 +321,15 @@ private fun TypographyBlockCard(
             ) {
                 TypographySelect(
                     current = sizeLabel(block.size),
-                    options = TypographyPresets.SIZE_PRESETS.map { sizeLabel(it) to it },
-                    themeId = themeId,
+                    options = sizeLabels,
+                    selected = TypographyPresets.SIZE_PRESETS.indexOf(block.size),
                     dark = dark,
                     titleColor = titleColor,
-                    divider = divider,
-                    onPick = { onUpdate(block.copy(size = it)) },
+                    border = if (dark) FieldBorderDark else divider,
+                    onPick = { onUpdate(block.copy(size = TypographyPresets.SIZE_PRESETS[it])) },
                 )
             }
+            val weightLabels = TypographyPresets.WEIGHT_PRESETS.map { stringResource(weightLabel(it)) }
             TypographyField(
                 label = stringResource(R.string.native_typography_field_weight),
                 titleColor = titleColor,
@@ -297,12 +337,12 @@ private fun TypographyBlockCard(
             ) {
                 TypographySelect(
                     current = stringResource(weightLabel(block.weight)),
-                    options = TypographyPresets.WEIGHT_PRESETS.map { stringResource(weightLabel(it)) to it },
-                    themeId = themeId,
+                    options = weightLabels,
+                    selected = TypographyPresets.WEIGHT_PRESETS.indexOf(block.weight),
                     dark = dark,
                     titleColor = titleColor,
-                    divider = divider,
-                    onPick = { onUpdate(block.copy(weight = it)) },
+                    border = if (dark) FieldBorderDark else divider,
+                    onPick = { onUpdate(block.copy(weight = TypographyPresets.WEIGHT_PRESETS[it])) },
                 )
             }
         }
@@ -351,7 +391,12 @@ private fun TypographyBlockCard(
     }
 }
 
-/** `.typo-modal-field`: a small uppercase label over its control. */
+/** `html.dark .typo-modal-field select` and `.typo-modal-toggle`: a
+ *  border a shade stronger than the dark divider. */
+private val FieldBorderDark = Color.White.copy(alpha = 0.12f)
+
+/** `.typo-modal-field`: a small uppercase label over its control, the
+ *  whole field, control included, at 75% opacity. */
 @Composable
 private fun TypographyField(
     label: String,
@@ -359,10 +404,10 @@ private fun TypographyField(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(modifier = modifier.alpha(0.75f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             label.uppercase(),
-            color = titleColor.copy(alpha = 0.75f),
+            color = titleColor,
             fontSize = 11.2.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 0.03.em,
@@ -371,68 +416,93 @@ private fun TypographyField(
     }
 }
 
-/** The native stand-in for the card's `<select>`: same 30dp pill, opening
- *  the same `.rt-pop`-styled list the toolbar's own menus use. */
+/** The card's `<select>`: a 30dp pill that opens what the WebView showed
+ *  for one on a phone, the platform's own single-choice list. */
 @Composable
-private fun <T> TypographySelect(
+private fun TypographySelect(
     current: String,
-    options: List<Pair<String, T>>,
-    themeId: String?,
+    options: List<String>,
+    selected: Int,
     dark: Boolean,
     titleColor: Color,
-    divider: Color,
-    onPick: (T) -> Unit,
+    border: Color,
+    onPick: (Int) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
-    Box {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(30.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(if (dark) Color.Black.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.6f))
-                .border(1.dp, divider, RoundedCornerShape(6.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) { open = true }
-                .padding(horizontal = 8.dp),
-        ) {
-            Text(current, color = titleColor, fontSize = 13.6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            ChevronDownIcon(size = 14.dp, tint = titleColor.copy(alpha = 0.7f))
-        }
-        if (open) {
-            RichPopover(dark = dark, onDismiss = { open = false }) {
-                for ((label, value) in options) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (label == current) WorkspaceTheme.rtActiveBg(themeId, dark) else Color.Transparent)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                role = Role.Button,
-                            ) { onPick(value); open = false }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                    ) {
-                        Text(
-                            label,
-                            color = if (label == current) WorkspaceTheme.rtActiveText(themeId, dark) else titleColor,
-                            fontSize = 13.6.sp,
-                        )
-                    }
-                }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(30.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (dark) Color.Black.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.6f))
+            .border(1.dp, border, RoundedCornerShape(6.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) { open = true }
+            .padding(horizontal = 8.dp),
+    ) {
+        Text(current, color = titleColor, fontSize = 13.6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        ChevronDownIcon(size = 14.dp, tint = titleColor.copy(alpha = 0.7f))
+    }
+    if (open) {
+        PlatformSelectDialog(
+            options = options,
+            selected = selected,
+            onPick = onPick,
+            onDismiss = { open = false },
+        )
+    }
+}
+
+/**
+ * Chromium's SelectPopupDialog, the popup a `<select>` opened in the
+ * WebView on a phone: a framework AlertDialog around a list of the
+ * platform's single-choice rows, the current option checked, closing on
+ * a pick. Built on the old APK's theme, AppCompat Light, which never had
+ * a dark variant: that popup was always light.
+ */
+@Composable
+private fun PlatformSelectDialog(
+    options: List<String>,
+    selected: Int,
+    onPick: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val currentOnPick by rememberUpdatedState(onPick)
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
+    DisposableEffect(context, options, selected) {
+        val themed = ContextThemeWrapper(context, androidx.appcompat.R.style.Theme_AppCompat_Light_NoActionBar)
+        val list = ListView(themed).apply {
+            adapter = ArrayAdapter(themed, android.R.layout.select_dialog_singlechoice, options)
+            choiceMode = ListView.CHOICE_MODE_SINGLE
+            isFocusableInTouchMode = true
+            if (selected >= 0) {
+                setSelection(selected)
+                setItemChecked(selected, true)
             }
+        }
+        val dialog = AlertDialog.Builder(themed).setView(list).create()
+        list.setOnItemClickListener { _, _, position, _ ->
+            currentOnPick(position)
+            dialog.dismiss()
+        }
+        dialog.setOnDismissListener { currentOnDismiss() }
+        dialog.show()
+        onDispose {
+            dialog.setOnDismissListener(null)
+            dialog.dismiss()
         }
     }
 }
 
 /** `.typo-modal-colors`: "inherit", the nine presets, then the free-form
- *  picker the web gets from `<input type="color">`. */
+ *  picker the web gets from `<input type="color">`, all centred on the
+ *  line the taller picker sets. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TypographyColorRow(
@@ -445,56 +515,38 @@ private fun TypographyColorRow(
 ) {
     var pickerOpen by remember { mutableStateOf(false) }
     val defaultLabel = stringResource(R.string.native_richtext_default)
-    val customLabel = stringResource(R.string.native_typography_custom_color)
+    val customLabel = stringResource(R.string.native_typography_field_color)
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(if (dark) Color.Black.copy(alpha = 0.35f) else Color.White)
-                .border(
-                    width = if (current == null) 2.dp else 1.dp,
-                    color = if (current == null) WorkspaceTheme.rtAccent(themeId).copy(alpha = 0.85f) else if (dark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(5.dp),
-                )
-                .semantics { contentDescription = defaultLabel }
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) { onPick(null) },
-            contentAlignment = Alignment.Center,
+        TypographySwatch(
+            label = defaultLabel,
+            fill = if (dark) Color.Black.copy(alpha = 0.35f) else Color.White,
+            selected = current == null,
+            themeId = themeId,
+            dark = dark,
+            onClick = { onPick(null) },
         ) {
             Canvas(Modifier.size(14.dp)) {
                 drawLine(
                     color = if (dark) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.4f),
                     start = Offset(size.width * 0.15f, size.height * 0.85f),
                     end = Offset(size.width * 0.85f, size.height * 0.15f),
-                    strokeWidth = 2f,
+                    strokeWidth = 1.4.dp.toPx(),
+                    cap = StrokeCap.Round,
                 )
             }
         }
         for (swatch in TypographyPresets.COLOR_PRESETS) {
-            val selected = swatch.equals(current, ignoreCase = true)
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(richColorOf(swatch, dark) ?: Color.Transparent)
-                    .border(
-                        width = if (selected) 2.dp else 1.dp,
-                        color = if (selected) WorkspaceTheme.rtAccent(themeId).copy(alpha = 0.85f) else if (dark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(5.dp),
-                    )
-                    .semantics { contentDescription = swatch }
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Button,
-                    ) { onPick(swatch) },
+            TypographySwatch(
+                label = swatch,
+                fill = richColorOf(swatch, dark) ?: Color.Transparent,
+                selected = swatch == current,
+                themeId = themeId,
+                dark = dark,
+                onClick = { onPick(swatch) },
             )
         }
         Box(
@@ -502,13 +554,15 @@ private fun TypographyColorRow(
                 .size(28.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(
-                    Brush.linearGradient(
+                    cssAngleGradient(
+                        135f,
                         listOf(
                             Color(0xFFEF4444), Color(0xFFEAB308), Color(0xFF22C55E),
                             Color(0xFF0EA5E9), Color(0xFFA855F7),
                         ),
                     ),
                 )
+                .dashedBorder(divider, RoundedCornerShape(6.dp))
                 .semantics { contentDescription = customLabel }
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
@@ -531,7 +585,57 @@ private fun TypographyColorRow(
     }
 }
 
-/** `.typo-modal-toggle`: an icon and a label in a 30dp outlined pill. */
+/** `.typo-modal-color`: a 24dp swatch in a 1px frame; the current one
+ *  wears a 2px accent ring outside it (a spread box-shadow), its frame
+ *  turning transparent in light mode. */
+@Composable
+private fun TypographySwatch(
+    label: String,
+    fill: Color,
+    selected: Boolean,
+    themeId: String?,
+    dark: Boolean,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit = {},
+) {
+    val shape = RoundedCornerShape(5.dp)
+    Box(
+        modifier = Modifier
+            .then(
+                if (selected) {
+                    Modifier.dropShadow(shape, Shadow(radius = 0.dp, spread = 2.dp, color = WorkspaceTheme.rtAccent(themeId).copy(alpha = 0.85f)))
+                } else {
+                    Modifier
+                },
+            )
+            .size(24.dp)
+            .clip(shape)
+            .background(fill)
+            .border(
+                width = 1.dp,
+                color = when {
+                    dark -> Color.White.copy(alpha = 0.18f)
+                    selected -> Color.Transparent
+                    else -> Color.Black.copy(alpha = 0.15f)
+                },
+                shape = shape,
+            )
+            .semantics { contentDescription = label }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
+    }
+}
+
+/** `.typo-modal-toggle`: an icon and a label in a 30dp outlined pill. In
+ *  dark mode `html.dark .typo-modal-toggle` outranks `.is-current`, so an
+ *  active toggle keeps the idle fill and border and only takes the
+ *  active text colour. */
 @Composable
 private fun TypographyToggle(
     label: String,
@@ -552,14 +656,18 @@ private fun TypographyToggle(
             .clip(RoundedCornerShape(6.dp))
             .background(
                 when {
-                    active -> WorkspaceTheme.rtActiveBg(themeId, dark)
                     dark -> Color.Black.copy(alpha = 0.35f)
+                    active -> WorkspaceTheme.rtActiveBg(themeId, dark = false)
                     else -> Color.White.copy(alpha = 0.55f)
                 },
             )
             .border(
                 width = 1.dp,
-                color = if (active) WorkspaceTheme.rtAccent(themeId).copy(alpha = 0.45f) else divider,
+                color = when {
+                    dark -> FieldBorderDark
+                    active -> WorkspaceTheme.rtAccent(themeId).copy(alpha = 0.45f)
+                    else -> divider
+                },
                 shape = RoundedCornerShape(6.dp),
             )
             .clickable(

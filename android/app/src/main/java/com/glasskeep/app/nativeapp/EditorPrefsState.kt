@@ -7,7 +7,6 @@ import com.glasskeep.app.nativeapp.data.NotifCategory
 import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
 import com.glasskeep.app.nativeapp.data.TokenStore
 import com.glasskeep.app.nativeapp.data.TypographyPresets
-import com.glasskeep.app.nativeapp.data.TypographyPresetsDto
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -26,8 +25,6 @@ private val FlagMapSerializer = MapSerializer(String.serializer(), Boolean.seria
  * reconciled with the account settings like the current web app.
  */
 class EditorPrefsState(private val tokenStore: TokenStore) {
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-
     var typography: TypographyPresets by mutableStateOf(readCachedTypography())
         private set
 
@@ -98,12 +95,7 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
 
     fun applyTypography(presets: TypographyPresets) {
         typography = presets
-        tokenStore.typographyPresetsJson = try {
-            json.encodeToString(TypographyPresetsDto.serializer(), presets.toDto())
-        } catch (t: Throwable) {
-            NativeDebug.e("EditorPrefsState: caching typography failed", t)
-            null
-        }
+        tokenStore.typographyPresetsJson = presets.toJson().toString()
     }
 
     fun applyToolbarMode(mode: String) {
@@ -154,7 +146,7 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
     private fun readCachedFlags(raw: String?): NotifCategoryFlags {
         if (raw == null) return NotifCategoryFlags.ALL_ON
         return try {
-            NotifCategoryFlags(json.decodeFromString(FlagMapSerializer, raw))
+            NotifCategoryFlags(Json.decodeFromString(FlagMapSerializer, raw))
         } catch (t: Throwable) {
             NativeDebug.e("EditorPrefsState: cached notification categories unreadable", t)
             NotifCategoryFlags.ALL_ON
@@ -162,7 +154,7 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
     }
 
     private fun encodeFlags(flags: NotifCategoryFlags): String? = try {
-        json.encodeToString(FlagMapSerializer, flags.values)
+        Json.encodeToString(FlagMapSerializer, flags.values)
     } catch (t: Throwable) {
         NativeDebug.e("EditorPrefsState: caching notification categories failed", t)
         null
@@ -171,7 +163,7 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
     private fun readCachedTypography(): TypographyPresets {
         val raw = tokenStore.typographyPresetsJson ?: return TypographyPresets.DEFAULT
         return try {
-            TypographyPresets.normalize(json.decodeFromString(TypographyPresetsDto.serializer(), raw))
+            TypographyPresets.normalize(Json.parseToJsonElement(raw))
         } catch (t: Throwable) {
             NativeDebug.e("EditorPrefsState: cached typography unreadable, using defaults", t)
             TypographyPresets.DEFAULT

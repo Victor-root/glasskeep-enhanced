@@ -636,17 +636,15 @@ internal fun SettingsScreen(
 
     /** Saves the whole presets blob on every edit, same as the web's own
      *  setPresets: the modal has no Save button, each control is applied
-     *  as it is touched. */
+     *  as it is touched. Local first like the web, whose PATCH failure is
+     *  silent and leaves the change on screen. */
     fun changeTypography(presets: TypographyPresets) {
-        val previous = editorPrefs.typography
         editorPrefs.applyTypography(presets)
         scope.launch {
             try {
                 repository.setTypographyPresets(presets)
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen setTypographyPresets failed", t)
-                editorPrefs.applyTypography(previous)
-                reportActionError(t)
             }
         }
     }
@@ -692,11 +690,14 @@ internal fun SettingsScreen(
             // --gk-statusbar, not the page background behind it, with a
             // 1px --border-light left edge.
             .background(WorkspaceTheme.statusBarColor(themeId, dark))
-            .drawBehind { drawRect(borderColor, size = Size(1.dp.toPx(), size.height)) }
-            .padding(start = 1.dp)
-            .windowInsetsPadding(WindowInsets.systemBars),
+            .drawBehind { drawRect(borderColor, size = Size(1.dp.toPx(), size.height)) },
     ) {
-        Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(start = 1.dp)
+                .windowInsetsPadding(WindowInsets.systemBars),
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,

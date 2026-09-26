@@ -1,10 +1,10 @@
 package com.glasskeep.app.nativeapp.data.network
 
-import com.glasskeep.app.nativeapp.data.TypographyPresetsDto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -726,9 +726,9 @@ data class UserSettingsDto(
     /** "simple" or "advanced": which formatting bar the rich-text editor
      *  shows (see RichToolbarMode). */
     val editorToolbarMode: String? = null,
-    /** The three saved typography profiles and which one is active (see
-     *  TypographyPresets.kt). */
-    val typographyPresets: TypographyPresetsDto? = null,
+    /** The three saved typography profiles and which one is active, raw
+     *  (see TypographyPresets.normalize). */
+    val typographyPresets: JsonElement? = null,
     /** Whether a note opens in read mode, with an edit toggle in its
      *  footer, or straight in edit mode. On by default (App.jsx:245-252). */
     val readModeEnabled: Boolean? = null,
@@ -789,7 +789,7 @@ data class SetEditorToolbarModeRequest(val editorToolbarMode: String)
 /** Body for a PATCH /api/user/settings that sets only the typography
  *  presets blob. */
 @Serializable
-data class SetTypographyPresetsRequest(val typographyPresets: TypographyPresetsDto)
+data class SetTypographyPresetsRequest(val typographyPresets: JsonObject)
 
 /** Body for a PATCH /api/user/settings that sets only whether notes open
  *  in read mode. */

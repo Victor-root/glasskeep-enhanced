@@ -1344,7 +1344,7 @@ class NotesRepository(
     /** Saves the edited typography profiles. */
     suspend fun setTypographyPresets(presets: TypographyPresets) {
         NativeDebug.d("NotesRepository.setTypographyPresets active=${presets.active}")
-        val response = api.setTypographyPresets(SetTypographyPresetsRequest(presets.toDto()))
+        val response = api.setTypographyPresets(SetTypographyPresetsRequest(presets.toJson()))
         if (!response.isSuccessful) {
             val error = "PATCH /api/user/settings (typographyPresets) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
             NativeDebug.e(error)

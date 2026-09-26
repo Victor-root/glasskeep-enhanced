@@ -539,7 +539,7 @@
     <string name="native_typography_title">Typographie de l’éditeur</string>
     <string name="native_typography_desc">Personnalisez taille, graisse, couleur, italique et soulignement pour chaque style de bloc des notes texte.</string>
     <string name="native_typography_open">Personnaliser…</string>
-    <string name="native_typography_card_hint">Les modifications s\'appliquent partout où ce style est utilisé dans le profil actif.</string>
+    <string name="native_typography_card_hint">Les modifications s’appliquent partout où ce style est utilisé dans le profil actif.</string>
     <string name="native_typography_block_paragraph">Paragraphe</string>
     <string name="native_typography_block_h1">Titre 1</string>
     <string name="native_typography_block_h2">Titre 2</string>

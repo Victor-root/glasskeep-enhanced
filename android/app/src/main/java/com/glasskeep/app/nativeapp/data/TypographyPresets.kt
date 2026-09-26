@@ -1,6 +1,12 @@
 package com.glasskeep.app.nativeapp.data
 
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Per-user typography presets for rich-text notes, ported from
@@ -13,47 +19,11 @@ import kotlinx.serialization.Serializable
  * server-side user settings, so it follows the account across devices,
  * same as the workspace theme.
  *
- * These are the [Serializable] wire shapes; [TypographyPresets.normalize]
- * turns whatever the server sends (including the pre-profiles legacy shape
- * where the six blocks sat at the top level) into a complete, valid set.
+ * The blob travels as raw JSON: [TypographyPresets.normalize] reads it the
+ * way normalizeTypographyPresets() does, which has to tell a `"color": null`
+ * (inherit) from a block with no colour at all (its default colour), and
+ * [TypographyPresets.toJson] writes every key back, nulls included.
  */
-@Serializable
-data class TypographyBlockDto(
-    val size: String? = null,
-    val weight: Int? = null,
-    val color: String? = null,
-    val italic: Boolean? = null,
-    val underline: Boolean? = null,
-)
-
-@Serializable
-data class TypographyProfileDto(
-    val p: TypographyBlockDto? = null,
-    val h1: TypographyBlockDto? = null,
-    val h2: TypographyBlockDto? = null,
-    val h3: TypographyBlockDto? = null,
-    val h4: TypographyBlockDto? = null,
-    val h5: TypographyBlockDto? = null,
-)
-
-@Serializable
-data class TypographyPresetsDto(
-    val active: String? = null,
-    val profile1: TypographyProfileDto? = null,
-    val profile2: TypographyProfileDto? = null,
-    val profile3: TypographyProfileDto? = null,
-    // The legacy shape kept the six blocks at the top level, with no
-    // profiles at all. Read here so an account that never opened the new
-    // typography modal still gets its saved look (normalizeTypographyPresets
-    // in typographyPresets.js:130-140 does the same migration).
-    val p: TypographyBlockDto? = null,
-    val h1: TypographyBlockDto? = null,
-    val h2: TypographyBlockDto? = null,
-    val h3: TypographyBlockDto? = null,
-    val h4: TypographyBlockDto? = null,
-    val h5: TypographyBlockDto? = null,
-)
-
 /** One block's five resolved properties. [size] is in rem, the unit the
  *  web stores; multiply by 16 for the sp value (1rem = 16px there). */
 data class TypographyBlock(
@@ -122,12 +92,10 @@ data class TypographyPresets(
         else -> copy(profile1 = profile)
     }
 
-    fun toDto(): TypographyPresetsDto = TypographyPresetsDto(
-        active = active,
-        profile1 = profile1.toDto(),
-        profile2 = profile2.toDto(),
-        profile3 = profile3.toDto(),
-    )
+    fun toJson(): JsonObject = buildJsonObject {
+        put("active", active)
+        for (key in PROFILE_KEYS) put(key, profileFor(key).toJson())
+    }
 
     val isDefault: Boolean
         get() = active == DEFAULT_ACTIVE &&
@@ -165,73 +133,88 @@ data class TypographyPresets(
             "#ec4899",
         )
 
-        fun normalize(dto: TypographyPresetsDto?): TypographyPresets {
-            if (dto == null) return DEFAULT
-            val hasNewShape = dto.active != null ||
-                dto.profile1 != null || dto.profile2 != null || dto.profile3 != null
-            if (!hasNewShape) {
-                val legacy = TypographyProfileDto(dto.p, dto.h1, dto.h2, dto.h3, dto.h4, dto.h5)
-                if (legacy == TypographyProfileDto()) return DEFAULT
-                return TypographyPresets(DEFAULT_ACTIVE, sanitize(legacy), DEFAULT_PROFILE, DEFAULT_PROFILE)
+        /** normalizeTypographyPresets(): the legacy shape, the six blocks
+         *  at the top level with no profiles at all, becomes profile 1. */
+        fun normalize(raw: JsonElement?): TypographyPresets {
+            val input = raw as? JsonObject ?: return DEFAULT
+            val hasNewShape = input["active"].isTruthy() || PROFILE_KEYS.any { input[it] is JsonObject }
+            if (!hasNewShape && BLOCK_KEYS.any { input[it].isTruthy() }) {
+                return TypographyPresets(DEFAULT_ACTIVE, sanitize(input), DEFAULT_PROFILE, DEFAULT_PROFILE)
             }
             return TypographyPresets(
-                active = dto.active?.takeIf { it in PROFILE_KEYS } ?: DEFAULT_ACTIVE,
-                profile1 = sanitize(dto.profile1),
-                profile2 = sanitize(dto.profile2),
-                profile3 = sanitize(dto.profile3),
+                active = input.string("active")?.takeIf { it in PROFILE_KEYS } ?: DEFAULT_ACTIVE,
+                profile1 = sanitize(input["profile1"]),
+                profile2 = sanitize(input["profile2"]),
+                profile3 = sanitize(input["profile3"]),
             )
         }
 
-        private fun sanitize(dto: TypographyProfileDto?): TypographyProfile {
-            if (dto == null) return DEFAULT_PROFILE
+        private fun sanitize(raw: JsonElement?): TypographyProfile {
+            val input = raw as? JsonObject
             return TypographyProfile(
-                p = sanitizeBlock(dto.p, DEFAULT_PROFILE.p),
-                h1 = sanitizeBlock(dto.h1, DEFAULT_PROFILE.h1),
-                h2 = sanitizeBlock(dto.h2, DEFAULT_PROFILE.h2),
-                h3 = sanitizeBlock(dto.h3, DEFAULT_PROFILE.h3),
-                h4 = sanitizeBlock(dto.h4, DEFAULT_PROFILE.h4),
-                h5 = sanitizeBlock(dto.h5, DEFAULT_PROFILE.h5),
+                p = sanitizeBlock(input?.get("p"), DEFAULT_PROFILE.p),
+                h1 = sanitizeBlock(input?.get("h1"), DEFAULT_PROFILE.h1),
+                h2 = sanitizeBlock(input?.get("h2"), DEFAULT_PROFILE.h2),
+                h3 = sanitizeBlock(input?.get("h3"), DEFAULT_PROFILE.h3),
+                h4 = sanitizeBlock(input?.get("h4"), DEFAULT_PROFILE.h4),
+                h5 = sanitizeBlock(input?.get("h5"), DEFAULT_PROFILE.h5),
             )
         }
 
-        private fun sanitizeBlock(dto: TypographyBlockDto?, fallback: TypographyBlock): TypographyBlock {
-            if (dto == null) return fallback
+        private fun sanitizeBlock(raw: JsonElement?, fallback: TypographyBlock): TypographyBlock {
+            val value = raw as? JsonObject ?: return fallback
             return TypographyBlock(
-                size = nearestPresetSize(dto.size) ?: fallback.size,
-                weight = dto.weight?.takeIf { it in WEIGHT_PRESETS } ?: fallback.weight,
-                color = dto.color?.takeIf { it.isNotBlank() && it != "inherit" },
-                italic = dto.italic ?: fallback.italic,
-                underline = dto.underline ?: fallback.underline,
+                size = value.string("size")?.let(::presetSize) ?: fallback.size,
+                weight = (value["weight"] as? JsonPrimitive)?.content?.trim()?.toDoubleOrNull()
+                    ?.takeIf { it in 100.0..900.0 }?.toInt() ?: fallback.weight,
+                color = if (value["color"] is JsonNull) {
+                    null
+                } else {
+                    value.string("color")?.takeIf { ColorRegex.containsMatchIn(it) } ?: fallback.color
+                },
+                italic = value.boolean("italic") ?: fallback.italic,
+                underline = value.boolean("underline") ?: fallback.underline,
             )
         }
+
+        private val ColorRegex = Regex("^(#[0-9a-fA-F]{3,8}|rgb|hsl|inherit|transparent)")
+        private val RemRegex = Regex("""^([\d.]+)\s*rem$""", RegexOption.IGNORE_CASE)
 
         /** Snaps a stored "1.35rem" to the nearest offered preset, exactly
          *  as nearestPresetSize() does on the web: the picker only offers
          *  the preset list, so an off-list value would otherwise show one
          *  size in the dropdown and render another. */
-        private fun nearestPresetSize(raw: String?): Float? {
-            val value = raw?.trim()?.removeSuffix("rem")?.trim()?.toFloatOrNull() ?: return null
+        private fun presetSize(raw: String): Float? {
+            val value = RemRegex.find(raw)?.groupValues?.get(1)?.toFloatOrNull() ?: return null
             return SIZE_PRESETS.minByOrNull { kotlin.math.abs(it - value) }
         }
     }
 }
 
-private fun TypographyProfile.toDto() = TypographyProfileDto(
-    p = p.toDto(),
-    h1 = h1.toDto(),
-    h2 = h2.toDto(),
-    h3 = h3.toDto(),
-    h4 = h4.toDto(),
-    h5 = h5.toDto(),
-)
+private fun TypographyProfile.toJson() = buildJsonObject {
+    for (key in TypographyPresets.BLOCK_KEYS) put(key, byKey(key).toJson())
+}
 
-private fun TypographyBlock.toDto() = TypographyBlockDto(
-    size = "${formatRem(size)}rem",
-    weight = weight,
-    color = color,
-    italic = italic,
-    underline = underline,
-)
+private fun TypographyBlock.toJson() = buildJsonObject {
+    put("size", "${formatRem(size)}rem")
+    put("weight", weight)
+    put("color", color)
+    put("italic", italic)
+    put("underline", underline)
+}
+
+private fun JsonObject.string(key: String): String? =
+    (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+private fun JsonObject.boolean(key: String): Boolean? =
+    (this[key] as? JsonPrimitive)?.takeIf { !it.isString }?.booleanOrNull
+
+/** JavaScript truthiness, for the legacy-shape test. */
+private fun JsonElement?.isTruthy(): Boolean = when (this) {
+    null, JsonNull -> false
+    is JsonPrimitive -> if (isString) content.isNotEmpty() else content != "false" && content.toDoubleOrNull() != 0.0
+    else -> true
+}
 
 /** "1rem", "1.125rem": the web writes plain decimals, never "1.0rem". */
 private fun formatRem(value: Float): String {
