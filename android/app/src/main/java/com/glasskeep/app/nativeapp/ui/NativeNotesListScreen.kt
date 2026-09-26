@@ -64,7 +64,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -1173,16 +1172,7 @@ fun NativeNotesListScreen(
                     .windowInsetsTopHeight(WindowInsets.statusBars)
                     .background(WorkspaceTheme.statusBarColor(themeId, dark)),
             )
-            // SwipeRefreshLayout's stock look: a #FAFAFA disc with a black
-            // arrow, coming out from under the status bar.
-            PullToRefreshDefaults.Indicator(
-                state = pullToRefreshState,
-                isRefreshing = pullRefreshing,
-                modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.statusBars),
-                containerColor = Color(0xFFFAFAFA),
-                color = Color.Black,
-                maxDistance = PullRefreshRest,
-            )
+            SwipeRefreshIndicator(pullToRefreshState, pullRefreshing)
         }
 
         if (fabOpen) {
@@ -1302,11 +1292,6 @@ private val DefaultHeaderHeight = 77.dp
 
 // The room the web makes above the list for the selection dock on a phone.
 private val SelectionShim = 44.dp
-
-// SwipeRefreshLayout's own numbers in the old app: a pull of 64dp triggers,
-// and the 40dp disc rests with its top 64dp under the status bar.
-private val PullRefreshTrigger = 64.dp
-private val PullRefreshRest = 104.dp
 
 /** The web's empty and loading lines: 16px, centred, gray-500 / gray-400. */
 @Composable

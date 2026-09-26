@@ -23,18 +23,22 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +46,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
@@ -1554,6 +1560,25 @@ internal fun Modifier.tailwindShadowMd(shape: Shape): Modifier = this
 internal fun Modifier.tailwindShadowLg(shape: Shape): Modifier = this
     .dropShadow(shape, Shadow(radius = 15.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-3).dp, offset = DpOffset(0.dp, 10.dp)))
     .dropShadow(shape, Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-4).dp, offset = DpOffset(0.dp, 4.dp)))
+
+// SwipeRefreshLayout's own numbers in the old app: a pull of 64dp triggers,
+// and the 40dp disc rests with its top 64dp under the status bar.
+internal val PullRefreshTrigger = 64.dp
+private val PullRefreshRest = 104.dp
+
+/** SwipeRefreshLayout's stock look, which wrapped the whole WebView: a
+ *  #FAFAFA disc with a black arrow, coming out from under the status bar. */
+@Composable
+internal fun BoxScope.SwipeRefreshIndicator(state: PullToRefreshState, isRefreshing: Boolean) {
+    PullToRefreshDefaults.Indicator(
+        state = state,
+        isRefreshing = isRefreshing,
+        modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.statusBars),
+        containerColor = Color(0xFFFAFAFA),
+        color = Color.Black,
+        maxDistance = PullRefreshRest,
+    )
+}
 
 /** `.glass-card`'s own `0 2px 8px rgba(139, 92, 246, 0.06)`, which the
  *  unlayered stylesheet keeps over any `shadow-*` utility beside it. */

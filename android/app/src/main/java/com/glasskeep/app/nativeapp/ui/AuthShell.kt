@@ -38,6 +38,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,6 +47,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
@@ -104,6 +107,13 @@ internal data class AuthShellColors(
 )
 
 private val AuthCardShape = RoundedCornerShape(12.dp)
+
+/** The WebView's pull-to-refresh on the signed-out pages, which reloaded
+ *  them: [onRefresh] rereads what they show and resets their forms, the
+ *  disc spinning while [refreshing]. */
+internal class SignedOutReload(val refreshing: Boolean, val onRefresh: () -> Unit)
+
+internal val LocalSignedOutReload = staticCompositionLocalOf<SignedOutReload?> { null }
 
 /** `glass-card auth-card rounded-xl p-6`: the form card and the QR
  *  sign-in card below it wear the same chrome. */
@@ -185,7 +195,25 @@ internal fun AuthShell(
         Modifier.background(WorkspaceTheme.appBackground(colors.themeId, dark))
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().then(pageBackground)) {
+    val reload = LocalSignedOutReload.current
+    val pullState = rememberPullToRefreshState()
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            .then(pageBackground)
+            .then(
+                if (reload != null) {
+                    Modifier.pullToRefresh(
+                        isRefreshing = reload.refreshing,
+                        state = pullState,
+                        threshold = PullRefreshTrigger,
+                        onRefresh = reload.onRefresh,
+                    )
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
         val screenHeight = maxHeight
         if (background != null) {
             LoginBackgroundLayer(background.bitmap, hasPlaceholder = placeholder != null, blur = branding.loginBackgroundBlur, dark = dark)
@@ -306,6 +334,7 @@ internal fun AuthShell(
             }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
+        if (reload != null) SwipeRefreshIndicator(pullState, reload.refreshing)
     }
 
     // The WebView's AndroidTheme.changeServer() always asked first.

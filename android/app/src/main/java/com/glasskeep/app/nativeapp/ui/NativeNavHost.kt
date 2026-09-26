@@ -32,6 +32,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -189,20 +190,7 @@ fun NativeNavHost(
     // session, unauthenticated, so the sign-in screen gets it too; the
     // cached copy already painted the right one on the first frame, this
     // just reconciles it (BrandingContext.jsx's own load-then-cache shape).
-    LaunchedEffect(serverUrl, brandingPokes) {
-        val api = container.api(serverUrl)
-        runCatching { api.getBranding() }
-            .getOrNull()
-            ?.takeIf { it.isSuccessful }
-            ?.body()
-            ?.let { container.branding.apply(it) }
-        // The admin's sign-in slogan, read alongside (App.jsx:4885).
-        runCatching { api.getLoginSlogan() }
-            .getOrNull()
-            ?.takeIf { it.isSuccessful }
-            ?.body()
-            ?.let { container.branding.loginSlogan = it.loginSlogan.orEmpty() }
-    }
+    LaunchedEffect(serverUrl, brandingPokes) { reloadBranding(container, serverUrl) }
 
     // Trade an ageing token for a fresh one whenever the app comes back to
     // the foreground, which is this app's own "window focus" (App.jsx:207).
@@ -331,6 +319,24 @@ fun NativeNavHost(
 
     val scope = rememberCoroutineScope()
 
+    // Pulling a signed-out page down reloaded it in the WebView: its form
+    // starts over (the screens below are keyed on the count) and what it
+    // shows is read again, the disc spinning until the branding is back.
+    var signedOutReloads by remember { mutableIntStateOf(0) }
+    var signedOutReloading by remember { mutableStateOf(false) }
+    val signedOutReload = SignedOutReload(signedOutReloading) {
+        signedOutReloading = true
+        signedOutReloads++
+        lockPokes++
+        scope.launch {
+            try {
+                reloadBranding(container, serverUrl)
+            } finally {
+                signedOutReloading = false
+            }
+        }
+    }
+
     // One pill for the whole app, over every screen: the web has exactly
     // one too, and it is what replaces the platform's own Toast here.
     val toasts = rememberToastController()
@@ -450,38 +456,44 @@ fun NativeNavHost(
     val lock = container.lockState
     val showUnlockScreen = lock.isLocked && (!signedIn || lock.overlayOpen)
 
-    CompositionLocalProvider(LocalGkToasts provides toasts, LocalGkTooltips provides tooltips) {
+    CompositionLocalProvider(
+        LocalGkToasts provides toasts,
+        LocalGkTooltips provides tooltips,
+        LocalSignedOutReload provides signedOutReload,
+    ) {
         Box(Modifier.fillMaxSize().then(safeLeft)) {
             if (showUnlockScreen) {
-                InstanceUnlockScreen(
-                    container = container,
-                    serverUrl = serverUrl,
-                    // The next status read confirms it; closing the overlay
-                    // now is what stops the screen lingering for the
-                    // round-trip (App.jsx:7381).
-                    onUnlocked = { lock.overlayOpen = false; lockPokes++ },
-                    onUnlockedWithSession = { mustChangePassword ->
-                        lock.overlayOpen = false
-                        lockPokes++
-                        // handleLoggedIn navigates, which needs a graph.
-                        // A cold start behind this screen never composed
-                        // the NavHost and has none; it is about to compose
-                        // with the session now in place, so all that has
-                        // to carry over is the password detour.
-                        if (currentEntry != null) {
-                            handleLoggedIn(mustChangePassword)
+                key(signedOutReloads) {
+                    InstanceUnlockScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        // The next status read confirms it; closing the overlay
+                        // now is what stops the screen lingering for the
+                        // round-trip (App.jsx:7381).
+                        onUnlocked = { lock.overlayOpen = false; lockPokes++ },
+                        onUnlockedWithSession = { mustChangePassword ->
+                            lock.overlayOpen = false
+                            lockPokes++
+                            // handleLoggedIn navigates, which needs a graph.
+                            // A cold start behind this screen never composed
+                            // the NavHost and has none; it is about to compose
+                            // with the session now in place, so all that has
+                            // to carry over is the password detour.
+                            if (currentEntry != null) {
+                                handleLoggedIn(mustChangePassword)
+                            } else {
+                                unlockedIntoForcedPasswordChange = mustChangePassword
+                            }
+                        },
+                        // Only from the banner's CTA: a cold start with no
+                        // session has no local cache to go back to.
+                        onBackToOffline = if (signedIn) {
+                            { lock.overlayOpen = false; lock.bannerDismissed = true }
                         } else {
-                            unlockedIntoForcedPasswordChange = mustChangePassword
-                        }
-                    },
-                    // Only from the banner's CTA: a cold start with no
-                    // session has no local cache to go back to.
-                    onBackToOffline = if (signedIn) {
-                        { lock.overlayOpen = false; lock.bannerDismissed = true }
-                    } else {
-                        null
-                    },
-                )
+                            null
+                        },
+                    )
+                }
             } else {
             NavHost(navController = navController, startDestination = startDestination) {
                 // The signed-out screens are hash routes on the web: they swap
@@ -493,13 +505,15 @@ fun NativeNavHost(
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { ExitTransition.None },
                 ) {
-                    NativeLoginScreen(
-                        container = container,
-                        serverUrl = serverUrl,
-                        onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
-                        onForgotPassword = { navController.navigate("login-secret") },
-                        onRegister = { navController.navigate("register") },
-                    )
+                    key(signedOutReloads) {
+                        NativeLoginScreen(
+                            container = container,
+                            serverUrl = serverUrl,
+                            onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
+                            onForgotPassword = { navController.navigate("login-secret") },
+                            onRegister = { navController.navigate("register") },
+                        )
+                    }
                 }
                 composable(
                     route = "register",
@@ -508,11 +522,13 @@ fun NativeNavHost(
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { ExitTransition.None },
                 ) {
-                    RegisterScreen(
-                        container = container,
-                        serverUrl = serverUrl,
-                        onBack = { navController.popBackStack() },
-                    )
+                    key(signedOutReloads) {
+                        RegisterScreen(
+                            container = container,
+                            serverUrl = serverUrl,
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
                 }
                 composable(
                     route = "login-secret",
@@ -521,12 +537,14 @@ fun NativeNavHost(
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { ExitTransition.None },
                 ) {
-                    SecretKeyLoginScreen(
-                        container = container,
-                        serverUrl = serverUrl,
-                        onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
-                        onBack = { navController.popBackStack() },
-                    )
+                    key(signedOutReloads) {
+                        SecretKeyLoginScreen(
+                            container = container,
+                            serverUrl = serverUrl,
+                            onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
                 }
                 // Under the settings panel the notes list neither fades nor
                 // moves: it sits behind the web's instant bg-black/50 scrim
@@ -773,3 +791,19 @@ private const val HEALTH_PENDING_MS = 5_000L
 private const val HEALTH_OFFLINE_MS = 3_000L
 
 private val SignedOutRoutes = setOf("login", "register", "login-secret")
+
+/** The instance's public branding and its admin's sign-in slogan
+ *  (App.jsx:4885), both read without a session. */
+private suspend fun reloadBranding(container: NativeAppContainer, serverUrl: String) {
+    val api = container.api(serverUrl)
+    runCatching { api.getBranding() }
+        .getOrNull()
+        ?.takeIf { it.isSuccessful }
+        ?.body()
+        ?.let { container.branding.apply(it) }
+    runCatching { api.getLoginSlogan() }
+        .getOrNull()
+        ?.takeIf { it.isSuccessful }
+        ?.body()
+        ?.let { container.branding.loginSlogan = it.loginSlogan.orEmpty() }
+}
