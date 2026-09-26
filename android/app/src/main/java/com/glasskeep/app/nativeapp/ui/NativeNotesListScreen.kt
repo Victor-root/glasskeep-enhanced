@@ -219,6 +219,9 @@ fun NativeNotesListScreen(
     container: NativeAppContainer,
     serverUrl: String,
     onOpenNote: (String) -> Unit,
+    /** A drawing just created here, opened on its canvas as the web's
+     *  createAndOpenBlankNote("draw") does. */
+    onOpenNewDrawing: (String) -> Unit,
     onOpenArchived: () -> Unit,
     onOpenTrash: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -693,7 +696,7 @@ fun NativeNotesListScreen(
         }
     }
 
-    fun createNote(create: suspend () -> NoteDto) {
+    fun createNote(create: suspend () -> NoteDto, open: (String) -> Unit = onOpenNote) {
         if (creatingNote) return
         creatingNote = true
         scope.launch {
@@ -701,7 +704,7 @@ fun NativeNotesListScreen(
                 val note = create()
                 NativeDebug.d("Created ${note.type} note id=${note.id}")
                 SyncQueueWorker.triggerNow(context)
-                onOpenNote(note.id)
+                open(note.id)
             } catch (t: CancellationException) {
                 throw t
             } catch (t: Throwable) {
@@ -1202,7 +1205,7 @@ fun NativeNotesListScreen(
                 onOpenChange = { fabOpen = it },
                 onCreateText = { createNote(repository::createTextNote) },
                 onCreateChecklist = { createNote(repository::createChecklistNote) },
-                onCreateDrawing = { createNote(repository::createDrawingNote) },
+                onCreateDrawing = { createNote(repository::createDrawingNote, onOpenNewDrawing) },
                 onCreateAudio = { createNote(repository::createAudioNote) },
             )
         }

@@ -27,6 +27,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -260,7 +261,7 @@ private data class LinkTarget(val blockId: String, val start: Int, val end: Int,
 /**
  * Milestone: opening and safely editing a single note, every note type the
  * server knows about. Checklist notes get their own flat editor
- * (ChecklistEditorBody); drawing notes their own canvas (DrawingEditor);
+ * (ChecklistEditorBody); drawing notes their own canvas (DrawingEditor.kt);
  * audio notes their own recorder/player (AudioClipsSection). A text note's
  * body goes through RichDoc.parse first: bold/italic/underline/strike/
  * link, headings, and bullet/numbered lists are natively editable
@@ -275,6 +276,7 @@ fun NoteDetailScreen(
     serverUrl: String,
     noteId: String,
     onBack: () -> Unit,
+    startInDrawMode: Boolean = false,
 ) {
     val dark = LocalGkDark.current
     val context = LocalContext.current
@@ -388,6 +390,13 @@ fun NoteDetailScreen(
     var drawingUndoStack by remember { mutableStateOf<List<List<DrawingStrokeDto>>>(emptyList()) }
     var drawingRedoStack by remember { mutableStateOf<List<List<DrawingStrokeDto>>>(emptyList()) }
     var drawingSaveJob by remember { mutableStateOf<Job?>(null) }
+    // Pen, colour, size and guides live as long as one draw session, as
+    // in the web's draw-mode canvas; the pen's default colour follows the
+    // theme.
+    val drawingTools = remember(drawingCanvasMode) { DrawingTools(dark) }
+    LaunchedEffect(dark) { drawingTools.color = defaultPenColor(dark) }
+    // The draw-mode area, in dp: the size a drawing that stores none takes.
+    var drawingArea by remember { mutableStateOf(DrawingDimensionsDto(width = 0f, height = 0f)) }
 
     // Audio notes: same debounced-autosave shape as drawing notes above,
     // see scheduleAudioAutosave.
@@ -1085,21 +1094,49 @@ fun NoteDetailScreen(
         }
     }
 
-    /** Every drawing mutation (a completed stroke, an erase, a clear, an
-     *  undo/redo) funnels through here or through undoDrawing/redoDrawing:
-     *  push the pre-change state so it can be undone, matching
-     *  useDrawingHistory.js's own pushPaths() exactly, capped at the same
-     *  80 entries. The very first mutation also fixes this drawing's
-     *  reference dimensions from whatever size the canvas measured itself
-     *  at, so later renders (here or on another device) scale consistently
-     *  against that same original size instead of the current screen's. */
-    fun commitDrawingChange(newPaths: List<DrawingStrokeDto>, canvasWidthDp: Float, canvasHeightDp: Float) {
-        if (drawingDimensions == null) {
-            drawingDimensions = DrawingDimensionsDto(width = canvasWidthDp, height = canvasHeightDp)
-        }
+    /** The drawing's own size: the stored one, or the draw-mode area for
+     *  a drawing that has none yet (DrawingCanvas.jsx:291-318). */
+    fun drawingCanvasSize(): DrawingDimensionsDto =
+        drawingDimensions?.takeIf { it.width > 0f && it.height > 0f } ?: drawingArea
+
+    /** Every drawing mutation (a completed stroke, an erase, a clear)
+     *  funnels through here: push the pre-change state so it can be
+     *  undone, matching useDrawingHistory.js's own pushPaths() exactly,
+     *  capped at the same 80 entries. Like notifyChange(), it writes the
+     *  size along, a page being the stored one or the whole canvas when
+     *  the drawing names none. */
+    fun commitDrawingChange(newPaths: List<DrawingStrokeDto>) {
+        val size = drawingCanvasSize()
+        drawingDimensions = DrawingDimensionsDto(
+            width = size.width,
+            height = size.height,
+            originalHeight = drawingDimensions?.originalHeight?.takeIf { it > 0f } ?: size.height,
+        )
         drawingUndoStack = (drawingUndoStack + listOf(drawingPaths)).takeLast(80)
         drawingRedoStack = emptyList()
         drawingPaths = newPaths
+        scheduleDrawingAutosave()
+    }
+
+    /** addPage() (DrawingCanvas.jsx:510-523): one page taller, outside
+     *  the undo history. */
+    fun addDrawingPage() {
+        val size = drawingCanvasSize()
+        val page = drawingPageHeight(drawingDimensions)
+        drawingDimensions = DrawingDimensionsDto(width = size.width, height = size.height + page, originalHeight = page)
+        scheduleDrawingAutosave()
+    }
+
+    /** removePage() (DrawingCanvas.jsx:528-546): one page shorter, the
+     *  strokes left wholly under the new bottom gone, as one undo step. */
+    fun removeDrawingPage() {
+        val size = drawingCanvasSize()
+        val page = drawingPageHeight(drawingDimensions)
+        val newHeight = size.height - page
+        drawingUndoStack = (drawingUndoStack + listOf(drawingPaths)).takeLast(80)
+        drawingRedoStack = emptyList()
+        drawingPaths = drawingPaths.filter { stroke -> stroke.points.any { it.y <= newHeight } }
+        drawingDimensions = DrawingDimensionsDto(width = size.width, height = newHeight, originalHeight = page)
         scheduleDrawingAutosave()
     }
 
@@ -1117,10 +1154,6 @@ fun NoteDetailScreen(
         drawingRedoStack = drawingRedoStack.dropLast(1)
         drawingPaths = next
         scheduleDrawingAutosave()
-    }
-
-    fun clearDrawing(canvasWidthDp: Float, canvasHeightDp: Float) {
-        commitDrawingChange(emptyList(), canvasWidthDp, canvasHeightDp)
     }
 
     // ---------- Audio note edits (AudioContent.parse-approved notes only) ----------
@@ -1471,6 +1504,7 @@ fun NoteDetailScreen(
         // immediately, then let the network call reconcile quietly in
         // the background; only a note with no cache at all (a fresh
         // deep link before its first sync) still shows the spinner.
+        var drawingFaceSet = false
         fun applyFetchedNote(fetched: NoteDto) {
             note = fetched
             titleText = fetched.title
@@ -1560,8 +1594,13 @@ fun NoteDetailScreen(
             drawingCaptionText = editability?.originalDrawingCaptionText
             if (editability?.isDrawType == true) {
                 richBlocks = editability?.originalRichBlocks
-                drawingCanvasMode = false
-                viewMode = container.editorPrefs.readModeEnabled
+                // Once, on the first render: a drawing opens on its read face,
+                // or on its canvas when it was just created.
+                if (!drawingFaceSet) {
+                    drawingFaceSet = true
+                    drawingCanvasMode = startInDrawMode
+                    viewMode = !startInDrawMode && container.editorPrefs.readModeEnabled
+                }
             }
             audioClips = editability?.originalAudioClips.orEmpty()
             audioCaptionText = editability?.originalAudioCaptionText
@@ -1591,14 +1630,15 @@ fun NoteDetailScreen(
         try {
             val fetched = repository.fetchNoteDetail(noteId)
             val baseline = cacheBaseline
-            if (baseline == null || baseline == currentSnapshot()) {
+            val untouched = baseline == currentSnapshot() && editability?.let { bodyChanged(it) } != true
+            if (baseline == null || untouched) {
                 applyFetchedNote(fetched)
             } else {
-                // The user already started typing in the gap between the
-                // instant cache render above and this network round-trip
-                // landing - never clobber that with a reconcile. Still
-                // pick up fresher metadata (tags, pin, collaborators),
-                // which doesn't touch any editable state.
+                // The user already started typing, drawing or recording in
+                // the gap between the instant cache render above and this
+                // network round-trip landing - never clobber that with a
+                // reconcile. Still pick up fresher metadata (tags, pin,
+                // collaborators), which doesn't touch any editable state.
                 NativeDebug.d("NoteDetailScreen: skipped reconcile, already editing id=$noteId")
                 note = fetched
             }
@@ -2049,7 +2089,27 @@ fun NoteDetailScreen(
                 ) {
                     ArrowLeftIcon(size = 20.dp, tint = modalIconColor)
                 }
-                Spacer(Modifier.weight(1f))
+                if (drawingCanvasMode) {
+                    // ModalHeader.jsx's toolbar slot: `flex-1 py-1`, the pill
+                    // centred between the back arrow and pin/save.
+                    Box(Modifier.weight(1f).padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
+                        DrawingToolbar(
+                            tools = drawingTools,
+                            dark = dark,
+                            canUndo = drawingUndoStack.isNotEmpty(),
+                            canRedo = drawingRedoStack.isNotEmpty(),
+                            canClear = drawingPaths.isNotEmpty(),
+                            canRemovePage = drawingCanvasSize().height > drawingPageHeight(drawingDimensions),
+                            onUndo = { undoDrawing() },
+                            onRedo = { redoDrawing() },
+                            onClear = { commitDrawingChange(emptyList()) },
+                            onAddPage = { addDrawingPage() },
+                            onRemovePage = { removeDrawingPage() },
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
                 note?.let { currentNote ->
                     // The web hides the pin while browsing the archived or
                     // trashed list; native reaches the same notes through
@@ -2113,6 +2173,42 @@ fun NoteDetailScreen(
                 }
             }
 
+            // The two warnings that sit between the images and the
+            // content on the web (NoteModal.jsx:750): a shared note
+            // being edited with the server down, and a mirrored note
+            // whose own server is away.
+            @Composable
+            fun NoteBanners(currentNote: NoteDto) {
+                if (isCollaborativeNote && container.syncStatus.serverReachable == false) {
+                    NoteWarningBanner(
+                        message = stringResource(R.string.native_offline_collab_warning),
+                        tone = NoteBannerTone.AMBER,
+                        dark = dark,
+                    ) { tint -> WifiOffIcon(size = 16.dp, tint = tint) }
+                }
+                currentNote.federation?.takeIf { it.readOnly }?.let { federation ->
+                    val peer = federation.peerLabel
+                        ?: stringResource(R.string.native_fed_remote_server)
+                    NoteWarningBanner(
+                        message = String.format(
+                            stringResource(
+                                when (federation.state) {
+                                    "offline" -> R.string.native_fed_read_only_offline
+                                    "locked" -> R.string.native_fed_read_only_locked
+                                    "incompatible" -> R.string.native_fed_read_only_incompatible
+                                    else -> R.string.native_fed_read_only_unknown
+                                },
+                            ),
+                            peer,
+                        ),
+                        // Offline is red (the peer is down); locked
+                        // and out-of-date are amber (actionable).
+                        tone = if (federation.state == "offline") NoteBannerTone.ROSE else NoteBannerTone.AMBER,
+                        dark = dark,
+                    ) { tint -> ServerIcon(size = 16.dp, tint = tint) }
+                }
+            }
+
             when {
                 loadError != null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(loadError.orEmpty(), color = ErrorColor, modifier = Modifier.padding(24.dp))
@@ -2124,11 +2220,35 @@ fun NoteDetailScreen(
                         Text(stringResource(R.string.native_note_detail_loading), color = subtextColor)
                     }
                 }
+                editability?.isDrawType == true && drawingCanvasMode -> {
+                    // Draw mode: the note stops scrolling and the canvas
+                    // takes everything under the warnings, edge to edge
+                    // (NoteModal.jsx:654, 756; DrawingCanvas.jsx:745-748).
+                    Column(Modifier.weight(1f).fillMaxWidth()) {
+                        NoteBanners(note!!)
+                        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                            val area = DrawingDimensionsDto(
+                                width = maxWidth.value.roundToInt().toFloat(),
+                                height = maxHeight.value.roundToInt().toFloat(),
+                            )
+                            SideEffect { if (drawingArea != area) drawingArea = area }
+                            val size = drawingDimensions?.takeIf { it.width > 0f && it.height > 0f } ?: area
+                            DrawingCanvasPane(
+                                paths = drawingPaths,
+                                canvasWidth = size.width,
+                                canvasHeight = size.height,
+                                pageHeight = drawingPageHeight(drawingDimensions),
+                                tools = drawingTools,
+                                dark = dark,
+                                onCommit = { newPaths -> commitDrawingChange(newPaths) },
+                            )
+                        }
+                    }
+                }
                 else -> {
                     val currentNote = note!!
                     val edit = editability!!
                     val stamp = editedStampText(currentNote, todayLabel, yesterdayLabel)
-                        ?.takeIf { !(edit.isDrawType && drawingCanvasMode) }
                     // NoteModal.jsx: inline after the content when the note
                     // scrolls, pinned bottom-right of the viewport when it does not.
                     val stampInline = contentScroll.maxValue > 0
@@ -2144,34 +2264,31 @@ fun NoteDetailScreen(
                             // ModalHeader.jsx does on a phone (and only there).
                             // Its 20dp side padding against the body's 24dp is
                             // the web's own deliberate 4px offset.
-                            // Hidden while drawing (ModalHeader.jsx:263).
-                            if (!(edit.isDrawType && drawingCanvasMode)) {
-                                NoteTitleField(
-                                    value = titleText,
-                                    enabled = !isNoteReadOnly &&
-                                        (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType),
-                                    // The web drops the field entirely and prints the
-                                    // title as text whenever the note shows its read
-                                    // face (ModalHeader.jsx:265). Checklists are its
-                                    // documented exception: their body stays
-                                    // interactive, so their title does too.
-                                    asText = (edit.isRichEditableType && viewMode) ||
-                                        (edit.isDrawType && !drawingCanvasMode && viewMode) ||
-                                        (isNoteReadOnly && !edit.isChecklistType),
-                                    titleColor = titleColor,
-                                    placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
-                                    onValueChange = { raw ->
-                                        // Enter alone jumps to the body, typing
-                                        // nothing (ModalHeader.jsx:65-80); any other
-                                        // newline, a pasted one, is flattened to a
-                                        // space: a title is single-line everywhere.
-                                        val enterOnly = raw.count { it == '\n' } == 1 && raw.replace("\n", "") == titleText
-                                        if (enterOnly) focusBodyFromTitle() else titleText = raw.replace(TitleNewlines, " ")
-                                    },
-                                )
-                            }
+                            NoteTitleField(
+                                value = titleText,
+                                enabled = !isNoteReadOnly &&
+                                    (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType),
+                                // The web drops the field entirely and prints the
+                                // title as text whenever the note shows its read
+                                // face (ModalHeader.jsx:265). Checklists are its
+                                // documented exception: their body stays
+                                // interactive, so their title does too.
+                                asText = (edit.isRichEditableType && viewMode) ||
+                                    (edit.isDrawType && viewMode) ||
+                                    (isNoteReadOnly && !edit.isChecklistType),
+                                titleColor = titleColor,
+                                placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
+                                onValueChange = { raw ->
+                                    // Enter alone jumps to the body, typing
+                                    // nothing (ModalHeader.jsx:65-80); any other
+                                    // newline, a pasted one, is flattened to a
+                                    // space: a title is single-line everywhere.
+                                    val enterOnly = raw.count { it == '\n' } == 1 && raw.replace("\n", "") == titleText
+                                    if (enterOnly) focusBodyFromTitle() else titleText = raw.replace(TitleNewlines, " ")
+                                },
+                            )
 
-                            if (edit.isTextType || edit.isChecklistType || (edit.isDrawType && !drawingCanvasMode)) {
+                            if (edit.isTextType || edit.isChecklistType || edit.isDrawType) {
                                 NoteImagesSection(
                                     images = images,
                                     borderColor = borderColor,
@@ -2179,50 +2296,15 @@ fun NoteDetailScreen(
                                 )
                             }
 
-                            // The two warnings that sit between the images and
-                            // the content on the web (NoteModal.jsx:750): a
-                            // shared note being edited with the server down,
-                            // and a mirrored note whose own server is away.
-                            if (isCollaborativeNote && container.syncStatus.serverReachable == false) {
-                                NoteWarningBanner(
-                                    message = stringResource(R.string.native_offline_collab_warning),
-                                    tone = NoteBannerTone.AMBER,
-                                    dark = dark,
-                                ) { tint -> WifiOffIcon(size = 16.dp, tint = tint) }
-                            }
-                            currentNote.federation?.takeIf { it.readOnly }?.let { federation ->
-                                val peer = federation.peerLabel
-                                    ?: stringResource(R.string.native_fed_remote_server)
-                                NoteWarningBanner(
-                                    message = String.format(
-                                        stringResource(
-                                            when (federation.state) {
-                                                "offline" -> R.string.native_fed_read_only_offline
-                                                "locked" -> R.string.native_fed_read_only_locked
-                                                "incompatible" -> R.string.native_fed_read_only_incompatible
-                                                else -> R.string.native_fed_read_only_unknown
-                                            },
-                                        ),
-                                        peer,
-                                    ),
-                                    // Offline is red (the peer is down); locked
-                                    // and out-of-date are amber (actionable).
-                                    tone = if (federation.state == "offline") NoteBannerTone.ROSE else NoteBannerTone.AMBER,
-                                    dark = dark,
-                                ) { tint -> ServerIcon(size = 16.dp, tint = tint) }
-                            }
+                            NoteBanners(currentNote)
 
                             // .modal-content-fade: the content area is re-keyed on
                             // view / edit / draw, and fades in 4px from below
                             // (200ms ease-out) each time, drawing excepted.
                             val contentFade = remember { Animatable(0f) }
-                            LaunchedEffect(viewMode, drawingCanvasMode) {
-                                if (drawingCanvasMode) {
-                                    contentFade.snapTo(1f)
-                                } else {
-                                    contentFade.snapTo(0f)
-                                    contentFade.animateTo(1f, tween(durationMillis = 200, easing = EaseOut))
-                                }
+                            LaunchedEffect(viewMode) {
+                                contentFade.snapTo(0f)
+                                contentFade.animateTo(1f, tween(durationMillis = 200, easing = EaseOut))
                             }
                             Column(
                                 modifier = Modifier
@@ -2262,8 +2344,10 @@ fun NoteDetailScreen(
                                         readOnly = isNoteReadOnly,
                                     )
                                 } else if (edit.isDrawType) {
-                                    if (!drawingCanvasMode) {
-                                        if (viewMode) {
+                                    if (viewMode) {
+                                        // The caption only when it says something, then
+                                        // the drawing 16dp under it (the web's mt-4).
+                                        if (richBlocks.orEmpty().any { it.text.isNotBlank() }) {
                                             RichTextReader(
                                                 blocks = richBlocks.orEmpty(),
                                                 typography = container.editorPrefs.typography.activeProfile,
@@ -2272,7 +2356,12 @@ fun NoteDetailScreen(
                                                 titleColor = titleColor,
                                                 noteColor = currentNote.color,
                                             )
-                                        } else {
+                                        }
+                                        Spacer(Modifier.height(16.dp))
+                                    } else {
+                                        // The caption editor keeps 80dp at least, the
+                                        // drawing right under it.
+                                        Box(Modifier.heightIn(min = 80.dp)) {
                                             RichTextEditor(
                                                 blocks = richBlocks.orEmpty(),
                                                 state = richEditorState,
@@ -2291,23 +2380,8 @@ fun NoteDetailScreen(
                                                 suppressKeyboard = showFormatSheet,
                                             )
                                         }
-                                        if (richBlocks.orEmpty().any { it.text.isNotBlank() }) Spacer(Modifier.height(14.dp))
                                     }
-                                    DrawingEditor(
-                                        paths = drawingPaths,
-                                        canvasWidthDp = drawingDimensions?.width,
-                                        canvasHeightDp = drawingDimensions?.height,
-                                        originalHeightDp = drawingDimensions?.originalHeight,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        subtextColor = subtextColor,
-                                        canUndo = drawingUndoStack.isNotEmpty(),
-                                        canRedo = drawingRedoStack.isNotEmpty(),
-                                        onCommit = { newPaths, w, h -> commitDrawingChange(newPaths, w, h) },
-                                        onUndo = { undoDrawing() },
-                                        onRedo = { redoDrawing() },
-                                        readOnly = !drawingCanvasMode || isNoteReadOnly,
-                                    )
+                                    DrawingPreview(paths = drawingPaths, dimensions = drawingDimensions, dark = dark)
                                 } else if (edit.isAudioType) {
                                     AudioClipsSection(
                                         clips = audioClips,
@@ -2503,6 +2577,7 @@ fun NoteDetailScreen(
                             null
                         },
                         drawingCanvasMode = drawingCanvasMode,
+                        readModeEnabled = container.editorPrefs.readModeEnabled,
                         // The web keeps Collaborate and Trash in the footer for
                         // every type except a text note actually being edited
                         // (ModalFooter.jsx's own `isDesktop || viewMode ||
@@ -2528,7 +2603,18 @@ fun NoteDetailScreen(
                             viewMode = !viewMode
                         },
                         onDrawModeClick = {
-                            drawingCanvasMode = !drawingCanvasMode
+                            if (drawingCanvasMode) {
+                                // onExitDrawToView: back on the read face whenever
+                                // that preference is on, whatever face was left.
+                                drawingCanvasMode = false
+                                viewMode = container.editorPrefs.readModeEnabled
+                            } else {
+                                // Each draw session starts with an empty history,
+                                // as the web's draw-mode canvas mounts afresh.
+                                drawingUndoStack = emptyList()
+                                drawingRedoStack = emptyList()
+                                drawingCanvasMode = true
+                            }
                             showFormatSheet = false
                         },
                         onFormatClick = { showFormatSheet = !showFormatSheet },
@@ -3761,6 +3847,7 @@ private fun NoteModalFooter(
     showDrawModeButton: Boolean,
     readOnlyTooltip: String?,
     drawingCanvasMode: Boolean,
+    readModeEnabled: Boolean,
     showCollaborateButton: Boolean,
     showTrashButton: Boolean,
     trashed: Boolean,
@@ -3979,8 +4066,11 @@ private fun NoteModalFooter(
                     if (showDrawModeButton) {
                         FooterIconButton(
                             contentDescription = stringResource(
-                                if (drawingCanvasMode) R.string.native_drawing_exit_mode
-                                else R.string.native_drawing_enter_mode
+                                when {
+                                    !drawingCanvasMode -> R.string.native_drawing_enter_mode
+                                    readModeEnabled -> R.string.native_drawing_exit_mode
+                                    else -> R.string.native_drawing_exit_drawing
+                                },
                             ),
                             backgroundBrush = ModeButtonGradient,
                             onClick = onDrawModeClick,

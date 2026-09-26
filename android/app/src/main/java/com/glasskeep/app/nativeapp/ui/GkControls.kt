@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -72,6 +73,7 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -99,6 +101,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -1446,7 +1449,7 @@ private fun DrawScope.drawFooterPopoverArrow(arrowLeft: Int, fill: Color, edge: 
 
 /** Tailwind's `ring-1` (`box-shadow: 0 0 0 1px`): a 1px band hugging the
  *  outside of [shape]. Placed before any clip so it is not cut away. */
-private fun Modifier.outsideRing(color: Color, shape: Shape): Modifier = drawBehind {
+internal fun Modifier.outsideRing(color: Color, shape: Shape): Modifier = drawBehind {
     val ring = 1.dp.toPx()
     val outline = shape.createOutline(Size(size.width + ring, size.height + ring), layoutDirection, this)
     translate(-ring / 2f, -ring / 2f) {
@@ -1486,6 +1489,12 @@ internal fun Modifier.dismissOnOutsideTouch(onDismiss: () -> Unit): Modifier = p
  *  web's `fixed inset-0` overlays): every touch landing on it stops here,
  *  even where nothing on the layer answers it. */
 internal fun Modifier.blockTouchesBelow(): Modifier = pointerInput(Unit) {}
+
+/** Tailwind v4's `shadow-sm` (plain `shadow` too): 0 1px 3px and
+ *  0 1px 2px -1px, both black 10%. */
+internal fun Modifier.tailwindShadowSm(shape: Shape): Modifier = this
+    .dropShadow(shape, Shadow(radius = 3.dp, color = Color.Black.copy(alpha = 0.1f), offset = DpOffset(0.dp, 1.dp)))
+    .dropShadow(shape, Shadow(radius = 2.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-1).dp, offset = DpOffset(0.dp, 1.dp)))
 
 /** Holds a layout's coordinates without making them state: they change on
  *  every scroll, and only a gesture reads them. */
@@ -1568,20 +1577,23 @@ internal fun Modifier.dashedBorder(color: Color, shape: Shape, width: Dp = 1.dp,
 }
 
 /**
- * ToolbarPopover (`DrawingToolbar.jsx:110-174`): a fixed-width card that
- * opens 10px under its button, centred on it, kept 8px from the screen
- * edges and flipped above when the bottom runs out. 16px radius, 12px of
- * padding, and no animation.
+ * ToolbarPopover (`DrawingToolbar.jsx:110-174`): a card as wide as its
+ * content that opens 10px under its button, centred on it, kept 8px from
+ * the screen edges and flipped above when the bottom runs out. 16px
+ * radius, a 1px border with a ring just outside it, 12px of padding, and
+ * no animation.
  */
 @Composable
 internal fun ToolbarPopover(
-    width: Dp,
     dark: Boolean,
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val density = LocalDensity.current
-    val positionProvider = remember(density, width) {
+    // Room inside the popup window for the shadow to blur into, as
+    // FooterPopover keeps; the window moves back by the same amount.
+    val shadowPad = 16.dp
+    val positionProvider = remember(density) {
         object : PopupPositionProvider {
             override fun calculatePosition(
                 anchorBounds: IntRect,
@@ -1589,18 +1601,17 @@ internal fun ToolbarPopover(
                 layoutDirection: LayoutDirection,
                 popupContentSize: IntSize,
             ): IntOffset {
-                val widthPx = with(density) { width.roundToPx() }
-                val marginPx = with(density) { 8.dp.roundToPx() }
-                val gapPx = with(density) { 10.dp.roundToPx() }
-                val left = (anchorBounds.center.x - widthPx / 2)
-                    .coerceIn(marginPx, (windowSize.width - widthPx - marginPx).coerceAtLeast(marginPx))
-                val below = anchorBounds.bottom + gapPx
-                val top = if (below + popupContentSize.height + marginPx > windowSize.height) {
-                    (anchorBounds.top - gapPx - popupContentSize.height).coerceAtLeast(marginPx)
-                } else {
-                    below
-                }
-                return IntOffset(left, top)
+                val pad = with(density) { shadowPad.roundToPx() }
+                val margin = with(density) { 8.dp.roundToPx() }
+                val gap = with(density) { 10.dp.roundToPx() }
+                val cardWidth = popupContentSize.width - 2 * pad
+                val cardHeight = popupContentSize.height - 2 * pad
+                var left = anchorBounds.center.x - cardWidth / 2
+                if (left + cardWidth + margin > windowSize.width) left = windowSize.width - cardWidth - margin
+                if (left < margin) left = margin
+                var top = anchorBounds.bottom + gap
+                if (top + cardHeight + margin > windowSize.height) top = anchorBounds.top - cardHeight - gap
+                return IntOffset(left - pad, top - pad)
             }
         }
     }
@@ -1609,18 +1620,18 @@ internal fun ToolbarPopover(
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
+        val shape = RoundedCornerShape(16.dp)
         Column(
             modifier = Modifier
-                .width(width)
-                .shadow(elevation = 24.dp, shape = RoundedCornerShape(16.dp))
-                .clip(RoundedCornerShape(16.dp))
-                .background(if (dark) Color(0xFA111827) else Color(0xFAFFFFFF))
-                .border(
-                    width = 1.dp,
-                    color = if (dark) Color(0x80374151) else Color(0xCCF3F4F6),
-                    shape = RoundedCornerShape(16.dp),
-                )
-                .padding(12.dp),
+                .padding(shadowPad)
+                .shadow(elevation = 12.dp, shape = shape)
+                // ring-1 ring-black/5, white on dark.
+                .outsideRing(if (dark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f), shape)
+                .clip(shape)
+                // bg-gray-900/98 / bg-white/98, border-gray-700/50 / border-gray-100/80.
+                .background(if (dark) Color(0xFA101828) else Color(0xFAFFFFFF))
+                .border(1.dp, if (dark) Color(0x80364153) else Color(0xCCF3F4F6), shape)
+                .padding(13.dp),
             content = content,
         )
     }

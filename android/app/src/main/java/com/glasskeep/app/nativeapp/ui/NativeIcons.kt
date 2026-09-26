@@ -1336,72 +1336,82 @@ fun NextTrackIcon(modifier: Modifier = Modifier, size: Dp = 18.dp, tint: Color =
 }
 
 /** The drawing toolbar's pen, a filled Material pencil
- *  (DrawingToolbar.jsx:78). */
+ *  (DrawingToolbar.jsx:26-30). */
 @Composable
-fun PenFilledIcon(modifier: Modifier = Modifier, size: Dp = 20.dp, tint: Color = Color.Black) {
-    val path = remember {
-        PathParser().parsePathString(
-            "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z " +
-                "M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
-        ).toPath()
-    }
-    Canvas(modifier.size(size)) {
-        val scale = this.size.minDimension / 24f
-        scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint)
-        }
-    }
-}
+fun PenFilledIcon(modifier: Modifier = Modifier, size: Dp = 20.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M3 17.25V21h3.75l11-11-3.75-3.75-11 11zM20.71 7.04a1.003 1.003 0 000-1.42L18.37 3.29a1.003 1.003 0 00-1.42 0" +
+        "L15.13 5.11l3.75 3.75 1.83-1.82z",
+    modifier, size, tint,
+)
 
-/** tabler/eraser.svg, the drawing toolbar's second tool. */
+/** Lucide's eraser, the drawing toolbar's second tool
+ *  (DrawingToolbar.jsx:32-38). */
 @Composable
 fun EraserIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
-    "M19 20h-10.5l-4.21 -4.3a1 1 0 0 1 0 -1.41l10 -10a1 1 0 0 1 1.41 0l5 5a1 1 0 0 1 0 1.41l-9.2 9.3 " +
-        "M18 13.3l-6.3 -6.3",
-    modifier, size, tint,
+    "M7 21l-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21 M22 21H7 M5 11l9 9",
+    modifier, size, tint, strokeWidth = 2f,
 )
 
-/** tabler/tool.svg: the drawing toolbar's "actions" button. */
+/** Lucide's wrench, the drawing toolbar's "actions" button
+ *  (DrawingToolbar.jsx:485-487). */
 @Composable
 fun WrenchIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
-    "M7 10h3v-3l-3.5 -3.5a6 6 0 0 1 8 8l6 6a2 2 0 0 1 -3 3l-6 -6a6 6 0 0 1 -8 -8l3.5 3.5",
+    "M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3" +
+        "l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z",
+    modifier, size, tint, strokeWidth = 2f,
+)
+
+/** The drawing actions' filled undo arrow (DrawingToolbar.jsx:57-61);
+ *  mirrored, it is their redo. */
+@Composable
+fun DrawingUndoIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M12.5 8c-2.35 0-4.45 1.02-5.9 2.64L4 8v8h8l-3.04-3.04A5.47 5.47 0 0112.5 11c2.76 0 5 2.24 5 5 0 .34-.03.67-.1.99" +
+        "l2.02 1.17c.28-.68.43-1.42.43-2.16 0-4.42-3.58-8-8-8z",
     modifier, size, tint,
 )
 
-/** tabler/square-plus.svg, "add a page". */
+/** Material's delete_forever, "clear all" (DrawingToolbar.jsx:69-73). */
 @Composable
-fun SquarePlusIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
-    "M9 12h6 M12 9v6 M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z",
+fun DeleteForeverIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M6 19c0 1.1.9 2 2 2h8a2 2 0 002-2V7H6v12zm3.46-7.12 1.41-1.41L12 11.59l1.12-1.12 1.41 1.41L13.41 13" +
+        "l1.12 1.12-1.41 1.41L12 14.41l-1.12 1.12-1.41-1.41L10.59 13l-1.13-1.12zM15.5 4l-1-1h-5l-1 1H5v2h14V4z",
     modifier, size, tint,
 )
 
-/** tabler/square-minus.svg, "remove the last page". */
+/** Lucide's file-plus, "add a page" (DrawingToolbar.jsx:40-47). */
 @Composable
-fun SquareMinusIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
-    "M9 12h6 M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z",
-    modifier, size, tint,
+fun FilePlusIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2L14 8L20 8 M12 18L12 12 M9 15L15 15",
+    modifier, size, tint, strokeWidth = 2f,
+)
+
+/** Lucide's file-minus, "remove the last page" (DrawingToolbar.jsx:49-55). */
+@Composable
+fun FileMinusIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2L14 8L20 8 M9 15L15 15",
+    modifier, size, tint, strokeWidth = 2f,
 )
 
 /** PageLinesIcon (DrawingToolbar.jsx:176-182): a page with two rules,
- *  dashed once the guides are hidden. */
+ *  the rules dashed once the guides are hidden. */
 @Composable
-fun PageLinesIcon(modifier: Modifier = Modifier, size: Dp = 18.dp, tint: Color = Color.Black, dashed: Boolean = false) {
+fun PageLinesIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, dashed: Boolean = false) {
     Canvas(modifier.size(size)) {
-        val unit = this.size.minDimension / 18f
+        val unit = this.size.minDimension / 24f
         val stroke = 2f * unit
-        val effect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(3f * unit, 3f * unit)) else null
         drawRoundRect(
             color = tint,
-            topLeft = Offset(unit, unit),
-            size = Size(16f * unit, 16f * unit),
+            topLeft = Offset(3f * unit, 3f * unit),
+            size = Size(18f * unit, 18f * unit),
             cornerRadius = CornerRadius(2f * unit, 2f * unit),
-            style = Stroke(width = stroke, pathEffect = effect),
+            style = Stroke(width = stroke, join = StrokeJoin.Round),
         )
-        listOf(7f, 12f).forEach { y ->
+        val effect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(3f * unit, 3f * unit)) else null
+        listOf(8f, 16f).forEach { y ->
             drawLine(
                 color = tint,
                 start = Offset(4f * unit, y * unit),
-                end = Offset(14f * unit, y * unit),
+                end = Offset(20f * unit, y * unit),
                 strokeWidth = stroke,
                 cap = StrokeCap.Round,
                 pathEffect = effect,
@@ -1409,6 +1419,17 @@ fun PageLinesIcon(modifier: Modifier = Modifier, size: Dp = 18.dp, tint: Color =
         }
     }
 }
+
+/** Material's palette, the drawing colour popover's "custom colour"
+ *  button (DrawingToolbar.jsx:329-331). */
+@Composable
+fun CustomColorIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10c1.38 0 2.5-1.12 2.5-2.5 0-.61-.23-1.2-.64-1.67-.08-.1-.13-.21-.13-.33 " +
+        "0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8 8 8.67 8 9.5 " +
+        "7.33 11 6.5 11zm3-4C8.67 7 8 6.33 8 5.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5" +
+        "S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z",
+    modifier, size, tint,
+)
 
 /** tabler/text-color.svg, the footer button that opens the formatting
  *  sheet (`ModalFooter.jsx:601-611`). */

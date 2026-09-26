@@ -572,8 +572,12 @@
     <string name="native_drawing_undo">Annuler</string>
     <string name="native_drawing_redo">Rétablir</string>
     <string name="native_drawing_add_page">Ajouter une page</string>
-    <string name="native_drawing_remove_page">Retirer une page</string>
-    <string name="native_drawing_page_lines">Repères</string>
+    <string name="native_drawing_remove_page">Retirer la dernière page</string>
+    <string name="native_drawing_hide_guides">Masquer repères</string>
+    <string name="native_drawing_show_guides">Afficher repères</string>
+    <string name="native_drawing_custom_color">Couleur personnalisée</string>
+    <string name="native_drawing_stroke">trait</string>
+    <string name="native_drawing_strokes">traits</string>
     <string name="native_drawing_size_fine">Fin</string>
     <string name="native_drawing_size_medium">Moyen</string>
     <string name="native_drawing_size_thick">Épais</string>
@@ -581,6 +585,7 @@
     <string name="native_drawing_caption_notice">Légende</string>
     <string name="native_drawing_enter_mode">Passer en mode dessin</string>
     <string name="native_drawing_exit_mode">Mode lecture</string>
+    <string name="native_drawing_exit_drawing">Retour</string>
     <string name="native_audio_too_large">L\'enregistrement est trop volumineux. Essayez un enregistrement plus court.</string>
     <string name="native_audio_empty_hint">Enregistrez un mémo vocal, il sera conservé avec cette note.</string>
     <string name="native_audio_download_original">Télécharger l’original</string>

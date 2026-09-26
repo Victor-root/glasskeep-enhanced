@@ -576,9 +576,13 @@
     <string name="native_drawing_clear_confirm">Sure?</string>
     <string name="native_drawing_undo">Undo</string>
     <string name="native_drawing_redo">Redo</string>
-    <string name="native_drawing_add_page">Add page</string>
-    <string name="native_drawing_remove_page">Remove page</string>
-    <string name="native_drawing_page_lines">Guides</string>
+    <string name="native_drawing_add_page">Add Page</string>
+    <string name="native_drawing_remove_page">Remove Last Page</string>
+    <string name="native_drawing_hide_guides">Hide guides</string>
+    <string name="native_drawing_show_guides">Show guides</string>
+    <string name="native_drawing_custom_color">Custom color</string>
+    <string name="native_drawing_stroke">stroke</string>
+    <string name="native_drawing_strokes">strokes</string>
     <string name="native_drawing_size_fine">Fine</string>
     <string name="native_drawing_size_medium">Medium</string>
     <string name="native_drawing_size_thick">Thick</string>
@@ -586,6 +590,7 @@
     <string name="native_drawing_caption_notice">Caption</string>
     <string name="native_drawing_enter_mode">Switch to Draw mode</string>
     <string name="native_drawing_exit_mode">Reading mode</string>
+    <string name="native_drawing_exit_drawing">Back</string>
     <string name="native_audio_too_large">Recording is too large to save. Try a shorter recording.</string>
     <string name="native_audio_empty_hint">Record a voice memo and it will be saved with this note.</string>
     <string name="native_audio_download_original">Download original</string>

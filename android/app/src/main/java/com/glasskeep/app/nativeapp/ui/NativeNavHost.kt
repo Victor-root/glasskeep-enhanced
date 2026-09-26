@@ -48,10 +48,12 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
@@ -549,6 +551,7 @@ fun NativeNavHost(
                             container = container,
                             serverUrl = serverUrl,
                             onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
+                            onOpenNewDrawing = { noteId -> navController.navigate("notes/$noteId?draw=true") },
                             onOpenArchived = { navController.navigate("archived") },
                             onOpenTrash = { navController.navigate("trash") },
                             onOpenSettings = { navController.navigate("settings") },
@@ -617,6 +620,7 @@ fun NativeNavHost(
                 // rise, 200ms ease-out in, 180ms ease-in out.
                 composable(
                     route = NoteRoute,
+                    arguments = listOf(navArgument("draw") { type = NavType.BoolType; defaultValue = false }),
                     enterTransition = {
                         if (initialState.destination.route == "notes") {
                             fadeIn(tween(200, easing = EaseOut)) +
@@ -640,6 +644,7 @@ fun NativeNavHost(
                         serverUrl = serverUrl,
                         noteId = noteId,
                         onBack = { navController.popBackStack() },
+                        startInDrawMode = backStackEntry.arguments?.getBoolean("draw") == true,
                     )
                 }
                 composable("compare/{firstId}/{secondId}") { backStackEntry ->
@@ -725,15 +730,18 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     }
 }
 
-// syncEngine.js's own health-check cadences (its lines 20-22), which the
-// read above follows: it is both this app's reachability probe and its
-// lock-status poll, so the tighter of the two schedules wins. The web
-// polls the lock endpoint at 3s while locked too (useInstanceLockStatus.js).
-private const val NoteRoute = "notes/{noteId}"
+/** `draw`: a drawing just created from the FAB opens straight on its
+ *  canvas. */
+private const val NoteRoute = "notes/{noteId}?draw={draw}"
 private val NoteRise = 14.dp
 
 /** Overlays the notes list stays in place under, rather than fading. */
 private val ListOverlayRoutes = setOf("settings", NoteRoute)
+
+// syncEngine.js's own health-check cadences (its lines 20-22), which the
+// read above follows: it is both this app's reachability probe and its
+// lock-status poll, so the tighter of the two schedules wins. The web
+// polls the lock endpoint at 3s while locked too (useInstanceLockStatus.js).
 private const val HEALTH_IDLE_MS = 10_000L
 private const val HEALTH_PENDING_MS = 5_000L
 private const val HEALTH_OFFLINE_MS = 3_000L
