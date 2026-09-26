@@ -2770,9 +2770,10 @@ private fun formatPasskeyDate(iso: String): String {
 // internal, not private: CollaboratorsScreen.kt and NativeLoginScreen.kt
 // (same package, different files) reuse this for the same
 // avatar-with-initials-fallback rendering, UserAvatar.jsx on the web.
-// Kotlin's top-level `private` is file-scoped.
+// Kotlin's top-level `private` is file-scoped. Without [onClick] it is a
+// plain picture, and a tap goes to whatever row it sits in.
 @Composable
-internal fun AvatarCircle(avatarUrl: String?, name: String, size: Dp, onClick: () -> Unit) {
+internal fun AvatarCircle(avatarUrl: String?, name: String, size: Dp, onClick: (() -> Unit)? = null) {
     val dark = LocalGkDark.current
     val bitmap = avatarUrl?.let { rememberDecodedImage(it) }
     val label = stringResource(R.string.native_settings_avatar_description)
@@ -2785,11 +2786,17 @@ internal fun AvatarCircle(avatarUrl: String?, name: String, size: Dp, onClick: (
             // workspace themes deliberately leave alone.
             .background(if (bitmap == null) (if (dark) AvatarFallbackBgDark else AvatarFallbackBgLight) else Color.Transparent)
             .semantics { contentDescription = label }
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Button,
-            ) { onClick() },
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onClick() }
+                } else {
+                    Modifier
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         if (bitmap != null) {

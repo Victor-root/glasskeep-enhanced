@@ -108,6 +108,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -156,6 +157,7 @@ import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.formatIso
+import com.glasskeep.app.nativeapp.data.network.CollaboratorDto
 import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.NoteIconDto
@@ -271,7 +273,6 @@ fun NoteDetailScreen(
     serverUrl: String,
     noteId: String,
     onBack: () -> Unit,
-    onOpenCollaborators: () -> Unit = {},
 ) {
     val dark = LocalGkDark.current
     val context = LocalContext.current
@@ -398,6 +399,13 @@ fun NoteDetailScreen(
     var logos by remember { mutableStateOf<List<LogoDto>>(emptyList()) }
     var changingImages by remember { mutableStateOf(false) }
     var viewerIndex by remember { mutableStateOf<Int?>(null) }
+    // The collaboration modal (CollaborationModal.jsx) over the note, and
+    // the note's whole roster, owner first: the web's addModalCollaborators,
+    // read as the note opens and kept current by the modal.
+    var showCollaborators by remember { mutableStateOf(false) }
+    var roster by remember { mutableStateOf<List<CollaboratorDto>?>(null) }
+    val currentUserId = remember { container.tokenStore.profile?.id }
+    val focusManager = LocalFocusManager.current
 
     // Tag suggestions need every note's tags, not just the open one (same
     // as App.jsx's allNotesForTags -> tagsWithCounts), so this reads the
@@ -421,6 +429,26 @@ fun NoteDetailScreen(
     // owned by someone else. The server already answers the second half in
     // `access`, so this needs no separate user-id comparison.
     val isCollaborativeNote = !note?.collaborators.isNullOrEmpty() || (note != null && !isOwnerAccess)
+
+    /** A fresh roster also refreshes the note's own list of everyone else
+     *  on it, which the footer badge and the delete dialog read. */
+    fun applyRoster(fresh: List<CollaboratorDto>) {
+        roster = fresh
+        note = note?.let { current ->
+            val viewerOwns = current.access == "owner"
+            current.copy(
+                collaborators = fresh.filterNot { if (viewerOwns) it.isOwner else it.id == currentUserId }.ifEmpty { null },
+            )
+        }
+    }
+
+    /** Tapping away from the note puts its keyboard away on the web; here
+     *  the editor would otherwise keep the focus under the modal. */
+    fun openCollaborators() {
+        focusManager.clearFocus()
+        showCollaborators = true
+    }
+
     val tagsWithCounts = remember(allNotes) {
         val counts = LinkedHashMap<String, Int>()
         for (n in allNotes) {
@@ -1577,6 +1605,17 @@ fun NoteDetailScreen(
         }
     }
 
+    // useCollaboration.js reads the roster as soon as a note opens; the
+    // collaboration modal, while open, keeps its own.
+    LaunchedEffect(noteId) {
+        try {
+            val fresh = repository.fetchNoteCollaborators(noteId)
+            if (!showCollaborators) applyRoster(fresh)
+        } catch (t: Throwable) {
+            NativeDebug.e("NoteDetailScreen roster load failed id=$noteId", t)
+        }
+    }
+
     // One snapshot per second of quiet, so a burst of typing collapses
     // into a single undoable step (useModalHistory.js's own DEBOUNCE_MS).
     // Restarting this effect on every keystroke is the debounce: the
@@ -1820,7 +1859,7 @@ fun NoteDetailScreen(
      *  including changes still inside a debounce or checklist row focus. */
     fun goBack() {
         if (BuildConfig.DEBUG) {
-            Log.d("GKBack", "goBack() invoked - showFormatSheet=$showFormatSheet noteAiOpen=$noteAiOpen showReminderPicker=$showReminderPicker", Throwable("GKBack trace"))
+            Log.d("GKBack", "goBack() invoked - showCollaborators=$showCollaborators showFormatSheet=$showFormatSheet noteAiOpen=$noteAiOpen showReminderPicker=$showReminderPicker", Throwable("GKBack trace"))
         }
         val current = note
         val edit = editability
@@ -1882,9 +1921,11 @@ fun NoteDetailScreen(
         SideEffect {
             Log.d(
                 "GKBack",
-                "branch recomposed: noteAiOpen=$noteAiOpen showReminderPicker=$showReminderPicker showFormatSheet=$showFormatSheet " +
+                "branch recomposed: showCollaborators=$showCollaborators noteAiOpen=$noteAiOpen " +
+                    "showReminderPicker=$showReminderPicker showFormatSheet=$showFormatSheet " +
                     "-> mounting ${
                         when {
+                            showCollaborators -> "showCollaborators"
                             noteAiOpen -> "noteAiOpen"
                             showReminderPicker -> "showReminderPicker"
                             showFormatSheet -> "showFormatSheet"
@@ -1894,7 +1935,12 @@ fun NoteDetailScreen(
             )
         }
     }
-    if (noteAiOpen) {
+    if (showCollaborators) {
+        BackHandler {
+            if (BuildConfig.DEBUG) Log.d("GKBack", "showCollaborators handler fired")
+            showCollaborators = false
+        }
+    } else if (noteAiOpen) {
         BackHandler {
             if (BuildConfig.DEBUG) Log.d("GKBack", "noteAiOpen handler fired")
             noteAiOpen = false
@@ -1926,8 +1972,10 @@ fun NoteDetailScreen(
     // Column's own background, so painting modalBg here alone never
     // reached them - they stayed on the workspace theme color underneath
     // this screen instead of following the note's own color the way the
-    // rest of the screen does.
-    LaunchedEffect(modalBg) { container.statusBarOverride.value = modalBg.toArgb() }
+    // rest of the screen does. The collaboration modal hands them its own
+    // surface while it is open, and the note's colour back after.
+    val systemBarColor = if (showCollaborators) collaboratorsSurface(dark) else modalBg
+    LaunchedEffect(systemBarColor) { container.statusBarOverride.value = systemBarColor.toArgb() }
     DisposableEffect(Unit) { onDispose { container.statusBarOverride.value = null } }
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
@@ -2439,7 +2487,7 @@ fun NoteDetailScreen(
                         showDrawModeButton = edit.isDrawType && !isReadOnlyAccess,
                         // ModalFooter.jsx's read-only pill names whoever set it.
                         readOnlyTooltip = if (isReadOnlyAccess) {
-                            currentNote.collaborators.orEmpty().firstOrNull { it.isOwner }
+                            roster.orEmpty().firstOrNull { it.isOwner }
                                 ?.let { owner -> owner.name.ifBlank { owner.email } }
                                 ?.takeIf { it.isNotBlank() }
                                 ?.let { stringResource(R.string.native_read_only_set_by, it) }
@@ -2477,7 +2525,7 @@ fun NoteDetailScreen(
                             showFormatSheet = false
                         },
                         onFormatClick = { showFormatSheet = !showFormatSheet },
-                        onCollaborateClick = { onOpenCollaborators() },
+                        onCollaborateClick = { openCollaborators() },
                         onTrashClick = { askTrash() },
                         onKebabClick = { menuExpanded = true },
                         imagePanel = {
@@ -2670,7 +2718,7 @@ fun NoteDetailScreen(
                                         PopoverMenuItem(
                                             label = stringResource(R.string.native_note_detail_collaborate),
                                             color = collaborateColor,
-                                            onClick = { menuExpanded = false; onOpenCollaborators() },
+                                            onClick = { menuExpanded = false; openCollaborators() },
                                         ) {
                                             CollaborateIcon(size = 16.dp, tint = collaborateColor)
                                         }
@@ -2728,10 +2776,19 @@ fun NoteDetailScreen(
             // right thing for both of those without native needing to say
             // so explicitly (see TrashNoteRequest's own doc comment).
             if (isOwnerAccess && !note?.collaborators.isNullOrEmpty()) {
-                DeleteSharedNoteDialog(
+                // remove_self is the plain dialog's own default mode;
+                // delete_for_all is owner-only server-side.
+                GkChoiceDialog(
+                    title = stringResource(R.string.native_note_detail_delete_shared_question),
+                    message = stringResource(R.string.native_note_detail_delete_shared_subtitle),
+                    mildLabel = stringResource(R.string.native_note_detail_remove_for_me),
+                    drasticLabel = stringResource(R.string.native_note_detail_delete_for_all),
                     dark = dark,
+                    borderColor = borderColor,
+                    titleColor = titleColor,
+                    onMild = { confirmTrash("remove_self") },
+                    onDrastic = { confirmTrash("delete_for_all") },
                     onDismiss = { showTrashConfirm = false },
-                    onConfirm = { mode -> confirmTrash(mode) },
                 )
             } else {
                 ConfirmDeleteDialog(
@@ -2848,6 +2905,19 @@ fun NoteDetailScreen(
                     noteAiError = null
                     container.noteAiStore.remove(noteId)
                 },
+            )
+        }
+
+        if (showCollaborators) {
+            CollaboratorsScreen(
+                container = container,
+                serverUrl = serverUrl,
+                noteId = noteId,
+                isOwner = isOwnerAccess,
+                currentUserId = currentUserId,
+                collaborators = roster.orEmpty(),
+                onCollaboratorsChange = { applyRoster(it) },
+                onClose = { showCollaborators = false },
             )
         }
     }
@@ -3327,9 +3397,10 @@ internal fun detailFieldColors(textColor: Color, subtextColor: Color, borderColo
         cursorColor = Indigo,
     )
 
-/** ConfirmDeleteDialog.jsx's plain and trashed variants: a centred card,
- *  title, one line of explanation, then Cancel and the red action side by
- *  side at the bottom right. */
+/** ConfirmDeleteDialog.jsx's plain and trashed variants: a centred card
+ *  over a `bg-black/40` scrim, title, one line of explanation, then Cancel
+ *  and the red action side by side at the bottom right, both at the
+ *  body's 16px, weight 400. */
 @Composable
 private fun ConfirmDeleteDialog(
     title: String,
@@ -3342,8 +3413,14 @@ private fun ConfirmDeleteDialog(
 ) {
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
-    GkDialog(onDismissRequest = onDismiss, dark = dark, borderColor = borderColor, maxWidth = 384.dp) {
-        Text(title, color = titleColor, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+    GkDialog(
+        onDismissRequest = onDismiss,
+        dark = dark,
+        borderColor = borderColor,
+        maxWidth = 384.dp,
+        scrimAlpha = ConfirmDialogDim,
+    ) {
+        Text(title, color = titleColor, fontSize = 18.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         Text(body, color = if (dark) DialogBodyDark else DialogBodyLight, fontSize = 14.sp, lineHeight = 20.sp)
         Spacer(Modifier.height(20.dp))
@@ -3355,82 +3432,22 @@ private fun ConfirmDeleteDialog(
                 label = stringResource(R.string.native_note_detail_trash_confirm_cancel),
                 borderColor = borderColor,
                 textColor = titleColor,
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Normal,
                 onClick = onDismiss,
             )
-            GkDangerButton(label = confirmLabel, enabled = enabled, onClick = onConfirm)
-        }
-    }
-}
-
-/** ConfirmDeleteDialog.jsx's third variant, for the owner of a shared
- *  note: the buttons become a full-width column, and there are three of
- *  them. "Remove for me" leaves via ownership transfer
- *  (mode=remove_self, same as the plain dialog's own default); "Delete
- *  for everyone" hard-deletes the note for every collaborator
- *  (mode=delete_for_all, owner-only server-side - see TrashNoteRequest's
- *  own doc comment). */
-@Composable
-private fun DeleteSharedNoteDialog(
-    dark: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: (mode: String) -> Unit,
-) {
-    val titleColor = if (dark) DarkTitleColor else LightTitleColor
-    val borderColor = if (dark) DarkBorderColor else LightBorderColor
-
-    GkDialog(onDismissRequest = onDismiss, dark = dark, borderColor = borderColor, maxWidth = 384.dp) {
-        Text(
-            stringResource(R.string.native_note_detail_delete_shared_question),
-            color = titleColor,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.native_note_detail_delete_shared_subtitle),
-            color = if (dark) DialogBodyDark else DialogBodyLight,
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-        )
-        Spacer(Modifier.height(20.dp))
-        GkSecondaryButton(
-            label = stringResource(R.string.native_note_detail_remove_for_me),
-            borderColor = borderColor,
-            textColor = titleColor,
-            modifier = Modifier.fillMaxWidth(),
-            onClick = { onConfirm("remove_self") },
-        )
-        Spacer(Modifier.height(8.dp))
-        GkDangerButton(
-            label = stringResource(R.string.native_note_detail_delete_for_all),
-            modifier = Modifier.fillMaxWidth(),
-            onClick = { onConfirm("delete_for_all") },
-        )
-        Spacer(Modifier.height(8.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) { onDismiss() }
-                .padding(vertical = 8.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                stringResource(R.string.native_dialog_cancel),
-                color = if (dark) DialogBodyDark else DialogBodyLight,
-                fontSize = 14.sp,
+            GkDangerButton(
+                label = confirmLabel,
+                enabled = enabled,
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Normal,
+                onClick = onConfirm,
             )
         }
     }
 }
-
-/** `text-gray-600` / `dark:text-gray-300`, the dialog body colour. */
-private val DialogBodyLight = Color(0xFF4B5563)
-private val DialogBodyDark = Color(0xFFD1D5DB)
 
 /** Any newline the user manages to get into a title (IME, paste, drop) is
  *  flattened to a space, same guard ModalHeader.jsx keeps: titles are

@@ -275,7 +275,6 @@ fun NativeLoginScreen(
                         avatarUrl = profile?.avatarUrl,
                         name = profile?.name.orEmpty(),
                         size = 80.dp,
-                        onClick = {},
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(

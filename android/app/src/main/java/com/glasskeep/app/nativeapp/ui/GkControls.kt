@@ -176,6 +176,11 @@ private val PopoverTextLight = Color(0xFF1E2939)
 private val PopoverTextDark = Color(0xFFF3F4F6)
 private val DialogBgDark = Color(0xFF282828)
 
+/** `text-gray-600` / `dark:text-gray-300`, the explanation line of the
+ *  web's confirmation dialogs. */
+internal val DialogBodyLight = Color(0xFF4A5565)
+internal val DialogBodyDark = Color(0xFFD1D5DC)
+
 /** `red-600`, the one red the workspace themes never retint. */
 internal val DangerRed = Color(0xFFE7000B)
 
@@ -904,9 +909,10 @@ internal fun GkDialog(
             usePlatformDefaultWidth = false,
         ),
     ) {
-        if (scrimAlpha != null) {
-            val window = (LocalView.current.parent as? DialogWindowProvider)?.window
-            SideEffect {
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+        SideEffect {
+            window?.setWindowAnimations(0)
+            if (scrimAlpha != null) {
                 window?.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
                 window?.setDimAmount(scrimAlpha)
             }
@@ -1045,6 +1051,75 @@ internal fun GkConfirmDialog(
     }
 }
 
+/**
+ * The web's two-way removal choice (ConfirmDeleteDialog.jsx's variant for
+ * the owner of a shared note, ConfirmRemoveCollaboratorDialog.jsx): the
+ * red confirmation card over a `bg-black/40` scrim, then three full-width
+ * buttons 8dp apart, the mild choice outlined and the drastic one red at
+ * the body's 16px, weight 400, and a borderless 14px Cancel.
+ */
+@Composable
+internal fun GkChoiceDialog(
+    title: String,
+    message: String,
+    mildLabel: String,
+    drasticLabel: String,
+    dark: Boolean,
+    borderColor: Color,
+    titleColor: Color,
+    onMild: () -> Unit,
+    onDrastic: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val bodyColor = if (dark) DialogBodyDark else DialogBodyLight
+    GkDialog(
+        onDismissRequest = onDismiss,
+        dark = dark,
+        borderColor = borderColor,
+        maxWidth = 384.dp,
+        scrimAlpha = ConfirmDialogDim,
+    ) {
+        Text(title, color = titleColor, fontSize = 18.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+        Text(message, color = bodyColor, fontSize = 14.sp, lineHeight = 20.sp)
+        Spacer(Modifier.height(20.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            GkSecondaryButton(
+                label = mildLabel,
+                borderColor = borderColor,
+                textColor = titleColor,
+                modifier = Modifier.fillMaxWidth(),
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Normal,
+                onClick = onMild,
+            )
+            GkDangerButton(
+                label = drasticLabel,
+                modifier = Modifier.fillMaxWidth(),
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Normal,
+                onClick = onDrastic,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onDismiss() }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(stringResource(R.string.native_dialog_cancel), color = bodyColor, fontSize = 14.sp, lineHeight = 20.sp)
+            }
+        }
+    }
+}
+
 /** The bordered secondary button (Cancel, Test connection):
  *  `px-4 py-2 rounded-lg border border-[var(--border-light)]`. A dialog's
  *  Cancel, with no `text-sm font-semibold`, passes the 16px/24px normal
@@ -1090,6 +1165,7 @@ internal fun GkDangerButton(
     enabled: Boolean = true,
     fontSize: TextUnit = 14.sp,
     lineHeight: TextUnit = 20.sp,
+    fontWeight: FontWeight = FontWeight.SemiBold,
     onClick: () -> Unit,
 ) {
     Box(
@@ -1106,7 +1182,7 @@ internal fun GkDangerButton(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Color.White, fontSize = fontSize, lineHeight = lineHeight, fontWeight = FontWeight.SemiBold)
+        Text(label, color = Color.White, fontSize = fontSize, lineHeight = lineHeight, fontWeight = fontWeight)
     }
 }
 
@@ -1404,6 +1480,11 @@ internal fun Modifier.dismissOnOutsideTouch(onDismiss: () -> Unit): Modifier = p
         } while (event.changes.any { it.pressed })
     }
 }
+
+/** For a layer drawn over a screen that stays composed beneath it (the
+ *  web's `fixed inset-0` overlays): every touch landing on it stops here,
+ *  even where nothing on the layer answers it. */
+internal fun Modifier.blockTouchesBelow(): Modifier = pointerInput(Unit) {}
 
 /** Lets a block spill past its parent's horizontal padding, the way the
  *  checklist deliberately does on a phone (`max-sm:-mx-4`). */

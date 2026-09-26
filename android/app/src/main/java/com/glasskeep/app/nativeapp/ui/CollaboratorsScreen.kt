@@ -1,5 +1,7 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.content.Context
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,47 +11,57 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
@@ -57,21 +69,23 @@ import com.glasskeep.app.nativeapp.data.AddCollaboratorResult
 import com.glasskeep.app.nativeapp.data.RemoveCollaboratorResult
 import com.glasskeep.app.nativeapp.data.SetCollaboratorAccessResult
 import com.glasskeep.app.nativeapp.data.network.CollaboratorDto
-import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkBorderColor
-import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
-import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBorderColor
-import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
+import java.text.Collator
 import kotlinx.coroutines.launch
-
-private val ErrorColor = Color(0xFFdc2626)
 
 /** LETTER_INDEX_MIN (CollaborationModal.jsx:11): below this many
  *  candidates the alphabet jump-list is more clutter than help. */
 private const val LetterIndexMin = 15
+
+/** The badges' 11px text keeps the 1.4286 line-height ratio of the
+ *  `text-sm` line they sit in. */
+private val BadgeLineHeight = 15.71.sp
+
+/** The modal's own surface, which the system bars take while it is open. */
+internal fun collaboratorsSurface(dark: Boolean): Color = if (dark) Color(0xFF282828) else Color.White
 
 private data class ShareCandidate(
     val key: String,
@@ -85,218 +99,272 @@ private data class ShareCandidate(
     val username: String,
 )
 
+/** useCollaboration.js's participantsMutationRef / pendingMutationsRef: a
+ *  roster change bumps [seq] when it starts and again when it ends, and
+ *  counts in [pending] while it travels, so a reload that overlapped one
+ *  can tell its answer may predate it. Main thread only. */
+private class RosterMutations {
+    var seq = 0
+        private set
+    var pending = 0
+        private set
+
+    fun begin() {
+        seq++
+        pending++
+    }
+
+    fun end() {
+        pending--
+        seq++
+    }
+}
+
 /**
- * CollaborationModal.jsx, ported: who has access to one note, and, for
- * the owner, everyone who could. One screen, not two: on a phone the web
- * modal already fills the viewport (`w-full h-full rounded-none`), and it
- * holds the roster AND the picker together, so splitting them into a
- * screen plus a dialog would have been the native app's own invention.
- *
- * Three zones, exactly as the web lays them out: a fixed header, a
+ * CollaborationModal.jsx, over the open note: who has access to it and,
+ * for the owner, everyone who could. On a phone the web modal fills the
+ * screen with the roster and the picker together: a fixed header, a
  * scrolling body (current collaborators, then the search and the
- * candidates), and a fixed footer (the access to grant, then Cancel and
+ * candidates) and a fixed footer (the access to grant, then Cancel and
  * Add). A non-owner sees only the roster and a Close button.
  *
- * The picker merges local accounts with real users advertised by paired
- * federation peers; the opaque ref@host value is only sent to the API and
- * never shown in place of the friendly name/server badge.
+ * The roster belongs to the note ([collaborators], the web's
+ * addModalCollaborators): this reloads it on open and after each change,
+ * and flips an access at once, before the server answers. The picker
+ * merges local accounts with real users advertised by paired federation
+ * peers; the opaque ref@host value is only sent to the API and never
+ * shown in place of the friendly name/server badge.
  */
 @Composable
 fun CollaboratorsScreen(
     container: NativeAppContainer,
     serverUrl: String,
     noteId: String,
-    onBack: () -> Unit,
+    isOwner: Boolean,
+    currentUserId: Int?,
+    collaborators: List<CollaboratorDto>,
+    onCollaboratorsChange: (List<CollaboratorDto>) -> Unit,
+    onClose: () -> Unit,
 ) {
     val dark = LocalGkDark.current
+    val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val toasts = LocalGkToasts.current
+    val applyCollaborators by rememberUpdatedState(onCollaboratorsChange)
 
-    var collaborators by remember { mutableStateOf<List<CollaboratorDto>>(emptyList()) }
-    var isOwner by remember { mutableStateOf(false) }
-    var currentUserId by remember { mutableStateOf<Int?>(null) }
-    var loading by remember { mutableStateOf(true) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
     var pendingRemoval by remember { mutableStateOf<CollaboratorDto?>(null) }
-
     var candidates by remember { mutableStateOf<List<ShareCandidate>>(emptyList()) }
-    var candidatesLoading by remember { mutableStateOf(false) }
+    var candidatesLoading by remember { mutableStateOf(isOwner) }
     var query by remember { mutableStateOf("") }
     var letterFilter by remember { mutableStateOf<String?>(null) }
     var selected by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var newAccess by remember { mutableStateOf("write") }
-    var submitting by remember { mutableStateOf(false) }
+    var adding by remember { mutableStateOf(false) }
+    val mutations = remember { RosterMutations() }
 
-    val errorTemplate = stringResource(R.string.native_collaborators_error)
-    val accessFailedTemplate = stringResource(R.string.native_collaborators_access_failed)
-    val removeFailedTemplate = stringResource(R.string.native_collaborators_remove_failed)
-    val loadErrorTemplate = stringResource(R.string.native_collaborators_search_error)
-    val addedTemplate = stringResource(R.string.native_collaborators_added_success)
-    val addFailedTemplate = stringResource(R.string.native_collaborators_add_failed)
-
-    val titleColor = if (dark) DarkTitleColor else LightTitleColor
-    val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
+    val textColor = if (dark) DarkTitleColor else LightTitleColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
+    // text-gray-500 / dark:text-gray-400.
+    val mutedColor = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282)
+    val accent = WorkspaceTheme.accent(themeId, dark)
 
-    suspend fun load() {
-        loading = true
-        errorMessage = null
-        try {
-            // Two calls, not one: fetchNoteCollaborators alone can't tell
-            // this viewer's OWN access level (every entry it returns is
-            // about someone else, or the owner, never "am I the owner"),
-            // and a nav-passed boolean would risk going stale if
-            // ownership changed between screens (see setArchivedQueued's
-            // own "leave" outcome in NotesRepository.kt for a real way
-            // that can happen) instead of always reflecting the current
-            // truth like every other fetch in this app.
-            isOwner = repository.fetchNoteDetail(noteId).access == "owner"
-            collaborators = repository.fetchNoteCollaborators(noteId)
+    /** loadCollaboratorsForAddModal. [force] is for the reload a change
+     *  asks for once the server confirmed it; any other drops its answer
+     *  when a change started, ended or was still travelling meanwhile,
+     *  since it could put the previous roster back. */
+    suspend fun reload(force: Boolean = false) {
+        val seq = mutations.seq
+        val fresh = try {
+            repository.fetchNoteCollaborators(noteId)
         } catch (t: Throwable) {
-            NativeDebug.e("CollaboratorsScreen load failed", t)
-            errorMessage = String.format(errorTemplate, t.message ?: t.javaClass.simpleName)
-        } finally {
-            loading = false
+            NativeDebug.e("CollaboratorsScreen reload failed", t)
+            return
         }
+        if (!force && (mutations.seq != seq || mutations.pending > 0)) return
+        applyCollaborators(fresh)
     }
 
+    /** The row flips at once; a refusal says why and puts the server's
+     *  own answer back. */
     fun changeAccess(collaborator: CollaboratorDto, access: String) {
+        mutations.begin()
+        val canWrite = if (access == "write") 1 else 0
+        onCollaboratorsChange(collaborators.map { if (it.id == collaborator.id) it.copy(canWrite = canWrite) else it })
         scope.launch {
             try {
-                when (val result = repository.setCollaboratorAccess(noteId, collaborator.id, access)) {
-                    SetCollaboratorAccessResult.Updated -> load()
-                    SetCollaboratorAccessResult.NotFound -> load()
-                    is SetCollaboratorAccessResult.Rejected -> {
-                        toasts.error(String.format(accessFailedTemplate, "HTTP ${result.httpCode}"))
+                val refusal = try {
+                    when (val result = repository.setCollaboratorAccess(noteId, collaborator.id, access)) {
+                        SetCollaboratorAccessResult.Updated -> null
+                        is SetCollaboratorAccessResult.Rejected ->
+                            collaborationError(context, result.error, R.string.native_collaborators_access_failed)
                     }
+                } catch (t: Throwable) {
+                    NativeDebug.e("CollaboratorsScreen changeAccess failed", t)
+                    context.getString(R.string.native_collaborators_access_failed)
                 }
-            } catch (t: Throwable) {
-                NativeDebug.e("CollaboratorsScreen changeAccess failed", t)
-                toasts.error(String.format(accessFailedTemplate, t.message ?: t.javaClass.simpleName))
+                if (refusal != null) {
+                    toasts.error(refusal)
+                    reload(force = true)
+                }
+            } finally {
+                mutations.end()
             }
         }
     }
 
+    /** No toast on success: the server's own notification reaches both
+     *  sides, as on the web. */
     fun removeCollaborator(collaborator: CollaboratorDto, keepCopy: Boolean) {
+        mutations.begin()
         scope.launch {
             try {
                 when (val result = repository.removeCollaborator(noteId, collaborator.id, keepCopy)) {
-                    is RemoveCollaboratorResult.Removed -> load()
-                    RemoveCollaboratorResult.NotFound -> load()
-                    is RemoveCollaboratorResult.Rejected -> {
-                        toasts.error(String.format(removeFailedTemplate, "HTTP ${result.httpCode}"))
-                    }
+                    is RemoveCollaboratorResult.Removed -> reload(force = true)
+                    is RemoveCollaboratorResult.Rejected ->
+                        toasts.error(collaborationError(context, result.error, R.string.native_collaborators_remove_failed))
                 }
             } catch (t: Throwable) {
                 NativeDebug.e("CollaboratorsScreen removeCollaborator failed", t)
-                toasts.error(String.format(removeFailedTemplate, t.message ?: t.javaClass.simpleName))
+                toasts.error(context.getString(R.string.native_collaborators_remove_failed))
             } finally {
-                pendingRemoval = null
+                mutations.end()
             }
         }
     }
 
-    /** Confirming sends one request per selected person, sequentially:
-     *  there's no batch endpoint on the server, same as the web's own
-     *  loop. Someone who is already a collaborator (a benign race, added
-     *  from another device moments ago) is silently skipped, same as the
-     *  web; any other failure is tallied and reported once at the end
-     *  instead of one toast per person. */
-    fun submitAdd() {
-        if (submitting || selected.isEmpty()) return
-        submitting = true
-        val targets = candidates.filter { it.key in selected.keys }
-        scope.launch {
-            var added = 0
-            var failed = 0
-            for (user in targets) {
-                try {
-                    when (repository.addCollaborator(noteId, user.username, selected[user.key] ?: newAccess)) {
-                        is AddCollaboratorResult.Added -> added++
-                        AddCollaboratorResult.AlreadyCollaborator -> Unit
-                        AddCollaboratorResult.UserNotFound, is AddCollaboratorResult.Rejected -> failed++
-                    }
-                } catch (t: Throwable) {
-                    NativeDebug.e("CollaboratorsScreen add failed for user ${user.key}", t)
-                    failed++
+    /** describeAddError: a locked peer names the server and the person as
+     *  the list shows them. */
+    fun addError(error: String?, user: ShareCandidate): String =
+        if (error == "locked") {
+            context.getString(
+                R.string.native_collaborators_peer_locked,
+                user.serverLabel ?: user.username.substringAfterLast('@'),
+                user.name,
+            )
+        } else {
+            collaborationError(context, error, R.string.native_collaborators_add_failed)
+        }
+
+    // Already on the note, so not offered again: local rows by id,
+    // federated ones by their peer identity and server. Sorted by name the
+    // way localeCompare's "base" sensitivity does, accents and case aside.
+    val available = remember(candidates, collaborators) {
+        val collator = Collator.getInstance().apply { strength = Collator.PRIMARY }
+        candidates.filterNot { candidate ->
+            if (candidate.federated) {
+                collaborators.any {
+                    it.federated && it.email == candidate.remoteRef &&
+                        it.serverLabel.orEmpty() == candidate.serverLabel.orEmpty()
                 }
+            } else {
+                collaborators.any { it.id == candidate.localId }
             }
-            submitting = false
+        }.sortedWith(compareBy(collator) { it.name })
+    }
+    val searchText = query.trim()
+    val visible = remember(available, searchText, letterFilter) {
+        when {
+            searchText.isNotEmpty() -> available.filter { it.name.contains(searchText, ignoreCase = true) }
+            letterFilter != null -> available.filter { initialOf(it.name) == letterFilter }
+            else -> available
+        }
+    }
+    val selectedUsers = available.filter { it.key in selected }
+
+    /** addCollaboratorsBatch: one request per person, each with its own
+     *  access, one toast per refusal and a single summary once done. */
+    fun submitAdd() {
+        if (selectedUsers.isEmpty() || adding) return
+        adding = true
+        val items = selectedUsers.map { it to (selected[it.key] ?: newAccess) }
+        mutations.begin()
+        scope.launch {
+            try {
+                var added = 0
+                for ((user, access) in items) {
+                    val refusal = try {
+                        when (val result = repository.addCollaborator(noteId, user.username, access)) {
+                            is AddCollaboratorResult.Added -> {
+                                added++
+                                null
+                            }
+                            AddCollaboratorResult.AlreadyCollaborator -> null
+                            is AddCollaboratorResult.Rejected -> addError(result.error, user)
+                        }
+                    } catch (t: Throwable) {
+                        NativeDebug.e("CollaboratorsScreen add failed for user ${user.key}", t)
+                        context.getString(R.string.native_collaborators_add_failed)
+                    }
+                    refusal?.let { toasts.error(it) }
+                }
+                if (added > 0) {
+                    toasts.success(
+                        if (added == 1) {
+                            context.getString(R.string.native_collaborators_added_one)
+                        } else {
+                            context.getString(R.string.native_collaborators_added_many, added)
+                        },
+                        icon = "share",
+                    )
+                    reload(force = true)
+                }
+            } finally {
+                mutations.end()
+            }
             selected = emptyMap()
-            if (added > 0) {
-                toasts.success(String.format(addedTemplate, added))
-            }
-            if (failed > 0) {
-                toasts.error(String.format(addFailedTemplate, failed))
-            }
-            load()
+            query = ""
+            letterFilter = null
+            adding = false
         }
     }
 
-    LaunchedEffect(noteId) {
-        load()
-        currentUserId = try {
-            repository.fetchProfile().id
-        } catch (t: Throwable) {
-            NativeDebug.e("CollaboratorsScreen fetchProfile failed", t)
-            null
-        }
-    }
+    LaunchedEffect(Unit) { reload() }
 
-    // The candidate list is only ever fetched for the owner, and only once
-    // the roster is in: it filters against it.
+    // Everyone the owner could share with: local accounts first, at once,
+    // then the real users of paired peers appended when they answer, so a
+    // slow or offline peer never holds the local list back.
     LaunchedEffect(isOwner) {
-        if (!isOwner || candidates.isNotEmpty()) return@LaunchedEffect
+        if (!isOwner) return@LaunchedEffect
         candidatesLoading = true
-        try {
-            val local = repository.searchUsers().map { user ->
+        candidates = try {
+            repository.searchUsers()
+                .filter { it.id != currentUserId }
+                .map { user ->
+                    ShareCandidate(
+                        key = "local:${user.id}", localId = user.id, name = user.name.ifEmpty { user.email },
+                        email = user.email, avatarUrl = user.avatarUrl, username = user.email,
+                    )
+                }
+        } catch (t: Throwable) {
+            NativeDebug.e("CollaboratorsScreen searchUsers failed", t)
+            emptyList()
+        }
+        candidatesLoading = false
+        val remotes = try {
+            repository.searchFederatedUsers().map { user ->
                 ShareCandidate(
-                    key = "local:${user.id}", localId = user.id, name = user.name,
-                    email = user.email, avatarUrl = user.avatarUrl, username = user.email,
-                )
-            }
-            val remote = runCatching { repository.searchFederatedUsers() }.getOrDefault(emptyList()).map { user ->
-                ShareCandidate(
-                    key = "remote:${user.host}|${user.ref}", name = user.name,
+                    key = "remote:${user.host}|${user.ref}", name = user.name.ifEmpty { user.ref },
                     avatarUrl = user.avatar, federated = true, serverLabel = user.serverLabel,
                     remoteRef = user.ref, username = "${user.ref}@${user.host}",
                 )
             }
-            candidates = local + remote
         } catch (t: Throwable) {
-            NativeDebug.e("CollaboratorsScreen searchUsers failed", t)
-            errorMessage = String.format(loadErrorTemplate, t.message ?: t.javaClass.simpleName)
-        } finally {
-            candidatesLoading = false
+            NativeDebug.e("CollaboratorsScreen searchFederatedUsers failed", t)
+            emptyList()
         }
+        if (remotes.isNotEmpty()) candidates = candidates + remotes
     }
 
-    // existingIds also excludes the current user without any extra lookup:
-    // the roster always includes the owner's own entry (the server's
-    // GET .../collaborators unconditionally unshifts it).
-    val existingIds = remember(collaborators) { collaborators.map { it.id }.toSet() }
-    val available = remember(candidates, existingIds, collaborators) {
-        candidates.filterNot { candidate ->
-            candidate.localId?.let { it in existingIds } == true ||
-                (candidate.federated && collaborators.any {
-                    it.federated && it.email == candidate.remoteRef &&
-                        (it.serverLabel.orEmpty() == candidate.serverLabel.orEmpty())
-                })
-        }
-    }
-    val filtered = remember(available, query, letterFilter) {
-        val trimmed = query.trim()
-        available
-            .filter { trimmed.isEmpty() || it.name.contains(trimmed, ignoreCase = true) || it.email.orEmpty().contains(trimmed, ignoreCase = true) || it.serverLabel.orEmpty().contains(trimmed, ignoreCase = true) }
-            .filter { letterFilter == null || initialOf(it.name) == letterFilter }
-    }
-
+    // Full screen on a phone, edge to edge under the system bars, the
+    // content 16dp inside them. The note's own 1px panel edge, which this
+    // sits inside, is the modal's `.glass-card` border.
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (dark) Color(0xFF282828) else Color.White)
+            .background(collaboratorsSurface(dark))
+            .blockTouchesBelow()
             .windowInsetsPadding(WindowInsets.systemBars)
             .padding(16.dp),
     ) {
@@ -309,8 +377,9 @@ fun CollaboratorsScreen(
                 stringResource(
                     if (isOwner) R.string.native_collaborators_add_action else R.string.native_collaborators_title,
                 ),
-                color = titleColor,
+                color = textColor,
                 fontSize = 18.sp,
+                lineHeight = 28.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -319,22 +388,19 @@ fun CollaboratorsScreen(
             val closeLabel = stringResource(R.string.native_common_close)
             Box(
                 modifier = Modifier
+                    // -mr-1.5: the button reaches 6dp into the gutter.
+                    .offset(x = 6.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .semantics { contentDescription = closeLabel }
-                    .gkTooltip(closeLabel)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         role = Role.Button,
-                    ) { onBack() }
+                    ) { onClose() }
                     .padding(6.dp),
             ) {
-                CloseIcon(size = 22.dp, tint = subtextColor)
+                CloseIcon(size = 22.dp, tint = mutedColor, strokeWidth = 2f)
             }
-        }
-
-        errorMessage?.let {
-            Text(it, color = ErrorColor, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
         }
 
         Column(
@@ -344,27 +410,38 @@ fun CollaboratorsScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             if (collaborators.isNotEmpty()) {
+                // The owner doesn't see their own row; a collaborator does,
+                // marked "Me", so it's clear they're on the note.
+                val shown = if (isOwner) collaborators.filterNot { it.isOwner } else collaborators
                 Text(
                     stringResource(R.string.native_collaborators_current),
-                    color = if (dark) Color(0xFFD1D5DB) else Color(0xFF374151),
+                    color = if (dark) Color(0xFFD1D5DC) else Color(0xFF364153),
                     fontSize = 14.sp,
+                    lineHeight = 20.sp,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    // Its 8px margin collapses into the section's 16px when
+                    // no row follows.
+                    modifier = Modifier.padding(bottom = if (shown.isEmpty()) 0.dp else 8.dp),
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 16.dp)) {
-                    for (collaborator in collaborators) {
-                        if (isOwner && collaborator.isOwner) continue
-                        CollaboratorRow(
-                            collaborator = collaborator,
-                            isMe = collaborator.id == currentUserId,
-                            dark = dark,
-                            titleColor = titleColor,
-                            subtextColor = subtextColor,
-                            borderColor = borderColor,
-                            canManage = isOwner && !collaborator.isOwner,
-                            onSetAccess = { access -> changeAccess(collaborator, access) },
-                            onRemove = { pendingRemoval = collaborator },
-                        )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 16.dp),
+                ) {
+                    for (collaborator in shown) {
+                        key(collaborator.id) {
+                            CollaboratorRow(
+                                collaborator = collaborator,
+                                isMe = collaborator.id == currentUserId,
+                                canManage = isOwner && !collaborator.isOwner,
+                                themeId = themeId,
+                                dark = dark,
+                                textColor = textColor,
+                                mutedColor = mutedColor,
+                                borderColor = borderColor,
+                                onSetAccess = { access -> changeAccess(collaborator, access) },
+                                onRemove = { pendingRemoval = collaborator },
+                            )
+                        }
                     }
                 }
             }
@@ -372,41 +449,46 @@ fun CollaboratorsScreen(
             if (isOwner) {
                 Text(
                     stringResource(R.string.native_collaborators_select_hint),
-                    color = if (dark) Color(0xFFD1D5DB) else Color(0xFF4B5563),
+                    color = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565),
                     fontSize = 14.sp,
+                    lineHeight = 20.sp,
                     modifier = Modifier.padding(bottom = 12.dp),
                 )
-                OutlinedTextField(
+                PeopleSearchField(
                     value = query,
-                    onValueChange = { query = it },
-                    placeholder = { Text(stringResource(R.string.native_collaborators_search_placeholder)) },
-                    leadingIcon = { SearchIcon(size = 16.dp, tint = subtextColor) },
-                    singleLine = true,
-                    colors = detailFieldColors(titleColor, subtextColor, borderColor),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    onValueChange = {
+                        query = it
+                        letterFilter = null
+                    },
+                    themeId = themeId,
+                    dark = dark,
+                    borderColor = borderColor,
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
-                if (available.size >= LetterIndexMin && query.isBlank()) {
+                if (available.size >= LetterIndexMin && searchText.isEmpty()) {
                     LetterIndex(
-                        letters = remember(available) { available.map { initialOf(it.name) }.toSortedSet().toList() },
+                        letters = remember(available) { available.map { initialOf(it.name) }.toSet() },
                         active = letterFilter,
+                        accent = accent,
                         dark = dark,
-                        titleColor = titleColor,
+                        textColor = textColor,
                         onSelect = { letterFilter = it },
                     )
                 }
                 CandidateList(
-                    candidates = filtered,
+                    visible = visible,
                     loading = candidatesLoading,
                     hasAny = available.isNotEmpty(),
                     selected = selected,
+                    themeId = themeId,
                     dark = dark,
-                    titleColor = titleColor,
-                    subtextColor = subtextColor,
+                    textColor = textColor,
+                    mutedColor = mutedColor,
                     borderColor = borderColor,
                     onToggle = { user ->
                         selected = if (user.key in selected) selected - user.key else selected + (user.key to newAccess)
                     },
-                    onAccess = { user, access -> selected = selected + (user.key to access) },
+                    onAccess = { user, access -> if (user.key in selected) selected = selected + (user.key to access) },
                 )
             }
         }
@@ -419,31 +501,34 @@ fun CollaboratorsScreen(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (selected.isEmpty()) {
+                        if (selectedUsers.isEmpty()) {
                             stringResource(R.string.native_collaborators_access_for_new)
                         } else {
-                            String.format(stringResource(R.string.native_collaborators_access_for_selected), selected.size)
+                            stringResource(R.string.native_collaborators_access_for_selected, selectedUsers.size)
                         },
-                        color = if (dark) Color(0xFFE5E7EB) else Color(0xFF374151),
+                        color = if (dark) Color(0xFFE5E7EB) else Color(0xFF364153),
                         fontSize = 12.sp,
+                        lineHeight = 16.sp,
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
                         stringResource(R.string.native_collaborators_access_for_new_hint),
-                        color = subtextColor,
+                        color = mutedColor,
                         fontSize = 11.sp,
+                        lineHeight = 16.5.sp,
                     )
                 }
+                // Sets the access of the next picks and, in one go, of
+                // everyone already picked.
                 AccessToggle(
                     canWrite = newAccess == "write",
+                    themeId = themeId,
                     dark = dark,
-                    subtextColor = subtextColor,
+                    mutedColor = mutedColor,
                     borderColor = borderColor,
-                    onChange = { write ->
-                        newAccess = if (write) "write" else "read"
-                        // Changing the default also re-grants everyone
-                        // already ticked, same as the web's own toggle.
-                        selected = selected.mapValues { newAccess }
+                    onChange = { access ->
+                        newAccess = access
+                        selected = selected.mapValues { access }
                     },
                 )
             }
@@ -455,17 +540,19 @@ fun CollaboratorsScreen(
                 GkSecondaryButton(
                     label = stringResource(R.string.native_dialog_cancel),
                     borderColor = borderColor,
-                    textColor = titleColor,
-                    onClick = onBack,
+                    textColor = textColor,
+                    fontSize = 16.sp,
+                    lineHeight = 24.sp,
+                    fontWeight = FontWeight.Normal,
+                    onClick = onClose,
                 )
+                val addLabel = stringResource(R.string.native_collaborators_add_action)
                 GkGradientButton(
-                    label = if (selected.isEmpty()) {
-                        stringResource(R.string.native_collaborators_add_action)
-                    } else {
-                        String.format(stringResource(R.string.native_collaborators_add_confirm), selected.size)
-                    },
-                    themeId = container.themeState.themeId,
-                    enabled = selected.isNotEmpty() && !submitting,
+                    label = if (selectedUsers.isEmpty()) addLabel else "$addLabel (${selectedUsers.size})",
+                    themeId = themeId,
+                    enabled = selectedUsers.isNotEmpty() && !adding,
+                    fontSize = 16.sp,
+                    lineHeight = 24.sp,
                     onClick = { submitAdd() },
                 )
             }
@@ -477,33 +564,62 @@ fun CollaboratorsScreen(
                 GkSecondaryButton(
                     label = stringResource(R.string.native_common_close),
                     borderColor = borderColor,
-                    textColor = titleColor,
-                    onClick = onBack,
+                    textColor = textColor,
+                    fontSize = 16.sp,
+                    lineHeight = 24.sp,
+                    fontWeight = FontWeight.Normal,
+                    onClick = onClose,
                 )
             }
         }
     }
 
-    if (loading) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(if (dark) Color(0xFF282828) else Color.White),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(stringResource(R.string.native_collaborators_searching), color = subtextColor, fontSize = 14.sp)
-        }
-    }
-
     pendingRemoval?.let { collaborator ->
-        RemoveCollaboratorDialog(
-            collaboratorName = collaborator.name,
+        GkChoiceDialog(
+            title = stringResource(R.string.native_collaborators_remove_question, collaborator.name.ifEmpty { collaborator.email }),
+            message = stringResource(R.string.native_collaborators_remove_subtitle),
+            mildLabel = stringResource(R.string.native_collaborators_remove_keep_copy),
+            drasticLabel = stringResource(R.string.native_collaborators_remove_no_copy),
             dark = dark,
+            borderColor = borderColor,
+            titleColor = textColor,
+            onMild = {
+                pendingRemoval = null
+                removeCollaborator(collaborator, keepCopy = true)
+            },
+            onDrastic = {
+                pendingRemoval = null
+                removeCollaborator(collaborator, keepCopy = false)
+            },
             onDismiss = { pendingRemoval = null },
-            onConfirm = { keepCopy -> removeCollaborator(collaborator, keepCopy) },
         )
     }
 }
+
+/** serverErrors.js, for what sharing runs into: the server's English text
+ *  or a federation token, reworded; any other text is shown as the server
+ *  wrote it, and a refusal without one falls back on [fallback]. */
+private fun collaborationError(context: Context, error: String?, @StringRes fallback: Int): String {
+    if (error.isNullOrBlank()) return context.getString(fallback)
+    val known = CollaborationErrors.firstOrNull { (needle, _) -> needle in error } ?: return error
+    return context.getString(known.second)
+}
+
+private val CollaborationErrors = listOf(
+    "Note not found" to R.string.native_err_note_not_found,
+    "User not found" to R.string.native_err_user_not_found,
+    "Failed to add collaborator" to R.string.native_err_add_collaborator_failed,
+    "Collaborator not found" to R.string.native_err_collaborator_not_found,
+    "peer_not_paired" to R.string.native_err_peer_not_paired,
+    "clock-skew" to R.string.native_err_peer_clock_skew,
+    "note_id_conflict" to R.string.native_err_peer_note_id_conflict,
+    "payload_too_large" to R.string.native_err_peer_payload_too_large,
+    "federation_failed" to R.string.native_err_federation_failed,
+    "tls-certificate-invalid" to R.string.native_err_peer_tls_invalid,
+    "dns-not-found" to R.string.native_err_peer_dns_not_found,
+    "connection-refused" to R.string.native_err_peer_unreachable,
+    "unreachable" to R.string.native_err_peer_unreachable,
+)
 
 /** The first letter a name is filed under, `#` for anything that doesn't
  *  start with a letter (CollaborationModal.jsx:15-18). */
@@ -512,14 +628,82 @@ private fun initialOf(name: String): String {
     return if (first in 'A'..'Z') first.toString() else "#"
 }
 
-/** The alphabet jump list: "All" then every letter actually present. */
+/** The search box: `pl-9 pr-3 py-2 text-sm rounded-lg` on white (dark
+ *  black 30%), the magnifier 12dp in, and the `ring-2` a workspace theme
+ *  retints to its accent (the default theme's is indigo-500 at 50%). */
+@Composable
+private fun PeopleSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    themeId: String?,
+    dark: Boolean,
+    borderColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val ring = if (WorkspaceTheme.forId(themeId).id == WorkspaceTheme.DEFAULT_ID) {
+        Color(0xFF615FFF).copy(alpha = 0.5f)
+    } else {
+        WorkspaceTheme.accent(themeId, dark)
+    }
+    // text-gray-900 / dark:text-gray-100, the caret following the text.
+    val textColor = if (dark) Color(0xFFF3F4F6) else Color(0xFF101828)
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = TextStyle(color = textColor, fontSize = 14.sp, lineHeight = 20.sp),
+        cursorBrush = SolidColor(textColor),
+        modifier = modifier
+            .fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .drawBehind {
+                if (focused) {
+                    val width = 2.dp.toPx()
+                    drawRoundRect(
+                        color = ring,
+                        topLeft = Offset(-width / 2f, -width / 2f),
+                        size = Size(size.width + width, size.height + width),
+                        cornerRadius = CornerRadius(8.dp.toPx() + width / 2f),
+                        style = Stroke(width),
+                    )
+                }
+            }
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (dark) Color.Black.copy(alpha = 0.3f) else Color.White)
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .padding(start = 12.dp, end = 13.dp, top = 9.dp, bottom = 9.dp),
+        decorationBox = { innerTextField ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ModalSearchIcon(size = 16.dp, tint = if (dark) Color(0xFF6A7282) else Color(0xFF99A1AF))
+                Box(Modifier.weight(1f).padding(start = 9.dp)) {
+                    if (value.isEmpty()) {
+                        Text(
+                            stringResource(R.string.native_collaborators_search_placeholder),
+                            color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    innerTextField()
+                }
+            }
+        },
+    )
+}
+
+/** The alphabet jump list: "All", the 26 letters (those nobody is filed
+ *  under faded and inert), then "#" when anyone is filed there. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LetterIndex(
-    letters: List<String>,
+    letters: Set<String>,
     active: String?,
+    accent: Color,
     dark: Boolean,
-    titleColor: Color,
+    textColor: Color,
     onSelect: (String?) -> Unit,
 ) {
     FlowRow(
@@ -527,51 +711,69 @@ private fun LetterIndex(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        LetterChip(stringResource(R.string.native_collaborators_letter_all), active == null, dark, titleColor) { onSelect(null) }
-        for (letter in letters) {
-            LetterChip(letter, active == letter, dark, titleColor) { onSelect(letter) }
+        LetterChip(stringResource(R.string.native_collaborators_letter_all), active == null, true, accent, dark, textColor) {
+            onSelect(null)
+        }
+        for (letter in 'A'..'Z') {
+            val label = letter.toString()
+            LetterChip(label, active == label, label in letters, accent, dark, textColor) { onSelect(label) }
+        }
+        if ("#" in letters) {
+            LetterChip("#", active == "#", true, accent, dark, textColor) { onSelect("#") }
         }
     }
 }
 
+/** `px-1.5 py-0.5 rounded-md text-[11px] font-semibold leading-none`:
+ *  gray-600 / gray-300, white on the accent when picked, the page's own
+ *  text at 25% when disabled. */
 @Composable
-private fun LetterChip(label: String, selected: Boolean, dark: Boolean, titleColor: Color, onClick: () -> Unit) {
-    Box(
+private fun LetterChip(
+    label: String,
+    active: Boolean,
+    enabled: Boolean,
+    accent: Color,
+    dark: Boolean,
+    textColor: Color,
+    onClick: () -> Unit,
+) {
+    Text(
+        label,
+        color = when {
+            !enabled -> textColor.copy(alpha = 0.25f)
+            active -> Color.White
+            dark -> Color(0xFFD1D5DC)
+            else -> Color(0xFF4A5565)
+        },
+        fontSize = 11.sp,
+        lineHeight = 11.sp,
+        fontWeight = FontWeight.SemiBold,
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(if (selected) Indigo else Color.Transparent)
+            .background(if (active && enabled) accent else Color.Transparent)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
+                enabled = enabled,
                 role = Role.Button,
             ) { onClick() }
             .padding(horizontal = 6.dp, vertical = 2.dp),
-    ) {
-        Text(
-            label,
-            color = when {
-                selected -> Color.White
-                dark -> Color(0xFFD1D5DB)
-                else -> Color(0xFF4B5563)
-            },
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
+    )
 }
 
-/** The bordered candidate box and its three states: still searching, no
- *  one left to add, or a filter that matched nothing (a single dash, the
- *  web's own placeholder). */
+/** The bordered candidate box, as tall as its rows (the whole body
+ *  scrolls), and its three placeholders: still searching, no one left to
+ *  add, or a filter that matched nothing (a single dash, the web's own). */
 @Composable
 private fun CandidateList(
-    candidates: List<ShareCandidate>,
+    visible: List<ShareCandidate>,
     loading: Boolean,
     hasAny: Boolean,
     selected: Map<String, String>,
+    themeId: String?,
     dark: Boolean,
-    titleColor: Color,
-    subtextColor: Color,
+    textColor: Color,
+    mutedColor: Color,
     borderColor: Color,
     onToggle: (ShareCandidate) -> Unit,
     onAccess: (ShareCandidate, String) -> Unit,
@@ -583,27 +785,22 @@ private fun CandidateList(
             .clip(RoundedCornerShape(8.dp))
             .background(if (dark) Color.Black.copy(alpha = 0.20f) else Color(0xFFF9FAFB).copy(alpha = 0.5f))
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-            .padding(6.dp),
+            .padding(7.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         when {
-            loading -> CandidatePlaceholder(stringResource(R.string.native_collaborators_searching), subtextColor)
-            !hasAny -> CandidatePlaceholder(stringResource(R.string.native_collaborators_none_available), subtextColor)
-            // The web prints exactly this one dash when the letter
-            // filter matches nobody, with no wording at all
-            // (CollaborationModal.jsx:440-441).
-            candidates.isEmpty() -> CandidatePlaceholder("\u2014", subtextColor)
-            else -> LazyColumn(
-                modifier = Modifier.heightIn(max = 320.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                items(candidates, key = { it.key }) { user ->
+            loading -> CandidatePlaceholder(stringResource(R.string.native_collaborators_searching), mutedColor)
+            !hasAny -> CandidatePlaceholder(stringResource(R.string.native_collaborators_none_available), mutedColor)
+            visible.isEmpty() -> CandidatePlaceholder("—", if (dark) Color(0xFF6A7282) else Color(0xFF99A1AF))
+            else -> for (user in visible) {
+                key(user.key) {
                     CandidateRow(
                         user = user,
                         access = selected[user.key],
+                        themeId = themeId,
                         dark = dark,
-                        titleColor = titleColor,
-                        subtextColor = subtextColor,
+                        textColor = textColor,
+                        mutedColor = mutedColor,
                         borderColor = borderColor,
                         onToggle = { onToggle(user) },
                         onAccess = { access -> onAccess(user, access) },
@@ -615,37 +812,41 @@ private fun CandidateList(
 }
 
 @Composable
-private fun CandidatePlaceholder(text: String, subtextColor: Color) {
+private fun CandidatePlaceholder(text: String, color: Color) {
     Box(
         modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = subtextColor, fontSize = 14.sp)
+        Text(text, color = color, fontSize = 14.sp, lineHeight = 20.sp)
     }
 }
 
+/** One person to pick: the whole row toggles them, the soft accent marks
+ *  a pick, whose own access then shows before the check circle. */
 @Composable
 private fun CandidateRow(
     user: ShareCandidate,
     access: String?,
+    themeId: String?,
     dark: Boolean,
-    titleColor: Color,
-    subtextColor: Color,
+    textColor: Color,
+    mutedColor: Color,
     borderColor: Color,
     onToggle: () -> Unit,
     onAccess: (String) -> Unit,
 ) {
     val checked = access != null
+    val accent = WorkspaceTheme.accent(themeId, dark)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(if (checked) Indigo.copy(alpha = if (dark) 0.22f else 0.12f) else Color.Transparent)
+            .background(if (checked) WorkspaceTheme.accentSoftBg(themeId, dark) else Color.Transparent)
             .border(
                 width = 1.dp,
-                color = if (checked) Indigo.copy(alpha = 0.45f) else Color.Transparent,
+                color = if (checked) WorkspaceTheme.accentSoftBorder(themeId, dark) else Color.Transparent,
                 shape = RoundedCornerShape(8.dp),
             )
             .clickable(
@@ -653,293 +854,259 @@ private fun CandidateRow(
                 indication = null,
                 role = Role.Button,
             ) { onToggle() }
-            .padding(8.dp),
+            .padding(9.dp),
     ) {
-        AvatarCircle(avatarUrl = user.avatarUrl, name = user.name, size = 32.dp, onClick = {})
+        AvatarCircle(avatarUrl = user.avatarUrl, name = user.name, size = 32.dp)
         Column(Modifier.weight(1f)) {
-            Text(
-                user.name,
-                color = titleColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (user.federated) {
-                SoftBadge(user.serverLabel ?: stringResource(R.string.native_collaborators_remote_server)) {
-                    WorldIcon(size = 14.dp, tint = Indigo)
-                }
-            } else {
-                Text(user.email.orEmpty(), color = subtextColor, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    user.name,
+                    color = textColor,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (user.federated) ServerBadge(user.serverLabel, themeId, dark)
+            }
+            if (!user.federated && !user.email.isNullOrEmpty()) {
+                Text(
+                    user.email,
+                    color = mutedColor,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
-        if (checked) {
+        if (access != null) {
             AccessToggle(
                 canWrite = access == "write",
+                themeId = themeId,
                 dark = dark,
-                subtextColor = subtextColor,
+                mutedColor = mutedColor,
                 borderColor = borderColor,
-                onChange = { write -> onAccess(if (write) "write" else "read") },
+                onChange = onAccess,
             )
         }
         Box(
             modifier = Modifier
                 .size(20.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(if (checked) Indigo else Color.Transparent)
+                .clip(CircleShape)
+                .background(if (checked) accent else Color.Transparent)
                 .border(
-                    width = if (checked) 0.dp else 1.dp,
-                    color = if (checked) Color.Transparent else borderColor,
-                    shape = RoundedCornerShape(999.dp),
+                    width = 1.dp,
+                    color = when {
+                        checked -> accent
+                        dark -> Color(0xFF4A5565)
+                        else -> Color(0xFFD1D5DC)
+                    },
+                    shape = CircleShape,
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            if (checked) CheckmarkIcon(size = 14.dp, tint = Color.White)
+            if (checked) TablerCheckIcon(size = 20.dp, tint = Color.White)
         }
     }
 }
 
-/** One roster row: avatar, name with its badges, email, then the access
- *  toggle and the remove button for the owner. */
+/** One roster row: avatar, name with its badges, e-mail, then the access
+ *  toggle and the red remove cross for the owner. */
 @Composable
 private fun CollaboratorRow(
     collaborator: CollaboratorDto,
     isMe: Boolean,
-    dark: Boolean,
-    titleColor: Color,
-    subtextColor: Color,
-    borderColor: Color,
     canManage: Boolean,
+    themeId: String?,
+    dark: Boolean,
+    textColor: Color,
+    mutedColor: Color,
+    borderColor: Color,
     onSetAccess: (String) -> Unit,
     onRemove: () -> Unit,
 ) {
+    val name = collaborator.name.ifEmpty { collaborator.email }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(if (dark) Color(0xFF374151) else Color(0xFFF3F4F6))
+            .background(if (dark) Color(0xFF364153) else Color(0xFFF3F4F6))
             .padding(8.dp),
     ) {
-        AvatarCircle(avatarUrl = collaborator.avatarUrl, name = collaborator.name, size = 32.dp, onClick = {})
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    collaborator.name,
-                    color = titleColor,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                if (collaborator.federated) {
-                    SoftBadge(
-                        collaborator.serverLabel ?: stringResource(R.string.native_collaborators_remote_server),
-                        leading = { WorldIcon(size = 14.dp, tint = Indigo) },
-                    )
-                }
-                if (isMe) SoftBadge(stringResource(R.string.native_collaborators_me))
-                if (collaborator.isOwner) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.weight(1f),
+        ) {
+            AvatarCircle(avatarUrl = collaborator.avatarUrl, name = name, size = 32.dp)
+            Column(Modifier.weight(1f, fill = false)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        stringResource(R.string.native_collaborators_owner),
-                        color = if (dark) Color(0xFF818CF8) else Indigo,
+                        name,
+                        color = textColor,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (collaborator.federated) ServerBadge(collaborator.serverLabel, themeId, dark)
+                    if (isMe) {
+                        Text(
+                            stringResource(R.string.native_collaborators_me),
+                            color = WorkspaceTheme.accent(themeId, dark),
+                            fontSize = 11.sp,
+                            lineHeight = BadgeLineHeight,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .softAccentChip(themeId, dark)
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                    if (collaborator.isOwner) {
+                        Text(
+                            stringResource(R.string.native_collaborators_owner),
+                            // indigo-500 / indigo-400.
+                            color = if (dark) Color(0xFF7C86FF) else Color(0xFF615FFF),
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                        )
+                    }
+                }
+                if (!collaborator.federated && collaborator.email.isNotEmpty()) {
+                    Text(
+                        collaborator.email,
+                        color = mutedColor,
                         fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
-            if (!collaborator.federated) {
-                Text(collaborator.email, color = subtextColor, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         if (canManage) {
-            AccessToggle(
-                canWrite = collaborator.canWrite != 0,
-                dark = dark,
-                subtextColor = subtextColor,
-                borderColor = borderColor,
-                onChange = { write -> onSetAccess(if (write) "write" else "read") },
-            )
-            val removeLabel = stringResource(R.string.native_collaborators_remove_action)
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .semantics { contentDescription = removeLabel }
-                    .gkTooltip(removeLabel)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Button,
-                    ) { onRemove() }
-                    .padding(6.dp),
-            ) {
-                CloseIcon(size = 16.dp, tint = ErrorColor)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                AccessToggle(
+                    canWrite = collaborator.canWrite != 0,
+                    themeId = themeId,
+                    dark = dark,
+                    mutedColor = mutedColor,
+                    borderColor = borderColor,
+                    onChange = onSetAccess,
+                )
+                val removeLabel = stringResource(R.string.native_collaborators_remove_action)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .semantics { contentDescription = removeLabel }
+                        .gkTooltip(removeLabel)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onRemove() }
+                        .padding(6.dp),
+                ) {
+                    CloseIcon(size = 16.dp, tint = DangerRed, strokeWidth = 2.5f)
+                }
             }
         }
     }
 }
 
-/** ServerBadge / the "Me" pill: the same soft-accent chip both use. */
+/** ServerBadge (CollaborationModal.jsx:23-30): the peer server a person
+ *  lives on, by its friendly name, never a URL. */
 @Composable
-private fun SoftBadge(label: String, leading: (@Composable () -> Unit)? = null) {
+private fun ServerBadge(label: String?, themeId: String?, dark: Boolean) {
+    val accent = WorkspaceTheme.accent(themeId, dark)
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Indigo.copy(alpha = 0.12f))
-            .border(1.dp, Indigo.copy(alpha = 0.28f), RoundedCornerShape(6.dp))
+            .softAccentChip(themeId, dark)
             .padding(start = 4.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
     ) {
-        leading?.invoke()
+        ServerIcon(size = 20.dp, tint = accent)
         Text(
-            label,
-            color = Indigo,
+            label ?: stringResource(R.string.native_collaborators_remote_server),
+            color = accent,
             fontSize = 11.sp,
+            lineHeight = BadgeLineHeight,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 160.dp),
         )
     }
 }
 
-/** AccessToggle (CollaborationModal.jsx:43-73): a two-cell segmented
- *  control, an eye for read-only and a pencil for can-edit, never
+/** The soft accent chip both badges share: the accent at 12% behind and
+ *  at 24% on its 1px edge, 6dp corners. */
+private fun Modifier.softAccentChip(themeId: String?, dark: Boolean): Modifier =
+    clip(RoundedCornerShape(6.dp))
+        .background(WorkspaceTheme.accentSoftBg(themeId, dark))
+        .border(1.dp, WorkspaceTheme.accentSoftBorder(themeId, dark), RoundedCornerShape(6.dp))
+        .padding(1.dp)
+
+/** AccessToggle (CollaborationModal.jsx:43-73): an eye for read-only and a
+ *  pencil for can-edit, the active half on the soft accent, never
  *  disabled. Tapping the half that is already on does nothing. */
 @Composable
 private fun AccessToggle(
     canWrite: Boolean,
+    themeId: String?,
     dark: Boolean,
-    subtextColor: Color,
+    mutedColor: Color,
     borderColor: Color,
-    onChange: (Boolean) -> Unit,
+    onChange: (String) -> Unit,
 ) {
-    val readLabel = stringResource(R.string.native_collaborators_read_only)
+    val accent = WorkspaceTheme.accent(themeId, dark)
+    val activeBg = WorkspaceTheme.accentSoftBg(themeId, dark)
+    val readLabel = stringResource(R.string.native_access_read_only)
     val writeLabel = stringResource(R.string.native_collaborators_can_write)
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp)),
+            .height(IntrinsicSize.Min)
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .padding(1.dp)
+            .clip(RoundedCornerShape(7.dp)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .background(if (!canWrite) Indigo.copy(alpha = if (dark) 0.22f else 0.12f) else Color.Transparent)
+                .background(if (!canWrite) activeBg else Color.Transparent)
                 .semantics { contentDescription = readLabel }
                 .gkTooltip(readLabel)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     role = Role.Button,
-                ) { if (canWrite) onChange(false) }
+                ) { if (canWrite) onChange("read") }
                 .padding(horizontal = 8.dp, vertical = 4.dp),
         ) {
-            EyeIcon(size = 14.dp, tint = if (!canWrite) Indigo else subtextColor)
+            TablerEyeIcon(size = 20.dp, tint = if (!canWrite) accent else mutedColor)
         }
-        Box(Modifier.width(1.dp).height(24.dp).background(borderColor))
+        Box(Modifier.width(1.dp).fillMaxHeight().background(borderColor))
         Box(
             modifier = Modifier
-                .background(if (canWrite) Indigo.copy(alpha = if (dark) 0.22f else 0.12f) else Color.Transparent)
+                .background(if (canWrite) activeBg else Color.Transparent)
                 .semantics { contentDescription = writeLabel }
                 .gkTooltip(writeLabel)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     role = Role.Button,
-                ) { if (!canWrite) onChange(true) }
+                ) { if (!canWrite) onChange("write") }
                 .padding(horizontal = 8.dp, vertical = 4.dp),
         ) {
-            PencilIcon(size = 14.dp, tint = if (canWrite) Indigo else subtextColor)
+            PencilIcon(size = 20.dp, tint = if (canWrite) accent else mutedColor, strokeWidth = 1.75f)
         }
-    }
-}
-
-/** Confirm step before the owner removes a collaborator: mirrors the
- *  web's own ConfirmRemoveCollaboratorDialog.jsx exactly (same three
- *  stacked choices, same meaning) rather than a single button plus a
- *  toggle, since the two remove modes are equally-weighted, mutually
- *  exclusive actions, not a default with an optional modifier. */
-@Composable
-private fun RemoveCollaboratorDialog(
-    collaboratorName: String,
-    dark: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: (keepCopy: Boolean) -> Unit,
-) {
-    val titleColor = if (dark) DarkTitleColor else LightTitleColor
-    val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
-    val borderColor = if (dark) DarkBorderColor else LightBorderColor
-
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(if (dark) DarkBgColor else Color.White)
-                .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-                .padding(24.dp),
-        ) {
-            Text(
-                String.format(stringResource(R.string.native_collaborators_remove_question), collaboratorName),
-                color = titleColor,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.native_collaborators_remove_subtitle),
-                color = subtextColor,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-            )
-            Spacer(Modifier.height(20.dp))
-
-            StackedDialogButton(
-                label = stringResource(R.string.native_collaborators_remove_keep_copy),
-                textColor = titleColor,
-                borderColor = borderColor,
-                onClick = { onConfirm(true) },
-            )
-            Spacer(Modifier.height(8.dp))
-            StackedDialogButton(
-                label = stringResource(R.string.native_collaborators_remove_no_copy),
-                textColor = Color.White,
-                background = ErrorColor,
-                onClick = { onConfirm(false) },
-            )
-            Spacer(Modifier.height(8.dp))
-            StackedDialogButton(
-                label = stringResource(R.string.native_dialog_cancel),
-                textColor = subtextColor,
-                onClick = onDismiss,
-            )
-        }
-    }
-}
-
-/** One full-width choice of a stacked dialog (`px-4 py-2 rounded-lg`). */
-@Composable
-private fun StackedDialogButton(
-    label: String,
-    textColor: Color,
-    borderColor: Color? = null,
-    background: Color = Color.Transparent,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(background)
-            .then(if (borderColor != null) Modifier.border(1.dp, borderColor, RoundedCornerShape(8.dp)) else Modifier)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Button,
-            ) { onClick() }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
     }
 }

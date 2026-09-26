@@ -83,6 +83,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import retrofit2.Response
 import java.util.UUID
 
 /** Outcome of a note save. Stale/ReadOnly are real, expected server
@@ -131,48 +132,40 @@ sealed class ChangePasswordResult {
 }
 
 /** Outcome of adding a collaborator (POST /api/notes/:id/collaborate).
- *  AlreadyCollaborator/UserNotFound get their own cases, same as every
- *  other sealed result in this file, because they're real, expected
- *  answers a picker UI reacts to differently, not bugs: the server
- *  reuses HTTP 404 for two different reasons ("Note not found" vs "User
- *  not found"), so UserNotFound is the one case here that needs a peek at
- *  the response body, not just the status code, to tell apart from
- *  Rejected(404) (a genuine, practically unreachable note-not-found race,
- *  since native never lets a non-owner or a deleted note reach this call
- *  in the first place). */
+ *  AlreadyCollaborator is the one refusal a picker skips quietly (someone
+ *  added them from elsewhere a moment ago); every other one carries the
+ *  server's own `error` text (an English sentence, or a federation token
+ *  such as "locked"), which the screen words the way the web's
+ *  serverErrors.js does. */
 sealed class AddCollaboratorResult {
     data class Added(val collaborator: CollaboratorDto) : AddCollaboratorResult()
     data object AlreadyCollaborator : AddCollaboratorResult()
-    data object UserNotFound : AddCollaboratorResult()
-    data class Rejected(val httpCode: Int) : AddCollaboratorResult()
+    data class Rejected(val httpCode: Int, val error: String?) : AddCollaboratorResult()
 }
 
-/** Just enough of POST .../collaborate's error body to tell apart the two
- *  reasons it reuses HTTP 404 for (see AddCollaboratorResult's own doc
- *  comment): not a general error-body framework, only this one field. */
+/** The `error` field of a refused collaboration request. */
 @Serializable
 private data class CollaborateErrorBody(val error: String? = null)
 
-/** Outcome of PATCH .../collaborate/:userId. NotFound covers the server's
- *  "Collaborator not found" 404 (they were removed from another device/
- *  session moments ago, a benign race): there's only one 404 reason on
- *  this route, unlike AddCollaboratorResult's, so no error-body peek is
- *  needed to tell it apart from anything else. */
-sealed class SetCollaboratorAccessResult {
-    data object Updated : SetCollaboratorAccessResult()
-    data object NotFound : SetCollaboratorAccessResult()
-    data class Rejected(val httpCode: Int) : SetCollaboratorAccessResult()
+private fun Response<*>.collaborateError(): String? = errorBody()?.string()?.let { raw ->
+    runCatching { errorJson.decodeFromString<CollaborateErrorBody>(raw).error }.getOrNull()
 }
 
-/** Outcome of DELETE .../collaborate/:userId. Same NotFound reasoning as
- *  SetCollaboratorAccessResult above. copyNoteId on Removed is non-null
- *  only when keepCopy was true AND the caller is the owner removing
- *  someone else (see NotesRepository.removeCollaborator's own doc
- *  comment). */
+/** Outcome of PATCH .../collaborate/:userId; a refusal carries the
+ *  server's `error` text, like AddCollaboratorResult's. */
+sealed class SetCollaboratorAccessResult {
+    data object Updated : SetCollaboratorAccessResult()
+    data class Rejected(val httpCode: Int, val error: String?) : SetCollaboratorAccessResult()
+}
+
+/** Outcome of DELETE .../collaborate/:userId; a refusal carries the
+ *  server's `error` text, like AddCollaboratorResult's. copyNoteId on
+ *  Removed is non-null only when keepCopy was true AND the caller is the
+ *  owner removing someone else (see NotesRepository.removeCollaborator's
+ *  own doc comment). */
 sealed class RemoveCollaboratorResult {
     data class Removed(val copyNoteId: String?) : RemoveCollaboratorResult()
-    data object NotFound : RemoveCollaboratorResult()
-    data class Rejected(val httpCode: Int) : RemoveCollaboratorResult()
+    data class Rejected(val httpCode: Int, val error: String?) : RemoveCollaboratorResult()
 }
 
 /** Sentinel sync-queue note id for a manual reorder, which touches many
@@ -1591,9 +1584,10 @@ class NotesRepository(
         }
     }
 
-    /** Full participant roster for CollaboratorsScreen.kt. Any
-     *  participant may call this, not just the owner. It is intentionally
-     *  fetched live because membership is not part of the offline queue. */
+    /** Full participant roster of a note, owner first, the open note's
+     *  own (NoteDetailScreen.kt, CollaboratorsScreen.kt). Any participant
+     *  may call this, not just the owner. It is intentionally fetched live
+     *  because membership is not part of the offline queue. */
     suspend fun fetchNoteCollaborators(id: String): List<CollaboratorDto> {
         NativeDebug.d("NotesRepository.fetchNoteCollaborators id=$id")
         val response = api.getNoteCollaborators(id)
@@ -1679,37 +1673,25 @@ class NotesRepository(
             NativeDebug.d("NotesRepository.addCollaborator noteId=$noteId: already a collaborator")
             return AddCollaboratorResult.AlreadyCollaborator
         }
-        if (response.code() == 404) {
-            val raw = response.errorBody()?.string()
-            val message = raw?.let { runCatching { Json.decodeFromString<CollaborateErrorBody>(it) }.getOrNull()?.error }
-            if (message == "User not found") {
-                NativeDebug.d("NotesRepository.addCollaborator noteId=$noteId: user not found")
-                return AddCollaboratorResult.UserNotFound
-            }
-        }
-        NativeDebug.e("NotesRepository.addCollaborator noteId=$noteId rejected: HTTP ${response.code()}")
-        return AddCollaboratorResult.Rejected(response.code())
+        val error = response.collaborateError()
+        NativeDebug.e("NotesRepository.addCollaborator noteId=$noteId rejected: HTTP ${response.code()} $error")
+        return AddCollaboratorResult.Rejected(response.code(), error)
     }
 
     /** Changes an existing collaborator's [access] ("read" or "write").
      *  Owner-only server-side: native never lets a non-owner reach this
-     *  call (see CollaboratorsScreen.kt's own canManage gating), so the
-     *  403 the server returns for "you're not the owner" is a practically
+     *  call (see CollaboratorsScreen.kt's own gating), so the 403 the
+     *  server returns for "you're not the owner" is a practically
      *  unreachable case here, folded into Rejected like everywhere else in
-     *  this file. No confirmation, no optimistic local state: matches the
-     *  web's own AccessToggle, which fires on every click with nothing to
-     *  guard against (setting the same access twice is a no-op server
-     *  side) and just reloads the roster from the server after. */
+     *  this file. No confirmation: the web's AccessToggle fires on every
+     *  click, setting the same access twice being a no-op server side. */
     suspend fun setCollaboratorAccess(noteId: String, userId: Int, access: String): SetCollaboratorAccessResult {
         NativeDebug.d("NotesRepository.setCollaboratorAccess noteId=$noteId userId=$userId access=$access")
         val response = api.setCollaboratorAccess(noteId, userId, SetCollaboratorAccessRequest(access))
         if (response.isSuccessful) return SetCollaboratorAccessResult.Updated
-        if (response.code() == 404) {
-            NativeDebug.d("NotesRepository.setCollaboratorAccess noteId=$noteId userId=$userId: not found")
-            return SetCollaboratorAccessResult.NotFound
-        }
-        NativeDebug.e("NotesRepository.setCollaboratorAccess noteId=$noteId userId=$userId rejected: HTTP ${response.code()}")
-        return SetCollaboratorAccessResult.Rejected(response.code())
+        val error = response.collaborateError()
+        NativeDebug.e("NotesRepository.setCollaboratorAccess noteId=$noteId userId=$userId rejected: HTTP ${response.code()} $error")
+        return SetCollaboratorAccessResult.Rejected(response.code(), error)
     }
 
     /** Removes a collaborator (owner removing someone else) or leaves a
@@ -1721,7 +1703,7 @@ class NotesRepository(
      *  a collaborator leaving on their own never gets one through this
      *  route, [keepCopy] is simply ignored for that case. Native only
      *  ever calls this for the owner-removes-someone-else case today (see
-     *  CollaboratorsScreen.kt's own canManage gating); leaving is instead
+     *  CollaboratorsScreen.kt's own gating); leaving is instead
      *  handled by the existing trash flow (see SaveNoteResult.Left),
      *  which does grant the leaver a trashed copy. */
     suspend fun removeCollaborator(noteId: String, userId: Int, keepCopy: Boolean): RemoveCollaboratorResult {
@@ -1733,12 +1715,9 @@ class NotesRepository(
                 ?: throw IllegalStateException("DELETE /api/notes/$noteId/collaborate/$userId: ok response with no body")
             return RemoveCollaboratorResult.Removed(body.copyNoteId)
         }
-        if (response.code() == 404) {
-            NativeDebug.d("NotesRepository.removeCollaborator noteId=$noteId userId=$userId: not found")
-            return RemoveCollaboratorResult.NotFound
-        }
-        NativeDebug.e("NotesRepository.removeCollaborator noteId=$noteId userId=$userId rejected: HTTP ${response.code()}")
-        return RemoveCollaboratorResult.Rejected(response.code())
+        val error = response.collaborateError()
+        NativeDebug.e("NotesRepository.removeCollaborator noteId=$noteId userId=$userId rejected: HTTP ${response.code()} $error")
+        return RemoveCollaboratorResult.Rejected(response.code(), error)
     }
 
     /** Not-yet-acknowledged share/collaboration notifications (see

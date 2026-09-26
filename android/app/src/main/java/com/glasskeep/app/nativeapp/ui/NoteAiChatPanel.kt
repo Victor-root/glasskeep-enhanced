@@ -150,6 +150,7 @@ fun NoteAiChatPanel(
         modifier = Modifier
             .fillMaxSize()
             .background(background)
+            .blockTouchesBelow()
             .windowInsetsPadding(WindowInsets.systemBars)
             .imePadding(),
     ) {

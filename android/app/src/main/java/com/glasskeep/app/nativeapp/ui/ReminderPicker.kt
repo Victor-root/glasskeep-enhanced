@@ -166,7 +166,7 @@ fun ReminderPickerOverlay(
     // popover's 50% black backdrop.
     val appear = remember { Animatable(0f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, tween(durationMillis = 120, easing = CssEaseOut)) }
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f))) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).blockTouchesBelow()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()

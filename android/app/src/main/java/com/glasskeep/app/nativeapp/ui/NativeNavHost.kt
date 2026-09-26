@@ -640,7 +640,6 @@ fun NativeNavHost(
                         serverUrl = serverUrl,
                         noteId = noteId,
                         onBack = { navController.popBackStack() },
-                        onOpenCollaborators = { navController.navigate("notes/$noteId/collaborators") },
                     )
                 }
                 composable("compare/{firstId}/{secondId}") { backStackEntry ->
@@ -655,15 +654,6 @@ fun NativeNavHost(
                             navController.popBackStack()
                             navController.navigate("notes/$survivor")
                         },
-                    )
-                }
-                composable("notes/{noteId}/collaborators") { backStackEntry ->
-                    val noteId = backStackEntry.arguments?.getString("noteId") ?: return@composable
-                    CollaboratorsScreen(
-                        container = container,
-                        serverUrl = serverUrl,
-                        noteId = noteId,
-                        onBack = { navController.popBackStack() },
                     )
                 }
                 composable("archived") {

@@ -144,6 +144,14 @@ fun SearchIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Co
     }
 }
 
+/** CollaborationModal.jsx's own search glyph: a lens of radius 7 at
+ *  (11,11) and a 4.3-unit handle, stroke 2. */
+@Composable
+fun ModalSearchIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0 M21 21l-4.3 -4.3",
+    modifier, size, tint, 2f,
+)
+
 @Composable
 fun CloseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, strokeWidth: Float = 2.4f) {
     // src/icons/index.jsx CloseIcon: two diagonal strokes forming an "x",
@@ -724,11 +732,9 @@ fun CheckSquareIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color
     }
 }
 
-// The two icons below back CollaboratorsScreen.kt's per-row access toggle
-// (read-only vs can-edit). Same source discipline as the rest of this
-// file: exact path data from the Tabler Icons set (MIT) this project
-// already vendors under src/icons/editor/tabler/ for the web's own
-// CollaborationModal.jsx AccessToggle (TI.Eye / TI.Pencil), not eyeballed.
+// The two icons below: exact path data from the Tabler Icons set (MIT)
+// this project already vendors under src/icons/editor/tabler/ (TI.Eye /
+// TI.Pencil), not eyeballed.
 
 @Composable
 fun EyeIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
