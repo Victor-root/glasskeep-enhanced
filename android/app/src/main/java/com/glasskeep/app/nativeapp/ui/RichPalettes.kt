@@ -1,7 +1,10 @@
 package com.glasskeep.app.nativeapp.ui
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import com.glasskeep.app.R
 
 /**
  * Every palette and list the rich-text toolbar offers, ported value for
@@ -53,49 +56,70 @@ const val RichDefaultFontSize = "16px"
  * web writes into the document, kept verbatim so a note round-trips
  * between the two clients unchanged.
  *
- * [family] is what Compose actually paints with. The web vendors all 28
- * webfonts through @fontsource; a phone has none of them installed, and
- * bundling them would mean carrying megabytes of font files in the APK
- * or fetching them from Google's servers at runtime, which this project
- * deliberately avoids (see the WorkManager/ML Kit notes in build.gradle.kts
- * on staying Play-Services-free). So the choice itself is fully supported
- * (listed, applied, stored, round-tripped, shown as active in the
- * toolbar) and rendered with the closest family Android ships: the stack's
- * own final fallback, which is exactly what a browser without the webfont
- * would do too.
+ * [family] is what Compose paints with: the very files the web vendors
+ * through @fontsource (their latin subset, in res/font as TTF), in the
+ * weights src/main.jsx loads. Any other weight takes the nearest one and
+ * italics are synthesised, as the browser does with those same files.
  */
 data class RichFontOption(val label: String, val value: String, val family: FontFamily)
 
+private fun webFont(vararg weights: Pair<Int, Int>): FontFamily =
+    FontFamily(weights.map { (resource, weight) -> Font(resource, FontWeight(weight)) })
+
 val RichFonts = listOf(
     RichFontOption("Sans", "", FontFamily.Default),
-    RichFontOption("Inter", "Inter, sans-serif", FontFamily.SansSerif),
-    RichFontOption("Roboto", "Roboto, sans-serif", FontFamily.SansSerif),
-    RichFontOption("Open Sans", "\"Open Sans\", sans-serif", FontFamily.SansSerif),
-    RichFontOption("Lato", "Lato, sans-serif", FontFamily.SansSerif),
-    RichFontOption("Source Sans", "\"Source Sans 3\", sans-serif", FontFamily.SansSerif),
-    RichFontOption("Noto Sans", "\"Noto Sans\", sans-serif", FontFamily.SansSerif),
-    RichFontOption("Nunito", "Nunito, sans-serif", FontFamily.SansSerif),
-    RichFontOption("Poppins", "Poppins, sans-serif", FontFamily.SansSerif),
-    RichFontOption("Montserrat", "Montserrat, sans-serif", FontFamily.SansSerif),
-    RichFontOption("Raleway", "Raleway, sans-serif", FontFamily.SansSerif),
-    RichFontOption("Work Sans", "\"Work Sans\", sans-serif", FontFamily.SansSerif),
-    RichFontOption("Ubuntu", "Ubuntu, sans-serif", FontFamily.SansSerif),
-    RichFontOption("Merriweather", "Merriweather, serif", FontFamily.Serif),
-    RichFontOption("Lora", "Lora, serif", FontFamily.Serif),
-    RichFontOption("PT Serif", "\"PT Serif\", serif", FontFamily.Serif),
-    RichFontOption("Playfair Display", "\"Playfair Display\", serif", FontFamily.Serif),
-    RichFontOption("EB Garamond", "\"EB Garamond\", serif", FontFamily.Serif),
-    RichFontOption("Source Serif", "\"Source Serif 4\", serif", FontFamily.Serif),
-    RichFontOption("JetBrains Mono", "\"JetBrains Mono\", monospace", FontFamily.Monospace),
-    RichFontOption("Fira Code", "\"Fira Code\", monospace", FontFamily.Monospace),
-    RichFontOption("Source Code Pro", "\"Source Code Pro\", monospace", FontFamily.Monospace),
-    RichFontOption("IBM Plex Mono", "\"IBM Plex Mono\", monospace", FontFamily.Monospace),
-    RichFontOption("Roboto Mono", "\"Roboto Mono\", monospace", FontFamily.Monospace),
-    RichFontOption("Bebas Neue", "\"Bebas Neue\", sans-serif", FontFamily.SansSerif),
-    RichFontOption("Oswald", "Oswald, sans-serif", FontFamily.SansSerif),
-    RichFontOption("Pacifico", "Pacifico, cursive", FontFamily.Cursive),
-    RichFontOption("Dancing Script", "\"Dancing Script\", cursive", FontFamily.Cursive),
-    RichFontOption("Caveat", "Caveat, cursive", FontFamily.Cursive),
+    RichFontOption("Inter", "Inter, sans-serif", webFont(R.font.rich_inter_400 to 400, R.font.rich_inter_700 to 700)),
+    RichFontOption("Roboto", "Roboto, sans-serif", webFont(R.font.rich_roboto_400 to 400, R.font.rich_roboto_700 to 700)),
+    RichFontOption("Open Sans", "\"Open Sans\", sans-serif", webFont(R.font.rich_open_sans_400 to 400, R.font.rich_open_sans_700 to 700)),
+    RichFontOption("Lato", "Lato, sans-serif", webFont(R.font.rich_lato_400 to 400, R.font.rich_lato_700 to 700)),
+    RichFontOption("Source Sans", "\"Source Sans 3\", sans-serif", webFont(R.font.rich_source_sans_3_400 to 400, R.font.rich_source_sans_3_700 to 700)),
+    RichFontOption("Noto Sans", "\"Noto Sans\", sans-serif", webFont(R.font.rich_noto_sans_400 to 400, R.font.rich_noto_sans_700 to 700)),
+    RichFontOption("Nunito", "Nunito, sans-serif", webFont(R.font.rich_nunito_400 to 400, R.font.rich_nunito_700 to 700)),
+    RichFontOption("Poppins", "Poppins, sans-serif", webFont(R.font.rich_poppins_400 to 400, R.font.rich_poppins_700 to 700)),
+    RichFontOption("Montserrat", "Montserrat, sans-serif", webFont(R.font.rich_montserrat_400 to 400, R.font.rich_montserrat_700 to 700)),
+    RichFontOption("Raleway", "Raleway, sans-serif", webFont(R.font.rich_raleway_400 to 400, R.font.rich_raleway_700 to 700)),
+    RichFontOption("Work Sans", "\"Work Sans\", sans-serif", webFont(R.font.rich_work_sans_400 to 400, R.font.rich_work_sans_700 to 700)),
+    RichFontOption(
+        "Ubuntu",
+        "Ubuntu, sans-serif",
+        webFont(R.font.rich_ubuntu_400 to 400, R.font.rich_ubuntu_500 to 500, R.font.rich_ubuntu_700 to 700),
+    ),
+    RichFontOption("Merriweather", "Merriweather, serif", webFont(R.font.rich_merriweather_400 to 400, R.font.rich_merriweather_700 to 700)),
+    RichFontOption("Lora", "Lora, serif", webFont(R.font.rich_lora_400 to 400, R.font.rich_lora_700 to 700)),
+    RichFontOption("PT Serif", "\"PT Serif\", serif", webFont(R.font.rich_pt_serif_400 to 400, R.font.rich_pt_serif_700 to 700)),
+    RichFontOption(
+        "Playfair Display",
+        "\"Playfair Display\", serif",
+        webFont(R.font.rich_playfair_display_400 to 400, R.font.rich_playfair_display_700 to 700),
+    ),
+    RichFontOption("EB Garamond", "\"EB Garamond\", serif", webFont(R.font.rich_eb_garamond_400 to 400, R.font.rich_eb_garamond_700 to 700)),
+    RichFontOption("Source Serif", "\"Source Serif 4\", serif", webFont(R.font.rich_source_serif_4_400 to 400, R.font.rich_source_serif_4_700 to 700)),
+    RichFontOption(
+        "JetBrains Mono",
+        "\"JetBrains Mono\", monospace",
+        webFont(R.font.rich_jetbrains_mono_400 to 400, R.font.rich_jetbrains_mono_700 to 700),
+    ),
+    RichFontOption("Fira Code", "\"Fira Code\", monospace", webFont(R.font.rich_fira_code_400 to 400, R.font.rich_fira_code_700 to 700)),
+    RichFontOption(
+        "Source Code Pro",
+        "\"Source Code Pro\", monospace",
+        webFont(R.font.rich_source_code_pro_400 to 400, R.font.rich_source_code_pro_700 to 700),
+    ),
+    RichFontOption(
+        "IBM Plex Mono",
+        "\"IBM Plex Mono\", monospace",
+        webFont(R.font.rich_ibm_plex_mono_400 to 400, R.font.rich_ibm_plex_mono_700 to 700),
+    ),
+    RichFontOption("Roboto Mono", "\"Roboto Mono\", monospace", webFont(R.font.rich_roboto_mono_400 to 400, R.font.rich_roboto_mono_700 to 700)),
+    RichFontOption("Bebas Neue", "\"Bebas Neue\", sans-serif", webFont(R.font.rich_bebas_neue_400 to 400)),
+    RichFontOption("Oswald", "Oswald, sans-serif", webFont(R.font.rich_oswald_400 to 400, R.font.rich_oswald_700 to 700)),
+    RichFontOption("Pacifico", "Pacifico, cursive", webFont(R.font.rich_pacifico_400 to 400)),
+    RichFontOption(
+        "Dancing Script",
+        "\"Dancing Script\", cursive",
+        webFont(R.font.rich_dancing_script_400 to 400, R.font.rich_dancing_script_700 to 700),
+    ),
+    RichFontOption("Caveat", "Caveat, cursive", webFont(R.font.rich_caveat_400 to 400, R.font.rich_caveat_700 to 700)),
 )
 
 fun richFontFor(value: String?): RichFontOption? =
