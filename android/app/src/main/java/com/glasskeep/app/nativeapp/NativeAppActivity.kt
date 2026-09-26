@@ -59,9 +59,8 @@ class NativeAppActivity : ComponentActivity() {
             // likewise only lasts the session, App.jsx:2240).
             val dark = container.shellPrefs.darkOverride ?: isSystemInDarkTheme()
             val view = LocalView.current
-            // Signed-in only: the login screen keeps the same fixed pair
-            // onboarding uses (the web's own theme system explicitly never
-            // recolors its login page either, see WorkspaceTheme.kt). Reads
+            // Signed out, the bars wear the login theme's status-bar colour,
+            // the page's theme-color the WebView painted them with. Reads
             // themeState.themeId (real Compose state) so picking a new
             // theme in Settings retints the bar immediately; reads
             // tokenStore.token directly (not state) so a first-ever login
@@ -85,11 +84,7 @@ class NativeAppActivity : ComponentActivity() {
                 // snapshotFlow below is what reacts to the override itself
                 // changing.
                 val overrideArgb = container.statusBarOverride.value
-                val baseColor = if (signedIn) {
-                    overrideArgb ?: WorkspaceTheme.statusBarColor(themeId, dark).toArgb()
-                } else {
-                    null
-                }
+                val baseColor = systemBarColor(signedIn, overrideArgb, themeId, container.branding.loginThemeId, dark)
                 (view.context as ComponentActivity).applyThemedSystemBars(dark, baseColor)
             }
 
@@ -104,11 +99,7 @@ class NativeAppActivity : ComponentActivity() {
             LaunchedEffect(view) {
                 snapshotFlow { container.statusBarOverride.value }
                     .collect { noteOverrideArgb ->
-                        val baseColor = if (currentSignedIn.value) {
-                            noteOverrideArgb ?: WorkspaceTheme.statusBarColor(currentThemeId.value, currentDark.value).toArgb()
-                        } else {
-                            null
-                        }
+                        val baseColor = systemBarColor(currentSignedIn.value, noteOverrideArgb, currentThemeId.value, container.branding.loginThemeId, currentDark.value)
                         NativeDebug.d(
                             "NativeAppActivity system bars: dark=${currentDark.value} signedIn=${currentSignedIn.value} " +
                                 "noteOverride=${noteOverrideArgb?.let { "#%08X".format(it) }} " +
@@ -166,3 +157,12 @@ class NativeAppActivity : ComponentActivity() {
         const val EXTRA_NEW_NOTE_TYPE = "newNoteType"
     }
 }
+
+/** The status and navigation bars' colour: an open note's own, else the
+ *  workspace theme's; signed out, the login theme's. */
+private fun systemBarColor(signedIn: Boolean, noteOverrideArgb: Int?, themeId: String?, loginThemeId: String?, dark: Boolean): Int =
+    if (signedIn) {
+        noteOverrideArgb ?: WorkspaceTheme.statusBarColor(themeId, dark).toArgb()
+    } else {
+        WorkspaceTheme.statusBarColor(loginThemeId ?: WorkspaceTheme.DEFAULT_ID, dark).toArgb()
+    }

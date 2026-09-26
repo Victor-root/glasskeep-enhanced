@@ -155,12 +155,14 @@ private fun Response<*>.serverError(): String? = errorBody()?.string()?.let { ra
 }
 
 /** A request the server answered with an error status. [error] is the
- *  `error` text of its body, what the web's api() throws as the message. */
-class ServerRefusal(val status: Int, val error: String?, request: String) :
+ *  `error` text of its body, what the web's api() throws as the message;
+ *  [authenticated] says whether it carried a session. */
+class ServerRefusal(val status: Int, val error: String?, request: String, val authenticated: Boolean = true) :
     IllegalStateException("$request failed: HTTP $status${error?.let { " $it" }.orEmpty()}")
 
-private fun Response<*>.refusal(request: String): ServerRefusal =
-    ServerRefusal(code(), serverError(), request).also { NativeDebug.e(it.message.orEmpty()) }
+internal fun Response<*>.refusal(request: String): ServerRefusal =
+    ServerRefusal(code(), serverError(), request, authenticated = raw().request.header("Authorization") != null)
+        .also { NativeDebug.e(it.message.orEmpty()) }
 
 /** Outcome of PATCH .../collaborate/:userId; a refusal carries the
  *  server's `error` text, like AddCollaboratorResult's. */

@@ -10,14 +10,16 @@ import java.net.SocketTimeoutException
 /**
  * What the web's api() throws as the message of a failed request
  * (utils/api.js): the server's own `error` text, `HTTP <code>` without
- * one, its unreachable-server sentence for a proxy's bodyless 502 to 504,
+ * one (nothing for a signed-out 401), its unreachable-server sentence for a proxy's bodyless 502 to 504,
  * and its timeout and network sentences.
  */
 internal fun Context.requestErrorText(t: Throwable): String = when (t) {
-    is ServerRefusal -> t.error ?: if (t.status in 502..504) {
-        getString(R.string.native_server_unreachable)
-    } else {
-        "HTTP ${t.status}"
+    is ServerRefusal -> t.error ?: when {
+        // A signed-out 401 is the answer about the secret just typed: no
+        // text, so the screen's own fallback speaks.
+        t.status == 401 -> if (t.authenticated) getString(R.string.native_session_expired) else ""
+        t.status in 502..504 -> getString(R.string.native_server_unreachable)
+        else -> "HTTP ${t.status}"
     }
     is SocketTimeoutException -> getString(R.string.native_request_timeout)
     is IOException -> getString(R.string.native_network_error)
@@ -34,9 +36,37 @@ internal fun Context.localizedServerError(message: String?, @StringRes fallback:
     return getString(known.second)
 }
 
+/**
+ * LoginView.jsx's reading of a failed sign-in: a 401 without a reason is
+ * the credentials being refused (localizeSecretRejection), a request that
+ * failed with one is reworded, anything else is the unexpected-error line.
+ */
+internal fun Context.loginErrorText(t: Throwable): String = when {
+    t is ServerRefusal && t.status == 401 && t.error.isNullOrEmpty() -> getString(R.string.native_err_invalid_credentials)
+    t is ServerRefusal && t.status == 401 -> localizedServerError(t.error, R.string.native_login_failed)
+    t is ServerRefusal || t is IOException -> localizedServerError(requestErrorText(t), R.string.native_login_unexpected_error)
+    else -> getString(R.string.native_login_unexpected_error)
+}
+
 /** The needles of serverErrors.js the app can run into, in its order. */
 private val ServerErrorPatterns = listOf(
+    "Invalid email or password" to R.string.native_err_invalid_credentials,
+    "Too many sign-in attempts" to R.string.native_err_too_many_sign_in,
+    "Invalid token" to R.string.native_err_invalid_token,
+    "Missing token" to R.string.native_err_missing_token,
+    "Invalid key." to R.string.native_err_invalid_key,
+    "Secret key not recognized" to R.string.native_err_secret_key_not_recognized,
+    "No account found" to R.string.native_err_no_account_found,
+    "Email and password are required" to R.string.native_err_email_password_required,
+    "Name, email, and password are required" to R.string.native_err_name_email_password_required,
+    "New password must be at least" to R.string.native_err_new_password_too_short,
+    "Password must be at least" to R.string.native_err_password_too_short,
     "Unlock the instance first" to R.string.native_err_unlock_first,
+    "New account creation is currently disabled" to R.string.native_err_registration_disabled,
+    "Email already registered" to R.string.native_err_email_already_registered,
+    "Email already in use by another user" to R.string.native_err_email_in_use_by_another,
+    "A registration request for this email is already pending" to R.string.native_err_registration_pending,
+    "A user with this email already exists" to R.string.native_err_user_already_exists,
     "User not found" to R.string.native_err_user_not_found,
     "Note not found or access denied" to R.string.native_err_note_access_denied,
     "Note not found" to R.string.native_err_note_not_found,

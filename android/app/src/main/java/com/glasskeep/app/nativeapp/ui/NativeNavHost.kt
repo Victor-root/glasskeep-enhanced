@@ -193,11 +193,18 @@ fun NativeNavHost(
     // cached copy already painted the right one on the first frame, this
     // just reconciles it (BrandingContext.jsx's own load-then-cache shape).
     LaunchedEffect(serverUrl, brandingPokes) {
-        runCatching { container.api(serverUrl).getBranding() }
+        val api = container.api(serverUrl)
+        runCatching { api.getBranding() }
             .getOrNull()
             ?.takeIf { it.isSuccessful }
             ?.body()
             ?.let { container.branding.apply(it) }
+        // The admin's sign-in slogan, read alongside (App.jsx:4885).
+        runCatching { api.getLoginSlogan() }
+            .getOrNull()
+            ?.takeIf { it.isSuccessful }
+            ?.body()
+            ?.let { container.branding.loginSlogan = it.loginSlogan.orEmpty() }
     }
 
     // Trade an ageing token for a fresh one whenever the app comes back to
@@ -426,7 +433,7 @@ fun NativeNavHost(
     // to the full unlock version.
     val currentEntry by navController.currentBackStackEntryAsState()
     val route = currentEntry?.destination?.route ?: startDestination
-    val signedIn = route != "login" && route != "login-secret" && route != "register"
+    val signedIn = route !in SignedOutRoutes
     // Every sign-in or launch replays the rows still pending as a burst of
     // pills, oldest first, without acknowledging them: that is left to
     // the bell (useShareNotifications.js:451-578).
@@ -479,7 +486,15 @@ fun NativeNavHost(
                 )
             } else {
             NavHost(navController = navController, startDestination = startDestination) {
-                composable("login") {
+                // The signed-out screens are hash routes on the web: they swap
+                // instantly, with none of NavHost's default cross-fade.
+                composable(
+                    route = "login",
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None },
+                    popExitTransition = { ExitTransition.None },
+                ) {
                     NativeLoginScreen(
                         container = container,
                         serverUrl = serverUrl,
@@ -488,14 +503,26 @@ fun NativeNavHost(
                         onRegister = { navController.navigate("register") },
                     )
                 }
-                composable("register") {
+                composable(
+                    route = "register",
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None },
+                    popExitTransition = { ExitTransition.None },
+                ) {
                     RegisterScreen(
                         container = container,
                         serverUrl = serverUrl,
                         onBack = { navController.popBackStack() },
                     )
                 }
-                composable("login-secret") {
+                composable(
+                    route = "login-secret",
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None },
+                    popExitTransition = { ExitTransition.None },
+                ) {
                     SecretKeyLoginScreen(
                         container = container,
                         serverUrl = serverUrl,
@@ -527,6 +554,10 @@ fun NativeNavHost(
                 // `scrimFadeIn` 50% black (200ms in, 180ms out).
                 composable(
                     route = "notes",
+                    // Signing in swaps the page at once, like the web's hash route.
+                    enterTransition = {
+                        if (initialState.destination.route in SignedOutRoutes) EnterTransition.None else null
+                    },
                     exitTransition = {
                         if (targetState.destination.route in ListOverlayRoutes) ExitTransition.KeepUntilTransitionsFinished else null
                     },
@@ -761,3 +792,5 @@ private val ListOverlayRoutes = setOf("settings", NoteRoute)
 private const val HEALTH_IDLE_MS = 10_000L
 private const val HEALTH_PENDING_MS = 5_000L
 private const val HEALTH_OFFLINE_MS = 3_000L
+
+private val SignedOutRoutes = setOf("login", "register", "login-secret")

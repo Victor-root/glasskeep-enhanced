@@ -1146,6 +1146,30 @@ data class DeviceLinkInfoResponse(
     val ip: String? = null,
 )
 
+/** Response for POST /api/device-link/create: the one-time token the
+ *  login screen's QR carries, and when it stops being valid. */
+@Serializable
+data class DeviceLinkCreateResponse(
+    val token: String,
+    val expiresAt: String? = null,
+    val pollIntervalMs: Long = 2000,
+)
+
+/** Response for GET /api/device-link/poll: `pending` until the phone
+ *  answers, then `approved` with the session /api/login would have
+ *  given, `rejected`, `expired`, or `consumed` (410). */
+@Serializable
+data class DeviceLinkPollResponse(
+    val status: String? = null,
+    val token: String? = null,
+    val user: UserDto? = null,
+    @SerialName("must_change_password") val mustChangePassword: Boolean = false,
+)
+
+/** Response for GET /api/admin/login-slogan, public like the branding. */
+@Serializable
+data class LoginSloganResponse(val loginSlogan: String? = null)
+
 /** Body shared by POST /api/device-link/approve and /reject. */
 @Serializable
 data class DeviceLinkTokenRequest(val token: String)
@@ -1205,6 +1229,9 @@ interface GlassKeepApi {
     // sign-in screen reads it before anyone has signed in.
     @GET("api/branding")
     suspend fun getBranding(): Response<BrandingDto>
+
+    @GET("api/admin/login-slogan")
+    suspend fun getLoginSlogan(): Response<LoginSloganResponse>
 
     @GET("api/admin/settings")
     suspend fun getAdminSettings(): Response<AdminSettingsDto>
@@ -1625,12 +1652,16 @@ interface GlassKeepApi {
     @POST("api/instance/lock")
     suspend fun lockInstance(): Response<UnlockResponse>
 
-    // Cross-device QR sign-in, phone side only (see QrScanScreen.kt): the
-    // phone that already has a session scans a QR shown on a PC's login
-    // screen, fetches who is asking, then approves or rejects. The PC's
-    // own create/poll routes have no native caller: nothing in this app
-    // needs to display a QR for itself to sign in (see this milestone's
-    // commit message for why).
+    // Cross-device QR sign-in. The login screen creates a challenge and
+    // polls it while its QR is shown (QrLoginPanel.kt); a phone that
+    // already has a session scans such a QR, fetches who is asking, then
+    // approves or rejects (QrScanScreen.kt).
+    @POST("api/device-link/create")
+    suspend fun createDeviceLink(): Response<DeviceLinkCreateResponse>
+
+    @GET("api/device-link/poll")
+    suspend fun pollDeviceLink(@Query("token") token: String): Response<DeviceLinkPollResponse>
+
     @GET("api/device-link/info")
     suspend fun deviceLinkInfo(@Query("token") token: String): Response<DeviceLinkInfoResponse>
 

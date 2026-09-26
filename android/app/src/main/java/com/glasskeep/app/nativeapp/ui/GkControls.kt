@@ -1142,6 +1142,7 @@ internal fun GkSecondaryButton(
     fontSize: TextUnit = 14.sp,
     lineHeight: TextUnit = 20.sp,
     fontWeight: FontWeight = FontWeight.SemiBold,
+    verticalPadding: Dp = 8.dp,
     onClick: () -> Unit,
 ) {
     Box(
@@ -1156,7 +1157,7 @@ internal fun GkSecondaryButton(
                 role = Role.Button,
             ) { onClick() }
             .padding(1.dp)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = verticalPadding),
         contentAlignment = Alignment.Center,
     ) {
         Text(label, color = textColor, fontSize = fontSize, lineHeight = lineHeight, fontWeight = fontWeight)
@@ -1250,18 +1251,7 @@ internal fun GkTextField(
                 .then(if (stretch) Modifier.weight(1f) else Modifier)
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .onFocusChanged { focused = it.isFocused }
-                .drawBehind {
-                    if (focused) {
-                        val ring = 2.dp.toPx()
-                        drawRoundRect(
-                            color = focusRingColor,
-                            topLeft = Offset(-ring / 2f, -ring / 2f),
-                            size = Size(size.width + ring, size.height + ring),
-                            cornerRadius = CornerRadius(8.dp.toPx() + ring / 2f),
-                            style = Stroke(ring),
-                        )
-                    }
-                }
+                .focusRing(focused, focusRingColor)
                 .background(background, RoundedCornerShape(8.dp))
                 .border(1.dp, borderColor, RoundedCornerShape(8.dp))
                 .padding(horizontal = 13.dp, vertical = 9.dp),
@@ -1280,6 +1270,21 @@ internal fun GkTextField(
                     innerTextField()
                 }
             },
+        )
+    }
+}
+
+/** Tailwind's `focus:ring-2`: a 2px ring drawn outside the box's
+ *  rounded edge while [focused], the 1px border inside it left as is. */
+internal fun Modifier.focusRing(focused: Boolean, color: Color, cornerRadius: Dp = 8.dp): Modifier = drawBehind {
+    if (focused) {
+        val ring = 2.dp.toPx()
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(-ring / 2f, -ring / 2f),
+            size = Size(size.width + ring, size.height + ring),
+            cornerRadius = CornerRadius(cornerRadius.toPx() + ring / 2f),
+            style = Stroke(ring),
         )
     }
 }
@@ -1541,6 +1546,11 @@ internal fun Modifier.tailwindShadowMd(shape: Shape): Modifier = this
 internal fun Modifier.tailwindShadowLg(shape: Shape): Modifier = this
     .dropShadow(shape, Shadow(radius = 15.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-3).dp, offset = DpOffset(0.dp, 10.dp)))
     .dropShadow(shape, Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-4).dp, offset = DpOffset(0.dp, 4.dp)))
+
+/** `.glass-card`'s own `0 2px 8px rgba(139, 92, 246, 0.06)`, which the
+ *  unlayered stylesheet keeps over any `shadow-*` utility beside it. */
+internal fun Modifier.glassCardShadow(shape: Shape): Modifier =
+    dropShadow(shape, Shadow(radius = 8.dp, color = Color(0xFF8B5CF6).copy(alpha = 0.06f), offset = DpOffset(0.dp, 2.dp)))
 
 /** `shadow-xl`: 0 20px 25px -5px and 0 8px 10px -6px, both black 10%. */
 internal fun Modifier.tailwindShadowXl(shape: Shape): Modifier = this

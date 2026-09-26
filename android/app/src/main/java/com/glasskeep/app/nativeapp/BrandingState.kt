@@ -39,6 +39,10 @@ class BrandingState(private val tokenStore: TokenStore) {
     var loginBackgroundBlur: Int by mutableStateOf(0)
         private set
 
+    /** The admin's sign-in slogan, read on each launch like the web's
+     *  own state; null or blank shows the built-in one. */
+    var loginSlogan: String? by mutableStateOf(null)
+
     fun apply(branding: BrandingDto) {
         appName = branding.appName.takeIf { it.isNotBlank() }
         logo = branding.logo?.takeIf { it.startsWith("data:") }

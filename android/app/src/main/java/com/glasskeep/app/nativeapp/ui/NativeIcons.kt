@@ -1,16 +1,23 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -973,14 +980,50 @@ fun CloudErrorIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color 
 /** The counterpart of [TablerIcon] for the web's own hand-drawn set
  *  (src/icons/index.jsx), which draws at strokeWidth 2. */
 @Composable
-private fun WebIcon(pathData: String, modifier: Modifier, size: Dp, tint: Color) {
+private fun WebIcon(pathData: String, modifier: Modifier, size: Dp, tint: Color, strokeWidth: Float = 2f) {
     val path = remember(pathData) { PathParser().parsePathString(pathData).toPath() }
     Canvas(modifier.size(size)) {
         val scale = this.size.minDimension / 24f
         scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawPath(path, color = tint, style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
     }
+}
+
+/** icons/index.jsx `Sun`, the sign-in screens' theme toggle: a small
+ *  disc and eight short rays (the header's [SunIcon] is another glyph). */
+@Composable
+fun AuthSunIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0 -8 M12 2L12 4 M12 20L12 22 M20 12L22 12 M2 12L4 12 " +
+        "M17.657 6.343L18.364 5.636 M5.636 18.364L6.343 17.657 M17.657 17.657L18.364 18.364 M5.636 5.636L6.343 6.343",
+    modifier, size, tint,
+)
+
+/** QrLoginButton.jsx's own glyph: three square finders and a scatter of
+ *  modules. */
+@Composable
+fun QrLoginIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M3 3h7v7h-7z M14 3h7v7h-7z M3 14h7v7h-7z M14 14v3 M14 20v1 M17 14h4 M17 17v4 M20 17h1 M20 20h1",
+    modifier, size, tint,
+)
+
+/** QrLoginPanel.jsx's approval tick, drawn at stroke 3. */
+@Composable
+fun BoldCheckIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M20 6L9 17L4 12",
+    modifier, size, tint, strokeWidth = 3f,
+)
+
+/** The web's spinner arc, turning once a second like `animate-spin`. */
+@Composable
+fun SpinnerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    val angle by rememberInfiniteTransition(label = "spinner").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 1000, easing = LinearEasing)),
+        label = "spinnerAngle",
+    )
+    WebIcon("M21 12a9 9 0 1 1 -6.219 -8.56", modifier.rotate(angle), size, tint)
 }
 
 @Composable
@@ -1171,6 +1214,13 @@ fun PaintRollerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color
     "M5 5a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -2 " +
         "M19 6h1a2 2 0 0 1 2 2a5 5 0 0 1 -5 5l-5 0v2 " +
         "M10 16a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -4",
+    modifier, size, tint,
+)
+
+/** tabler/arrow-badge-down.svg. */
+@Composable
+fun ArrowBadgeDownIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M17 7v6l-5 4l-5 -4v-6l5 4z",
     modifier, size, tint,
 )
 

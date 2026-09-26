@@ -82,17 +82,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.glasskeep.app.BuildConfig
-import com.glasskeep.app.MainActivity
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.ImageCompression
@@ -112,12 +108,10 @@ import com.glasskeep.app.nativeapp.data.network.UserAiTestRequest
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.isUserCancellation
 import com.glasskeep.app.nativeapp.prfOutputOf
-import com.glasskeep.app.ui.ButtonGradient
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightBorderColor
-import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import com.glasskeep.app.update.ReleaseInfo
 import com.glasskeep.app.update.UpdateManager
@@ -730,22 +724,6 @@ internal fun SettingsScreen(
                 repository.setTypographyPresets(presets)
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen setTypographyPresets failed", t)
-            }
-        }
-    }
-
-    /** Purges all state owned by this server, then restarts on setup. */
-    fun changeServer() {
-        scope.launch {
-            try {
-                container.clearForServerChange()
-                val intent = Intent(context, MainActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                context.startActivity(intent)
-                activity.finish()
-            } catch (t: Throwable) {
-                NativeDebug.e("SettingsScreen changeServer failed", t)
-                toasts.error(context.getString(R.string.native_change_server_error))
             }
         }
     }
@@ -1649,7 +1627,7 @@ internal fun SettingsScreen(
         if (showChangeServerDialog) {
             ChangeServerDialog(
                 dark = dark,
-                onConfirm = { showChangeServerDialog = false; changeServer() },
+                onConfirm = { showChangeServerDialog = false; scope.launch { switchServer(container, activity, toasts) } },
                 onDismiss = { showChangeServerDialog = false },
             )
         }
@@ -1666,7 +1644,7 @@ private fun jsNumberText(value: Double): String =
 
 /** What PasskeySettingsSection.jsx reads as the user closing the system
  *  sheet rather than a failure. */
-private val PasskeyCancelRegex = Regex("""not[\s_-]*allowed|cancel|abort|interrupt|annul""", RegexOption.IGNORE_CASE)
+internal val PasskeyCancelRegex = Regex("""not[\s_-]*allowed|cancel|abort|interrupt|annul""", RegexOption.IGNORE_CASE)
 
 private val AiProviderErrorRegex = Regex("""^AI provider error:\s*(.+)$""")
 private val AiUnreachableErrorRegex = Regex("""^Failed to reach AI provider\s*\((.+)\)\.?$""")
@@ -2413,114 +2391,6 @@ private fun ResetNoteOrderDialog(
                 onClick = onConfirm,
             )
         }
-    }
-}
-
-/** A platform TextView's line box with its default font padding, which
- *  the WebView-era change-server dialog was built from. */
-private val TextViewLineHeight = 1.33.em
-
-/**
- * The change-server confirmation the APK has always shown natively
- * (WebViewActivity's showChangeServerDialog): an 85%-wide, 20dp-radius
- * card, the swap glyph in a tinted circle, centred title and message, and
- * two equal buttons, the confirm one on the fixed indigo-to-violet
- * gradient the old dialog hardcoded.
- */
-@Composable
-private fun ChangeServerDialog(dark: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    val cardShape = RoundedCornerShape(20.dp)
-    val buttonShape = RoundedCornerShape(12.dp)
-    val mutedColor = if (dark) DarkSubtextColor else LightSubtextColor
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .shadow(elevation = 16.dp, shape = cardShape)
-                .background(if (dark) Color(0xFF282828) else Color.White, cardShape)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(if (dark) Color(0xFF2D2644) else Color(0xFFF0E8FF), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                SwapServerIcon(size = 24.dp, tint = Color(0xFF6366F1))
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                stringResource(R.string.dialog_change_server),
-                color = if (dark) DarkTitleColor else LightTitleColor,
-                fontSize = 18.sp,
-                lineHeight = TextViewLineHeight,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.dialog_change_message),
-                color = mutedColor,
-                fontSize = 14.sp,
-                lineHeight = TextViewLineHeight,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(24.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ChangeServerButton(
-                    label = stringResource(R.string.dialog_no),
-                    textColor = mutedColor,
-                    background = Brush.horizontalGradient(
-                        List(2) { if (dark) Color(0xFF363636) else Color(0xFFF3F4F6) },
-                    ),
-                    shape = buttonShape,
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                )
-                ChangeServerButton(
-                    label = stringResource(R.string.dialog_yes),
-                    textColor = Color.White,
-                    background = ButtonGradient,
-                    shape = buttonShape,
-                    onClick = onConfirm,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ChangeServerButton(
-    label: String,
-    textColor: Color,
-    background: Brush,
-    shape: RoundedCornerShape,
-    onClick: () -> Unit,
-    modifier: Modifier,
-) {
-    Box(
-        modifier = modifier
-            .clip(shape)
-            .background(background)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Button,
-            ) { onClick() }
-            .padding(vertical = 12.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            label,
-            color = textColor,
-            fontSize = 15.sp,
-            lineHeight = TextViewLineHeight,
-            fontWeight = FontWeight.Bold,
-        )
     }
 }
 

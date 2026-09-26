@@ -216,4 +216,9 @@ dependencies {
     // The audio player's "MP3" download (AudioTranscoder.kt): a pure Java
     // port of LAME, the encoder the web bundles as lamejs.
     implementation("de.sciss:jump3r:1.0.5")
+
+    // The login screen's QR sign-in code (QrLoginPanel.kt), what the web
+    // draws with the qrcode package: a small pure Java encoder (MIT),
+    // called directly, so R8 needs no rule for it.
+    implementation("io.nayuki:qrcodegen:1.8.0")
 }

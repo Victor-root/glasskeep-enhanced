@@ -484,7 +484,7 @@ private val DEVICE_LINK_FRAGMENT_REGEX = Regex("^/device-link/([A-Za-z0-9_-]+)$"
 // cased, default ports 443/80 omitted) so a phone whose configured
 // server address happens to spell out ":443" still matches a PC whose
 // browser address bar never shows a default port.
-private fun originOf(url: String): String? {
+internal fun originOf(url: String): String? {
     val uri = try { URI(url) } catch (e: Exception) { return null }
     val scheme = uri.scheme?.lowercase() ?: return null
     val host = uri.host?.lowercase() ?: return null
