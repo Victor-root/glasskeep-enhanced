@@ -74,8 +74,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -103,14 +105,11 @@ import com.glasskeep.app.nativeapp.data.ChecklistBlock
 import com.glasskeep.app.nativeapp.data.ChecklistEntry
 import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.ChecklistItems
-import com.glasskeep.app.nativeapp.data.ChecklistPreview
 import com.glasskeep.app.nativeapp.data.ChecklistSectionData
 import com.glasskeep.app.nativeapp.data.ContactLink
 import com.glasskeep.app.nativeapp.data.ContactLinks
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.LightBorderColor
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -153,6 +152,10 @@ private val PlaceholderDark = Color(0xFF6A7282)
  * Structural changes (reorder, indent, add, remove, section edits) hand
  * a whole new entry list back through [onEntriesChange]; typing does the
  * same with `persist = false`, and the row saves once it loses the focus.
+ *
+ * [readOnly] (a read-only share, or a mirror whose server is away) keeps
+ * the same list but frozen, as the web does: no handles, crosses or add
+ * buttons, greyed boxes, fixed titles; only the Done area still folds.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -168,6 +171,7 @@ fun ChecklistEditorBody(
     onEntriesChange: (List<ChecklistEntry>, persist: Boolean) -> Unit,
     onFocusItem: (id: String) -> Unit,
     onDoneCollapsedChange: (Boolean) -> Unit,
+    readOnly: Boolean = false,
 ) {
     val blocks = remember(entries) { ChecklistItems.blocks(entries) }
     val hasChecked = remember(entries) { entries.any { it is ChecklistItemData && it.done } }
@@ -296,16 +300,18 @@ fun ChecklistEditorBody(
     ) {
         if (entries.isEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (insertPosition == "top") ChecklistAddRow(borderColor = borderColor, dark = dark) { addItemAtEdge() }
+                if (!readOnly && insertPosition == "top") ChecklistAddRow(borderColor = borderColor, dark = dark) { addItemAtEdge() }
                 Text(
                     stringResource(R.string.native_checklist_empty),
                     color = CheckedTextLight,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                 )
-                if (insertPosition != "top") ChecklistAddRow(borderColor = borderColor, dark = dark) { addItemAtEdge() }
-                ChecklistAddSectionButton(borderColor = borderColor, dark = dark, modifier = Modifier.padding(top = 8.dp)) {
-                    addSection()
+                if (!readOnly && insertPosition != "top") ChecklistAddRow(borderColor = borderColor, dark = dark) { addItemAtEdge() }
+                if (!readOnly) {
+                    ChecklistAddSectionButton(borderColor = borderColor, dark = dark, modifier = Modifier.padding(top = 8.dp)) {
+                        addSection()
+                    }
                 }
             }
         } else {
@@ -315,6 +321,7 @@ fun ChecklistEditorBody(
                     ChecklistSectionBlock(
                         block = block,
                         entries = entries,
+                        readOnly = readOnly,
                         insertPosition = insertPosition,
                         onAddAtEdge = { addItemAtEdge() },
                         blockDragging = draggingSectionId == blockKey,
@@ -412,14 +419,17 @@ fun ChecklistEditorBody(
                     )
                 }
 
-                ChecklistAddSectionButton(borderColor = borderColor, dark = dark, modifier = Modifier.padding(top = 4.dp)) {
-                    addSection()
+                if (!readOnly) {
+                    ChecklistAddSectionButton(borderColor = borderColor, dark = dark, modifier = Modifier.padding(top = 4.dp)) {
+                        addSection()
+                    }
                 }
 
                 // Its own 16dp top margin folds into the 24dp above it.
                 if (hasChecked) {
                     ChecklistDoneArea(
                         blocks = blocks,
+                        readOnly = readOnly,
                         showSectionLabels = blocks.size > 1,
                         collapsed = doneCollapsed,
                         dark = dark,
@@ -506,6 +516,7 @@ private fun moveItem(
 private fun ChecklistSectionBlock(
     block: ChecklistBlock,
     entries: List<ChecklistEntry>,
+    readOnly: Boolean,
     insertPosition: String,
     onAddAtEdge: () -> Unit,
     blockDragging: Boolean,
@@ -558,6 +569,7 @@ private fun ChecklistSectionBlock(
             val shift = neighbourShift(visibleIndex, draggedIndex, dropIndex, draggingId, rowHeights, visibleIds)
             ChecklistRowView(
                 item = item,
+                readOnly = readOnly,
                 dark = dark,
                 titleColor = titleColor,
                 borderColor = borderColor,
@@ -607,14 +619,14 @@ private fun ChecklistSectionBlock(
             // space-y-3 around the rows. An empty row list still carries its
             // 12dp margin: under the "bottom" add row it collapses above the
             // block, over the "top" one into the 24dp gap that follows.
-            if (insertPosition == "top") {
+            if (!readOnly && insertPosition == "top") {
                 ChecklistAddRow(borderColor = borderColor, dark = dark, onClick = onAddAtEdge)
                 if (unchecked.isNotEmpty()) Spacer(Modifier.height(12.dp))
-            } else if (unchecked.isEmpty()) {
+            } else if (!readOnly && unchecked.isEmpty()) {
                 Spacer(Modifier.height(12.dp))
             }
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { Rows() }
-            if (insertPosition != "top") {
+            if (!readOnly && insertPosition != "top") {
                 if (unchecked.isNotEmpty()) Spacer(Modifier.height(12.dp))
                 ChecklistAddRow(borderColor = borderColor, dark = dark, onClick = onAddAtEdge)
             }
@@ -628,6 +640,7 @@ private fun ChecklistSectionBlock(
             ) {
                 ChecklistSectionHeader(
                     section = section,
+                    readOnly = readOnly,
                     accent = accent,
                     uncheckedCount = unchecked.size,
                     dark = dark,
@@ -652,7 +665,7 @@ private fun ChecklistSectionBlock(
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) { Rows() }
                         }
-                        ChecklistAddToSectionRow(dark = dark, onClick = onAddToSection)
+                        if (!readOnly) ChecklistAddToSectionRow(dark = dark, onClick = onAddToSection)
                     }
                 }
             }
@@ -740,6 +753,7 @@ private fun neighbourShift(
 @Composable
 private fun ChecklistRowView(
     item: ChecklistItemData,
+    readOnly: Boolean,
     dark: Boolean,
     titleColor: Color,
     borderColor: Color,
@@ -800,70 +814,73 @@ private fun ChecklistRowView(
                 .weight(1f)
                 .offset { IntOffset(slideX.roundToInt(), 0) },
         ) {
-            Box(
-                modifier = Modifier
-                    .semantics { contentDescription = moveLabel }
-                    .padding(horizontal = 4.dp)
-                    .pointerInput(item.id, canIndent, item.indent) {
-                        var locked = false
-                        var vertical = false
-                        var totalX = 0f
-                        var totalY = 0f
-                        detectDragGestures(
-                            onDragStart = {
-                                locked = false
-                                vertical = false
-                                totalX = 0f
-                                totalY = 0f
-                            },
-                            onDrag = { change, delta ->
-                                change.consume()
-                                totalX += delta.x
-                                totalY += delta.y
-                                if (!locked) {
-                                    // 8px axis lock: whichever axis wins
-                                    // first owns the whole gesture.
-                                    if (abs(totalX) < AxisLockPx && abs(totalY) < AxisLockPx) return@detectDragGestures
-                                    locked = true
-                                    vertical = abs(totalX) <= abs(totalY)
-                                    onDragStart(vertical)
-                                }
-                                if (vertical) {
-                                    onDragDelta(delta.y)
-                                } else {
-                                    val step = with(density) { IndentStep.toPx() }
-                                    val allowed = if (totalX > 0) canIndent else item.indent == 1
-                                    slideX = if (!allowed) 0f else totalX.coerceIn(-step, step)
-                                }
-                            },
-                            onDragEnd = {
-                                if (locked && vertical) {
-                                    onDragEnd()
-                                } else if (locked) {
-                                    val step = with(density) { IndentStep.toPx() }
-                                    if (abs(slideX) >= step) {
-                                        onIndentChange(if (slideX > 0) 1 else 0)
+            if (!readOnly) {
+                Box(
+                    modifier = Modifier
+                        .semantics { contentDescription = moveLabel }
+                        .padding(horizontal = 4.dp)
+                        .pointerInput(item.id, canIndent, item.indent) {
+                            var locked = false
+                            var vertical = false
+                            var totalX = 0f
+                            var totalY = 0f
+                            detectDragGestures(
+                                onDragStart = {
+                                    locked = false
+                                    vertical = false
+                                    totalX = 0f
+                                    totalY = 0f
+                                },
+                                onDrag = { change, delta ->
+                                    change.consume()
+                                    totalX += delta.x
+                                    totalY += delta.y
+                                    if (!locked) {
+                                        // 8px axis lock: whichever axis wins
+                                        // first owns the whole gesture.
+                                        if (abs(totalX) < AxisLockPx && abs(totalY) < AxisLockPx) return@detectDragGestures
+                                        locked = true
+                                        vertical = abs(totalX) <= abs(totalY)
+                                        onDragStart(vertical)
                                     }
+                                    if (vertical) {
+                                        onDragDelta(delta.y)
+                                    } else {
+                                        val step = with(density) { IndentStep.toPx() }
+                                        val allowed = if (totalX > 0) canIndent else item.indent == 1
+                                        slideX = if (!allowed) 0f else totalX.coerceIn(-step, step)
+                                    }
+                                },
+                                onDragEnd = {
+                                    if (locked && vertical) {
+                                        onDragEnd()
+                                    } else if (locked) {
+                                        val step = with(density) { IndentStep.toPx() }
+                                        if (abs(slideX) >= step) {
+                                            onIndentChange(if (slideX > 0) 1 else 0)
+                                        }
+                                        slideX = 0f
+                                    }
+                                    locked = false
+                                },
+                                onDragCancel = {
+                                    if (locked && vertical) onDragCancel()
                                     slideX = 0f
-                                }
-                                locked = false
-                            },
-                            onDragCancel = {
-                                if (locked && vertical) onDragCancel()
-                                slideX = 0f
-                                locked = false
-                            },
-                        )
-                    },
-            ) {
-                ChecklistDragHandle(dark = dark)
+                                    locked = false
+                                },
+                            )
+                        },
+                ) {
+                    ChecklistDragHandle(dark = dark)
+                }
+                Spacer(Modifier.width(8.dp))
             }
-            Spacer(Modifier.width(8.dp))
-            GkCheckbox(checked = item.done, onCheckedChange = onToggle)
+            GkCheckbox(checked = item.done, onCheckedChange = onToggle, enabled = !readOnly)
             Spacer(Modifier.width(6.dp))
             ChecklistRowText(
                 text = item.text,
                 done = false,
+                readOnly = readOnly,
                 textColor = titleColor,
                 dark = dark,
                 borderColor = borderColor,
@@ -879,29 +896,31 @@ private fun ChecklistRowView(
                 modifier = Modifier.weight(1f),
             )
         }
-        // The row's 8dp gap plus the button's own ml-1.5, then -translate-x-2.
-        Box(
-            modifier = Modifier
-                .padding(start = 14.dp)
-                .offset(x = (-8).dp)
-                .size(24.dp)
-                .clip(CircleShape)
-                .alpha(0.8f)
-                .semantics { contentDescription = removeLabel }
-                .gkTooltip(removeLabel)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) { onRemove() },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                "✕",
-                color = if (dark) HandleDotDark else CheckedTextLight,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
+        if (!readOnly) {
+            // The row's 8dp gap plus the button's own ml-1.5, then -translate-x-2.
+            Box(
+                modifier = Modifier
+                    .padding(start = 14.dp)
+                    .offset(x = (-8).dp)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .alpha(0.8f)
+                    .semantics { contentDescription = removeLabel }
+                    .gkTooltip(removeLabel)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onRemove() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "✕",
+                    color = if (dark) HandleDotDark else CheckedTextLight,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
     }
 }
@@ -929,6 +948,7 @@ private fun ChecklistRowText(
     onTextChange: (String) -> Unit,
     onBlur: () -> Unit,
     modifier: Modifier = Modifier,
+    readOnly: Boolean = false,
     onEnter: ((atStart: Boolean) -> Unit)? = null,
     onBackspaceEmpty: (() -> Unit)? = null,
     onIndent: (() -> Unit)? = null,
@@ -952,6 +972,26 @@ private fun ChecklistRowText(
         },
     )
     val atRest = remember(links, linkStyle) { ChecklistAtRestTransformation(links, linkStyle) }
+
+    if (readOnly) {
+        // The span alone, links included, and nothing when empty.
+        Text(
+            remember(text, links, linkStyle) {
+                buildAnnotatedString {
+                    append(text.replace('\n', ' '))
+                    links.forEach { addLink(LinkAnnotation.Url(it.uri, TextLinkStyles(linkStyle)), it.start, it.end) }
+                }
+            },
+            style = TextStyle(
+                color = textColor,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None,
+            ),
+            modifier = modifier.padding(bottom = 3.dp),
+        )
+        return
+    }
 
     LaunchedEffect(caretToEnd) {
         if (caretToEnd) {
@@ -1082,6 +1122,7 @@ private class ChecklistAtRestTransformation(
 @Composable
 private fun ChecklistSectionHeader(
     section: ChecklistSectionData,
+    readOnly: Boolean,
     accent: Color?,
     uncheckedCount: Int,
     dark: Boolean,
@@ -1099,7 +1140,7 @@ private fun ChecklistSectionHeader(
     // An untitled section opens straight into its title, focused with
     // everything selected; the title is written back trimmed, once, when
     // it loses the focus, or with Enter, which also starts a row in it.
-    var editingTitle by remember(section.id) { mutableStateOf(section.title.isBlank()) }
+    var editingTitle by remember(section.id) { mutableStateOf(!readOnly && section.title.isBlank()) }
     var draft by remember(section.id) { mutableStateOf(TextFieldValue(section.title, TextRange(0, section.title.length))) }
     var titleFocused by remember(section.id) { mutableStateOf(false) }
     var enterPressed by remember(section.id) { mutableStateOf(false) }
@@ -1138,66 +1179,68 @@ private fun ChecklistSectionHeader(
             .padding(bottom = if (accent != null) 1.dp else 0.dp)
             .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .semantics { contentDescription = moveLabel }
-                .gkTooltip(moveLabel)
-                .pointerInput(section.id) {
-                    detectDragGestures(
-                        onDragStart = { onDragStart() },
-                        onDrag = { change, delta ->
-                            change.consume()
-                            onDragDelta(delta.y)
-                        },
-                        onDragEnd = { onDragEnd() },
-                        onDragCancel = { onDragCancel() },
-                    )
-                },
-        ) {
-            ChecklistDragHandle(dark = dark, small = true)
-        }
-        Box {
+        if (!readOnly) {
             Box(
                 modifier = Modifier
-                    .size(16.dp)
-                    .clip(CircleShape)
-                    .then(
-                        if (accent != null) {
-                            Modifier.background(accent)
-                        } else {
-                            // border-gray-300 / dark:border-gray-500.
-                            Modifier.border(2.dp, if (dark) Color(0xFF6A7282) else Color(0xFFD1D5DC), CircleShape)
-                        },
+                    .semantics { contentDescription = moveLabel }
+                    .gkTooltip(moveLabel)
+                    .pointerInput(section.id) {
+                        detectDragGestures(
+                            onDragStart = { onDragStart() },
+                            onDrag = { change, delta ->
+                                change.consume()
+                                onDragDelta(delta.y)
+                            },
+                            onDragEnd = { onDragEnd() },
+                            onDragCancel = { onDragCancel() },
+                        )
+                    },
+            ) {
+                ChecklistDragHandle(dark = dark, small = true)
+            }
+            Box {
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clip(CircleShape)
+                        .then(
+                            if (accent != null) {
+                                Modifier.background(accent)
+                            } else {
+                                // border-gray-300 / dark:border-gray-500.
+                                Modifier.border(2.dp, if (dark) Color(0xFF6A7282) else Color(0xFFD1D5DC), CircleShape)
+                            },
+                        )
+                        .semantics { contentDescription = colorLabel }
+                        .gkTooltip(colorLabel)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { pickerOpen = true },
+                )
+                if (pickerOpen) {
+                    ChecklistSectionColorPicker(
+                        selected = section.color ?: NoSectionColor,
+                        dark = dark,
+                        onSelect = { color -> onChange(section.copy(color = color)); pickerOpen = false },
+                        onDismiss = { pickerOpen = false },
                     )
-                    .semantics { contentDescription = colorLabel }
-                    .gkTooltip(colorLabel)
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .semantics { contentDescription = collapseLabel }
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         role = Role.Button,
-                    ) { pickerOpen = true },
-            )
-            if (pickerOpen) {
-                ChecklistSectionColorPicker(
-                    selected = section.color ?: NoSectionColor,
-                    dark = dark,
-                    onSelect = { color -> onChange(section.copy(color = color)); pickerOpen = false },
-                    onDismiss = { pickerOpen = false },
-                )
+                    ) { onChange(section.copy(collapsed = !section.collapsed)) },
+                contentAlignment = Alignment.Center,
+            ) {
+                ChecklistChevron(collapsed = section.collapsed, dark = dark)
             }
-        }
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .semantics { contentDescription = collapseLabel }
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) { onChange(section.copy(collapsed = !section.collapsed)) },
-            contentAlignment = Alignment.Center,
-        ) {
-            ChecklistChevron(collapsed = section.collapsed, dark = dark)
         }
         val titlePlaceholder = stringResource(R.string.native_checklist_section_title_placeholder)
         if (editingTitle) {
@@ -1259,6 +1302,7 @@ private fun ChecklistSectionHeader(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
+                        enabled = !readOnly,
                         role = Role.Button,
                     ) {
                         draft = TextFieldValue(section.title, TextRange(0, section.title.length))
@@ -1280,25 +1324,27 @@ private fun ChecklistSectionHeader(
                 fontWeight = FontWeight.Medium,
             )
         }
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .semantics { contentDescription = removeLabel }
-                .gkTooltip(removeLabel)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) {
-                    if (confirmingRemove) onRemove() else confirmingRemove = true
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            if (confirmingRemove) {
-                SaveCheckIcon(size = 16.dp, tint = SectionDeleteRed, strokeWidth = 2.5f)
-            } else {
-                CloseIcon(size = 16.dp, tint = SectionDeleteRed, strokeWidth = 2.5f)
+        if (!readOnly) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .semantics { contentDescription = removeLabel }
+                    .gkTooltip(removeLabel)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) {
+                        if (confirmingRemove) onRemove() else confirmingRemove = true
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (confirmingRemove) {
+                    SaveCheckIcon(size = 16.dp, tint = SectionDeleteRed, strokeWidth = 2.5f)
+                } else {
+                    CloseIcon(size = 16.dp, tint = SectionDeleteRed, strokeWidth = 2.5f)
+                }
             }
         }
     }
@@ -1507,6 +1553,7 @@ private fun ChecklistAddSectionButton(borderColor: Color, dark: Boolean, modifie
 @Composable
 private fun ChecklistDoneArea(
     blocks: List<ChecklistBlock>,
+    readOnly: Boolean,
     showSectionLabels: Boolean,
     collapsed: Boolean,
     dark: Boolean,
@@ -1582,6 +1629,7 @@ private fun ChecklistDoneArea(
                         key(item.id) {
                             ChecklistDoneRow(
                                 item = item,
+                                readOnly = readOnly,
                                 dark = dark,
                                 borderColor = borderColor,
                                 onToggle = { value -> onToggle(item.id, value) },
@@ -1602,6 +1650,7 @@ private fun ChecklistDoneArea(
 @Composable
 private fun ChecklistDoneRow(
     item: ChecklistItemData,
+    readOnly: Boolean,
     dark: Boolean,
     borderColor: Color,
     onToggle: (Boolean) -> Unit,
@@ -1614,11 +1663,12 @@ private fun ChecklistDoneRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(start = if (item.indent == 1) IndentStep else 0.dp),
     ) {
-        GkCheckbox(checked = true, onCheckedChange = onToggle)
+        GkCheckbox(checked = true, onCheckedChange = onToggle, enabled = !readOnly)
         Spacer(Modifier.width(6.dp))
         ChecklistRowText(
             text = item.text,
             done = true,
+            readOnly = readOnly,
             textColor = if (dark) CheckedTextDark else CheckedTextLight,
             dark = dark,
             borderColor = borderColor,
@@ -1629,48 +1679,24 @@ private fun ChecklistDoneRow(
             onBlur = onBlur,
             modifier = Modifier.weight(1f),
         )
-        Box(
-            modifier = Modifier
-                .padding(start = 6.dp)
-                .offset(x = (-8).dp)
-                .size(24.dp)
-                .clip(CircleShape)
-                .alpha(0.8f)
-                .semantics { contentDescription = removeLabel }
-                .gkTooltip(removeLabel)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) { onRemove() },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("✕", color = if (dark) HandleDotDark else CheckedTextLight, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-/** Full, non-interactive listing (every item, checked included, unlike the
- *  capped/unchecked-only NoteCard preview), used where a checklist is only
- *  being shown rather than edited. */
-@Composable
-fun ChecklistReadOnlyPreview(items: List<JsonElement>, titleColor: Color, subtextColor: Color) {
-    val parsed = remember(items) { ChecklistPreview.parse(JsonArray(items).toString()) }
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (item in parsed) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (item.done) "☑" else "☐",
-                    color = subtextColor,
-                    fontSize = 15.sp,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    item.text,
-                    color = if (item.done) subtextColor else titleColor,
-                    fontSize = 14.sp,
-                    textDecoration = if (item.done) TextDecoration.LineThrough else TextDecoration.None,
-                )
+        if (!readOnly) {
+            Box(
+                modifier = Modifier
+                    .padding(start = 6.dp)
+                    .offset(x = (-8).dp)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .alpha(0.8f)
+                    .semantics { contentDescription = removeLabel }
+                    .gkTooltip(removeLabel)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onRemove() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("✕", color = if (dark) HandleDotDark else CheckedTextLight, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }

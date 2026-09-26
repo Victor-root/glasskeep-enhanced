@@ -2231,28 +2231,20 @@ fun NoteDetailScreen(
                                     ),
                             ) {
                                 if (edit.isChecklistType) {
-                                    val checklistEntries = edit.checklistItems.orEmpty()
-                                    if (isNoteReadOnly) {
-                                        ChecklistReadOnlyPreview(
-                                            items = currentNote.items,
-                                            titleColor = titleColor,
-                                            subtextColor = subtextColor,
-                                        )
-                                    } else {
-                                        ChecklistEditorBody(
-                                            entries = checklistEntries,
-                                            insertPosition = container.editorPrefs.checklistInsertPosition,
-                                            removeSectionBehavior = container.editorPrefs.checklistRemoveSectionBehavior,
-                                            dark = dark,
-                                            titleColor = titleColor,
-                                            borderColor = borderColor,
-                                            doneCollapsed = doneSectionCollapsed,
-                                            focusRequesterFor = { id -> checklistFocusRequesters.getOrPut(id) { FocusRequester() } },
-                                            onEntriesChange = { updated, persist -> updateChecklistEntries(updated, persist) },
-                                            onFocusItem = { id -> pendingChecklistFocus = id },
-                                            onDoneCollapsedChange = { collapsed -> setDoneSectionCollapsed(collapsed) },
-                                        )
-                                    }
+                                    ChecklistEditorBody(
+                                        entries = edit.checklistItems.orEmpty(),
+                                        insertPosition = container.editorPrefs.checklistInsertPosition,
+                                        removeSectionBehavior = container.editorPrefs.checklistRemoveSectionBehavior,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        borderColor = borderColor,
+                                        doneCollapsed = doneSectionCollapsed,
+                                        focusRequesterFor = { id -> checklistFocusRequesters.getOrPut(id) { FocusRequester() } },
+                                        onEntriesChange = { updated, persist -> updateChecklistEntries(updated, persist) },
+                                        onFocusItem = { id -> pendingChecklistFocus = id },
+                                        onDoneCollapsedChange = { collapsed -> setDoneSectionCollapsed(collapsed) },
+                                        readOnly = isNoteReadOnly,
+                                    )
                                 } else if (edit.isDrawType) {
                                     if (!drawingCanvasMode) {
                                         if (viewMode) {
