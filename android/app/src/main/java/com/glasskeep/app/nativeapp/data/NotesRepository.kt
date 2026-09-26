@@ -19,6 +19,9 @@ import com.glasskeep.app.nativeapp.data.network.DeviceLinkInfoResponse
 import com.glasskeep.app.nativeapp.data.network.DeviceLinkTokenRequest
 import com.glasskeep.app.nativeapp.data.network.FederatedUserDto
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
+import com.glasskeep.app.nativeapp.data.network.ImportNotesRequest
+import com.glasskeep.app.nativeapp.data.network.ImportNotesResponse
+import com.glasskeep.app.nativeapp.data.network.InstanceStatusResponse
 import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.NoteIconDto
@@ -26,52 +29,52 @@ import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.network.NotificationIdsRequest
 import com.glasskeep.app.nativeapp.data.network.NotificationRemoveRequest
 import com.glasskeep.app.nativeapp.data.network.PasskeyCeremonyOptionsResponse
-import com.glasskeep.app.nativeapp.data.network.PasskeyDto
+import com.glasskeep.app.nativeapp.data.network.PasskeyListResponse
 import com.glasskeep.app.nativeapp.data.network.PasskeyLoginVerifyRequest
 import com.glasskeep.app.nativeapp.data.network.PasskeyRegisterVerifyRequest
+import com.glasskeep.app.nativeapp.data.network.PasskeyRegisterVerifyResponse
 import com.glasskeep.app.nativeapp.data.network.PasskeyRenameRequest
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
+import com.glasskeep.app.nativeapp.data.network.PromotePasskeyVerifyRequest
 import com.glasskeep.app.nativeapp.data.network.RemoveCollaboratorRequest
 import com.glasskeep.app.nativeapp.data.network.ReorderNotesRequest
 import com.glasskeep.app.nativeapp.data.network.SetAlwaysShowSidebarOnWideRequest
 import com.glasskeep.app.nativeapp.data.network.SetAvatarRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistInsertPositionRequest
-import com.glasskeep.app.nativeapp.data.network.SetNoteIconRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
+import com.glasskeep.app.nativeapp.data.network.SetChecklistRemoveSectionRequest
 import com.glasskeep.app.nativeapp.data.network.SetCollaboratorAccessRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
-import com.glasskeep.app.nativeapp.data.network.ImportNotesRequest
-import com.glasskeep.app.nativeapp.data.network.ImportNotesResponse
-import com.glasskeep.app.nativeapp.data.network.SetChecklistRemoveSectionRequest
 import com.glasskeep.app.nativeapp.data.network.SetEdgeToEdgeLandscapeRequest
 import com.glasskeep.app.nativeapp.data.network.SetEditorToolbarModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetFloatingCardsRequest
 import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
 import com.glasskeep.app.nativeapp.data.network.SetLanguageRequest
+import com.glasskeep.app.nativeapp.data.network.SetNoteIconRequest
 import com.glasskeep.app.nativeapp.data.network.SetNotificationsFilterTypesRequest
 import com.glasskeep.app.nativeapp.data.network.SetNotificationsSoundRequest
 import com.glasskeep.app.nativeapp.data.network.SetNotificationsSoundTypesRequest
 import com.glasskeep.app.nativeapp.data.network.SetPasteModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
-import com.glasskeep.app.nativeapp.data.network.SetReadModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetQrQuickRequest
-import com.glasskeep.app.nativeapp.data.network.SetSidebarBreakpointRequest
-import com.glasskeep.app.nativeapp.data.network.SetTaskStrikeRequest
+import com.glasskeep.app.nativeapp.data.network.SetReadModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderTimeChipsRequest
 import com.glasskeep.app.nativeapp.data.network.SetShellThemeRequest
+import com.glasskeep.app.nativeapp.data.network.SetShowOnLoginRequest
+import com.glasskeep.app.nativeapp.data.network.SetSidebarBreakpointRequest
+import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
+import com.glasskeep.app.nativeapp.data.network.SetTaskStrikeRequest
+import com.glasskeep.app.nativeapp.data.network.SetToastDurationRequest
+import com.glasskeep.app.nativeapp.data.network.SetToastPositionRequest
+import com.glasskeep.app.nativeapp.data.network.SetTypographyPresetsRequest
+import com.glasskeep.app.nativeapp.data.network.SetViewModeRequest
+import com.glasskeep.app.nativeapp.data.network.TrashNoteRequest
 import com.glasskeep.app.nativeapp.data.network.UserAiSettingsDto
 import com.glasskeep.app.nativeapp.data.network.UserAiSettingsRequest
 import com.glasskeep.app.nativeapp.data.network.UserAiTestRequest
 import com.glasskeep.app.nativeapp.data.network.UserAiTestResponse
-import com.glasskeep.app.nativeapp.data.network.SetViewModeRequest
-import com.glasskeep.app.nativeapp.data.network.SetToastDurationRequest
-import com.glasskeep.app.nativeapp.data.network.SetToastPositionRequest
-import com.glasskeep.app.nativeapp.data.network.SetTypographyPresetsRequest
-import com.glasskeep.app.nativeapp.data.network.SetShowOnLoginRequest
-import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
-import com.glasskeep.app.nativeapp.data.network.TrashNoteRequest
 import com.glasskeep.app.nativeapp.data.network.UserDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -143,13 +146,21 @@ sealed class AddCollaboratorResult {
     data class Rejected(val httpCode: Int, val error: String?) : AddCollaboratorResult()
 }
 
-/** The `error` field of a refused collaboration request. */
+/** The `error` field of a refused request's body. */
 @Serializable
-private data class CollaborateErrorBody(val error: String? = null)
+private data class ErrorBody(val error: String? = null)
 
-private fun Response<*>.collaborateError(): String? = errorBody()?.string()?.let { raw ->
-    runCatching { errorJson.decodeFromString<CollaborateErrorBody>(raw).error }.getOrNull()
+private fun Response<*>.serverError(): String? = errorBody()?.string()?.let { raw ->
+    runCatching { errorJson.decodeFromString<ErrorBody>(raw).error }.getOrNull()
 }
+
+/** A request the server answered with an error status. [error] is the
+ *  `error` text of its body, what the web's api() throws as the message. */
+class ServerRefusal(val status: Int, val error: String?, request: String) :
+    IllegalStateException("$request failed: HTTP $status${error?.let { " $it" }.orEmpty()}")
+
+private fun Response<*>.refusal(request: String): ServerRefusal =
+    ServerRefusal(code(), serverError(), request).also { NativeDebug.e(it.message.orEmpty()) }
 
 /** Outcome of PATCH .../collaborate/:userId; a refusal carries the
  *  server's `error` text, like AddCollaboratorResult's. */
@@ -1197,27 +1208,16 @@ class NotesRepository(
         NativeDebug.d("NotesRepository.setUserAiSettings mode=${request.mode} enabled=${request.enabled}")
         val response = api.setUserAiSettings(request)
         val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "PUT /api/user/ai/settings failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        if (!response.isSuccessful || body == null) throw response.refusal("PUT /api/user/ai/settings")
         return body
     }
 
-    /** Tries a configuration without saving it. A refusal is an answer
-     *  here, not a failure: the server's own message is what the panel
-     *  shows, so it is read out of the error body too. */
+    /** Tries a configuration without saving it. A refusal carries the
+     *  server's own reason, which is what the panel shows. */
     suspend fun testUserAi(request: UserAiTestRequest): UserAiTestResponse {
         NativeDebug.d("NotesRepository.testUserAi mode=${request.mode}")
         val response = api.testUserAi(request)
-        response.body()?.let { return it }
-        val raw = response.errorBody()?.string()
-        NativeDebug.e("POST /api/user/ai/test failed: HTTP ${response.code()} $raw")
-        val message = raw?.let {
-            runCatching { errorJson.decodeFromString<UserAiTestResponse>(it).error }.getOrNull()
-        }
-        return UserAiTestResponse(ok = false, error = message ?: "HTTP ${response.code()}")
+        return response.body().takeIf { response.isSuccessful } ?: throw response.refusal("POST /api/user/ai/test")
     }
 
     /** Sets what a removed checklist section does with its items
@@ -1462,18 +1462,12 @@ class NotesRepository(
         return key
     }
 
-    /** Registered passkeys for this account (Settings screen's passkey
-     *  management section). */
-    suspend fun listPasskeys(): List<PasskeyDto> {
+    /** Registered passkeys for this account and whether the instance can
+     *  create one at all (false until an admin declares its domain). */
+    suspend fun listPasskeys(): PasskeyListResponse {
         NativeDebug.d("NotesRepository.listPasskeys")
         val response = api.listPasskeys()
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "GET /api/passkeys failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        return body.passkeys
+        return response.body().takeIf { response.isSuccessful } ?: throw response.refusal("GET /api/passkeys")
     }
 
     /** Starts a passkey registration ceremony: the caller re-serializes
@@ -1485,36 +1479,24 @@ class NotesRepository(
     suspend fun fetchPasskeyRegisterOptions(): PasskeyCeremonyOptionsResponse {
         NativeDebug.d("NotesRepository.fetchPasskeyRegisterOptions")
         val response = api.passkeyRegisterOptions()
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "POST /api/passkeys/register/options failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        return body
+        return response.body().takeIf { response.isSuccessful }
+            ?: throw response.refusal("POST /api/passkeys/register/options")
     }
 
     /** [responseJson] is Credential Manager's own RegistrationResponseJSON
      *  string, already parsed into a JsonElement by the caller (see
      *  PasskeyRegisterVerifyRequest.response's own doc comment for why). */
-    suspend fun verifyPasskeyRegistration(responseJson: JsonElement, challengeId: String, name: String) {
+    suspend fun verifyPasskeyRegistration(responseJson: JsonElement, challengeId: String, name: String): PasskeyRegisterVerifyResponse {
         NativeDebug.d("NotesRepository.verifyPasskeyRegistration")
         val response = api.passkeyRegisterVerify(PasskeyRegisterVerifyRequest(responseJson, challengeId, name))
-        if (!response.isSuccessful || response.body()?.ok != true) {
-            val error = "POST /api/passkeys/register/verify failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        return response.body()?.takeIf { response.isSuccessful && it.ok }
+            ?: throw response.refusal("POST /api/passkeys/register/verify")
     }
 
     suspend fun renamePasskey(credentialId: String, name: String) {
         NativeDebug.d("NotesRepository.renamePasskey id=$credentialId")
         val response = api.renamePasskey(credentialId, PasskeyRenameRequest(name))
-        if (!response.isSuccessful) {
-            val error = "PATCH /api/passkeys/$credentialId failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        if (!response.isSuccessful) throw response.refusal("PATCH /api/passkeys/$credentialId")
     }
 
     /** First half of the "test this passkey" ceremony: the caller runs
@@ -1523,33 +1505,53 @@ class NotesRepository(
     suspend fun fetchPasskeyTestOptions(credentialId: String): PasskeyCeremonyOptionsResponse {
         NativeDebug.d("NotesRepository.fetchPasskeyTestOptions id=$credentialId")
         val response = api.passkeyTestOptions(credentialId)
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "POST /api/passkeys/$credentialId/test/options failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        return body
+        return response.body().takeIf { response.isSuccessful }
+            ?: throw response.refusal("POST /api/passkeys/$credentialId/test/options")
     }
 
     suspend fun verifyPasskeyTest(credentialId: String, responseJson: JsonElement, challengeId: String) {
         NativeDebug.d("NotesRepository.verifyPasskeyTest id=$credentialId")
         val response = api.passkeyTestVerify(credentialId, PasskeyLoginVerifyRequest(responseJson, challengeId))
-        if (!response.isSuccessful) {
-            val error = "POST /api/passkeys/$credentialId/test/verify failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        if (!response.isSuccessful) throw response.refusal("POST /api/passkeys/$credentialId/test/verify")
     }
 
     suspend fun deletePasskey(credentialId: String) {
         NativeDebug.d("NotesRepository.deletePasskey id=$credentialId")
         val response = api.deletePasskey(credentialId)
-        if (!response.isSuccessful) {
-            val error = "DELETE /api/passkeys/$credentialId failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        if (!response.isSuccessful) throw response.refusal("DELETE /api/passkeys/$credentialId")
+    }
+
+    /** First half of letting an admin passkey unlock the encrypted
+     *  instance: options asking the authenticator for its PRF output,
+     *  which [verifyPasskeyUnlock] hands over so the server can wrap the
+     *  live data key under it. */
+    suspend fun fetchPasskeyUnlockOptions(credentialId: String): PasskeyCeremonyOptionsResponse {
+        NativeDebug.d("NotesRepository.fetchPasskeyUnlockOptions id=$credentialId")
+        val response = api.promotePasskeyOptions(credentialId)
+        return response.body().takeIf { response.isSuccessful }
+            ?: throw response.refusal("POST /api/passkeys/$credentialId/instance-unlock/options")
+    }
+
+    suspend fun verifyPasskeyUnlock(credentialId: String, responseJson: JsonElement, challengeId: String, prfOutput: String) {
+        NativeDebug.d("NotesRepository.verifyPasskeyUnlock id=$credentialId")
+        val response = api.promotePasskeyVerify(credentialId, PromotePasskeyVerifyRequest(responseJson, challengeId, prfOutput))
+        if (!response.isSuccessful) throw response.refusal("POST /api/passkeys/$credentialId/instance-unlock/verify")
+    }
+
+    suspend fun disablePasskeyUnlock(credentialId: String) {
+        NativeDebug.d("NotesRepository.disablePasskeyUnlock id=$credentialId")
+        val response = api.disablePasskeyUnlock(credentialId)
+        if (!response.isSuccessful) throw response.refusal("POST /api/passkeys/$credentialId/instance-unlock/disable")
+    }
+
+    /** Whether at-rest encryption is on and currently unlocked, or null
+     *  when the server could not say. */
+    suspend fun fetchInstanceStatus(): InstanceStatusResponse? = try {
+        val response = api.instanceStatus()
+        response.body().takeIf { response.isSuccessful }
+    } catch (t: Throwable) {
+        NativeDebug.e("NotesRepository.fetchInstanceStatus failed", t)
+        null
     }
 
     suspend fun fetchDeviceLinkInfo(token: String): DeviceLinkInfoResponse {
@@ -1673,7 +1675,7 @@ class NotesRepository(
             NativeDebug.d("NotesRepository.addCollaborator noteId=$noteId: already a collaborator")
             return AddCollaboratorResult.AlreadyCollaborator
         }
-        val error = response.collaborateError()
+        val error = response.serverError()
         NativeDebug.e("NotesRepository.addCollaborator noteId=$noteId rejected: HTTP ${response.code()} $error")
         return AddCollaboratorResult.Rejected(response.code(), error)
     }
@@ -1689,7 +1691,7 @@ class NotesRepository(
         NativeDebug.d("NotesRepository.setCollaboratorAccess noteId=$noteId userId=$userId access=$access")
         val response = api.setCollaboratorAccess(noteId, userId, SetCollaboratorAccessRequest(access))
         if (response.isSuccessful) return SetCollaboratorAccessResult.Updated
-        val error = response.collaborateError()
+        val error = response.serverError()
         NativeDebug.e("NotesRepository.setCollaboratorAccess noteId=$noteId userId=$userId rejected: HTTP ${response.code()} $error")
         return SetCollaboratorAccessResult.Rejected(response.code(), error)
     }
@@ -1715,7 +1717,7 @@ class NotesRepository(
                 ?: throw IllegalStateException("DELETE /api/notes/$noteId/collaborate/$userId: ok response with no body")
             return RemoveCollaboratorResult.Removed(body.copyNoteId)
         }
-        val error = response.collaborateError()
+        val error = response.serverError()
         NativeDebug.e("NotesRepository.removeCollaborator noteId=$noteId userId=$userId rejected: HTTP ${response.code()} $error")
         return RemoveCollaboratorResult.Rejected(response.code(), error)
     }

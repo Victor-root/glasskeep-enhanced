@@ -52,18 +52,16 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NativePasskeys
 import com.glasskeep.app.nativeapp.PasskeyCeremonyResult
-import com.glasskeep.app.nativeapp.data.network.UnlockPassphraseRequest
 import com.glasskeep.app.nativeapp.data.network.UnlockPasskeyVerifyRequest
+import com.glasskeep.app.nativeapp.data.network.UnlockPassphraseRequest
 import com.glasskeep.app.nativeapp.data.network.UnlockRecoveryRequest
 import com.glasskeep.app.nativeapp.data.network.UnlockResponse
 import com.glasskeep.app.nativeapp.isUserCancellation
+import com.glasskeep.app.nativeapp.prfOutputOf
 import com.glasskeep.app.ui.ButtonGradient
 import com.glasskeep.app.ui.Indigo
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import retrofit2.Response
 
@@ -633,17 +631,3 @@ private fun UnlockErrorLine(message: String, dark: Boolean) {
     Text(message, fontSize = 14.sp, color = if (dark) UnlockErrorDark else UnlockErrorLight)
 }
 
-/**
- * The PRF output Credential Manager put in the assertion, at
- * `clientExtensionResults.prf.results.first`. It arrives already
- * base64url-encoded (JSON can't carry the raw bytes), which is exactly
- * the string the server's own base64UrlToBuf() expects, so this only has
- * to find it and reject an empty one.
- */
-private fun prfOutputOf(assertion: JsonObject): String? {
-    val results = (assertion["clientExtensionResults"] as? JsonObject)
-        ?.get("prf")?.let { it as? JsonObject }
-        ?.get("results")?.let { it as? JsonObject }
-    val first = (results?.get("first") as? JsonPrimitive)?.contentOrNull
-    return first?.takeIf { it.isNotEmpty() }
-}

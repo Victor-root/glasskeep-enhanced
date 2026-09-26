@@ -4,10 +4,12 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -42,6 +44,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -61,6 +64,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -75,9 +79,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -97,6 +103,7 @@ import com.glasskeep.app.nativeapp.PasskeyCeremonyResult
 import com.glasskeep.app.nativeapp.data.NotifCategory
 import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
 import com.glasskeep.app.nativeapp.data.TypographyPresets
+import com.glasskeep.app.nativeapp.data.network.InstanceStatusResponse
 import com.glasskeep.app.nativeapp.data.network.PasskeyDto
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
 import com.glasskeep.app.nativeapp.data.network.UserAiSettingsDto
@@ -104,6 +111,7 @@ import com.glasskeep.app.nativeapp.data.network.UserAiSettingsRequest
 import com.glasskeep.app.nativeapp.data.network.UserAiTestRequest
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.isUserCancellation
+import com.glasskeep.app.nativeapp.prfOutputOf
 import com.glasskeep.app.ui.ButtonGradient
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
@@ -113,27 +121,30 @@ import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import com.glasskeep.app.update.ReleaseInfo
 import com.glasskeep.app.update.UpdateManager
-import java.text.DateFormat
+import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 
 /** `red-500` as rendered, the "remove photo" link. */
 private val LinkRed = Color(0xFFFB2C36)
-private val PasskeyDeleteBorderLight = Color(0xFFFCA5A5)
-private val PasskeyDeleteBorderDark = Color(0xFF991B1B)
-private val PasskeyDeleteFgLight = Color(0xFFDC2626)
-private val PasskeyDeleteFgDark = Color(0xFFF87171)
-private val BadgeAmberBgLight = Color(0xFFFEF3C7)
-private val BadgeAmberFgLight = Color(0xFF92400E)
-private val BadgeAmberBgDark = Color(0x66451A03)
-private val BadgeAmberFgDark = Color(0xFFFDE68A)
+private val PasskeyDeleteBorderLight = Color(0xFFFFA2A2)
+private val PasskeyDeleteBorderDark = Color(0xFF9F0712)
+private val PasskeyDeleteFgLight = Color(0xFFE7000B)
+private val PasskeyDeleteFgDark = Color(0xFFFF6467)
+private val BadgeAmberBgLight = Color(0xFFFEF3C6)
+private val BadgeAmberFgLight = Color(0xFF973C00)
+private val BadgeAmberBgDark = Color(0x667B3306)
+private val BadgeAmberFgDark = Color(0xFFFEE685)
 private val BadgeGrayBgLight = Color(0xFFF3F4F6)
-private val BadgeGrayFgLight = Color(0xFF374151)
-private val BadgeGrayBgDark = Color(0xFF374151)
+private val BadgeGrayFgLight = Color(0xFF364153)
+private val BadgeGrayBgDark = Color(0xFF364153)
 private val BadgeGrayFgDark = Color(0xFFE5E7EB)
 
 // Tailwind v4 greys as the web renders them (gray-500 is SettingsSubtleColor).
@@ -176,8 +187,10 @@ internal fun SettingsScreen(
     container: NativeAppContainer,
     serverUrl: String,
     actions: SettingsActions,
+    aiSettingsPokes: Int,
     onBack: () -> Unit,
     onOpenQrScanner: () -> Unit,
+    onOpenPasskeyDomainSetting: () -> Unit,
 ) {
     val dark = LocalGkDark.current
     val themeId = container.themeState.themeId
@@ -190,9 +203,6 @@ internal fun SettingsScreen(
     var profile by remember { mutableStateOf(container.tokenStore.profile) }
     var passkeys by remember { mutableStateOf<List<PasskeyDto>>(emptyList()) }
 
-    // Keys of the preferences whose save is still out: a second change of
-    // the same one waits for the first to land.
-    val savingPreferences = remember { mutableSetOf<String>() }
     var changingAvatar by remember { mutableStateOf(false) }
     var changingShowOnLogin by remember { mutableStateOf(false) }
     var changingLanguage by remember { mutableStateOf(false) }
@@ -203,15 +213,17 @@ internal fun SettingsScreen(
     var sidebarBreakpointMenuOpen by remember { mutableStateOf(false) }
     var showTypographyModal by remember { mutableStateOf(false) }
     var addingPasskey by remember { mutableStateOf(false) }
-    var removingPasskeyId by remember { mutableStateOf<String?>(null) }
+    // The key being renamed, removed or given or denied the unlock right.
+    var busyPasskeyId by remember { mutableStateOf<String?>(null) }
     var testingPasskeyId by remember { mutableStateOf<String?>(null) }
-    var renamingPasskeyId by remember { mutableStateOf<String?>(null) }
+    // False while no admin has declared the instance's passkey domain.
+    var passkeysAvailable by remember { mutableStateOf(true) }
+    var instanceStatus by remember { mutableStateOf<InstanceStatusResponse?>(null) }
 
     var showAddPasskeyDialog by remember { mutableStateOf(false) }
-    var addPasskeyNameInput by remember { mutableStateOf("") }
     var renamePasskeyTarget by remember { mutableStateOf<PasskeyDto?>(null) }
-    var renamePasskeyInput by remember { mutableStateOf("") }
     var pendingDeletePasskeyId by remember { mutableStateOf<String?>(null) }
+    var pendingUnlockPasskeyId by remember { mutableStateOf<String?>(null) }
 
     var showResetOrderConfirm by remember { mutableStateOf(false) }
 
@@ -240,14 +252,11 @@ internal fun SettingsScreen(
     var passkeyListOpen by rememberSaveable { mutableStateOf(false) }
     var languageMenuOpen by remember { mutableStateOf(false) }
 
-    val actionErrorTemplate = stringResource(R.string.native_settings_action_error)
     val passkeyUntitledLabel = stringResource(R.string.native_settings_passkeys_untitled)
     val passkeyTestOkMessage = stringResource(R.string.native_settings_passkeys_test_ok)
-    val passkeyTestFailedMessage = stringResource(R.string.native_settings_passkeys_test_failed)
     val aiSavedMessage = stringResource(R.string.native_settings_ai_saved)
     val aiKeyClearedMessage = stringResource(R.string.native_settings_ai_api_key_cleared)
     val aiTestOkMessage = stringResource(R.string.native_settings_ai_test_ok)
-    val aiTestFailedMessage = stringResource(R.string.native_settings_ai_test_failed)
     val avatarUpdatedMessage = stringResource(R.string.native_settings_avatar_updated)
     val avatarRemovedMessage = stringResource(R.string.native_settings_avatar_removed)
     val avatarUploadFailedMessage = stringResource(R.string.native_settings_avatar_upload_failed)
@@ -279,15 +288,26 @@ internal fun SettingsScreen(
         }
     }
 
-    // Its own effect, not folded into the one above: a passkey-list
-    // failure is a lot less important than the profile fetch above (the
-    // rest of the screen works fine without it).
-    LaunchedEffect(serverUrl) {
+    /** The list and whether the instance takes a new key at all; a
+     *  failure leaves both as they were (PasskeySettingsSection.jsx's
+     *  refresh). */
+    suspend fun refreshPasskeys() {
         try {
-            passkeys = repository.listPasskeys()
+            val result = repository.listPasskeys()
+            passkeys = result.passkeys
+            passkeysAvailable = result.available
         } catch (t: Throwable) {
             NativeDebug.e("SettingsScreen listPasskeys failed", t)
         }
+    }
+
+    // Its own effect, not folded into the one above: a passkey-list
+    // failure is a lot less important than the profile fetch above (the
+    // rest of the screen works fine without it). The encryption state
+    // decides whether an admin's keys offer the unlock right.
+    LaunchedEffect(serverUrl) {
+        refreshPasskeys()
+        instanceStatus = repository.fetchInstanceStatus()
     }
 
     /** The server always answers with its own public shape, so applying
@@ -301,7 +321,7 @@ internal fun SettingsScreen(
             model = config.model,
             // Never prefilled: a stored key never comes back.
             apiKey = "",
-            temperature = config.temperature.toString(),
+            temperature = jsNumberText(config.temperature),
             maxTokens = config.maxTokens.toString(),
             showApiKey = false,
         )
@@ -310,31 +330,33 @@ internal fun SettingsScreen(
     // Best-effort like the passkey list: until it answers the section
     // shows its defaults with the controls held, and a failed read simply
     // leaves those defaults in place (UserAiSettingsSection.jsx:93-118).
-    LaunchedEffect(serverUrl) {
+    // Read again when another session changes them, as the web applies
+    // its user-ai-settings-updated event.
+    LaunchedEffect(serverUrl, aiSettingsPokes) {
         repository.fetchUserAiSettings()?.let { applyAiSettings(it) }
         aiLoading = false
     }
 
-    fun reportActionError(t: Throwable) {
-        toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
-    }
-
-    /** Applies a preference at once, the way the web's setters do, then
-     *  saves it; a failed save puts the previous value back. */
+    /** Applies a preference at once and saves it behind, the way
+     *  App.jsx's own effects do: local first, every change sent, a failed
+     *  PATCH left silent. */
     fun <T> savePreference(key: String, previous: T, next: T, apply: (T) -> Unit, save: suspend (T) -> Unit) {
-        if (next == previous || !savingPreferences.add(key)) return
+        if (next == previous) return
         apply(next)
         scope.launch {
             try {
                 save(next)
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen saving $key failed", t)
-                apply(previous)
-                reportActionError(t)
-            } finally {
-                savingPreferences.remove(key)
             }
         }
+    }
+
+    /** A failed passkey request's toast: the server's reason reworded,
+     *  [fallback] without one. What reads as the user closing the system
+     *  sheet stays silent, as on the web. */
+    fun reportPasskeyError(message: String, @StringRes fallback: Int) {
+        if (!PasskeyCancelRegex.containsMatchIn(message)) toasts.error(context.localizedServerError(message, fallback))
     }
 
     fun addPasskey(name: String) {
@@ -345,22 +367,31 @@ internal fun SettingsScreen(
                 val options = repository.fetchPasskeyRegisterOptions()
                 when (val ceremony = NativePasskeys.register(activity, options.options.toString())) {
                     is PasskeyCeremonyResult.Success -> {
-                        repository.verifyPasskeyRegistration(Json.parseToJsonElement(ceremony.responseJson), options.challengeId, name)
-                        passkeys = repository.listPasskeys()
-                        showAddPasskeyDialog = false
-                        addPasskeyNameInput = ""
+                        val saved = repository.verifyPasskeyRegistration(
+                            Json.parseToJsonElement(ceremony.responseJson),
+                            options.challengeId,
+                            name,
+                        )
+                        toasts.success(context.getString(R.string.native_settings_passkeys_added))
+                        // Said once, and long enough to be read: this key
+                        // will never offer the unlock right.
+                        if (!saved.prfSupported) {
+                            toasts.show(
+                                context.getString(R.string.native_settings_passkeys_no_prf_notice),
+                                NotifVariant.INFO,
+                                durationMs = 10_000,
+                            )
+                        }
+                        refreshPasskeys()
                         passkeyListOpen = true
                     }
-                    is PasskeyCeremonyResult.Failed -> {
-                        // Same silent-no-op treatment as the login
-                        // screen's own submitPasskeyLogin: the user
-                        // dismissing the system picker isn't a failure.
-                        if (!ceremony.isUserCancellation()) reportActionError(IllegalStateException(ceremony.message))
+                    is PasskeyCeremonyResult.Failed -> if (!ceremony.isUserCancellation()) {
+                        reportPasskeyError(ceremony.message, R.string.native_settings_passkeys_add_failed)
                     }
                 }
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen addPasskey failed", t)
-                reportActionError(t)
+                reportPasskeyError(context.requestErrorText(t), R.string.native_settings_passkeys_add_failed)
             } finally {
                 addingPasskey = false
             }
@@ -380,53 +411,101 @@ internal fun SettingsScreen(
                 when (val ceremony = NativePasskeys.authenticate(activity, options.options.toString())) {
                     is PasskeyCeremonyResult.Success -> {
                         repository.verifyPasskeyTest(credentialId, Json.parseToJsonElement(ceremony.responseJson), options.challengeId)
-                        passkeys = repository.listPasskeys()
                         toasts.success(passkeyTestOkMessage)
                     }
-                    is PasskeyCeremonyResult.Failed -> {
-                        if (!ceremony.isUserCancellation()) {
-                            toasts.error(passkeyTestFailedMessage)
-                        }
+                    is PasskeyCeremonyResult.Failed -> if (!ceremony.isUserCancellation()) {
+                        reportPasskeyError(ceremony.message, R.string.native_settings_passkeys_test_failed)
                     }
                 }
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen testPasskey failed", t)
-                toasts.error(passkeyTestFailedMessage)
+                reportPasskeyError(context.requestErrorText(t), R.string.native_settings_passkeys_test_failed)
             } finally {
                 testingPasskeyId = null
             }
         }
     }
 
-    fun renamePasskey(credentialId: String, name: String) {
-        if (renamingPasskeyId != null) return
-        renamingPasskeyId = credentialId
+    /** The trimmed name, cut at 64; an emptied one renames nothing. */
+    fun renamePasskey(credentialId: String, input: String) {
+        val name = input.trim().take(64)
+        if (name.isEmpty()) return
+        busyPasskeyId = credentialId
         scope.launch {
             try {
                 repository.renamePasskey(credentialId, name)
-                passkeys = passkeys.map { if (it.credentialId == credentialId) it.copy(name = name) else it }
-                renamePasskeyTarget = null
+                refreshPasskeys()
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen renamePasskey failed", t)
-                reportActionError(t)
+                toasts.error(context.localizedServerError(context.requestErrorText(t), R.string.native_settings_passkeys_rename_failed))
             } finally {
-                renamingPasskeyId = null
+                busyPasskeyId = null
             }
         }
     }
 
     fun deletePasskey(credentialId: String) {
-        if (removingPasskeyId != null) return
-        removingPasskeyId = credentialId
+        busyPasskeyId = credentialId
         scope.launch {
             try {
                 repository.deletePasskey(credentialId)
-                passkeys = passkeys.filter { it.credentialId != credentialId }
+                refreshPasskeys()
+                toasts.success(context.getString(R.string.native_settings_passkeys_deleted))
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen deletePasskey failed", t)
-                reportActionError(t)
+                toasts.error(context.localizedServerError(context.requestErrorText(t), R.string.native_settings_passkeys_delete_failed))
             } finally {
-                removingPasskeyId = null
+                busyPasskeyId = null
+            }
+        }
+    }
+
+    /** Takes the unlock right back: the server only drops the wrapped
+     *  key, no ceremony needed. */
+    fun disablePasskeyUnlock(credentialId: String) {
+        busyPasskeyId = credentialId
+        scope.launch {
+            try {
+                repository.disablePasskeyUnlock(credentialId)
+                toasts.success(context.getString(R.string.native_settings_passkeys_unlock_disabled))
+                refreshPasskeys()
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen disablePasskeyUnlock failed", t)
+                toasts.error(context.localizedServerError(context.requestErrorText(t), R.string.native_settings_passkeys_toggle_failed))
+            } finally {
+                busyPasskeyId = null
+            }
+        }
+    }
+
+    /** Gives the unlock right: one authentication with the key, whose PRF
+     *  output lets the server wrap the live data key under it. */
+    fun enablePasskeyUnlock(credentialId: String) {
+        busyPasskeyId = credentialId
+        scope.launch {
+            try {
+                val options = repository.fetchPasskeyUnlockOptions(credentialId)
+                when (val ceremony = NativePasskeys.authenticate(activity, options.options.toString())) {
+                    is PasskeyCeremonyResult.Success -> {
+                        val response = Json.parseToJsonElement(ceremony.responseJson)
+                        val prfOutput = prfOutputOf(response.jsonObject)
+                        if (prfOutput == null) {
+                            reportPasskeyError(context.getString(R.string.native_passkey_no_prf_output), R.string.native_settings_passkeys_toggle_failed)
+                        } else {
+                            repository.verifyPasskeyUnlock(credentialId, response, options.challengeId, prfOutput)
+                            toasts.success(context.getString(R.string.native_settings_passkeys_unlock_enabled))
+                            refreshPasskeys()
+                        }
+                    }
+                    is PasskeyCeremonyResult.Failed -> if (!ceremony.isUserCancellation()) {
+                        reportPasskeyError(ceremony.message, R.string.native_settings_passkeys_toggle_failed)
+                    }
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen enablePasskeyUnlock failed", t)
+                reportPasskeyError(context.requestErrorText(t), R.string.native_settings_passkeys_toggle_failed)
+            } finally {
+                busyPasskeyId = null
             }
         }
     }
@@ -548,22 +627,29 @@ internal fun SettingsScreen(
     val editorPrefs = container.editorPrefs
     val shellPrefs = container.shellPrefs
 
-    /** buildPatch() (UserAiSettingsSection.jsx:118-129): the whole config
-     *  every time, with [overrides] for the one field the caller is
-     *  actually changing, and the key only when something was typed. */
+    /** buildPatch() (UserAiSettingsSection.jsx:120-132): the whole config
+     *  every time, with [enabled] or [mode] for the one field the caller
+     *  is actually changing, and the key only when something was typed. */
     fun aiPatch(
         enabled: Boolean = aiSettings?.enabled ?: false,
         mode: String = aiSettings?.mode ?: "server",
-        apiKey: String? = aiDraft.apiKey.takeIf { it.isNotEmpty() },
     ) = UserAiSettingsRequest(
         enabled = enabled,
         mode = mode,
         baseUrl = aiDraft.baseUrl.trim(),
         model = aiDraft.model.trim(),
-        temperature = aiDraft.temperature.trim().toDoubleOrNull() ?: 0.3,
-        maxTokens = aiDraft.maxTokens.trim().toIntOrNull() ?: 800,
-        apiKey = apiKey,
+        temperature = jsNumberOf(aiDraft.temperature),
+        maxTokens = jsNumberOf(aiDraft.maxTokens).roundToInt(),
+        apiKey = aiDraft.apiKey.takeIf { it.isNotEmpty() },
     )
+
+    /** The failed test's line (UserAiSettingsSection.jsx:211-223): the
+     *  reason reworded, plus the provider's own detail it would drop. */
+    fun aiTestFailure(raw: String): String {
+        val localized = context.localizedServerError(raw, R.string.native_settings_ai_test_failed)
+        val detail = (AiProviderErrorRegex.find(raw) ?: AiUnreachableErrorRegex.find(raw))?.groupValues?.get(1)
+        return if (detail != null && detail !in localized) "$localized : $detail" else localized
+    }
 
     fun saveAiSettings(request: UserAiSettingsRequest, successMessage: String?) {
         if (savingAi) return
@@ -575,7 +661,7 @@ internal fun SettingsScreen(
                 successMessage?.let { toasts.success(it) }
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen setUserAiSettings failed", t)
-                reportActionError(t)
+                toasts.error(context.localizedServerError(context.requestErrorText(t), R.string.native_settings_save_failed))
             } finally {
                 savingAi = false
             }
@@ -594,8 +680,8 @@ internal fun SettingsScreen(
                         mode = "custom",
                         baseUrl = aiDraft.baseUrl.trim(),
                         model = aiDraft.model.trim(),
-                        temperature = aiDraft.temperature.trim().toDoubleOrNull() ?: 0.3,
-                        maxTokens = aiDraft.maxTokens.trim().toIntOrNull() ?: 800,
+                        temperature = jsNumberOf(aiDraft.temperature),
+                        maxTokens = jsNumberOf(aiDraft.maxTokens).roundToInt(),
                         apiKey = aiDraft.apiKey.takeIf { it.isNotEmpty() },
                     )
                 } else {
@@ -605,15 +691,14 @@ internal fun SettingsScreen(
                 aiTestOutcome = if (result.ok) {
                     // The reply itself is worth showing: it is how you
                     // tell a working endpoint from a reachable one.
-                    val reply = result.reply?.takeIf { it.isNotBlank() }
+                    val reply = result.reply?.takeIf { it.isNotEmpty() }
                     AiTestOutcome(true, if (reply != null) "$aiTestOkMessage : $reply" else aiTestOkMessage)
                 } else {
-                    val detail = result.error?.takeIf { it.isNotBlank() }
-                    AiTestOutcome(false, if (detail != null) "$aiTestFailedMessage : $detail" else aiTestFailedMessage)
+                    AiTestOutcome(false, aiTestFailure(result.error.orEmpty()))
                 }
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen testUserAi failed", t)
-                aiTestOutcome = AiTestOutcome(false, "$aiTestFailedMessage : ${t.message ?: t.javaClass.simpleName}")
+                aiTestOutcome = AiTestOutcome(false, aiTestFailure(context.requestErrorText(t)))
             } finally {
                 testingAi = false
             }
@@ -807,23 +892,35 @@ internal fun SettingsScreen(
                                 },
                             )
 
+                            val isAdmin = profile?.isAdmin == true
                             PasskeysCard(
                                 passkeys = passkeys,
+                                available = passkeysAvailable,
+                                isAdmin = isAdmin,
+                                encryptionEnabled = instanceStatus?.enabled == true,
+                                instanceUnlocked = instanceStatus?.unlocked == true,
                                 listOpen = passkeyListOpen,
                                 adding = addingPasskey,
                                 testingId = testingPasskeyId,
-                                renamingId = renamingPasskeyId,
-                                removingId = removingPasskeyId,
+                                busyId = busyPasskeyId,
                                 untitledLabel = passkeyUntitledLabel,
                                 themeId = themeId,
                                 dark = dark,
                                 titleColor = titleColor,
                                 borderColor = borderColor,
                                 onToggleList = { passkeyListOpen = !passkeyListOpen },
-                                onAdd = { addPasskeyNameInput = ""; showAddPasskeyDialog = true },
+                                onAdd = { showAddPasskeyDialog = true },
+                                onOpenDomainSetting = onOpenPasskeyDomainSetting,
                                 onTest = { testPasskey(it) },
-                                onRename = { renamePasskeyTarget = it; renamePasskeyInput = it.name.orEmpty() },
+                                onRename = { renamePasskeyTarget = it },
                                 onDelete = { pendingDeletePasskeyId = it },
+                                onToggleUnlock = { passkey ->
+                                    if (passkey.canUnlockInstance) {
+                                        disablePasskeyUnlock(passkey.credentialId)
+                                    } else {
+                                        pendingUnlockPasskeyId = passkey.credentialId
+                                    }
+                                },
                             )
                         }
 
@@ -1358,12 +1455,12 @@ internal fun SettingsScreen(
                                     if (mode != ai.mode) saveAiSettings(aiPatch(mode = mode), null)
                                 },
                                 onDraftChange = { aiDraft = it },
-                                // The one call that sends an
-                                // empty key on purpose: that is
-                                // how the server is told to
-                                // forget the stored one.
+                                // The key alone, empty on purpose:
+                                // that is how the server is told to
+                                // forget the stored one, and unsaved
+                                // edits stay unsaved.
                                 onClearApiKey = {
-                                    saveAiSettings(aiPatch(apiKey = ""), aiKeyClearedMessage)
+                                    saveAiSettings(UserAiSettingsRequest(apiKey = ""), aiKeyClearedMessage)
                                 },
                                 onTest = { testAiSettings() },
                                 onSave = { saveAiSettings(aiPatch(), aiSavedMessage) },
@@ -1472,137 +1569,66 @@ internal fun SettingsScreen(
         }
 
         if (showAddPasskeyDialog) {
-            GkDialog(
-                onDismissRequest = { if (!addingPasskey) showAddPasskeyDialog = false },
+            PasskeyNameDialog(
+                title = stringResource(R.string.native_settings_passkeys_add),
+                message = stringResource(R.string.native_settings_passkeys_name_prompt),
+                initialName = "",
+                confirmLabel = stringResource(R.string.native_settings_passkeys_add),
+                themeId = themeId,
                 dark = dark,
+                titleColor = titleColor,
                 borderColor = borderColor,
-            ) {
-                Text(
-                    stringResource(R.string.native_settings_passkeys_name_prompt),
-                    color = titleColor,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                )
-                Spacer(Modifier.height(12.dp))
-                GkTextField(
-                    value = addPasskeyNameInput,
-                    onValueChange = { addPasskeyNameInput = it.take(64) },
-                    label = null,
-                    placeholder = stringResource(R.string.native_settings_passkeys_add_name_placeholder),
-                    themeId = themeId,
-                    dark = dark,
-                    titleColor = titleColor,
-                    borderColor = borderColor,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-                ) {
-                    GkSecondaryButton(
-                        label = stringResource(R.string.native_dialog_cancel),
-                        borderColor = borderColor,
-                        textColor = titleColor,
-                        enabled = !addingPasskey,
-                        onClick = { showAddPasskeyDialog = false },
-                    )
-                    GkGradientButton(
-                        label = stringResource(R.string.native_settings_passkeys_add),
-                        themeId = themeId,
-                        enabled = !addingPasskey,
-                        onClick = { addPasskey(addPasskeyNameInput.trim()) },
-                    )
-                }
-            }
+                onSubmit = { addPasskey(it.trim()) },
+                onDismiss = { showAddPasskeyDialog = false },
+            )
         }
 
         renamePasskeyTarget?.let { target ->
-            GkDialog(
-                onDismissRequest = { if (renamingPasskeyId == null) renamePasskeyTarget = null },
+            PasskeyNameDialog(
+                title = stringResource(R.string.native_settings_passkeys_rename),
+                message = stringResource(R.string.native_settings_passkeys_rename_prompt),
+                initialName = target.name.orEmpty(),
+                confirmLabel = stringResource(R.string.native_settings_passkeys_rename),
+                themeId = themeId,
                 dark = dark,
+                titleColor = titleColor,
                 borderColor = borderColor,
-            ) {
-                Text(
-                    stringResource(R.string.native_settings_passkeys_rename_prompt),
-                    color = titleColor,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                )
-                Spacer(Modifier.height(12.dp))
-                GkTextField(
-                    value = renamePasskeyInput,
-                    onValueChange = { renamePasskeyInput = it.take(64) },
-                    label = null,
-                    placeholder = stringResource(R.string.native_settings_passkeys_add_name_placeholder),
-                    themeId = themeId,
-                    dark = dark,
-                    titleColor = titleColor,
-                    borderColor = borderColor,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-                ) {
-                    GkSecondaryButton(
-                        label = stringResource(R.string.native_dialog_cancel),
-                        borderColor = borderColor,
-                        textColor = titleColor,
-                        enabled = renamingPasskeyId == null,
-                        onClick = { renamePasskeyTarget = null },
-                    )
-                    GkGradientButton(
-                        label = stringResource(R.string.native_settings_passkeys_rename),
-                        themeId = themeId,
-                        enabled = renamingPasskeyId == null && renamePasskeyInput.isNotBlank(),
-                        onClick = { renamePasskey(target.credentialId, renamePasskeyInput.trim()) },
-                    )
-                }
-            }
+                onSubmit = { renamePasskey(target.credentialId, it) },
+                onDismiss = { renamePasskeyTarget = null },
+            )
         }
 
-        val deletePasskeyTargetId = pendingDeletePasskeyId
-        if (deletePasskeyTargetId != null) {
-            GkDialog(
-                onDismissRequest = { pendingDeletePasskeyId = null },
+        pendingDeletePasskeyId?.let { credentialId ->
+            GkConfirmDialog(
+                title = stringResource(R.string.native_settings_passkeys_delete_confirm_title),
+                message = stringResource(R.string.native_settings_passkeys_delete_confirm_body),
+                confirmLabel = stringResource(R.string.native_settings_passkeys_delete),
+                cancelLabel = stringResource(R.string.native_dialog_cancel),
+                themeId = themeId,
                 dark = dark,
                 borderColor = borderColor,
-            ) {
-                Text(
-                    stringResource(R.string.native_settings_passkeys_delete_confirm_title),
-                    color = titleColor,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.native_settings_passkeys_delete_confirm_body),
-                    color = subtextColor,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                )
-                Spacer(Modifier.height(20.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-                ) {
-                    GkSecondaryButton(
-                        label = stringResource(R.string.native_dialog_cancel),
-                        borderColor = borderColor,
-                        textColor = titleColor,
-                        onClick = { pendingDeletePasskeyId = null },
-                    )
-                    GkDangerButton(
-                        label = stringResource(R.string.native_settings_passkeys_delete),
-                        onClick = {
-                            pendingDeletePasskeyId = null
-                            deletePasskey(deletePasskeyTargetId)
-                        },
-                    )
-                }
-            }
+                titleColor = titleColor,
+                subtextColor = if (dark) DialogBodyDark else DialogBodyLight,
+                variant = GkConfirmVariant.DANGER,
+                onConfirm = { deletePasskey(credentialId) },
+                onDismiss = { pendingDeletePasskeyId = null },
+            )
+        }
+
+        pendingUnlockPasskeyId?.let { credentialId ->
+            GkConfirmDialog(
+                title = stringResource(R.string.native_settings_passkeys_enable_unlock),
+                message = stringResource(R.string.native_settings_passkeys_enable_unlock_explain),
+                confirmLabel = stringResource(R.string.native_settings_passkeys_enable_unlock),
+                cancelLabel = stringResource(R.string.native_dialog_cancel),
+                themeId = themeId,
+                dark = dark,
+                borderColor = borderColor,
+                titleColor = titleColor,
+                subtextColor = if (dark) DialogBodyDark else DialogBodyLight,
+                onConfirm = { enablePasskeyUnlock(credentialId) },
+                onDismiss = { pendingUnlockPasskeyId = null },
+            )
         }
 
         if (showResetOrderConfirm) {
@@ -1629,6 +1655,21 @@ internal fun SettingsScreen(
         }
     }
 }
+
+/** Number() on a typed field: blank reads as 0, and so does anything
+ *  that is not a number at all. */
+private fun jsNumberOf(text: String): Double = text.trim().toDoubleOrNull()?.takeIf { it.isFinite() } ?: 0.0
+
+/** A number as JavaScript prints it: a whole one without its ".0". */
+private fun jsNumberText(value: Double): String =
+    if (value % 1.0 == 0.0 && abs(value) < 1e15) value.toLong().toString() else value.toString()
+
+/** What PasskeySettingsSection.jsx reads as the user closing the system
+ *  sheet rather than a failure. */
+private val PasskeyCancelRegex = Regex("""not[\s_-]*allowed|cancel|abort|interrupt|annul""", RegexOption.IGNORE_CASE)
+
+private val AiProviderErrorRegex = Regex("""^AI provider error:\s*(.+)$""")
+private val AiUnreachableErrorRegex = Regex("""^Failed to reach AI provider\s*\((.+)\)\.?$""")
 
 /** f-droid.org resolves to whichever F-Droid client is installed; the
  *  section only shows this when the APK came from one of them. */
@@ -2486,14 +2527,18 @@ private fun ChangeServerButton(
 /** The Passkeys card: header row, explanation, split add/expand button
  *  and the saved-key rows (`SettingsPanel.jsx:479-497` wrapping
  *  `PasskeySettingsSection.jsx`). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PasskeysCard(
     passkeys: List<PasskeyDto>,
+    available: Boolean,
+    isAdmin: Boolean,
+    encryptionEnabled: Boolean,
+    instanceUnlocked: Boolean,
     listOpen: Boolean,
     adding: Boolean,
     testingId: String?,
-    renamingId: String?,
-    removingId: String?,
+    busyId: String?,
     untitledLabel: String,
     themeId: String?,
     dark: Boolean,
@@ -2501,16 +2546,18 @@ private fun PasskeysCard(
     borderColor: Color,
     onToggleList: () -> Unit,
     onAdd: () -> Unit,
+    onOpenDomainSetting: () -> Unit,
     onTest: (String) -> Unit,
     onRename: (PasskeyDto) -> Unit,
     onDelete: (String) -> Unit,
+    onToggleUnlock: (PasskeyDto) -> Unit,
 ) {
+    val mutedColor = if (dark) Gray400 else SettingsSubtleColor
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .settingsCardBorder(borderColor)
             .padding(13.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             SettingsRowIcon(themeId, dark) { tint -> TablerKeyIcon(size = 20.dp, tint = tint) }
@@ -2530,22 +2577,68 @@ private fun PasskeysCard(
                 )
             }
         }
+        Spacer(Modifier.height(12.dp))
+        // `leading-snug`.
         Text(
             stringResource(R.string.native_settings_passkeys_explain),
-            color = SettingsSubtleColor,
+            color = mutedColor,
             fontSize = 14.sp,
-            lineHeight = 20.sp,
+            lineHeight = 1.375.em,
         )
+        Spacer(Modifier.height(12.dp))
+
+        // Said before the button rather than after a failure: nobody can
+        // create a passkey until an admin declares the domain, and only
+        // an admin has somewhere to be sent.
+        if (!available) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (dark) Color(0x1AFE9A00) else Color(0xFFFFFBEB))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                val noticeColor = if (dark) Color(0xFFFFD230) else Color(0xFF7B3306)
+                Text(
+                    stringResource(
+                        if (isAdmin) R.string.native_settings_passkeys_domain_not_set_admin
+                        else R.string.native_settings_passkeys_domain_not_set_user
+                    ),
+                    color = noticeColor,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                )
+                if (isAdmin) {
+                    Text(
+                        stringResource(R.string.native_settings_passkeys_domain_go_to_setting),
+                        color = noticeColor,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                            ) { onOpenDomainSetting() },
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
 
         // The web's split button: one gradient surface, a 1px white
         // divider, and two independent click zones.
+        val canAdd = !adding && available
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min)
-                .alpha(if (adding) 0.5f else 1f)
+                .alpha(if (canAdd) 1f else 0.5f)
                 .clip(RoundedCornerShape(8.dp))
-                .background(WorkspaceTheme.accentGradient(themeId)),
+                .background(WorkspaceTheme.buttonGradient(themeId)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -2554,7 +2647,7 @@ private fun PasskeysCard(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                        enabled = !adding,
+                        enabled = canAdd,
                         role = Role.Button,
                     ) { onAdd() }
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -2568,6 +2661,7 @@ private fun PasskeysCard(
                     },
                     color = Color.White,
                     fontSize = 14.sp,
+                    lineHeight = 20.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -2575,7 +2669,12 @@ private fun PasskeysCard(
             }
             if (passkeys.isNotEmpty()) {
                 Box(Modifier.width(1.dp).fillMaxHeight().background(Color.White.copy(alpha = 0.3f)))
-                val toggleLabel = stringResource(R.string.native_settings_passkeys_toggle_list)
+                val toggleLabel = stringResource(if (listOpen) R.string.native_common_close else R.string.native_common_show)
+                val rotation by animateFloatAsState(
+                    targetValue = if (listOpen) 180f else 0f,
+                    animationSpec = tween(durationMillis = 200),
+                    label = "passkeyListChevron",
+                )
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
@@ -2589,47 +2688,68 @@ private fun PasskeysCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     ChevronDownIcon(
-                        modifier = Modifier.rotate(if (listOpen) 180f else 0f),
-                        size = 16.dp,
+                        modifier = Modifier.rotate(rotation),
+                        size = 20.dp,
                         tint = Color.White,
                     )
                 }
             }
         }
 
+        // `space-y-3`: the block above keeps its 12px margin even while
+        // the list under it is folded away.
         if (passkeys.isEmpty()) {
+            Spacer(Modifier.height(12.dp))
             Text(
                 stringResource(R.string.native_settings_passkeys_empty),
-                color = SettingsSubtleColor,
+                color = mutedColor,
                 fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontStyle = FontStyle.Italic,
             )
-        } else if (listOpen) {
-            passkeys.forEach { passkey ->
-                PasskeyRow(
-                    passkey = passkey,
-                    untitledLabel = untitledLabel,
-                    themeId = themeId,
-                    dark = dark,
-                    titleColor = titleColor,
-                    borderColor = borderColor,
-                    testing = testingId == passkey.credentialId,
-                    busy = renamingId == passkey.credentialId || removingId == passkey.credentialId,
-                    onTest = { onTest(passkey.credentialId) },
-                    onRename = { onRename(passkey) },
-                    onDelete = { onDelete(passkey.credentialId) },
-                )
+        } else {
+            Spacer(Modifier.height(12.dp))
+            if (listOpen) {
+                Column(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    passkeys.forEach { passkey ->
+                        PasskeyRow(
+                            passkey = passkey,
+                            untitledLabel = untitledLabel,
+                            isAdmin = isAdmin,
+                            encryptionEnabled = encryptionEnabled,
+                            unlockToggleAllowed = isAdmin && encryptionEnabled && instanceUnlocked,
+                            themeId = themeId,
+                            dark = dark,
+                            titleColor = titleColor,
+                            borderColor = borderColor,
+                            testing = testingId == passkey.credentialId,
+                            busy = busyId == passkey.credentialId,
+                            onTest = { onTest(passkey.credentialId) },
+                            onRename = { onRename(passkey) },
+                            onDelete = { onDelete(passkey.credentialId) },
+                            onToggleUnlock = { onToggleUnlock(passkey) },
+                        )
+                    }
+                }
             }
         }
     }
 }
 
-/** One saved passkey: name, badges, last use, then the three small
- *  bordered actions (`PasskeySettingsSection.jsx:387-460`). Instance
- *  unlock authorization lives in the native administrator security tab. */
+/** One saved passkey: name and badges wrapping together, last use, then
+ *  the small bordered actions, wrapping too, the unlock right last for an
+ *  admin of an encrypted instance (`PasskeySettingsSection.jsx:387-460`). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PasskeyRow(
     passkey: PasskeyDto,
     untitledLabel: String,
+    isAdmin: Boolean,
+    encryptionEnabled: Boolean,
+    unlockToggleAllowed: Boolean,
     themeId: String?,
     dark: Boolean,
     titleColor: Color,
@@ -2639,32 +2759,36 @@ private fun PasskeyRow(
     onTest: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    onToggleUnlock: () -> Unit,
 ) {
+    val mutedColor = if (dark) Gray400 else SettingsSubtleColor
+    val actionColor = if (dark) Color(0xFFE5E7EB) else Color(0xFF364153)
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-            .padding(12.dp),
+            .padding(13.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            itemVerticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
-                passkey.name?.takeIf { it.isNotBlank() } ?: untitledLabel,
+                passkey.name?.takeIf { it.isNotEmpty() } ?: untitledLabel,
                 color = titleColor,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
             )
-            Spacer(Modifier.width(8.dp))
             PasskeyBadge(
                 label = stringResource(R.string.native_settings_passkeys_badge_login),
                 background = WorkspaceTheme.accentSoftBg(themeId, dark),
                 foreground = WorkspaceTheme.accent(themeId, dark),
             )
             if (passkey.canUnlockInstance) {
-                Spacer(Modifier.width(8.dp))
                 PasskeyBadge(
                     label = stringResource(R.string.native_settings_passkeys_badge_unlock),
                     background = if (dark) BadgeAmberBgDark else BadgeAmberBgLight,
@@ -2672,7 +2796,6 @@ private fun PasskeyRow(
                 )
             }
             if (passkey.backedUp) {
-                Spacer(Modifier.width(8.dp))
                 PasskeyBadge(
                     label = stringResource(R.string.native_settings_passkeys_badge_synced),
                     background = if (dark) BadgeGrayBgDark else BadgeGrayBgLight,
@@ -2683,13 +2806,25 @@ private fun PasskeyRow(
         Text(
             passkey.lastUsedAt?.let { stringResource(R.string.native_settings_passkeys_last_used, formatPasskeyDate(it)) }
                 ?: stringResource(R.string.native_settings_passkeys_never_used),
-            color = SettingsSubtleColor,
+            color = mutedColor,
             fontSize = 12.sp,
+            lineHeight = 16.sp,
             modifier = Modifier.padding(top = 2.dp),
         )
-        Row(
+        if (!passkey.prfSupported && isAdmin && encryptionEnabled) {
+            Text(
+                stringResource(R.string.native_settings_passkeys_no_prf_row),
+                color = mutedColor,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                fontStyle = FontStyle.Italic,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        FlowRow(
             modifier = Modifier.padding(top = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             PasskeySmallButton(
                 label = if (testing) {
@@ -2698,14 +2833,14 @@ private fun PasskeyRow(
                     stringResource(R.string.native_settings_passkeys_test)
                 },
                 borderColor = borderColor,
-                textColor = titleColor,
+                textColor = actionColor,
                 enabled = !testing && !busy,
                 onClick = onTest,
             )
             PasskeySmallButton(
                 label = stringResource(R.string.native_settings_passkeys_rename),
                 borderColor = borderColor,
-                textColor = titleColor,
+                textColor = actionColor,
                 enabled = !busy,
                 onClick = onRename,
             )
@@ -2716,10 +2851,29 @@ private fun PasskeyRow(
                 enabled = !busy,
                 onClick = onDelete,
             )
+            if (isAdmin && encryptionEnabled && passkey.prfSupported) {
+                PasskeySmallButton(
+                    label = stringResource(
+                        if (passkey.canUnlockInstance) R.string.native_settings_passkeys_disable_unlock
+                        else R.string.native_settings_passkeys_enable_unlock
+                    ),
+                    borderColor = if (passkey.canUnlockInstance) Color(0xFFFE9A00) else borderColor,
+                    textColor = when {
+                        !passkey.canUnlockInstance -> actionColor
+                        dark -> Color(0xFFFFD230)
+                        else -> Color(0xFFBB4D00)
+                    },
+                    fontWeight = FontWeight.Medium,
+                    enabled = !busy && unlockToggleAllowed,
+                    onClick = onToggleUnlock,
+                )
+            }
         }
     }
 }
 
+/** `text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5
+ *  rounded`, on the inherited 1.5 line height. */
 @Composable
 private fun PasskeyBadge(label: String, background: Color, foreground: Color) {
     Box(
@@ -2732,12 +2886,15 @@ private fun PasskeyBadge(label: String, background: Color, foreground: Color) {
             label.uppercase(),
             color = foreground,
             fontSize = 10.sp,
+            lineHeight = 15.sp,
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.25.sp,
+            letterSpacing = 0.025.em,
         )
     }
 }
 
+/** `px-2.5 py-1 rounded text-xs border`: 26dp tall, the 1px border
+ *  outside the padding like the CSS box. */
 @Composable
 private fun PasskeySmallButton(
     label: String,
@@ -2745,9 +2902,11 @@ private fun PasskeySmallButton(
     textColor: Color,
     enabled: Boolean,
     onClick: () -> Unit,
+    fontWeight: FontWeight = FontWeight.Normal,
 ) {
     Box(
         modifier = Modifier
+            .alpha(if (enabled) 1f else 0.5f)
             .clip(RoundedCornerShape(4.dp))
             .border(1.dp, borderColor, RoundedCornerShape(4.dp))
             .clickable(
@@ -2756,16 +2915,93 @@ private fun PasskeySmallButton(
                 enabled = enabled,
                 role = Role.Button,
             ) { onClick() }
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .padding(horizontal = 11.dp, vertical = 5.dp),
     ) {
-        Text(label, color = textColor, fontSize = 12.sp)
+        Text(label, color = textColor, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = fontWeight)
     }
 }
 
-/** `new Date(iso).toLocaleString()`, the web's own passkey date. */
+/** `new Date(iso).toLocaleString()`, the web's own passkey date: the
+ *  numeric date with its full year and the time with its seconds. */
 private fun formatPasskeyDate(iso: String): String {
     val ms = parseIsoToEpochMillis(iso) ?: return iso
-    return DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.getDefault()).format(Date(ms))
+    val locale = Locale.getDefault()
+    val pattern = DateFormat.getBestDateTimePattern(locale, "yMdjms")
+    return SimpleDateFormat(pattern, locale).format(Date(ms))
+}
+
+/** The dialog the web's passkey section opens to name a key
+ *  (PasskeyTextDialog): a title, its prompt and the name field, focused
+ *  at once; Enter or the confirm button close it before the action runs. */
+@Composable
+private fun PasskeyNameDialog(
+    title: String,
+    message: String,
+    initialName: String,
+    confirmLabel: String,
+    themeId: String?,
+    dark: Boolean,
+    titleColor: Color,
+    borderColor: Color,
+    onSubmit: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf(initialName) }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    val submit = {
+        onDismiss()
+        onSubmit(name)
+    }
+    GkDialog(
+        onDismissRequest = onDismiss,
+        dark = dark,
+        borderColor = borderColor,
+        maxWidth = 384.dp,
+        scrimAlpha = ConfirmDialogDim,
+    ) {
+        Text(title, color = titleColor, fontSize = 18.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+        Text(message, color = if (dark) DialogBodyDark else DialogBodyLight, fontSize = 14.sp, lineHeight = 20.sp)
+        Spacer(Modifier.height(12.dp))
+        GkTextField(
+            value = name,
+            onValueChange = { name = it.take(64) },
+            label = null,
+            placeholder = stringResource(R.string.native_settings_passkeys_add_name_placeholder),
+            themeId = themeId,
+            dark = dark,
+            titleColor = titleColor,
+            borderColor = borderColor,
+            focusRequester = focusRequester,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { submit() }),
+            background = if (dark) Color(0xFF1F1F1F) else Color.White,
+        )
+        Spacer(Modifier.height(20.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GkSecondaryButton(
+                label = stringResource(R.string.native_dialog_cancel),
+                borderColor = borderColor,
+                textColor = titleColor,
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Normal,
+                onClick = onDismiss,
+            )
+            GkGradientButton(
+                label = confirmLabel,
+                themeId = themeId,
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                onClick = submit,
+            )
+        }
+    }
 }
 
 // internal, not private: CollaboratorsScreen.kt and NativeLoginScreen.kt

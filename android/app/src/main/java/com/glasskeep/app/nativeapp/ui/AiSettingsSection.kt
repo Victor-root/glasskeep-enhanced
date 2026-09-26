@@ -7,13 +7,16 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,10 +31,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.network.UserAiSettingsDto
@@ -84,8 +89,9 @@ fun AiSettingsSection(
     // With the master switch off server-side nothing here can be turned
     // on, not even a personal provider, so the form stays hidden.
     val effectiveEnabled = settings.enabled && settings.adminAiEnabled
+    // The form's own `pl-3` (SettingsPanel.jsx:1376): no right inset.
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(
@@ -96,7 +102,11 @@ fun AiSettingsSection(
             Column(Modifier.weight(1f)) {
                 Text(
                     stringResource(R.string.native_settings_ai_enable),
-                    color = if (settings.adminAiEnabled) titleColor else SettingsSubtleColor,
+                    color = when {
+                        settings.adminAiEnabled -> titleColor
+                        dark -> Color(0xFF6A7282)
+                        else -> Color(0xFF99A1AF)
+                    },
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
                 )
@@ -107,12 +117,10 @@ fun AiSettingsSection(
                     ),
                     // The "your admin turned this off" line is amber, not
                     // grey: it explains why the switch will not move.
-                    color = if (settings.adminAiEnabled) {
-                        SettingsSubtleColor
-                    } else if (dark) {
-                        Color(0xFFFBBF24)
-                    } else {
-                        Color(0xFFB45309)
+                    color = when {
+                        settings.adminAiEnabled -> SettingsSubtleColor
+                        dark -> Color(0xFFFFB900)
+                        else -> Color(0xFFBB4D00)
                     },
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
@@ -144,7 +152,7 @@ fun AiSettingsSection(
                 dark = dark,
                 titleColor = titleColor,
                 borderColor = borderColor,
-                icon = { tint -> WorldIcon(size = 16.dp, tint = tint) },
+                icon = { tint -> WorldIcon(size = 20.dp, tint = tint) },
                 onClick = { onSelectMode("server") },
             )
             AiModeCard(
@@ -156,7 +164,7 @@ fun AiSettingsSection(
                 dark = dark,
                 titleColor = titleColor,
                 borderColor = borderColor,
-                icon = { tint -> BrainIcon(size = 16.dp, tint = tint) },
+                icon = { tint -> BrainIcon(size = 20.dp, tint = tint) },
                 onClick = { onSelectMode("custom") },
             )
         }
@@ -192,14 +200,15 @@ fun AiSettingsSection(
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 AiFieldLabel(stringResource(R.string.native_settings_ai_api_key))
+                // `flex gap-2`: the input stretches to the reveal button's
+                // height when there is one.
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     GkTextField(
                         value = draft.apiKey,
-                        onValueChange = { onDraftChange(draft.copy(apiKey = it)) },
+                        onValueChange = { if (!busy) onDraftChange(draft.copy(apiKey = it)) },
                         label = null,
                         // A stored key is never sent back, so the field
                         // stays empty and its placeholder says so.
@@ -211,18 +220,28 @@ fun AiSettingsSection(
                         dark = dark,
                         titleColor = titleColor,
                         borderColor = borderColor,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).fillMaxHeight().alpha(if (busy) 0.5f else 1f),
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrectEnabled = false,
+                            keyboardType = if (draft.showApiKey) KeyboardType.Text else KeyboardType.Password,
+                            imeAction = ImeAction.Next,
+                        ),
                         visualTransformation = if (draft.showApiKey) {
                             VisualTransformation.None
                         } else {
                             PasswordVisualTransformation()
                         },
+                        stretch = true,
                     )
                     if (!settings.hasApiKey || draft.apiKey.isNotEmpty()) {
                         val revealLabel = stringResource(
-                            if (draft.showApiKey) R.string.native_settings_ai_api_key_hide
-                            else R.string.native_settings_ai_api_key_show
+                            if (draft.showApiKey) R.string.native_common_hide else R.string.native_common_show
                         )
+                        // `px-3 py-2` around a 20px icon that sits on the
+                        // text baseline of the button's 24px line: 9dp
+                        // above it, the line's descent added under it.
                         Box(
                             modifier = Modifier
                                 .alpha(if (busy) 0.5f else 1f)
@@ -236,39 +255,39 @@ fun AiSettingsSection(
                                     enabled = !busy,
                                     role = Role.Button,
                                 ) { onDraftChange(draft.copy(showApiKey = !draft.showApiKey)) }
-                                .padding(12.dp),
+                                .padding(start = 13.dp, end = 13.dp, top = 9.dp, bottom = 15.5.dp),
                         ) {
                             if (draft.showApiKey) {
-                                EyeOffIcon(size = 16.dp, tint = titleColor)
+                                EyeOffIcon(size = 20.dp, tint = titleColor)
                             } else {
-                                EyeIcon(size = 16.dp, tint = titleColor)
+                                EyeIcon(size = 20.dp, tint = titleColor)
                             }
                         }
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
+                // `flex-wrap justify-between gap-2`: the hint takes the
+                // whole line, the link wraps under it.
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         stringResource(R.string.native_settings_ai_api_key_hint),
                         color = SettingsSubtleColor,
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
-                        modifier = Modifier.weight(1f),
                     )
                     if (settings.hasApiKey) {
-                        Spacer(Modifier.width(8.dp))
                         Text(
                             stringResource(R.string.native_settings_ai_api_key_clear),
                             color = DangerRed,
                             fontSize = 12.sp,
-                            modifier = Modifier.clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                enabled = !busy,
-                                role = Role.Button,
-                            ) { onClearApiKey() },
+                            lineHeight = 16.sp,
+                            modifier = Modifier
+                                .alpha(if (busy) 0.5f else 1f)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    enabled = !busy,
+                                    role = Role.Button,
+                                ) { onClearApiKey() },
                         )
                     }
                 }
@@ -282,7 +301,7 @@ fun AiSettingsSection(
                     AiField(
                         label = stringResource(R.string.native_settings_ai_temperature),
                         value = draft.temperature,
-                        placeholder = "0.3",
+                        placeholder = "",
                         hint = null,
                         enabled = !busy,
                         keyboardType = KeyboardType.Decimal,
@@ -296,7 +315,7 @@ fun AiSettingsSection(
                     AiField(
                         label = stringResource(R.string.native_settings_ai_max_tokens),
                         value = draft.maxTokens,
-                        placeholder = "800",
+                        placeholder = "",
                         hint = null,
                         enabled = !busy,
                         keyboardType = KeyboardType.Number,
@@ -305,6 +324,10 @@ fun AiSettingsSection(
                         titleColor = titleColor,
                         borderColor = borderColor,
                         modifier = Modifier.weight(1f),
+                        // The form's last field: its Go key submits it,
+                        // like tapping Save.
+                        imeAction = ImeAction.Go,
+                        onImeAction = onSave,
                         onValueChange = { onDraftChange(draft.copy(maxTokens = it)) },
                     )
                 }
@@ -313,25 +336,26 @@ fun AiSettingsSection(
                     color = SettingsSubtleColor,
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
         }
 
         testOutcome?.let { outcome ->
             val fg = if (outcome.ok) {
-                if (dark) Color(0xFFA7F3D0) else Color(0xFF065F46)
+                if (dark) Color(0xFFA4F4CF) else Color(0xFF006045)
             } else {
-                if (dark) Color(0xFFFECACA) else Color(0xFF991B1B)
+                if (dark) Color(0xFFFFC9C9) else Color(0xFF9F0712)
             }
             val bg = if (outcome.ok) {
-                if (dark) Color(0x4D064E3B) else Color(0xFFECFDF5)
+                if (dark) Color(0x4D004F3C) else Color(0xFFECFDF5)
             } else {
-                if (dark) Color(0x4D7F1D1D) else Color(0xFFFEF2F2)
+                if (dark) Color(0x4D81171A) else Color(0xFFFEF2F2)
             }
             val edge = if (outcome.ok) {
-                if (dark) Color(0xFF065F46) else Color(0xFFA7F3D0)
+                if (dark) Color(0xFF006045) else Color(0xFFA4F4CF)
             } else {
-                if (dark) Color(0xFF991B1B) else Color(0xFFFECACA)
+                if (dark) Color(0xFF9F0712) else Color(0xFFFFC9C9)
             }
             Text(
                 outcome.message,
@@ -343,7 +367,7 @@ fun AiSettingsSection(
                     .clip(RoundedCornerShape(8.dp))
                     .background(bg)
                     .border(1.dp, edge, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 13.dp, vertical = 9.dp),
             )
         }
 
@@ -362,12 +386,15 @@ fun AiSettingsSection(
                 onClick = onTest,
             )
             if (settings.mode == "custom") {
+                // A bare `from-indigo-500 to-violet-600`, without
+                // `btn-gradient`: no workspace theme retints it.
                 GkGradientButton(
                     label = stringResource(
                         if (busy) R.string.native_settings_ai_saving
                         else R.string.native_settings_ai_save
                     ),
                     themeId = themeId,
+                    gradient = WorkspaceTheme.buttonGradient(WorkspaceTheme.DEFAULT_ID),
                     enabled = !busy,
                     onClick = onSave,
                 )
@@ -405,7 +432,7 @@ private fun AiModeCard(
                 enabled = enabled,
                 role = Role.Button,
             ) { onClick() }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 13.dp, vertical = 9.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             icon(titleColor)
@@ -422,22 +449,22 @@ private fun AiModeCard(
 @Composable
 private fun AiPrivacyWarning(amber: Boolean, dark: Boolean) {
     val fg = when {
-        amber && dark -> Color(0xFFFEF3C7)
-        amber -> Color(0xFF78350F)
+        amber && dark -> Color(0xFFFEF3C6)
+        amber -> Color(0xFF7B3306)
         dark -> Color(0xFFDBEAFE)
-        else -> Color(0xFF1E3A8A)
+        else -> Color(0xFF1C398E)
     }
     val bg = when {
-        amber && dark -> Color(0x33451A03)
+        amber && dark -> Color(0x337D3205)
         amber -> Color(0xFFFFFBEB)
-        dark -> Color(0x331E3A8A)
+        dark -> Color(0x331E378C)
         else -> Color(0xFFEFF6FF)
     }
     val edge = when {
-        amber && dark -> Color(0xFFB45309)
-        amber -> Color(0xFFFCD34D)
-        dark -> Color(0xFF1D4ED8)
-        else -> Color(0xFF93C5FD)
+        amber && dark -> Color(0xFFBB4D00)
+        amber -> Color(0xFFFFD230)
+        dark -> Color(0xFF1447E6)
+        else -> Color(0xFF8EC5FF)
     }
     Row(
         modifier = Modifier
@@ -445,9 +472,10 @@ private fun AiPrivacyWarning(amber: Boolean, dark: Boolean) {
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
             .border(1.dp, edge, RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 13.dp, vertical = 9.dp),
     ) {
-        ShieldLockIcon(size = 20.dp, tint = fg)
+        // `mt-0.5`: centred on the first 20px line.
+        ShieldLockIcon(modifier = Modifier.padding(top = 2.dp), size = 20.dp, tint = fg)
         Spacer(Modifier.width(8.dp))
         Text(
             stringResource(R.string.native_settings_ai_privacy),
@@ -466,11 +494,15 @@ private fun AiFieldLabel(text: String) {
         text.uppercase(),
         color = SettingsSubtleColor,
         fontSize = 12.sp,
+        lineHeight = 16.sp,
         fontWeight = FontWeight.SemiBold,
-        letterSpacing = 0.6.sp,
+        letterSpacing = 0.025.em,
     )
 }
 
+/** One `text-sm` input of the form, no autocorrect (`spellCheck={false}`),
+ *  its keyboard's action key moving on to the next field unless
+ *  [imeAction] says otherwise. */
 @Composable
 private fun AiField(
     label: String,
@@ -485,6 +517,8 @@ private fun AiField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     keyboardType: KeyboardType = KeyboardType.Text,
+    imeAction: ImeAction = ImeAction.Next,
+    onImeAction: (() -> Unit)? = null,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         AiFieldLabel(label)
@@ -497,7 +531,14 @@ private fun AiField(
             dark = dark,
             titleColor = titleColor,
             borderColor = borderColor,
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            keyboardOptions = KeyboardOptions(
+                autoCorrectEnabled = false,
+                keyboardType = keyboardType,
+                imeAction = imeAction,
+            ),
+            keyboardActions = if (onImeAction != null) KeyboardActions(onGo = { onImeAction() }) else KeyboardActions.Default,
             modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.5f),
         )
         if (hint != null) {

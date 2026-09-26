@@ -94,6 +94,7 @@ import com.glasskeep.app.nativeapp.data.network.SelfUpdateStatusDto
 import com.glasskeep.app.nativeapp.data.network.StartSelfUpdateRequest
 import com.glasskeep.app.nativeapp.data.network.UpdateAdminUserRequest
 import com.glasskeep.app.nativeapp.data.network.UpdateCheckDto
+import com.glasskeep.app.nativeapp.prfOutputOf
 import com.glasskeep.app.ui.ButtonGradient
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
@@ -106,9 +107,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import retrofit2.Response
 
 private enum class AdminTab(val label: Int) {
@@ -120,13 +119,18 @@ private enum class AdminTab(val label: Int) {
     SERVER(R.string.native_admin_tab_server),
 }
 
+/** What [AdminScreen]'s `focus` names: the passkey domain field, which
+ *  the settings' passkey notice sends an admin to. */
+const val AdminFocusPasskeyDomain = "passkeyDomain"
+
 /** Complete phone administration surface. Every mutation goes through the
- * same authenticated endpoints as AdminPanel.jsx; none opens web content. */
+ * same authenticated endpoints as AdminPanel.jsx; none opens web content.
+ * [focus] opens it where that setting lives. */
 @Composable
-fun AdminScreen(container: NativeAppContainer, serverUrl: String, onBack: () -> Unit) {
+fun AdminScreen(container: NativeAppContainer, serverUrl: String, focus: String?, onBack: () -> Unit) {
     val dark = LocalGkDark.current
     val api = remember(serverUrl) { container.api(serverUrl) }
-    var tab by remember { mutableStateOf(AdminTab.USERS) }
+    var tab by remember { mutableStateOf(if (focus == AdminFocusPasskeyDomain) AdminTab.BRANDING else AdminTab.USERS) }
     val title = if (dark) DarkTitleColor else LightTitleColor
     val subtext = if (dark) DarkSubtextColor else LightSubtextColor
     val border = if (dark) DarkBorderColor else LightBorderColor
@@ -576,7 +580,7 @@ private fun AdminSecuritySection(
                                     is PasskeyCeremonyResult.Failed -> error(ceremony.message)
                                     is PasskeyCeremonyResult.Success -> {
                                         val response = Json.parseToJsonElement(ceremony.responseJson)
-                                        val prf = adminPrfOutput(response.jsonObject) ?: error("No PRF output")
+                                        val prf = prfOutputOf(response.jsonObject) ?: error("No PRF output")
                                         api.promotePasskeyVerify(key.credentialId, PromotePasskeyVerifyRequest(response, options.challengeId, prf)).requireBody("enable passkey unlock")
                                     }
                                 }
@@ -870,10 +874,6 @@ private fun formatBytes(bytes: Long): String {
     while (value >= 1024 && index < units.lastIndex) { value /= 1024; index++ }
     return if (value >= 100) "%.0f %s".format(value, units[index]) else "%.1f %s".format(value, units[index])
 }
-
-private fun adminPrfOutput(assertion: JsonObject): String? =
-    ((assertion["clientExtensionResults"] as? JsonObject)?.get("prf") as? JsonObject)
-        ?.get("results")?.jsonObject?.get("first")?.jsonPrimitive?.content
 
 private suspend fun <T> Response<T>.requireBody(action: String): T {
     val body = body()

@@ -17,6 +17,9 @@ import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlin.coroutines.resume
 
 /** Outcome of a passkey register/authenticate ceremony. */
@@ -161,3 +164,18 @@ object NativePasskeys {
  *  does on e.name before deciding whether to show an error at all. */
 fun PasskeyCeremonyResult.isUserCancellation(): Boolean =
     this is PasskeyCeremonyResult.Failed && name == "NotAllowedError"
+
+/**
+ * The PRF output Credential Manager put in the assertion, at
+ * `clientExtensionResults.prf.results.first`. It arrives already
+ * base64url-encoded (JSON can't carry the raw bytes), which is exactly
+ * the string the server's own base64UrlToBuf() expects, so this only has
+ * to find it and reject an empty one.
+ */
+fun prfOutputOf(assertion: JsonObject): String? {
+    val results = (assertion["clientExtensionResults"] as? JsonObject)
+        ?.get("prf")?.let { it as? JsonObject }
+        ?.get("results")?.let { it as? JsonObject }
+    val first = (results?.get("first") as? JsonPrimitive)?.contentOrNull
+    return first?.takeIf { it.isNotEmpty() }
+}

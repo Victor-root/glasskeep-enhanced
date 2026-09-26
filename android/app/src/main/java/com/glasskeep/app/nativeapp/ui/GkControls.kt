@@ -39,6 +39,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -70,7 +71,6 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -80,6 +80,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
@@ -91,9 +92,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -1196,7 +1199,10 @@ internal fun GkDangerButton(
  * `px-3 py-2` box inside a 1px `--border-light` edge, with a 2px
  * [focusRingColor] ring drawn outside that edge while focused (Tailwind's
  * `ring-2`, a box-shadow), and its label above it (14px/500, 4px gap).
- * The text is the page's 16px/24px unless the input is `text-sm`.
+ * The text is the page's 16px/24px unless the input is `text-sm`. With
+ * [stretch] the box fills the height its caller gives it, the text kept
+ * centred, the way a flex row stretches an input. Like a browser's input,
+ * a field focused without a tap has its caret after the text.
  */
 @Composable
 internal fun GkTextField(
@@ -1214,24 +1220,34 @@ internal fun GkTextField(
     fontSize: TextUnit = 16.sp,
     lineHeight: TextUnit = 24.sp,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    stretch: Boolean = false,
+    background: Color = Color.Transparent,
 ) {
     var focused by remember { mutableStateOf(false) }
+    var fieldState by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+    val fieldValue = fieldState.copy(text = value)
     Column(modifier) {
         if (label != null) {
             Text(label, color = titleColor, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(4.dp))
         }
         BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
+            value = fieldValue,
+            onValueChange = { next ->
+                fieldState = next
+                if (next.text != value) onValueChange(next.text)
+            },
             singleLine = true,
             textStyle = TextStyle(color = titleColor, fontSize = fontSize, lineHeight = lineHeight),
             cursorBrush = SolidColor(WorkspaceTheme.accent(themeId, dark)),
             keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
             visualTransformation = visualTransformation,
             modifier = Modifier
                 .fillMaxWidth()
+                .then(if (stretch) Modifier.weight(1f) else Modifier)
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .onFocusChanged { focused = it.isFocused }
                 .drawBehind {
@@ -1246,18 +1262,23 @@ internal fun GkTextField(
                         )
                     }
                 }
+                .background(background, RoundedCornerShape(8.dp))
                 .border(1.dp, borderColor, RoundedCornerShape(8.dp))
                 .padding(horizontal = 13.dp, vertical = 9.dp),
             decorationBox = { innerTextField ->
-                if (value.isEmpty()) {
-                    Text(
-                        placeholder,
-                        color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
-                        fontSize = fontSize,
-                        lineHeight = lineHeight,
-                    )
+                // Stretched, the line is centred in the taller box instead
+                // of filling it from the top.
+                Box(propagateMinConstraints = !stretch, contentAlignment = Alignment.CenterStart) {
+                    if (value.isEmpty()) {
+                        Text(
+                            placeholder,
+                            color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
+                            fontSize = fontSize,
+                            lineHeight = lineHeight,
+                        )
+                    }
+                    innerTextField()
                 }
-                innerTextField()
             },
         )
     }

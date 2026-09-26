@@ -1,7 +1,5 @@
 package com.glasskeep.app.nativeapp.ui
 
-import android.content.Context
-import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -198,7 +196,7 @@ fun CollaboratorsScreen(
                     when (val result = repository.setCollaboratorAccess(noteId, collaborator.id, access)) {
                         SetCollaboratorAccessResult.Updated -> null
                         is SetCollaboratorAccessResult.Rejected ->
-                            collaborationError(context, result.error, R.string.native_collaborators_access_failed)
+                            context.localizedServerError(result.error, R.string.native_collaborators_access_failed)
                     }
                 } catch (t: Throwable) {
                     NativeDebug.e("CollaboratorsScreen changeAccess failed", t)
@@ -223,7 +221,7 @@ fun CollaboratorsScreen(
                 when (val result = repository.removeCollaborator(noteId, collaborator.id, keepCopy)) {
                     is RemoveCollaboratorResult.Removed -> reload(force = true)
                     is RemoveCollaboratorResult.Rejected ->
-                        toasts.error(collaborationError(context, result.error, R.string.native_collaborators_remove_failed))
+                        toasts.error(context.localizedServerError(result.error, R.string.native_collaborators_remove_failed))
                 }
             } catch (t: Throwable) {
                 NativeDebug.e("CollaboratorsScreen removeCollaborator failed", t)
@@ -244,7 +242,7 @@ fun CollaboratorsScreen(
                 user.name,
             )
         } else {
-            collaborationError(context, error, R.string.native_collaborators_add_failed)
+            context.localizedServerError(error, R.string.native_collaborators_add_failed)
         }
 
     // Already on the note, so not offered again: local rows by id,
@@ -595,31 +593,6 @@ fun CollaboratorsScreen(
         )
     }
 }
-
-/** serverErrors.js, for what sharing runs into: the server's English text
- *  or a federation token, reworded; any other text is shown as the server
- *  wrote it, and a refusal without one falls back on [fallback]. */
-private fun collaborationError(context: Context, error: String?, @StringRes fallback: Int): String {
-    if (error.isNullOrBlank()) return context.getString(fallback)
-    val known = CollaborationErrors.firstOrNull { (needle, _) -> needle in error } ?: return error
-    return context.getString(known.second)
-}
-
-private val CollaborationErrors = listOf(
-    "Note not found" to R.string.native_err_note_not_found,
-    "User not found" to R.string.native_err_user_not_found,
-    "Failed to add collaborator" to R.string.native_err_add_collaborator_failed,
-    "Collaborator not found" to R.string.native_err_collaborator_not_found,
-    "peer_not_paired" to R.string.native_err_peer_not_paired,
-    "clock-skew" to R.string.native_err_peer_clock_skew,
-    "note_id_conflict" to R.string.native_err_peer_note_id_conflict,
-    "payload_too_large" to R.string.native_err_peer_payload_too_large,
-    "federation_failed" to R.string.native_err_federation_failed,
-    "tls-certificate-invalid" to R.string.native_err_peer_tls_invalid,
-    "dns-not-found" to R.string.native_err_peer_dns_not_found,
-    "connection-refused" to R.string.native_err_peer_unreachable,
-    "unreachable" to R.string.native_err_peer_unreachable,
-)
 
 /** The first letter a name is filed under, `#` for anything that doesn't
  *  start with a letter (CollaborationModal.jsx:15-18). */

@@ -148,6 +148,7 @@ fun NativeNavHost(
     // next tick, same as the web's own listener calling refresh().
     var lockPokes by remember { mutableIntStateOf(0) }
     var preferencePokes by remember { mutableIntStateOf(0) }
+    var aiSettingsPokes by remember { mutableIntStateOf(0) }
     var brandingPokes by remember { mutableIntStateOf(0) }
     // The last share/revoke frame the server pushed, waiting to become a
     // pill (the web's own showShareNotificationToast, App.jsx:3841).
@@ -163,7 +164,10 @@ fun NativeNavHost(
             onAuxiliaryEvent = { type ->
                 when (type) {
                     "admin_settings_updated", "logo_added", "logo_deleted" -> brandingPokes++
-                    else -> preferencePokes++
+                    else -> {
+                        preferencePokes++
+                        if (type == "user_ai_settings_updated") aiSettingsPokes++
+                    }
                 }
             },
         )
@@ -598,14 +602,26 @@ fun NativeNavHost(
                         container = container,
                         serverUrl = serverUrl,
                         actions = settingsActions,
+                        aiSettingsPokes = aiSettingsPokes,
                         onBack = { navController.popBackStack() },
                         onOpenQrScanner = { navController.navigate("qr-scan") },
+                        // The web closes the panel and opens the admin one
+                        // on the section holding the field.
+                        onOpenPasskeyDomainSetting = {
+                            navController.navigate("admin?focus=$AdminFocusPasskeyDomain") {
+                                popUpTo("settings") { inclusive = true }
+                            }
+                        },
                     )
                 }
-                composable("admin") {
+                composable(
+                    route = "admin?focus={focus}",
+                    arguments = listOf(navArgument("focus") { type = NavType.StringType; nullable = true; defaultValue = null }),
+                ) { backStackEntry ->
                     AdminScreen(
                         container = container,
                         serverUrl = serverUrl,
+                        focus = backStackEntry.arguments?.getString("focus"),
                         onBack = { navController.popBackStack() },
                     )
                 }

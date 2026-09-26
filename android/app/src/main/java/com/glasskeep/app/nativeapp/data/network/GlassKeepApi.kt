@@ -861,19 +861,19 @@ data class UserAiSettingsDto(
 )
 
 /**
- * Body for PUT /api/user/ai/settings. `apiKey` follows the server's own
- * three-way convention: absent keeps the stored key, "" clears it, any
- * other value replaces it (aiRoutes.js:247-248), which is why it is
- * nullable here and dropped when null.
+ * Body for PUT /api/user/ai/settings. A field left null is dropped and
+ * keeps its stored value, which is how removing the key sends the key
+ * alone. `apiKey` follows the server's own three-way convention: absent
+ * keeps the stored key, "" clears it, any other value replaces it.
  */
 @Serializable
 data class UserAiSettingsRequest(
-    val enabled: Boolean,
-    val mode: String,
-    val baseUrl: String,
-    val model: String,
-    val temperature: Double,
-    val maxTokens: Int,
+    val enabled: Boolean? = null,
+    val mode: String? = null,
+    val baseUrl: String? = null,
+    val model: String? = null,
+    val temperature: Double? = null,
+    val maxTokens: Int? = null,
     val apiKey: String? = null,
 )
 
@@ -1018,7 +1018,8 @@ data class PasskeyDto(
 
 @Serializable
 data class PasskeyListResponse(
-    val available: Boolean = false,
+    // A server that does not say is taken at its word (passkeyClient.js).
+    val available: Boolean = true,
     val passkeys: List<PasskeyDto> = emptyList(),
 )
 
