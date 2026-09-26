@@ -1,6 +1,7 @@
 package com.glasskeep.app.nativeapp.data
 
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -379,13 +380,16 @@ object RichDoc {
      *  (DEFAULT_HIGHLIGHT_SWATCH): slot 1 of the palette. */
     const val DefaultHighlight = "var(--rt-hl-1)"
 
-    /** True when every attrs key is one this vocabulary knows about. A key
-     *  it has never heard of rejects the whole doc rather than silently
-     *  drop whatever it meant. */
+    /** True when every attrs key is one this vocabulary knows about, or is
+     *  left unset: Tiptap writes every attribute its schema declares, so a
+     *  newer one arrives as null on notes that never used it (orderedList's
+     *  `type`), with nothing to keep. A key it has never heard of that does
+     *  carry a value rejects the whole doc rather than silently drop
+     *  whatever it meant. */
     private fun attrsAreKnown(attrs: JsonObject?, extraAllowedKeys: Set<String> = emptySet()): Boolean {
         if (attrs.isNullOrEmpty()) return true
         val allowed = KNOWN_ATTR_KEYS + extraAllowedKeys
-        return attrs.keys.all { it in allowed }
+        return attrs.all { (key, value) -> key in allowed || value is JsonNull }
     }
 
     private fun readIndent(attrs: JsonObject?): Int =
