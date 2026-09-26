@@ -510,6 +510,7 @@
     <string name="native_richtext_task_list_options">Options de liste à cocher</string>
     <string name="native_richtext_task_list_strike">Barrer les éléments cochés</string>
     <string name="native_richtext_task_toggle">Cocher ou décocher cet élément</string>
+    <string name="native_richtext_placeholder">Écrivez votre note…</string>
     <string name="native_richtext_align_left">Aligner à gauche</string>
     <string name="native_richtext_align_center">Centrer</string>
     <string name="native_richtext_align_right">Aligner à droite</string>

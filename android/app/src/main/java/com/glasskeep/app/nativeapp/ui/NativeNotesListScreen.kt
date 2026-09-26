@@ -876,6 +876,7 @@ fun NativeNotesListScreen(
                         citedNotes = notes.filter { it.id in aiCitedNoteIds },
                         typography = container.editorPrefs.typography.activeProfile,
                         taskStrike = container.editorPrefs.taskStrike,
+                        themeId = themeId,
                         onOpenNote = onOpenNote,
                         onDismiss = {
                             aiAnswer = null
@@ -1829,6 +1830,7 @@ private fun AiAnswerCard(
     citedNotes: List<NoteEntity>,
     typography: TypographyProfile,
     taskStrike: Boolean,
+    themeId: String,
     onOpenNote: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1935,6 +1937,7 @@ private fun AiAnswerCard(
                         onClick = { onOpenNote(note.id) },
                         typography = typography,
                         taskStrike = taskStrike,
+                        themeId = themeId,
                     )
                 }
             }
@@ -2461,7 +2464,14 @@ internal fun NoteCard(
             if (note.type == "checklist") {
                 ChecklistCardPreview(note = note, titleColor = titleColor, dark = dark)
             } else if (note.type == "draw") {
-                DrawingCardPreview(note = note, dark = dark, typography = typography, taskStrike = taskStrike, titleColor = titleColor)
+                DrawingCardPreview(
+                    note = note,
+                    dark = dark,
+                    typography = typography,
+                    taskStrike = taskStrike,
+                    titleColor = titleColor,
+                    accent = WorkspaceTheme.rtAccent(themeId),
+                )
             } else if (note.type == "audio") {
                 AudioCardPreview(note = note, dark = dark, titleColor = titleColor)
             } else {
@@ -2481,6 +2491,8 @@ internal fun NoteCard(
                         dark = dark,
                         titleColor = titleColor,
                         compact = true,
+                        noteColor = note.color,
+                        accent = WorkspaceTheme.rtAccent(themeId),
                         modifier = Modifier.heightIn(max = 280.dp).clipToBounds(),
                     )
                 } else if (note.type != "text") {
@@ -2546,6 +2558,7 @@ private fun DrawingCardPreview(
     typography: TypographyProfile,
     taskStrike: Boolean,
     titleColor: Color,
+    accent: Color,
 ) {
     val drawing = remember(note.content) { DrawingContent.parse(note.content) } ?: return
     val caption = remember(drawing.text) {
@@ -2559,6 +2572,8 @@ private fun DrawingCardPreview(
             dark = dark,
             titleColor = titleColor,
             compact = true,
+            noteColor = note.color,
+            accent = accent,
             modifier = Modifier.heightIn(max = 280.dp).clipToBounds(),
         )
         Spacer(Modifier.height(8.dp))

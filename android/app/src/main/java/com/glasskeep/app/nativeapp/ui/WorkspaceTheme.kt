@@ -76,6 +76,9 @@ data class WorkspaceThemeEntry(
      *  other theme inherits the generic html[class*="gk-theme-"] rule
      *  that sets it to that theme's grad-from. */
     val switchOn: Color,
+    /** --rt-accent: the rich text's task boxes and quote bars. The theme's
+     *  grad-from, except Blush, which takes its chrome accent. */
+    val rtAccent: Color,
 )
 
 object WorkspaceTheme {
@@ -121,6 +124,7 @@ object WorkspaceTheme {
             gradFrom = Color(0xFF6366F1),
             gradTo = Color(0xFF7C3AED),
             switchOn = Color(0xFF4F46E5),
+            rtAccent = Color(0xFF6366F1),
         ),
         WorkspaceThemeEntry(
             id = "emerald",
@@ -161,6 +165,7 @@ object WorkspaceTheme {
             gradFrom = Color(0xFF10B981),
             gradTo = Color(0xFF0D9488),
             switchOn = Color(0xFF10B981),
+            rtAccent = Color(0xFF10B981),
         ),
         WorkspaceThemeEntry(
             id = "amber",
@@ -201,6 +206,7 @@ object WorkspaceTheme {
             gradFrom = Color(0xFFD97706),
             gradTo = Color(0xFFB45309),
             switchOn = Color(0xFFD97706),
+            rtAccent = Color(0xFFD97706),
         ),
         WorkspaceThemeEntry(
             id = "rosewood",
@@ -241,6 +247,7 @@ object WorkspaceTheme {
             gradFrom = Color(0xFFE11D1D),
             gradTo = Color(0xFF9F1010),
             switchOn = Color(0xFFE11D1D),
+            rtAccent = Color(0xFFE11D1D),
         ),
         WorkspaceThemeEntry(
             id = "graphite",
@@ -281,6 +288,7 @@ object WorkspaceTheme {
             gradFrom = Color(0xFF64748B),
             gradTo = Color(0xFF475569),
             switchOn = Color(0xFF64748B),
+            rtAccent = Color(0xFF64748B),
         ),
         WorkspaceThemeEntry(
             id = "blush",
@@ -321,6 +329,7 @@ object WorkspaceTheme {
             gradFrom = Color(0xFFEC4899),
             gradTo = Color(0xFFBE185D),
             switchOn = Color(0xFFEC4899),
+            rtAccent = Color(0xFFDB2777),
         ),
     )
 
@@ -403,6 +412,8 @@ object WorkspaceTheme {
     fun gradTo(id: String?): Color = forId(id).gradTo
 
     fun switchOnColor(id: String?): Color = forId(id).switchOn
+
+    fun rtAccent(id: String?): Color = forId(id).rtAccent
 
     /** --gk-accent-soft-bg / --gk-accent-soft-border: color-mix of the
      *  accent at 12% / 24% over transparent, i.e. the same color at that

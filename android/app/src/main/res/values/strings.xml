@@ -515,6 +515,7 @@
     <string name="native_richtext_task_list_options">Checklist options</string>
     <string name="native_richtext_task_list_strike">Strike through checked items</string>
     <string name="native_richtext_task_toggle">Check or uncheck this item</string>
+    <string name="native_richtext_placeholder">Write your note…</string>
     <string name="native_richtext_align_left">Align left</string>
     <string name="native_richtext_align_center">Align center</string>
     <string name="native_richtext_align_right">Align right</string>

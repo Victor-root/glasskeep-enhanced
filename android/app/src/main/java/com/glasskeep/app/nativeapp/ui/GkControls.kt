@@ -5,13 +5,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -44,7 +42,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -88,6 +85,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.LinkAnnotation
@@ -116,6 +114,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
+import com.glasskeep.app.nativeapp.NativeDebug
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.sqrt
@@ -1526,6 +1525,16 @@ internal fun Modifier.tailwindShadowLg(shape: Shape): Modifier = this
 internal fun Modifier.tailwindShadowXl(shape: Shape): Modifier = this
     .dropShadow(shape, Shadow(radius = 25.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-5).dp, offset = DpOffset(0.dp, 20.dp)))
     .dropShadow(shape, Shadow(radius = 10.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-6).dp, offset = DpOffset(0.dp, 8.dp)))
+
+/** Opens [url] in whatever app handles it, doing nothing when none does
+ *  (the platform handler throws then, a web page would simply stay put). */
+internal fun UriHandler.openSafely(url: String) {
+    try {
+        openUri(url)
+    } catch (e: IllegalArgumentException) {
+        NativeDebug.e("No app opens $url", e)
+    }
+}
 
 /** Holds a layout's coordinates without making them state: they change on
  *  every scroll, and only a gesture reads them. */

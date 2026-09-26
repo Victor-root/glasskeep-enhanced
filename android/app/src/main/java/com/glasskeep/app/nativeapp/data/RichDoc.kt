@@ -45,6 +45,13 @@ enum class RichAlign { LEFT, CENTER, RIGHT, JUSTIFY }
  * One editable paragraph/heading/list-item/quote/code block, or a divider.
  * [id] is local only (Compose keys and focus tracking), never serialized.
  *
+ * [indent] is the Indent extension's attribute: on the `<li>` of a bullet
+ * or ordered item, on the paragraph of a task item (Indent.js skips only
+ * listItem paragraphs), on the node itself everywhere else. [nestLevel] is
+ * a list item's structural depth: 0 for an item of a top-level list, 1 for
+ * an item of a list nested inside another item (Tab / sinkListItem on the
+ * web), and so on. It is always 0 on anything that is not a list item.
+ *
  * [checked] only means anything on a [RichBlockKind.TASK_ITEM], and
  * [language] only on a [RichBlockKind.CODE_BLOCK]; both are carried
  * unchanged through a round-trip on every other kind so switching a block
@@ -59,6 +66,7 @@ data class RichBlock(
     val indent: Int = 0,
     val checked: Boolean = false,
     val language: String? = null,
+    val nestLevel: Int = 0,
 )
 
 /**
@@ -76,11 +84,10 @@ data class RichBlock(
  * three textStyle attributes (colour, font family, font size).
  *
  * The editor model is flat: a list, blockquote or task list becomes a run
- * of consecutive blocks. Structurally nested Tiptap lists are flattened
- * into those blocks with increasing [RichBlock.indent], which the project's
- * own Indent extension renders and [encode] preserves. This keeps one
- * editable text field per visible line without degrading nested lists to
- * the plain read-only fallback.
+ * of consecutive blocks. Structurally nested Tiptap lists keep their depth
+ * in [RichBlock.nestLevel], and [encode] nests them back the same way, so
+ * one editable text field per visible line never changes the structure of
+ * a note written on the web.
  *
  * [parse] still returns null rather than guess for anything outside that
  * vocabulary: a heading beyond level 5, a table, an image node.
@@ -154,11 +161,9 @@ object RichDoc {
         return parseTextBlock(node, kind)
     }
 
-    /** `list -> listItem[] -> [paragraph, nestedList?]`. Nested children
-     *  are flattened in document order and gain one indent level. Existing
-     *  explicit indent attrs are additive, so older documents produced by
-     *  this app and standard structurally-nested Tiptap documents converge
-     *  on the same editable representation. */
+    /** `list -> listItem[] -> [paragraph, nestedList*]`. Nested children
+     *  follow their parent item in document order, one [RichBlock.nestLevel]
+     *  deeper. The Indent extension's attribute lives on the `<li>`. */
     private fun parseList(
         node: JsonObject,
         itemKind: RichBlockKind,
@@ -177,7 +182,7 @@ object RichDoc {
             val paragraphNode = itemContent[0] as? JsonObject ?: return null
             if (nodeType(paragraphNode) != "paragraph") return null
             val block = parseTextBlock(paragraphNode, itemKind) ?: return null
-            blocks.add(block.copy(indent = (readIndent(itemAttrs) + nestingDepth).coerceAtMost(MAX_INDENT)))
+            blocks.add(block.copy(indent = readIndent(itemAttrs), nestLevel = nestingDepth))
             for (child in itemContent.drop(1)) {
                 val childObj = child as? JsonObject ?: return null
                 blocks.addAll(parseNestedList(childObj, nestingDepth + 1) ?: return null)
@@ -186,8 +191,10 @@ object RichDoc {
         return blocks
     }
 
-    /** TaskItem is configured `nested: true` on the web. It uses the same
-     *  flatten-to-indent representation as bullet and ordered lists. */
+    /** TaskItem is configured `nested: true` on the web and has no indent
+     *  attribute of its own: Indent.js puts it on the item's paragraph. An
+     *  indent on the taskItem itself is only ever one an earlier version of
+     *  this app wrote, still read so those notes keep their look. */
     private fun parseTaskList(node: JsonObject, nestingDepth: Int = 0): List<RichBlock>? {
         if (!attrsAreKnown(node["attrs"] as? JsonObject)) return null
         val items = node["content"] as? JsonArray ?: return null
@@ -206,7 +213,8 @@ object RichDoc {
             blocks.add(
                 block.copy(
                     checked = checked,
-                    indent = (readIndent(itemAttrs) + nestingDepth).coerceAtMost(MAX_INDENT),
+                    indent = block.indent.takeIf { it > 0 } ?: readIndent(itemAttrs),
+                    nestLevel = nestingDepth,
                 ),
             )
             for (child in itemContent.drop(1)) {
@@ -401,47 +409,44 @@ object RichDoc {
 
     /** Serializes [blocks] back into the same envelope [parse] reads.
      *  Consecutive same-kind blocks are regrouped into the one nested node
-     *  Tiptap expects (a list, a task list, a blockquote); only the attrs
-     *  this editor actually sets are emitted, everything else is left for
-     *  Tiptap's own schema defaults to fill in on the other end. */
+     *  Tiptap expects (a list, a task list, a blockquote), list items are
+     *  nested back under their parent item by [RichBlock.nestLevel]; only
+     *  the attrs this editor actually sets are emitted, everything else is
+     *  left for Tiptap's own schema defaults to fill in on the other end. */
     fun encode(blocks: List<RichBlock>): String {
+        val normalized = normalizeNesting(blocks)
         val nodes = mutableListOf<JsonObject>()
         var i = 0
-        while (i < blocks.size) {
-            val kind = blocks[i].kind
-            val run = mutableListOf<RichBlock>()
-            when (kind) {
-                RichBlockKind.BULLET_ITEM, RichBlockKind.NUMBERED_ITEM -> {
-                    while (i < blocks.size && blocks[i].kind == kind) run.add(blocks[i++])
-                    nodes.add(
-                        buildJsonObject {
-                            put("type", if (kind == RichBlockKind.BULLET_ITEM) "bulletList" else "orderedList")
-                            put("content", JsonArray(run.map { encodeListItem(it) }))
-                        },
-                    )
-                }
-                RichBlockKind.TASK_ITEM -> {
-                    while (i < blocks.size && blocks[i].kind == kind) run.add(blocks[i++])
-                    nodes.add(
-                        buildJsonObject {
-                            put("type", "taskList")
-                            put("content", JsonArray(run.map { encodeTaskItem(it) }))
-                        },
-                    )
+        while (i < normalized.size) {
+            val block = normalized[i]
+            when (block.kind) {
+                RichBlockKind.BULLET_ITEM, RichBlockKind.NUMBERED_ITEM, RichBlockKind.TASK_ITEM -> {
+                    // One top-level list: its own items plus everything
+                    // nested under them.
+                    var end = i + 1
+                    while (end < normalized.size && normalized[end].kind.isListItem &&
+                        (normalized[end].nestLevel > 0 || normalized[end].kind == block.kind)
+                    ) {
+                        end++
+                    }
+                    nodes.add(encodeList(normalized.subList(i, end)))
+                    i = end
                 }
                 RichBlockKind.QUOTE -> {
-                    while (i < blocks.size && blocks[i].kind == kind) run.add(blocks[i++])
+                    var end = i + 1
+                    while (end < normalized.size && normalized[end].kind == RichBlockKind.QUOTE) end++
+                    val run = normalized.subList(i, end)
                     nodes.add(
                         buildJsonObject {
                             put("type", "blockquote")
-                            val indent = run.first().indent
-                            if (indent > 0) put("attrs", buildJsonObject { put("indent", indent) })
+                            if (block.indent > 0) put("attrs", buildJsonObject { put("indent", block.indent) })
                             put("content", JsonArray(run.map { encodeTextBlock(it, withIndent = false) }))
                         },
                     )
+                    i = end
                 }
                 RichBlockKind.CODE_BLOCK -> {
-                    nodes.add(encodeCodeBlock(blocks[i]))
+                    nodes.add(encodeCodeBlock(block))
                     i++
                 }
                 RichBlockKind.DIVIDER -> {
@@ -449,7 +454,7 @@ object RichDoc {
                     i++
                 }
                 else -> {
-                    nodes.add(encodeTextBlock(blocks[i]))
+                    nodes.add(encodeTextBlock(block))
                     i++
                 }
             }
@@ -466,24 +471,76 @@ object RichDoc {
         return envelope.toString()
     }
 
-    /** The indent lives on the `<li>`, never on its inner paragraph, so the
-     *  bullet and its text shift together (Indent.js:69-75). */
-    private fun encodeListItem(block: RichBlock): JsonObject = buildJsonObject {
-        put("type", "listItem")
-        if (block.indent > 0) put("attrs", buildJsonObject { put("indent", block.indent) })
-        put("content", JsonArray(listOf(encodeTextBlock(block, withIndent = false))))
+    /** One list: [items] starts with an item of the list's own level, every
+     *  later item of that level has the same kind, and each deeper item
+     *  belongs to the item of this level before it. */
+    private fun encodeList(items: List<RichBlock>): JsonObject {
+        val level = items.first().nestLevel
+        val kind = items.first().kind
+        val encoded = mutableListOf<JsonObject>()
+        var j = 0
+        while (j < items.size) {
+            var next = j + 1
+            while (next < items.size && items[next].nestLevel > level) next++
+            encoded.add(encodeListItem(items[j], items.subList(j + 1, next)))
+            j = next
+        }
+        return buildJsonObject {
+            put(
+                "type",
+                when (kind) {
+                    RichBlockKind.BULLET_ITEM -> "bulletList"
+                    RichBlockKind.NUMBERED_ITEM -> "orderedList"
+                    else -> "taskList"
+                },
+            )
+            put("content", JsonArray(encoded))
+        }
     }
 
-    private fun encodeTaskItem(block: RichBlock): JsonObject = buildJsonObject {
-        put("type", "taskItem")
-        put(
-            "attrs",
-            buildJsonObject {
-                put("checked", block.checked)
-                if (block.indent > 0) put("indent", block.indent)
-            },
-        )
-        put("content", JsonArray(listOf(encodeTextBlock(block, withIndent = false))))
+    /** A list item and the lists nested under it, one per run of same-kind
+     *  children. A bullet or ordered item carries its indent on the `<li>`
+     *  so the marker and the text shift together (Indent.js:69-75); a task
+     *  item has no indent attribute, its paragraph carries it. */
+    private fun encodeListItem(item: RichBlock, children: List<RichBlock>): JsonObject {
+        val nested = mutableListOf<JsonObject>()
+        var c = 0
+        while (c < children.size) {
+            val level = children[c].nestLevel
+            var end = c + 1
+            while (end < children.size &&
+                (children[end].nestLevel > level || children[end].kind == children[c].kind)
+            ) {
+                end++
+            }
+            nested.add(encodeList(children.subList(c, end)))
+            c = end
+        }
+        val task = item.kind == RichBlockKind.TASK_ITEM
+        return buildJsonObject {
+            put("type", if (task) "taskItem" else "listItem")
+            if (task) {
+                put("attrs", buildJsonObject { put("checked", item.checked) })
+            } else if (item.indent > 0) {
+                put("attrs", buildJsonObject { put("indent", item.indent) })
+            }
+            put("content", JsonArray(listOf(encodeTextBlock(item, withIndent = task)) + nested))
+        }
+    }
+
+    /** A list item can only sit one level below the item before it, and a
+     *  list always starts at the top level; anything else (left behind by
+     *  deleting a parent item, for instance) is pulled back up. Non-list
+     *  blocks never carry a level. */
+    fun normalizeNesting(blocks: List<RichBlock>): List<RichBlock> {
+        var previous: RichBlock? = null
+        return blocks.map { block ->
+            val maxLevel = previous?.takeIf { it.kind.isListItem }?.let { it.nestLevel + 1 } ?: 0
+            val level = if (block.kind.isListItem) block.nestLevel.coerceIn(0, maxLevel) else 0
+            val fixed = if (level == block.nestLevel) block else block.copy(nestLevel = level)
+            previous = fixed
+            fixed
+        }
     }
 
     private fun encodeCodeBlock(block: RichBlock): JsonObject = buildJsonObject {
@@ -643,6 +700,17 @@ object RichDoc {
         return covering.distinctBy { it.value to it.color }.singleOrNull()
     }
 
+    /** ProseMirror's `$from.marks()` for a collapsed caret: the marks of the
+     *  character before it, or of the first character at the very start of
+     *  a block. Every mark of this schema is inclusive (the link too, since
+     *  the web turns autolink on), so a mark ending at the caret counts and
+     *  what gets typed there carries it. An empty block has none. */
+    fun marksAtCaret(marks: List<RichMark>, textLength: Int, caret: Int): List<RichMark> {
+        if (textLength == 0) return emptyList()
+        val at = (caret - 1).coerceIn(0, textLength - 1)
+        return marks.filter { it.start <= at && it.end > at }
+    }
+
     /** Removes [type] from `[start, end)`, trimming any mark instance that
      *  only partly overlaps instead of dropping it outright. */
     fun clearMark(marks: List<RichMark>, type: RichMarkType, start: Int, end: Int): List<RichMark> {
@@ -715,20 +783,19 @@ object RichDoc {
      *  spanning it, typing in the middle of a bolded word stays bold; a
      *  mark only partly overlapping is trimmed to whatever part of it is
      *  still there. New text is never retroactively styled from a partial
-     *  overlap, only a full one or an insertion at a mark's own end (see
-     *  the inclusive-mark rule below); select it and toggle a mark
-     *  explicitly otherwise. */
+     *  overlap, only a full one or an insertion where [marksAtCaret] says
+     *  the mark applies; select it and toggle a mark explicitly otherwise. */
     fun adjustMarksForEdit(oldText: String, newText: String, marks: List<RichMark>): List<RichMark> {
         if (oldText == newText) return marks
         val span = diffEdit(oldText, newText)
         val insertion = span.oldEnd == span.start && span.newEnd > span.start
         return marks.mapNotNull { m ->
             when {
-                // ProseMirror marks are inclusive by default: typing right
-                // after a bold word keeps writing in bold. A link is the
-                // exception Tiptap itself makes (inclusive: false), so text
-                // typed after one is plain.
-                insertion && m.end == span.start && m.type != RichMarkType.LINK ->
+                // Inclusive marks: typing right after a bold word (or a
+                // link) keeps writing in it, and typing at the very start
+                // of a block takes the marks of its first character.
+                insertion && m.end == span.start -> m.copy(end = m.end + span.delta)
+                insertion && span.start == 0 && m.start == 0 && oldText.isNotEmpty() ->
                     m.copy(end = m.end + span.delta)
                 m.end <= span.start -> m
                 m.start >= span.oldEnd -> m.copy(start = m.start + span.delta, end = m.end + span.delta)
@@ -739,6 +806,76 @@ object RichDoc {
             }
         }
     }
+
+    /** LinkPopover.jsx's ensureSchemeURL: an http(s), mailto or tel link is
+     *  kept as typed, an e-mail address becomes a mailto: link, a phone
+     *  number a tel: link of its digits, anything else an https:// one. */
+    fun ensureSchemeUrl(raw: String): String {
+        val value = raw.trim()
+        return when {
+            value.isEmpty() -> ""
+            UrlSchemeRegex.containsMatchIn(value) -> value
+            BareEmailRegex.matches(value) -> "mailto:$value"
+            BarePhoneRegex.matches(value) -> "tel:" + value.filter { it in '0'..'9' || it == '+' }
+            else -> "https://$value"
+        }
+    }
+
+    /** linkifyContactsHTML (utils/markdown.jsx:127-218): the read view turns
+     *  phone numbers and e-mail addresses into tel:/mailto: links. The web
+     *  searches each DOM text node on its own, so this searches each run of
+     *  text sharing one set of marks, between line breaks, and skips runs
+     *  already inside a link or inline code. */
+    fun contactLinks(text: String, marks: List<RichMark>): List<RichMark> {
+        if (text.isEmpty()) return emptyList()
+        val cuts = sortedSetOf(0, text.length)
+        for (m in marks) {
+            cuts.add(m.start.coerceIn(0, text.length))
+            cuts.add(m.end.coerceIn(0, text.length))
+        }
+        text.forEachIndexed { index, c ->
+            if (c == '\n') {
+                cuts.add(index)
+                cuts.add(index + 1)
+            }
+        }
+        val points = cuts.toList()
+        val links = mutableListOf<RichMark>()
+        for (k in 0 until points.size - 1) {
+            val start = points[k]
+            val end = points[k + 1]
+            if (start >= end || text[start] == '\n') continue
+            val insideLinkOrCode = marks.any {
+                (it.type == RichMarkType.LINK || it.type == RichMarkType.CODE) && it.start <= start && it.end >= end
+            }
+            if (insideLinkOrCode) continue
+            for (match in ContactRegex.findAll(text.substring(start, end))) {
+                val href = if (match.groups[1] != null) {
+                    "tel:" + match.value.filterNot { it in PhoneSeparators || JsWhitespaceRegex.matches(it.toString()) }
+                } else {
+                    "mailto:${match.value}"
+                }
+                links.add(RichMark(start + match.range.first, start + match.range.last + 1, RichMarkType.LINK, href))
+            }
+        }
+        return links
+    }
+
+    /** JavaScript's `\s`, which also matches the no-break and typographic
+     *  spaces a French phone number is often written with. */
+    private const val JsSpace = "\\s\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff"
+    private val JsWhitespaceRegex = Regex("[$JsSpace]")
+    private const val PhoneSeparators = ".()-"
+    private val UrlSchemeRegex = Regex("^(https?|mailto|tel):", RegexOption.IGNORE_CASE)
+    private val BareEmailRegex = Regex("^[\\w.+-]+@[\\w.-]+\\.[a-z]{2,}$", RegexOption.IGNORE_CASE)
+    private val BarePhoneRegex = Regex("^\\+?\\d[\\d$JsSpace().-]+$")
+    private const val PhonePattern =
+        "(?:\\+1[$JsSpace.-]?)?\\(\\d{3}\\)[$JsSpace.-]?\\d{3}[$JsSpace.-]?\\d{4}" +
+            "|(?:\\+1[$JsSpace.-]?)?\\d{3}[$JsSpace.-]\\d{3}[$JsSpace.-]\\d{4}" +
+            "|\\+33[$JsSpace.-]?\\d[$JsSpace.-]?\\d{2}[$JsSpace.-]?\\d{2}[$JsSpace.-]?\\d{2}[$JsSpace.-]?\\d{2}" +
+            "|0\\d[$JsSpace.-]?\\d{2}[$JsSpace.-]?\\d{2}[$JsSpace.-]?\\d{2}[$JsSpace.-]?\\d{2}"
+    private const val EmailPattern = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+    private val ContactRegex = Regex("($PhonePattern)|($EmailPattern)")
 }
 
 val RichBlockKind.isHeading: Boolean
@@ -750,3 +887,7 @@ val RichBlockKind.isHeading: Boolean
  *  divider, which has no text field at all). */
 val RichBlockKind.hasText: Boolean
     get() = this != RichBlockKind.DIVIDER
+
+val RichBlockKind.isListItem: Boolean
+    get() = this == RichBlockKind.BULLET_ITEM || this == RichBlockKind.NUMBERED_ITEM ||
+        this == RichBlockKind.TASK_ITEM

@@ -106,19 +106,17 @@ fun noteColorName(colorKey: String): String = stringResource(
 
 
 /**
- * noteColorBtn from NoteModal.jsx:657-659 - what `--note-color` is actually
- * set to, i.e. the code-copy button's own background. NOT the same value
- * as [noteModalBackground]: that one mixes 80% white into a light-mode
- * note for readability, so it would render the button almost invisible
- * against a pastel note. This is the note's raw swatch at full opacity -
- * `solid(bgFor(colorKey, dark))` - so the button reads as a small solid
- * tab of the note's actual color. A colorless note in light mode gets a
- * fixed violet instead of solid white.
+ * noteColorBtn from NoteModal.jsx:657-659, what `--note-color` is set to:
+ * the code copy button's fill and the colour of a quote's frame. NOT
+ * [noteModalBackground], which mixes 80% white into a light-mode note.
+ * It is `solid(bgFor(colorKey, dark))`, whose "0.6" to "1" swap never
+ * matches the swatches' 0.85, so the swatch keeps its own alpha. A
+ * colourless note in light mode gets a fixed violet instead of white.
  */
-fun codeCopyButtonColor(colorKey: String?, dark: Boolean): Color {
+fun noteCssColor(colorKey: String?, dark: Boolean): Color {
     val key = colorKey?.trim()?.lowercase()
     if (!dark && (key.isNullOrEmpty() || key == "default")) return Color(0xFFA78BFA)
-    return noteColorFor(key, dark).copy(alpha = 1f)
+    return noteColorFor(key, dark)
 }
 
 /**

@@ -444,6 +444,8 @@ fun SecondaryNotesScreen(
                             onToggleSelect = {
                                 selectedIds = if (note.id in selectedIds) selectedIds - note.id else selectedIds + note.id
                             },
+                            typography = container.editorPrefs.typography.activeProfile,
+                            taskStrike = container.editorPrefs.taskStrike,
                             loadDetail = repository::cachedNoteDetailOrNull,
                             themeId = container.themeState.themeId,
                         )

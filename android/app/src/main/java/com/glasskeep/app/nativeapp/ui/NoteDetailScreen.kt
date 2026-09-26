@@ -60,7 +60,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -157,18 +156,20 @@ import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichDoc
+import com.glasskeep.app.nativeapp.data.RichEdit
+import com.glasskeep.app.nativeapp.data.RichEdits
 import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.formatIso
+import com.glasskeep.app.nativeapp.data.hasText
 import com.glasskeep.app.nativeapp.data.network.CollaboratorDto
 import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.NoteIconDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.data.toEntity
-import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
@@ -350,6 +351,9 @@ fun NoteDetailScreen(
     // a tag or a checklist item. See Editability.originalRichBlocks for
     // the as-loaded snapshot this diffs against.
     var richBlocks by remember { mutableStateOf<List<RichBlock>?>(null) }
+    // True once the load below is over: the cached copy, then the
+    // server's, or its failure.
+    var loadSettled by remember { mutableStateOf(false) }
     val richFocusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
     var pendingRichFocus by remember { mutableStateOf<String?>(null) }
     // One-shot cursor-position override for mergeRichBlockWithPrevious:
@@ -627,6 +631,13 @@ fun NoteDetailScreen(
         }
     }
 
+    /** Puts the caret at the end of rich block [id]. */
+    fun focusRichBlockEnd(id: String) {
+        val block = richBlocks?.firstOrNull { it.id == id } ?: return
+        pendingRichSelections[id] = TextRange(block.text.length)
+        pendingRichFocus = id
+    }
+
     /** Where Enter in the title lands: the end of the body, or a
      *  checklist's first row (NoteModal.jsx:717-734). */
     fun focusBodyFromTitle() {
@@ -634,10 +645,7 @@ fun NoteDetailScreen(
         if (edit.isChecklistType) {
             edit.checklistItems?.firstOrNull { it is ChecklistItemData }?.let { pendingChecklistFocus = it.id }
         } else {
-            richBlocks?.lastOrNull()?.let { last ->
-                pendingRichSelections[last.id] = TextRange(last.text.length)
-                pendingRichFocus = last.id
-            }
+            richBlocks?.lastOrNull { it.kind.hasText }?.let { focusRichBlockEnd(it.id) }
         }
     }
 
@@ -889,22 +897,23 @@ fun NoteDetailScreen(
         richBlocks = blocks.map { if (it.id == id) it.copy(text = newText, marks = newMarks) else it }
     }
 
-    /** The toolbar's block buttons are toggles on the web
-     *  (toggleBulletList, toggleTaskList, toggleBlockquote,
-     *  smartToggleCodeBlock): pressing the one already active turns the
-     *  block back into a plain paragraph. The heading gallery is the
-     *  exception, setHeading() always sets. */
-    fun setRichBlockKind(id: String, kind: RichBlockKind) {
-        val blocks = richBlocks ?: return
-        val togglesOff = kind == RichBlockKind.BULLET_ITEM || kind == RichBlockKind.NUMBERED_ITEM ||
-            kind == RichBlockKind.TASK_ITEM || kind == RichBlockKind.QUOTE || kind == RichBlockKind.CODE_BLOCK
-        richBlocks = blocks.map { block ->
-            if (block.id != id) {
-                block
-            } else {
-                block.copy(kind = if (togglesOff && block.kind == kind) RichBlockKind.PARAGRAPH else kind)
-            }
+    /** A structural edit's result: the new blocks, and the caret it
+     *  leaves, if it moves one. */
+    fun applyRichEdit(edit: RichEdit?) {
+        edit ?: return
+        richBlocks = edit.blocks
+        edit.focusId?.let { id ->
+            pendingRichSelections[id] = TextRange(edit.caret)
+            pendingRichFocus = id
         }
+    }
+
+    fun setRichBlockKind(id: String, kind: RichBlockKind) {
+        applyRichEdit(RichEdits.setKind(richBlocks ?: return, id, kind))
+    }
+
+    fun toggleRichCodeBlock(id: String, start: Int, end: Int) {
+        applyRichEdit(RichEdits.toggleCodeBlock(richBlocks ?: return, id, start, end))
     }
 
     fun toggleRichMark(id: String, start: Int, end: Int, type: RichMarkType) {
@@ -933,18 +942,8 @@ fun NoteDetailScreen(
         richBlocks = blocks.map { if (it.id == id) it.copy(indent = (it.indent + delta).coerceIn(0, 8)) else it }
     }
 
-    /** setHorizontalRule(): drops a rule after the focused block, then a
-     *  fresh paragraph so there is always something to type into after it
-     *  (the web's own setHorizontalRule leaves the cursor in the paragraph
-     *  the rule pushed down). */
-    fun insertRichDivider(id: String) {
-        val blocks = richBlocks ?: return
-        val idx = blocks.indexOfFirst { it.id == id }
-        if (idx < 0) return
-        val rule = RichDoc.newBlock(RichBlockKind.DIVIDER)
-        val after = RichDoc.newBlock()
-        richBlocks = blocks.toMutableList().apply { addAll(idx + 1, listOf(rule, after)) }
-        pendingRichFocus = after.id
+    fun insertRichDivider(id: String, start: Int, end: Int) {
+        applyRichEdit(RichEdits.insertDivider(richBlocks ?: return, id, start, end))
     }
 
     fun toggleRichChecked(id: String) {
@@ -976,7 +975,7 @@ fun NoteDetailScreen(
         val blocks = richBlocks ?: return
         richBlocks = blocks.map { block ->
             if (block.id == target.blockId) {
-                block.copy(marks = RichDoc.setMark(block.marks, RichMarkType.LINK, target.start, target.end, normalizeRichLinkUrl(href)))
+                block.copy(marks = RichDoc.setMark(block.marks, RichMarkType.LINK, target.start, target.end, RichDoc.ensureSchemeUrl(href)))
             } else {
                 block
             }
@@ -994,72 +993,16 @@ fun NoteDetailScreen(
         closeLinkDialog()
     }
 
-    /** Enter inside a block: splits it at [position] into two. The new
-     *  block continues a list, a task list or a quote, so pressing Enter
-     *  partway through one keeps adding items to it; any other kind's
-     *  continuation is a plain paragraph, matching how most editors treat
-     *  Enter at the end of a heading. A code block never gets here at all,
-     *  Enter inside a snippet is a real newline (see RichTextEditor). */
     fun splitRichBlock(id: String, position: Int) {
-        val blocks = richBlocks ?: return
-        val idx = blocks.indexOfFirst { it.id == id }
-        if (idx < 0) return
-        val block = blocks[idx]
-        val continues = block.kind == RichBlockKind.BULLET_ITEM || block.kind == RichBlockKind.NUMBERED_ITEM ||
-            block.kind == RichBlockKind.TASK_ITEM || block.kind == RichBlockKind.QUOTE
-        val newBlock = RichDoc.newBlock(if (continues) block.kind else RichBlockKind.PARAGRAPH).copy(
-            text = block.text.substring(position),
-            marks = RichDoc.clipMarks(block.marks, position, block.text.length),
-            align = block.align,
-            indent = if (continues) block.indent else 0,
-        )
-        val updated = blocks.toMutableList()
-        updated[idx] = block.copy(text = block.text.substring(0, position), marks = RichDoc.clipMarks(block.marks, 0, position))
-        updated.add(idx + 1, newBlock)
-        richBlocks = updated
-        pendingRichFocus = newBlock.id
+        applyRichEdit(RichEdits.split(richBlocks ?: return, id, position))
     }
 
-    /** Best-effort backspace-at-start-of-block, mirroring ProseMirror's
-     *  joinBackward in reverse of splitRichBlock above: [id]'s text is
-     *  appended to the end of the PREVIOUS block, which keeps its own
-     *  kind/align/indent (the "whichever block absorbs text keeps its own
-     *  identity" convention, same spirit as splitRichBlock's "continues"
-     *  check), and [id] is dropped. Reuses the previous block's own id
-     *  rather than minting a new one, so pendingRichSelections can place
-     *  the caret at the join point once that field's safety-net
-     *  LaunchedEffect picks it up (see RichTextEditor.kt). Never touches
-     *  the first block (nothing precedes it) or a code block on either
-     *  side (raw code text merging into/from formatted text either
-     *  direction doesn't make sense - same exclusion as splitRichBlock).
-     *  A divider has no text to merge into, so backspacing right after
-     *  one removes the divider instead of trying to join through it. */
     fun mergeRichBlockWithPrevious(id: String) {
-        val blocks = richBlocks ?: return
-        val idx = blocks.indexOfFirst { it.id == id }
-        if (idx <= 0) return
-        val current = blocks[idx]
-        if (current.kind == RichBlockKind.CODE_BLOCK) return
-        val prev = blocks[idx - 1]
-        val updated = blocks.toMutableList()
-        if (prev.kind == RichBlockKind.DIVIDER) {
-            updated.removeAt(idx - 1)
-            richBlocks = updated
-            pendingRichFocus = current.id
-            return
-        }
-        if (prev.kind == RichBlockKind.CODE_BLOCK) return
-        val joinAt = prev.text.length
-        val merged = prev.copy(
-            text = prev.text + current.text,
-            marks = (prev.marks + current.marks.map { it.copy(start = it.start + joinAt, end = it.end + joinAt) })
-                .sortedBy { it.start },
-        )
-        updated[idx - 1] = merged
-        updated.removeAt(idx)
-        richBlocks = updated
-        pendingRichFocus = merged.id
-        pendingRichSelections[merged.id] = TextRange(joinAt)
+        applyRichEdit(RichEdits.joinBackward(richBlocks ?: return, id))
+    }
+
+    fun insertRichLines(id: String, newText: String, newMarks: List<RichMark>, start: Int, end: Int) {
+        applyRichEdit(RichEdits.insertLines(richBlocks ?: return, id, newText, newMarks, start, end))
     }
 
     // Bundled once: the formatting bar takes one actions object rather than
@@ -1068,6 +1011,7 @@ fun NoteDetailScreen(
     val richToolbarActions = remember {
         RichToolbarActions(
             setBlockKind = ::setRichBlockKind,
+            toggleCodeBlock = ::toggleRichCodeBlock,
             toggleMark = ::toggleRichMark,
             setMark = ::setRichMark,
             clearMark = ::clearRichMark,
@@ -1189,6 +1133,18 @@ fun NoteDetailScreen(
         if (isNoteReadOnly) {
             viewMode = true
             drawingCanvasMode = false
+        }
+    }
+
+    // Tiptap's TrailingNode: while the rich editor is up, the note ends with
+    // a paragraph to type into, saved with it as on the web. Only once the
+    // note is loaded, or the server's copy would be taken for an edit.
+    val richEditing = editability?.let { it.isRichEditableType || it.isDrawType && !drawingCanvasMode } == true &&
+        !isNoteReadOnly && !viewMode
+    LaunchedEffect(richBlocks, richEditing, loadSettled) {
+        val blocks = richBlocks ?: return@LaunchedEffect
+        if (loadSettled && richEditing && RichEdits.needsTrailingParagraph(blocks)) {
+            richBlocks = blocks + RichDoc.newBlock()
         }
     }
 
@@ -1655,6 +1611,7 @@ fun NoteDetailScreen(
                 NativeDebug.e("NoteDetailScreen background refresh failed id=$noteId", t)
             }
         }
+        loadSettled = true
     }
 
     // useCollaboration.js reads the roster as soon as a note opens; the
@@ -2033,6 +1990,7 @@ fun NoteDetailScreen(
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
     val accentColor = WorkspaceTheme.accent(container.themeState.themeId, dark)
+    val richAccent = WorkspaceTheme.rtAccent(container.themeState.themeId)
     // .modal-icon-btn at rest (globalCSS.js:1343/1367).
     val modalIconColor = if (dark) Color.White.copy(alpha = 0.65f) else Color(0xFF4B5563)
     // .modal-footer-btn at rest (globalCSS.js:1797/1852).
@@ -2212,6 +2170,33 @@ fun NoteDetailScreen(
                         dark = dark,
                     ) { tint -> ServerIcon(size = 16.dp, tint = tint) }
                 }
+            }
+
+            // A text note's body, or a drawing's caption, being edited.
+            @Composable
+            fun RichBodyEditor(currentNote: NoteDto, minHeight: Dp) {
+                RichTextEditor(
+                    blocks = richBlocks.orEmpty(),
+                    state = richEditorState,
+                    typography = container.editorPrefs.typography.activeProfile,
+                    taskStrike = container.editorPrefs.taskStrike,
+                    dark = dark,
+                    noteColor = currentNote.color,
+                    titleColor = titleColor,
+                    accent = richAccent,
+                    readModeEnabled = container.editorPrefs.readModeEnabled,
+                    minHeight = minHeight,
+                    focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
+                    onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
+                    onEnter = { id, position -> splitRichBlock(id, position) },
+                    onInsertLines = { id, newText, newMarks, start, end -> insertRichLines(id, newText, newMarks, start, end) },
+                    onToggleChecked = { id -> toggleRichChecked(id) },
+                    onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
+                    onTapBlank = { id -> focusRichBlockEnd(id) },
+                    pendingSelectionFor = { id -> pendingRichSelections[id] },
+                    onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
+                    suppressKeyboard = showFormatSheet,
+                )
             }
 
             // Outside the sticky bar on purpose: the title scrolls away
@@ -2395,31 +2380,14 @@ fun NoteDetailScreen(
                                                 dark = dark,
                                                 titleColor = titleColor,
                                                 noteColor = currentNote.color,
+                                                accent = richAccent,
                                             )
                                         }
                                         Spacer(Modifier.height(16.dp))
                                     } else {
                                         // The caption editor keeps 80dp at least, the
                                         // drawing right under it.
-                                        Box(Modifier.heightIn(min = 80.dp)) {
-                                            RichTextEditor(
-                                                blocks = richBlocks.orEmpty(),
-                                                state = richEditorState,
-                                                typography = container.editorPrefs.typography.activeProfile,
-                                                taskStrike = container.editorPrefs.taskStrike,
-                                                dark = dark,
-                                                noteColor = currentNote.color,
-                                                titleColor = titleColor,
-                                                focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
-                                                onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
-                                                onEnter = { id, position -> splitRichBlock(id, position) },
-                                                onToggleChecked = { id -> toggleRichChecked(id) },
-                                                onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
-                                                pendingSelectionFor = { id -> pendingRichSelections[id] },
-                                                onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
-                                                suppressKeyboard = showFormatSheet,
-                                            )
-                                        }
+                                        RichBodyEditor(currentNote, minHeight = 80.dp)
                                     }
                                     DrawingPreview(paths = drawingPaths, dimensions = drawingDimensions, dark = dark)
                                 } else if (!edit.isTextType) {
@@ -2446,25 +2414,10 @@ fun NoteDetailScreen(
                                         dark = dark,
                                         titleColor = titleColor,
                                         noteColor = currentNote.color,
+                                        accent = richAccent,
                                     )
                                 } else if (edit.isRichEditableType) {
-                                    RichTextEditor(
-                                        blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
-                                        state = richEditorState,
-                                        typography = container.editorPrefs.typography.activeProfile,
-                                        taskStrike = container.editorPrefs.taskStrike,
-                                        dark = dark,
-                                        noteColor = currentNote.color,
-                                        titleColor = titleColor,
-                                        focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
-                                        onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
-                                        onEnter = { id, position -> splitRichBlock(id, position) },
-                                        onToggleChecked = { id -> toggleRichChecked(id) },
-                                        onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
-                                        pendingSelectionFor = { id -> pendingRichSelections[id] },
-                                        onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
-                                        suppressKeyboard = showFormatSheet,
-                                    )
+                                    RichBodyEditor(currentNote, minHeight = 160.dp)
                                 } else {
                                     if (!edit.bodyEditable) {
                                         Text(
@@ -2508,7 +2461,7 @@ fun NoteDetailScreen(
             // and the footer (NoteModal.jsx:927-948), so opening it shrinks
             // the note above instead of covering it.
             editability?.let { edit ->
-                if ((edit.isRichEditableType || (edit.isDrawType && !drawingCanvasMode)) && !isNoteReadOnly && !viewMode) {
+                if (richEditing) {
                     FormatSheet(
                         open = showFormatSheet,
                         dark = dark,
@@ -3475,18 +3428,6 @@ private fun NoteTagsPopover(
                 )
             }
         }
-    }
-}
-
-/** Auto-prepends https:// for a bare domain typed without one, a smaller
- *  version of the web's LinkPopover ensureSchemeURL (no email/phone-number
- *  scheme detection, a reasonable cut for a notes app's own links). */
-private fun normalizeRichLinkUrl(input: String): String {
-    val trimmed = input.trim()
-    return if (trimmed.contains("://") || trimmed.startsWith("mailto:") || trimmed.startsWith("tel:")) {
-        trimmed
-    } else {
-        "https://$trimmed"
     }
 }
 

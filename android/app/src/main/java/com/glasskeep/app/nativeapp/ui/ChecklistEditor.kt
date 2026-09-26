@@ -1045,7 +1045,7 @@ private fun ChecklistRowText(
                     down.consume()
                     val up = waitForUpOrCancellation(pass = PointerEventPass.Initial) ?: return@awaitEachGesture
                     up.consume()
-                    uriHandler.openUri(link.uri)
+                    uriHandler.openSafely(link.uri)
                 }
             }
             // pb-0.5, then the 1px bottom border, drawn only while typing.
