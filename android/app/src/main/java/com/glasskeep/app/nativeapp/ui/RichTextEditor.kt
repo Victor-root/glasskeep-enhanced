@@ -9,11 +9,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.FocusRequester
@@ -64,6 +68,8 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -88,9 +94,16 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.RichAlign
@@ -104,12 +117,15 @@ import com.glasskeep.app.nativeapp.data.hasText
 import com.glasskeep.app.nativeapp.data.isHeading
 import com.glasskeep.app.nativeapp.data.isListItem
 import com.glasskeep.app.ui.DarkBorderColor
+import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightBorderColor
+import com.glasskeep.app.ui.LightTitleColor
+import kotlin.math.PI
+import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.PI
-import kotlin.math.sin
 
 /** `1rem` in the web's own root font size, the unit every ported measure
  *  below is expressed in. */
@@ -306,6 +322,8 @@ fun RichTextEditor(
                     onMerge = { onMergeWithPrevious(block.id) },
                     pendingSelection = pendingSelectionFor(block.id),
                     onPendingSelectionConsumed = { onPendingSelectionConsumed(block.id) },
+                    editExtras = !readModeEnabled,
+                    noteColor = noteColor,
                     modifier = modifier,
                 )
             }
@@ -923,8 +941,8 @@ private fun ReaderText(
                     if (armable) {
                         Modifier.pointerInput(codeMarks) {
                             detectTapGestures { position ->
-                                val offset = layout?.getOffsetForPosition(position) ?: return@detectTapGestures
-                                val hit = codeMarks.firstOrNull { offset >= it.start && offset < it.end }
+                                val at = layout?.charAt(position, block.text.length)
+                                val hit = at?.let { i -> codeMarks.firstOrNull { i >= it.start && i < it.end } }
                                 armed = if (hit != null && hit == armed) null else hit
                             }
                         }
@@ -933,20 +951,36 @@ private fun ReaderText(
                     },
                 ),
         )
-        armed?.let { mark ->
-            val start = mark.start.coerceIn(0, block.text.length)
-            val end = mark.end.coerceIn(start, block.text.length)
-            if (end <= start) return@let
-            val box = layout?.getBoundingBox(end - 1) ?: return@let
-            DisableSelection {
-                Layout(content = { CodeCopyButton(text = block.text.substring(start, end), noteColor = noteColor, dark = dark) }) { measurables, constraints ->
-                    val placeable = measurables.first().measure(constraints)
-                    val x = box.right.toInt() + 4.dp.roundToPx()
-                    val y = (box.top + (box.bottom - box.top) / 2f - placeable.height / 2f).toInt()
-                    layout(placeable.width, placeable.height) { placeable.place(x, y) }
-                }
-            }
+        val armedMark = armed
+        val textLayout = layout
+        if (armedMark != null && textLayout != null) {
+            DisableSelection { InlineCodeCopy(armedMark, block.text, textLayout, noteColor, dark) }
         }
+    }
+}
+
+/**
+ * EditExtras' `.rt-inline-code-copy`: the copy chip for the inline code
+ * [mark], 4dp right of where it ends and centred on that line, or, when
+ * it would run past the right edge, 4dp under that line against the
+ * right, pushing what follows down the way the web's spacer does.
+ */
+@Composable
+private fun InlineCodeCopy(mark: RichMark, text: String, layout: TextLayoutResult, noteColor: String?, dark: Boolean) {
+    val start = mark.start.coerceIn(0, text.length)
+    val end = mark.end.coerceIn(start, text.length)
+    if (end <= start) return
+    val box = layout.getBoundingBox(end - 1)
+    Layout(content = { CodeCopyButton(text = text.substring(start, end), noteColor = noteColor, dark = dark) }) { measurables, _ ->
+        val chip = measurables.first().measure(Constraints())
+        val gap = 4.dp.roundToPx()
+        val width = layout.size.width
+        val right = box.right.toInt() + gap
+        val below = right + chip.width + gap > width
+        val x = if (below) (minOf(box.right.toInt(), width - gap) - chip.width).coerceAtLeast(gap) else right
+        val y = if (below) box.bottom.toInt() + gap else (box.top + (box.height - chip.height) / 2f).toInt()
+        val height = if (below) maxOf(layout.size.height, y + chip.height + gap) else layout.size.height
+        layout(width, height) { chip.place(x, y) }
     }
 }
 
@@ -977,6 +1011,8 @@ private fun RichTextBlockField(
     onMerge: () -> Unit,
     pendingSelection: TextRange?,
     onPendingSelectionConsumed: () -> Unit,
+    editExtras: Boolean,
+    noteColor: String?,
     modifier: Modifier = Modifier,
 ) {
     // Cursor at the start on first composition: a freshly split-off block's
@@ -985,6 +1021,20 @@ private fun RichTextBlockField(
         mutableStateOf(TextFieldValue(annotatedTextFor(block, style, dark, surface), TextRange.Zero))
     }
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    // EditExtras, with the read-mode preference off: a tapped inline code
+    // shows its copy chip, until 5s pass or it is tapped again (which then
+    // places the caret); a tapped link offers Open and Edit. Both keep the
+    // keyboard down.
+    var armedCode by remember(block.id) { mutableStateOf<RichMark?>(null) }
+    var tappedLink by remember(block.id) { mutableStateOf<RichMark?>(null) }
+    LaunchedEffect(armedCode) {
+        if (armedCode != null) {
+            delay(5000)
+            armedCode = null
+        }
+    }
+    val focusManager = LocalFocusManager.current
+    val uriHandler = LocalUriHandler.current
     // Changes that did not come from this field (a toolbar mark, a split, a
     // join) rebuild the styled value from the model, keeping whatever
     // selection still fits, unless an edit left an explicit caret for this
@@ -1062,9 +1112,66 @@ private fun RichTextBlockField(
                     Text(placeholder, style = style.copy(color = if (dark) Color(0xFF6B7280) else Color(0xFF9CA3AF)))
                 }
                 inner()
+                val textLayout = layout
+                val code = armedCode
+                if (code != null && textLayout != null) InlineCodeCopy(code, block.text, textLayout, noteColor, dark)
+                val link = tappedLink
+                if (link != null && textLayout != null) {
+                    val start = link.start.coerceIn(0, block.text.length)
+                    val end = link.end.coerceIn(start, block.text.length)
+                    LinkTapPopover(
+                        bounds = textLayout.getPathForRange(start, end).getBounds(),
+                        dark = dark,
+                        onOpen = {
+                            tappedLink = null
+                            uriHandler.openSafely(RichDoc.ensureSchemeUrl(link.value.orEmpty()))
+                        },
+                        onEdit = {
+                            tappedLink = null
+                            fieldValue = fieldValue.copy(selection = TextRange(start))
+                            focusRequester.requestFocus()
+                        },
+                        onDismiss = { tappedLink = null },
+                    )
+                }
             }
         },
         modifier = modifier
+            .then(
+                if (editExtras) {
+                    Modifier.pointerInput(block.marks) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            val up = waitForUpOrCancellation(PointerEventPass.Initial) ?: return@awaitEachGesture
+                            // TAP_MOVE_PX: anything longer is a scroll.
+                            if ((up.position - down.position).getDistance() > 24.dp.toPx()) return@awaitEachGesture
+                            val at = layout?.charAt(down.position, block.text.length)
+                            val link = at?.let { i ->
+                                block.marks.firstOrNull { it.type == RichMarkType.LINK && !it.value.isNullOrBlank() && it.start <= i && it.end > i }
+                            }
+                            val code = at?.let { i ->
+                                block.marks.firstOrNull { it.type == RichMarkType.CODE && it.start <= i && it.end > i }
+                            }
+                            when {
+                                link != null -> {
+                                    up.consume()
+                                    armedCode = null
+                                    focusManager.clearFocus()
+                                    tappedLink = link
+                                }
+                                code != null && code != armedCode -> {
+                                    up.consume()
+                                    focusManager.clearFocus()
+                                    armedCode = code
+                                }
+                                else -> armedCode = null
+                            }
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            )
             .focusRequester(focusRequester)
             .onFocusChanged { focus -> if (focus.isFocused) onFocusGained(fieldValue.selection) }
             .drawBehind { layout?.let { drawRichDecorations(it, block, style, dark, surface) } }
@@ -1081,6 +1188,115 @@ private fun RichTextBlockField(
                 }
             },
     )
+}
+
+/** The character under [position], or null past the end of its line. */
+private fun TextLayoutResult.charAt(position: Offset, textLength: Int): Int? {
+    val offset = getOffsetForPosition(position)
+    return listOf(offset - 1, offset).firstOrNull { it in 0 until textLength && getBoundingBox(it).contains(position) }
+}
+
+/** Room around the tap popover for its shadow (see RichPopover). */
+private val LinkTapShadowRoom = 28.dp
+
+/**
+ * EditExtras' `.rt-link-popover`: tapping a link in the editor, with the
+ * read-mode preference off, shows "Open" and "Edit" 8px above the link and
+ * centred on it, under it when there is no room above, 8px inside the
+ * screen; a touch anywhere else closes it. [bounds] is the link, in the
+ * text's own coordinates.
+ */
+@Composable
+private fun LinkTapPopover(bounds: Rect, dark: Boolean, onOpen: () -> Unit, onEdit: () -> Unit, onDismiss: () -> Unit) {
+    val density = LocalDensity.current
+    val positionProvider = remember(bounds, density) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset {
+                val room = with(density) { LinkTapShadowRoom.roundToPx() }
+                val margin = with(density) { 8.dp.roundToPx() }
+                val width = popupContentSize.width - 2 * room
+                val height = popupContentSize.height - 2 * room
+                val above = anchorBounds.top + bounds.top.roundToInt() - height - margin
+                val top = if (above < margin) anchorBounds.top + bounds.bottom.roundToInt() + margin else above
+                val left = (anchorBounds.left + bounds.center.x.roundToInt() - width / 2)
+                    .coerceAtMost(windowSize.width - width - margin)
+                    .coerceAtLeast(margin)
+                return IntOffset(left - room, top - room)
+            }
+        }
+    }
+    Popup(
+        popupPositionProvider = positionProvider,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = false, dismissOnClickOutside = true),
+    ) {
+        val shape = RoundedCornerShape(10.dp)
+        val buttonShape = RoundedCornerShape(7.dp)
+        val textColor = if (dark) DarkTitleColor else LightTitleColor
+        Box(
+            Modifier
+                .pointerInput(Unit) {
+                    val room = LinkTapShadowRoom.toPx()
+                    detectTapGestures { tap ->
+                        val onCard = tap.x >= room && tap.y >= room && tap.x <= size.width - room && tap.y <= size.height - room
+                        if (!onCard) onDismiss()
+                    }
+                }
+                .padding(LinkTapShadowRoom),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .dropShadow(
+                        shape,
+                        Shadow(radius = 28.dp, color = Color.Black.copy(alpha = if (dark) 0.55f else 0.22f), offset = DpOffset(0.dp, 8.dp)),
+                    )
+                    .then(
+                        if (dark) {
+                            Modifier
+                        } else {
+                            Modifier.dropShadow(shape, Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.12f), offset = DpOffset(0.dp, 2.dp)))
+                        },
+                    )
+                    .clip(shape)
+                    .background(if (dark) Color(red = 30, green = 30, blue = 35).copy(alpha = 0.98f) else Color.White.copy(alpha = 0.98f))
+                    .border(1.dp, if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f), shape)
+                    .padding(7.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(buttonShape)
+                        .background(cssAngleGradient(135f, listOf(Color(0xFF6366F1), Color(0xFF7C3AED))))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onOpen() }
+                        .padding(horizontal = 12.8.dp, vertical = 6.4.dp),
+                ) {
+                    Text(stringResource(R.string.native_richtext_link_open), color = Color.White, fontSize = 13.12.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(buttonShape)
+                        .border(1.dp, if (dark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.12f), buttonShape)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onEdit() }
+                        .padding(horizontal = 12.8.dp, vertical = 6.4.dp),
+                ) {
+                    Text(stringResource(R.string.native_richtext_link_edit), color = textColor, fontSize = 13.12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
 }
 
 // ---------- Styles ----------

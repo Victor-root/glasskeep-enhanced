@@ -504,6 +504,7 @@
     <string name="native_richtext_link_apply">Apply</string>
     <string name="native_richtext_link_update">Update</string>
     <string name="native_richtext_link_open">Open</string>
+    <string name="native_richtext_link_edit">Edit</string>
     <string name="native_richtext_font_family">Font</string>
     <string name="native_richtext_font_size">Size</string>
     <string name="native_richtext_block_style_hint">%1$s : Customisable in settings.</string>

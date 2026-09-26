@@ -499,6 +499,7 @@
     <string name="native_richtext_link_apply">Appliquer</string>
     <string name="native_richtext_link_update">Mettre à jour</string>
     <string name="native_richtext_link_open">Ouvrir</string>
+    <string name="native_richtext_link_edit">Modifier</string>
     <string name="native_richtext_font_family">Police</string>
     <string name="native_richtext_font_size">Taille</string>
     <string name="native_richtext_block_style_hint">%1$s : Personnalisable dans paramètres.</string>
