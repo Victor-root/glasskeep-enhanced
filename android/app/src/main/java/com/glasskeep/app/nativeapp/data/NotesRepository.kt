@@ -404,60 +404,32 @@ class NotesRepository(
         }
     }
 
-    private suspend fun cachedSecondaryNotes(entities: List<NoteEntity>): List<NoteDto> =
-        entities.mapNotNull { entity -> cachedNote(entity.id) ?: entity.toOfflineDetail() }
-
-    /** Archived notes only. A successful request refreshes their complete
-     *  Room-backed view; transport and temporary server failures fall back
-     *  to that view so archive browsing and unarchive keep working offline. */
-    suspend fun fetchArchivedNotes(): List<NoteDto> {
-        NativeDebug.d("NotesRepository.fetchArchivedNotes")
-        try {
-            val response = api.getArchivedNotes()
-            val notes = response.body()
-            if (response.isSuccessful && notes != null) {
-                noteDao.replaceArchived(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() }, getProtectedNoteIds())
-                return notes
-            }
-            val code = response.code()
-            val error = "GET /api/notes/archived failed: HTTP $code ${response.errorBody()?.string()}"
-            if (code == 408 || code == 423 || code == 429 || code >= 500) {
-                val cached = cachedSecondaryNotes(noteDao.getArchived())
-                if (cached.isNotEmpty()) return cached
-            }
+    /** The archive's own list, the way refresh() reads the active one: the
+     *  archive view shows Room's copy, which stays on screen when this
+     *  fails, as the web keeps IndexedDB's (App.jsx:3055-3059). */
+    suspend fun refreshArchived() {
+        NativeDebug.d("NotesRepository.refreshArchived: fetching /api/notes/archived")
+        val response = api.getArchivedNotes()
+        val notes = response.body()
+        if (!response.isSuccessful || notes == null) {
+            val error = "GET /api/notes/archived failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
             throw IllegalStateException(error)
-        } catch (t: Throwable) {
-            if (t is IllegalStateException && t.message?.startsWith("GET /api/notes/archived failed:") == true) throw t
-            val cached = cachedSecondaryNotes(noteDao.getArchived())
-            if (cached.isNotEmpty()) return cached
-            throw t
         }
+        noteDao.replaceArchived(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() }, getProtectedNoteIds())
     }
 
-    /** Trashed notes use the same local-first secondary-view policy as
-     *  archived notes, including complete payloads for offline restore. */
-    suspend fun fetchTrashedNotes(): List<NoteDto> {
-        NativeDebug.d("NotesRepository.fetchTrashedNotes")
-        try {
-            val response = api.getTrashedNotes()
-            val notes = response.body()
-            if (response.isSuccessful && notes != null) {
-                noteDao.replaceTrashed(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() }, getProtectedNoteIds())
-                return notes
-            }
-            val code = response.code()
-            val error = "GET /api/notes/trashed failed: HTTP $code ${response.errorBody()?.string()}"
-            if (code == 408 || code == 423 || code == 429 || code >= 500) {
-                val cached = cachedSecondaryNotes(noteDao.getTrashed())
-                if (cached.isNotEmpty()) return cached
-            }
+    /** The trash's own list, on the same terms as [refreshArchived]. */
+    suspend fun refreshTrashed() {
+        NativeDebug.d("NotesRepository.refreshTrashed: fetching /api/notes/trashed")
+        val response = api.getTrashedNotes()
+        val notes = response.body()
+        if (!response.isSuccessful || notes == null) {
+            val error = "GET /api/notes/trashed failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
             throw IllegalStateException(error)
-        } catch (t: Throwable) {
-            if (t is IllegalStateException && t.message?.startsWith("GET /api/notes/trashed failed:") == true) throw t
-            val cached = cachedSecondaryNotes(noteDao.getTrashed())
-            if (cached.isNotEmpty()) return cached
-            throw t
         }
+        noteDao.replaceTrashed(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() }, getProtectedNoteIds())
     }
 
     /**
@@ -568,7 +540,7 @@ class NotesRepository(
     /** Restores a trashed note back to the active list. Also un-archives it
      *  if it had been archived before being trashed, that's the server's
      *  own restore semantics (see POST /:id/restore), not a native choice:
-     *  the trash screen only offers one action, so it must make the note
+     *  the trash view only offers one action, so it must make the note
      *  reappear wherever the user goes looking for it. No readOnly outcome
      *  here, same as setArchived(): restoring your own trashed note isn't
      *  a shared-content permission concern. Mirrors the restored note back
@@ -591,7 +563,7 @@ class NotesRepository(
         return SaveNoteResult.Saved(saved)
     }
 
-    /** Permanently deletes a note already in trash. The trash screen is the
+    /** Permanently deletes a note already in trash. The trash view is the
      *  only place this is offered from, so "note must be in trash" (the
      *  server's own guard on this route) is never a real concern here. Its
      *  detail-only cache entry is removed on success too. */
@@ -947,11 +919,9 @@ class NotesRepository(
         updateCachedNote(entity.id) { it.copy(reminderAt = reminderAtIso, reminderFiredAt = null, updatedAt = instant, clientUpdatedAt = instant) }
     }
 
-    /** See NoteDao.replaceAll's own doc comment; exposed (not just used
-     *  internally by refresh()) so a non-Room-backed screen with its own
-     *  in-memory list (SecondaryNotesScreen.kt) can guard its own refresh
-     *  the same way. */
-    suspend fun getProtectedNoteIds(): Set<String> = syncQueueDao.getProtectedNoteIds().toSet()
+    /** What the three list refreshes leave alone (see NoteDao.replaceAll's
+     *  own doc comment). */
+    private suspend fun getProtectedNoteIds(): Set<String> = syncQueueDao.getProtectedNoteIds().toSet()
 
     /** Every note with anything still pending, of any type: drives a
      *  list-level "still syncing" indicator (see SyncQueueDao.
@@ -1764,8 +1734,8 @@ class NotesRepository(
 // Full content/items are cached now too (not just the summary fields), so
 // the list's cards can show a real preview, like the web app's own
 // NoteCard.jsx, instead of just a title. Top-level and internal (not a
-// class member) so ArchivedNotesScreen can reuse it too, for the same
-// NoteCard rendering, without duplicating this mapping.
+// class member) so the note screen can hand its own copy to the queued
+// actions without duplicating this mapping.
 internal fun NoteDto.toEntity() = NoteEntity(
     id = id,
     type = type,

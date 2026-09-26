@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -456,6 +457,13 @@ fun NativeNavHost(
     val currentEntry by navController.currentBackStackEntryAsState()
     val route = currentEntry?.destination?.route ?: startDestination
     val signedIn = route !in SignedOutRoutes
+    // The notes screen's drawer view (the web's tagFilter, App.jsx:216),
+    // kept here because a note unarchived from the archive takes the list
+    // back to the notes (App.jsx:4855-4859). Each session starts on them.
+    var notesView by rememberSaveable(signedIn) { mutableStateOf<String?>(null) }
+    fun onNoteUnarchived() {
+        if (notesView == SidebarArchived) notesView = null
+    }
     // Every sign-in or launch replays the rows still pending as a burst of
     // pills, oldest first, without acknowledging them: that is left to
     // the bell (useShareNotifications.js:451-578).
@@ -660,10 +668,10 @@ fun NativeNavHost(
                         NativeNotesListScreen(
                             container = container,
                             serverUrl = serverUrl,
+                            activeTagFilter = notesView,
+                            onActiveTagFilterChange = { notesView = it },
                             onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
                             onOpenNewNote = { noteId -> navController.navigate("notes/$noteId?new=true") },
-                            onOpenArchived = { navController.navigate("archived") },
-                            onOpenTrash = { navController.navigate("trash") },
                             onOpenSettings = { navController.navigate("settings") },
                             onOpenAdmin = { navController.navigate("admin") },
                             onOpenQrScanner = { qrScannerOpen = true },
@@ -762,6 +770,7 @@ fun NativeNavHost(
                         noteId = noteId,
                         onBack = { navController.popBackStack() },
                         isNew = backStackEntry.arguments?.getBoolean("new") == true,
+                        onUnarchived = { onNoteUnarchived() },
                     )
                 }
                 composable("compare/{firstId}/{secondId}") { backStackEntry ->
@@ -776,23 +785,7 @@ fun NativeNavHost(
                             navController.popBackStack()
                             navController.navigate("notes/$survivor")
                         },
-                    )
-                }
-                composable("archived") {
-                    ArchivedNotesScreen(
-                        container = container,
-                        serverUrl = serverUrl,
-                        onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
-                        onOpenSideBySide = { first, second -> navController.navigate("compare/$first/$second") },
-                        onBack = { navController.popBackStack() },
-                    )
-                }
-                composable("trash") {
-                    TrashScreen(
-                        container = container,
-                        serverUrl = serverUrl,
-                        onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
-                        onBack = { navController.popBackStack() },
+                        onUnarchived = { onNoteUnarchived() },
                     )
                 }
                 }

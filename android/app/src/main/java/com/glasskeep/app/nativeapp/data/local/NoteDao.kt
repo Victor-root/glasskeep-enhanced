@@ -23,12 +23,6 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE trashed = 1 ORDER BY position DESC, updatedAt DESC")
     fun observeTrashed(): Flow<List<NoteEntity>>
 
-    @Query("SELECT * FROM notes WHERE archived = 1 AND trashed = 0 ORDER BY position DESC, updatedAt DESC")
-    suspend fun getArchived(): List<NoteEntity>
-
-    @Query("SELECT * FROM notes WHERE trashed = 1 ORDER BY position DESC, updatedAt DESC")
-    suspend fun getTrashed(): List<NoteEntity>
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(notes: List<NoteEntity>)
 

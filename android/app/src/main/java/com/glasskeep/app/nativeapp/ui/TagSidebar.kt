@@ -54,13 +54,17 @@ import com.glasskeep.app.R
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightTitleColor
 
-/** The two entries that are not folders but lenses over the notes
- *  already loaded: only those carrying an image, and only those carrying
- *  a reminder (ALL_IMAGES / REMINDERS, utils/constants.js). Sentinels
- *  rather than an enum so they share [activeTag] with the web's singular
- *  `tagFilter`; ordinary tags use [activeTags] for single or multi-filter. */
+/** The drawer's views other than the plain notes: two lenses over the
+ *  notes already loaded, only those carrying an image and only those
+ *  carrying a reminder, and the archive and the trash, each its own list
+ *  (ALL_IMAGES / REMINDERS, utils/constants.js, and "ARCHIVED" /
+ *  "TRASHED"). Sentinels rather than an enum so they share [activeTag]
+ *  with the web's singular `tagFilter`; ordinary tags use [activeTags] for
+ *  single or multi-filter. */
 internal const val SidebarAllImages = "__ALL_IMAGES__"
 internal const val SidebarReminders = "__REMINDERS__"
+internal const val SidebarArchived = "ARCHIVED"
+internal const val SidebarTrashed = "TRASHED"
 
 /**
  * Notes drawer, ported from TagSidebar.jsx's own non-permanent (mobile)
@@ -82,8 +86,8 @@ fun TagSidebar(
     onClearTagFilters: () -> Unit,
     onSelectImages: () -> Unit,
     onSelectReminders: () -> Unit,
-    onOpenArchived: () -> Unit,
-    onOpenTrash: () -> Unit,
+    onSelectArchived: () -> Unit,
+    onSelectTrash: () -> Unit,
     onClose: () -> Unit,
 ) {
     if (open) {
@@ -187,11 +191,11 @@ fun TagSidebar(
                 SidebarNavItem(
                     icon = { tint -> SidebarArchiveIcon(size = 20.dp, tint = tint) },
                     label = stringResource(R.string.native_sidebar_archived_notes),
-                    active = false,
+                    active = activeTag == SidebarArchived,
                     titleColor = titleColor,
                     activeGradient = activeGradient,
                     activeGlow = activeGlow,
-                    onClick = onOpenArchived,
+                    onClick = onSelectArchived,
                 )
                 Spacer(Modifier.height(8.dp))
                 SidebarNavItem(
@@ -207,11 +211,11 @@ fun TagSidebar(
                 SidebarNavItem(
                     icon = { tint -> SidebarTrashIcon(size = 20.dp, tint = tint) },
                     label = stringResource(R.string.native_trash_title),
-                    active = false,
+                    active = activeTag == SidebarTrashed,
                     titleColor = titleColor,
                     activeGradient = activeGradient,
                     activeGlow = activeGlow,
-                    onClick = onOpenTrash,
+                    onClick = onSelectTrash,
                 )
                 Spacer(Modifier.height(8.dp))
 

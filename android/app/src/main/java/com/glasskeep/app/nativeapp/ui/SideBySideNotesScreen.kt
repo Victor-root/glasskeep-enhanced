@@ -22,15 +22,16 @@ fun SideBySideNotesScreen(
     firstId: String,
     secondId: String,
     onKeepOnly: (String) -> Unit,
+    onUnarchived: () -> Unit,
 ) {
     val border = if (LocalGkDark.current) DarkBorderColor else LightBorderColor
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            NoteDetailScreen(container, serverUrl, firstId, onBack = { onKeepOnly(secondId) })
+            NoteDetailScreen(container, serverUrl, firstId, onBack = { onKeepOnly(secondId) }, onUnarchived = onUnarchived)
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(border))
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            NoteDetailScreen(container, serverUrl, secondId, onBack = { onKeepOnly(firstId) })
+            NoteDetailScreen(container, serverUrl, secondId, onBack = { onKeepOnly(firstId) }, onUnarchived = onUnarchived)
         }
     }
 }

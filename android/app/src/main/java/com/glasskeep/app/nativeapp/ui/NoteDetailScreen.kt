@@ -277,6 +277,9 @@ fun NoteDetailScreen(
     /** Just created: it opens the way the web's createAndOpenBlankNote
      *  opens it, out of read mode, and a drawing on its canvas. */
     isNew: Boolean = false,
+    /** Unarchived while open, which takes the list under it out of the
+     *  archive (App.jsx:4855-4859). */
+    onUnarchived: () -> Unit = {},
 ) {
     val dark = LocalGkDark.current
     val context = LocalContext.current
@@ -664,8 +667,13 @@ fun NoteDetailScreen(
                 repository.setArchivedQueued(live.toEntity(), archive)
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen toggleArchive queued id=${current.id}")
-                toasts.success(if (archive) archivedMessage else unarchivedMessage)
-                if (archive) onBack() else note = note?.copy(archived = false)
+                toasts.success(if (archive) archivedMessage else unarchivedMessage, if (archive) "archive" else "archive-off")
+                if (archive) {
+                    onBack()
+                } else {
+                    note = note?.copy(archived = false)
+                    onUnarchived()
+                }
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen toggleArchive failed", t)
                 toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))

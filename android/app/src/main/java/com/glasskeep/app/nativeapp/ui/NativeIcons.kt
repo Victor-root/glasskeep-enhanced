@@ -1163,6 +1163,13 @@ fun BulkLogoIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = 
     modifier, size, tint, strokeWidth = 2f,
 )
 
+/** MultiSelectToolbar.jsx's restore glyph: an arrow curling back. */
+@Composable
+fun RestoreIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 8v6h6 M3 14a9 9 0 1 0 3 -7",
+    modifier, size, tint, strokeWidth = 2.2f,
+)
+
 @Composable
 fun ShieldLockIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
     "M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3 " +

@@ -72,6 +72,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -213,17 +214,23 @@ private val CardBorderDark = Color(0xFF4B5563).copy(alpha = 0.3f)
  * two, depending on the view chosen from the header menu - and a header
  * carrying the app's own branding, same shape as NotesHeader.jsx /
  * NoteCard.jsx on the web side, including the administrator entry point.
+ * The archive and the trash are this same screen too, over their own
+ * lists, as they are on the web.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NativeNotesListScreen(
     container: NativeAppContainer,
     serverUrl: String,
+    /** The drawer's view (the web's `tagFilter`): null for the notes, or
+     *  one of TagSidebar's sentinels. Held above this screen, which a note
+     *  replaces, because a note unarchived from the archive switches it
+     *  back to the notes (App.jsx:4855-4859). */
+    activeTagFilter: String?,
+    onActiveTagFilterChange: (String?) -> Unit,
     onOpenNote: (String) -> Unit,
     /** A note just created here (see NoteDetailScreen's isNew). */
     onOpenNewNote: (String) -> Unit,
-    onOpenArchived: () -> Unit,
-    onOpenTrash: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAdmin: () -> Unit,
     onOpenQrScanner: () -> Unit,
@@ -257,6 +264,24 @@ fun NativeNotesListScreen(
     // it never mounts against that transient zero.
     val rawNotes by repository.observeNotes().collectAsState(initial = null)
     val notes = rawNotes ?: emptyList()
+    // The archive and the trash are each their own server list
+    // (App.jsx:3194-3205), which the page shows instead of the notes; the
+    // drawer's tag counts keep reading the notes. Keyed on the view, so
+    // opening one starts from "loading" as the web empties its list first
+    // (App.jsx:7525).
+    val secondaryView = secondaryViewOf(activeTagFilter)
+    val secondaryNotes: List<NoteEntity>? = key(secondaryView) {
+        val flow = remember(repository) {
+            when (secondaryView) {
+                SidebarArchived -> repository.observeArchivedNotes()
+                SidebarTrashed -> repository.observeTrashedNotes()
+                else -> null
+            }
+        }
+        flow?.collectAsState(initial = null)?.value
+    }
+    val rawShown = if (secondaryView != null) secondaryNotes else rawNotes
+    val shownNotes = rawShown ?: emptyList()
     // The whole queue, for the header's cloud icon and its panel: the set
     // above is per-note, this one is per queued action, which is the
     // number the web's own badge shows.
@@ -268,6 +293,8 @@ fun NativeNotesListScreen(
     )
     var syncSheetOpen by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
+    // Counts the list loads started (see loadView).
+    var loads by remember { mutableIntStateOf(0) }
     // Only a pull shows the spinner: the old app's SwipeRefreshLayout spun
     // for the reload its own gesture started, never for the app's loads.
     var pullRefreshing by remember { mutableStateOf(false) }
@@ -299,13 +326,15 @@ fun NativeNotesListScreen(
     var notificationsOpen by remember { mutableStateOf(false) }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    // The dock's red action, whose confirmation reads per view: to the
+    // trash, or for good from inside it.
     var showBulkTrashConfirm by remember { mutableStateOf(false) }
+    var showEmptyTrashConfirm by remember { mutableStateOf(false) }
     var showBulkColorPicker by remember { mutableStateOf(false) }
     var showBulkLogoPicker by remember { mutableStateOf(false) }
     var bulkLogos by remember { mutableStateOf<List<LogoDto>>(emptyList()) }
     var bulkActionRunning by remember { mutableStateOf(false) }
     var sidebarOpen by remember { mutableStateOf(false) }
-    var activeTagFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var activeTagFilters by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
     var aiAnswer by rememberSaveable { mutableStateOf<String?>(null) }
     var aiCitedNoteIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
@@ -361,7 +390,8 @@ fun NativeNotesListScreen(
 
     // Manual drag reorder (see NotesRepository.reorderQueued), on any view
     // but multi-select, like the web's canDrag = !multiMode: a filtered
-    // view still swaps inside the full pinned/others group below.
+    // view still swaps inside the full pinned/others group below, and the
+    // archive and the trash reorder their own list.
     // Unclipped window bounds per card (see ReorderableNoteCard), read by
     // the drag to find the card under the finger - not State, nothing
     // should recompose when they change.
@@ -396,43 +426,48 @@ fun NativeNotesListScreen(
             NativeDebug.d("NativeNotesListScreen reorder: no drop target for $id")
             return
         }
-        val draggedNote = notes.find { it.id == id }
-        val target = notes.find { it.id == targetId }
+        val draggedNote = shownNotes.find { it.id == id }
+        val target = shownNotes.find { it.id == targetId }
         if (draggedNote == null || target == null || target.pinned != draggedNote.pinned) {
             NativeDebug.d("NativeNotesListScreen reorder: $id dropped on $targetId outside its group")
             return
         }
-        val group = notes.filter { it.pinned == draggedNote.pinned }.toMutableList()
+        val group = shownNotes.filter { it.pinned == draggedNote.pinned }.toMutableList()
         val fromIndex = group.indexOfFirst { it.id == id }
         val toIndex = group.indexOfFirst { it.id == targetId }
         NativeDebug.d("NativeNotesListScreen reorder: swap $id <-> $targetId (pinned=${draggedNote.pinned})")
         group[fromIndex] = group[toIndex].also { group[toIndex] = group[fromIndex] }
-        val pinnedGroup = if (draggedNote.pinned) group else notes.filter { it.pinned }
-        val otherGroup = if (draggedNote.pinned) notes.filter { !it.pinned } else group
+        val pinnedGroup = if (draggedNote.pinned) group else shownNotes.filter { it.pinned }
+        val otherGroup = if (draggedNote.pinned) shownNotes.filter { !it.pinned } else group
         scope.launch { repository.reorderQueued(pinnedGroup, otherGroup) }
     }
 
     // Client-side parity with App.jsx: multi-tags are OR'ed, then search
     // matches title/body/tags/checklist rows/image display names.
-    val filteredNotes = remember(notes, searchQuery, activeTagFilter, activeTagFilters) {
-        // The drawer's two lenses are not folders: they narrow the list
-        // already loaded, and the notes they hide are still in the plain
-        // view (App.jsx:7063-7077).
+    val filteredNotes = remember(shownNotes, searchQuery, activeTagFilter, activeTagFilters) {
+        // The images and reminders lenses are not folders: they narrow the
+        // list already loaded, and the notes they hide are still in the
+        // plain view (App.jsx:7063-7077).
         val byTag = when (activeTagFilter) {
-            null -> notes
-            SidebarAllImages -> notes.filter { it.hasImages }
-            SidebarReminders -> notes.filter { !it.reminderAt.isNullOrBlank() }
-            else -> notes
+            SidebarAllImages -> shownNotes.filter { it.hasImages }
+            SidebarReminders -> shownNotes.filter { !it.reminderAt.isNullOrBlank() }
+            else -> shownNotes
         }
         byTag.filter { it.matchesAnyTag(activeTagFilters) && it.matchesSearchQuery(searchQuery) }
     }
 
     val errorCreateTemplate = stringResource(R.string.native_notes_create_error)
     val archivedSuccessTemplate = stringResource(R.string.native_bulk_archived_success)
+    val unarchivedSuccessTemplate = stringResource(R.string.native_bulk_unarchived_success)
     val trashedSuccessTemplate = stringResource(R.string.native_bulk_trashed_success)
+    val restoredSuccessTemplate = stringResource(R.string.native_bulk_restored_success)
+    val deletedSuccessTemplate = stringResource(R.string.native_bulk_deleted_success)
     val partialFailureTemplate = stringResource(R.string.native_bulk_partial_failure)
     val trashLabel = stringResource(R.string.native_note_detail_move_to_trash)
+    val deleteForeverLabel = stringResource(R.string.native_note_detail_delete_permanently)
+    val restoreLabel = stringResource(R.string.native_note_detail_restore)
     val archiveLabel = stringResource(R.string.native_note_detail_archive)
+    val unarchiveLabel = stringResource(R.string.native_note_detail_unarchive)
     val pinLabel = stringResource(R.string.native_bulk_pin)
     val colorLabel = stringResource(R.string.native_bulk_color)
     val logoLabel = stringResource(R.string.native_add_logo)
@@ -474,31 +509,75 @@ fun NativeNotesListScreen(
         notesScrollState.dispatchRawDelta(-with(density) { SelectionShim.toPx() })
     }
 
+    /** onBulkArchive (App.jsx:1909-1946): archiving from the notes, or
+     *  unarchiving from the archive, which then goes back to the notes. */
     fun bulkArchive() {
         if (bulkActionRunning || selectedIds.isEmpty()) return
         bulkActionRunning = true
+        val archive = secondaryView != SidebarArchived
         val ids = selectedIds
-        val entities = notes.associateBy { it.id }
+        val entities = shownNotes.associateBy { it.id }
         scope.launch {
             val outcome = runBulkAction(context, ids) { id ->
-                repository.setArchivedQueued(entities.getValue(id), true)
+                repository.setArchivedQueued(entities.getValue(id), archive)
             }
             bulkActionRunning = false
-            reportOutcome(archivedSuccessTemplate, outcome)
+            if (!archive) onActiveTagFilterChange(null)
             exitSelection()
+            if (archive) {
+                reportOutcome(archivedSuccessTemplate, outcome, "archive")
+            } else {
+                reportOutcome(unarchivedSuccessTemplate, outcome, "archive-off")
+            }
         }
     }
 
-    fun bulkTrash() {
+    /** onBulkDelete (App.jsx:1757-1812): to the trash, or for good from
+     *  inside it. */
+    fun bulkDelete() {
         showBulkTrashConfirm = false
         if (bulkActionRunning || selectedIds.isEmpty()) return
         bulkActionRunning = true
+        val forever = secondaryView == SidebarTrashed
         val ids = selectedIds
         scope.launch {
-            val outcome = runBulkAction(context, ids) { id -> repository.trashNoteQueued(id) }
+            val outcome = runBulkAction(context, ids) { id ->
+                if (forever) repository.deleteNotePermanentlyQueued(id) else repository.trashNoteQueued(id)
+            }
             bulkActionRunning = false
-            reportOutcome(trashedSuccessTemplate, outcome, "trash")
             exitSelection()
+            if (forever) {
+                reportOutcome(deletedSuccessTemplate, outcome, "trash-x")
+            } else {
+                reportOutcome(trashedSuccessTemplate, outcome, "trash")
+            }
+        }
+    }
+
+    fun bulkRestore() {
+        if (bulkActionRunning || selectedIds.isEmpty()) return
+        bulkActionRunning = true
+        val ids = selectedIds
+        val entities = shownNotes.associateBy { it.id }
+        scope.launch {
+            val outcome = runBulkAction(context, ids) { id -> repository.restoreNoteQueued(entities.getValue(id)) }
+            bulkActionRunning = false
+            exitSelection()
+            reportOutcome(restoredSuccessTemplate, outcome, "restore")
+        }
+    }
+
+    /** onEmptyTrash (App.jsx:1815-1836): the whole trash, notes a search
+     *  hides included. */
+    fun emptyTrash() {
+        showEmptyTrashConfirm = false
+        val ids = shownNotes.map { it.id }
+        if (bulkActionRunning || ids.isEmpty()) return
+        bulkActionRunning = true
+        scope.launch {
+            val outcome = runBulkAction(context, ids) { id -> repository.deleteNotePermanentlyQueued(id) }
+            bulkActionRunning = false
+            reportOutcome(deletedSuccessTemplate, outcome)
         }
     }
 
@@ -506,7 +585,7 @@ fun NativeNotesListScreen(
         if (bulkActionRunning || selectedIds.isEmpty()) return
         bulkActionRunning = true
         val ids = selectedIds
-        val entities = notes.associateBy { it.id }
+        val entities = shownNotes.associateBy { it.id }
         scope.launch {
             runBulkAction(context, ids) { id -> repository.setPinnedQueued(entities.getValue(id), true) }
             bulkActionRunning = false
@@ -561,7 +640,7 @@ fun NativeNotesListScreen(
 
     fun bulkExportZip() {
         if (bulkActionRunning || selectedIds.isEmpty()) return
-        val chosen = notes.filter { it.id in selectedIds }
+        val chosen = shownNotes.filter { it.id in selectedIds }
         bulkActionRunning = true
         scope.launch {
             val ok = withContext(Dispatchers.IO) { NoteExporter.exportNotesZip(context, chosen) }
@@ -589,9 +668,10 @@ fun NativeNotesListScreen(
         }
     }
 
-    /** handleAiSearch() (App.jsx:2826-2851): the whole active list is
-     *  sent as context and the server picks what is relevant, so the
-     *  question is answered against every note, not the filtered view. */
+    /** handleAiSearch() (App.jsx:2826-2851): the whole list on screen (the
+     *  notes, the archive or the trash) is sent as context and the server
+     *  picks what is relevant, so the question is answered against every
+     *  note of it, not the filtered view. */
     fun askAi(question: String) {
         val trimmed = question.trim()
         if (trimmed.length < 3 || aiLoading) return
@@ -599,7 +679,7 @@ fun NativeNotesListScreen(
         aiAnswer = null
         aiCitedNoteIds = emptyList()
         scope.launch {
-            val result = aiClient.ask(trimmed, notes, AppLanguage.currentTag())
+            val result = aiClient.ask(trimmed, shownNotes, AppLanguage.currentTag())
             if (result.error != null) {
                 NativeDebug.e("Notes askAi failed: ${result.error}")
                 aiAnswer = aiErrorMessage
@@ -657,8 +737,12 @@ fun NativeNotesListScreen(
         }
     }
 
-    fun refresh() {
-        if (refreshing) return
+    /** Reads [view]'s own list from the server (loadNotes,
+     *  loadArchivedNotes, loadTrashedNotes, App.jsx:2862-3168). Only the
+     *  latest load, the one for the view on screen, ends the loading state:
+     *  one still running for a view just left finishes quietly. */
+    fun loadView(view: String?) {
+        val load = ++loads
         refreshing = true
         // The queue drains alongside the pull, so the cloud icon reads
         // "syncing" for both halves at once, like the web's own
@@ -667,21 +751,33 @@ fun NativeNotesListScreen(
         SyncQueueWorker.triggerNow(context)
         scope.launch {
             try {
-                repository.refresh()
+                when (view) {
+                    SidebarArchived -> repository.refreshArchived()
+                    SidebarTrashed -> repository.refreshTrashed()
+                    else -> repository.refresh()
+                }
                 container.syncStatus.recordReachable()
             } catch (t: CancellationException) {
                 throw t
             } catch (t: Throwable) {
                 // Nothing on the list itself: the header's offline pill and
                 // cloud are how the web reports it.
-                NativeDebug.e("Notes refresh failed", t)
+                NativeDebug.e("Notes refresh failed (view $view)", t)
                 container.syncStatus.recordUnreachable(syncErrorKindOf(t))
             } finally {
-                refreshing = false
-                pullRefreshing = false
-                container.syncStatus.markSyncing(false)
+                if (load == loads) {
+                    refreshing = false
+                    pullRefreshing = false
+                    container.syncStatus.markSyncing(false)
+                }
             }
         }
+    }
+
+    /** A pull or "sync now": the view on screen again (reloadCurrentView,
+     *  App.jsx:3171-3185). */
+    fun refresh() {
+        if (!refreshing) loadView(activeTagFilter)
     }
 
     fun createNote(create: suspend () -> NoteDto) {
@@ -704,11 +800,12 @@ fun NativeNotesListScreen(
         }
     }
 
-    LaunchedEffect(serverUrl) {
+    // Each view reads its list as it opens (App.jsx:3190-3205).
+    LaunchedEffect(serverUrl, activeTagFilter) {
         if (BuildConfig.DEBUG) {
-            Log.d("GKScroll", "LaunchedEffect(serverUrl) firing refresh() - this restarts on every fresh composition, not just a real serverUrl change")
+            Log.d("GKScroll", "LaunchedEffect(serverUrl, activeTagFilter) loading view $activeTagFilter - this restarts on every fresh composition, not just a real change")
         }
-        refresh()
+        loadView(activeTagFilter)
     }
 
     // The launcher shortcut, once: consumed straight away so coming back
@@ -774,6 +871,20 @@ fun NativeNotesListScreen(
         searchQuery = ""
     }
 
+    /** A drawer entry's view. The archive and the trash open at the top,
+     *  the web emptying the page before filling it (App.jsx:7525), and a
+     *  selection made over another list does not follow: the web keeps it,
+     *  and would act on notes no longer on screen. */
+    fun openView(view: String?) {
+        val list = secondaryViewOf(view)
+        if (list != secondaryView) {
+            selectedIds = emptySet()
+            if (list != null) notesScrollState.dispatchRawDelta(-notesScrollState.value.toFloat())
+        }
+        activeTagFilters = emptySet()
+        onActiveTagFilterChange(view)
+    }
+
     // The web closes the topmost overlay first, in App.jsx's own popstate
     // order; the header menu and the dialogs are windows of their own and
     // take back before this. Nothing open leaves back to the system.
@@ -828,12 +939,13 @@ fun NativeNotesListScreen(
             // The page scrolls like the web's document, from under the status
             // bar: the locked banner, the header's own slot (the header
             // itself floats above), the assistant's answer, then the notes.
-            // It stays unscrollable until Room answers (see rawNotes).
+            // It stays unscrollable until Room answers (see rawNotes), for
+            // the archive and the trash as for the notes.
             Column(
                 Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.statusBars)
-                    .then(if (rawNotes != null) Modifier.verticalScroll(notesScrollState) else Modifier),
+                    .then(if (rawShown != null) Modifier.verticalScroll(notesScrollState) else Modifier),
             ) {
                 if (showLockedBanner) {
                     LockedBanner(
@@ -853,7 +965,7 @@ fun NativeNotesListScreen(
                         loading = aiLoading,
                         dark = dark,
                         titleColor = titleColor,
-                        citedNotes = notes.filter { it.id in aiCitedNoteIds },
+                        citedNotes = shownNotes.filter { it.id in aiCitedNoteIds },
                         typography = container.editorPrefs.typography.activeProfile,
                         taskStrike = container.editorPrefs.taskStrike,
                         themeId = themeId,
@@ -874,11 +986,18 @@ fun NativeNotesListScreen(
                 // main.px-4.pb-12, over the body's own bottom inset.
                 Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 48.dp + navBarBottom)) {
                     when {
-                        rawNotes == null || (refreshing && notes.isEmpty()) ->
+                        rawShown == null || (refreshing && shownNotes.isEmpty()) ->
                             EmptyListText(stringResource(R.string.native_notes_loading), subtextColor, Modifier.padding(top = emptyTop))
-                        notes.isEmpty() -> Column(Modifier.padding(top = emptyTop, start = 16.dp, end = 16.dp)) {
+                        shownNotes.isEmpty() -> Column(Modifier.padding(top = emptyTop, start = 16.dp, end = 16.dp)) {
                             EmptyListText(
-                                stringResource(if (reminderLens) R.string.native_notes_no_reminders else R.string.native_notes_empty),
+                                stringResource(
+                                    when (activeTagFilter) {
+                                        SidebarTrashed -> R.string.native_trash_empty
+                                        SidebarArchived -> R.string.native_notes_search_empty
+                                        SidebarReminders -> R.string.native_notes_no_reminders
+                                        else -> R.string.native_notes_empty
+                                    },
+                                ),
                                 subtextColor,
                             )
                             if (syncState == SyncState.OFFLINE) {
@@ -898,6 +1017,16 @@ fun NativeNotesListScreen(
                             Modifier.padding(top = emptyTop),
                         )
                         else -> {
+                            if (secondaryView == SidebarTrashed && !selectionMode) {
+                                // NotesSections.jsx:37-46: flex justify-end mb-4.
+                                Box(Modifier.fillMaxWidth().padding(bottom = 16.dp), contentAlignment = Alignment.CenterEnd) {
+                                    GkSolidButton(
+                                        label = stringResource(R.string.native_trash_empty_action),
+                                        fontWeight = FontWeight.Medium,
+                                        onClick = { showEmptyTrashConfirm = true },
+                                    )
+                                }
+                            }
                             val pinnedNotes = remember(filteredNotes) { filteredNotes.filter { it.pinned } }
                             val otherNotes = remember(filteredNotes) { filteredNotes.filter { !it.pinned } }
                             val renderNoteCard: @Composable (NoteEntity) -> Unit = { note ->
@@ -953,19 +1082,22 @@ fun NativeNotesListScreen(
             }
         }
 
-        if (!selectionMode) CreateNoteScrim(open = fabOpen)
+        if (!selectionMode && secondaryView == null) CreateNoteScrim(open = fabOpen)
 
         if (selectionMode) {
             val visibleIds = filteredNotes.mapTo(linkedSetOf()) { it.id }
             val allVisibleSelected = visibleIds.isNotEmpty() && visibleIds.all { it in selectedIds }
-            SelectionActionBar(
-                selectedCount = selectedIds.size,
-                actions = listOf(
+            val inTrash = secondaryView == SidebarTrashed
+            val canAct = !bulkActionRunning && selectedIds.isNotEmpty()
+            // MultiSelectToolbar.jsx:267-352, in its order for each view.
+            val actions = buildList {
+                // Always there, and never usable in the trash.
+                add(
                     BulkActionButton(
                         label = sideBySideLabel,
                         tone = BulkTone.SLATE,
-                        icon = { SideBySideIcon(size = 16.dp, tint = Color.White) },
-                        enabled = !bulkActionRunning && selectedIds.size == 2,
+                        icon = { tint -> SideBySideIcon(size = 16.dp, tint = tint) },
+                        enabled = !bulkActionRunning && selectedIds.size == 2 && !inTrash,
                         dimWhenDisabled = true,
                         gradient = if (WorkspaceTheme.forId(themeId).id == WorkspaceTheme.DEFAULT_ID) {
                             Brush.horizontalGradient(listOf(Color(0xFF4F39F6), Color(0xFF7008E7)))
@@ -977,100 +1109,127 @@ fun NativeNotesListScreen(
                             if (ids.size == 2) onOpenSideBySide(ids[0], ids[1])
                         },
                     ),
+                )
+                add(
                     BulkActionButton(
-                        label = trashLabel,
+                        label = if (inTrash) deleteForeverLabel else trashLabel,
                         tone = BulkTone.RED,
-                        icon = { TrashIcon(size = 20.dp, tint = BulkTone.RED.foreground(dark)) },
-                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                        icon = { tint -> TrashIcon(size = 20.dp, tint = tint) },
+                        enabled = canAct,
                         onClick = { showBulkTrashConfirm = true },
                     ),
-                    BulkActionButton(
-                        label = colorLabel,
-                        tone = BulkTone.VIOLET,
-                        icon = { Text("\uD83C\uDFA8", fontSize = 16.sp, lineHeight = 16.sp) },
-                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
-                        anchored = {
-                            if (showBulkColorPicker) {
-                                NoteColorPopover(
-                                    currentColorKey = null,
-                                    dark = dark,
-                                    enabled = !bulkActionRunning,
-                                    onSelect = { colorKey -> bulkColor(colorKey) },
-                                    onDismiss = { showBulkColorPicker = false },
-                                    below = true,
-                                )
-                            }
-                        },
-                        onClick = { showBulkColorPicker = true },
-                    ),
-                    BulkActionButton(
-                        label = logoLabel,
-                        tone = BulkTone.CYAN,
-                        icon = { BulkLogoIcon(size = 16.dp, tint = BulkTone.CYAN.foreground(dark)) },
-                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
-                        anchored = {
-                            if (showBulkLogoPicker) {
-                                LogoPickerPopover(
-                                    logos = bulkLogos,
-                                    dark = dark,
-                                    onPick = { logo -> bulkSetIcon(NoteIconDto(id = logo.id, src = logo.src, name = logo.name)) },
-                                    onUploadNew = {
-                                        showBulkLogoPicker = false
-                                        bulkLogoPickerLauncher.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                                        )
-                                    },
-                                    onDelete = { logo ->
-                                        scope.launch {
-                                            if (repository.deleteLogo(logo.id)) bulkLogos = bulkLogos.filterNot { it.id == logo.id }
-                                        }
-                                    },
-                                    onDismiss = { showBulkLogoPicker = false },
-                                    selectedSrc = null,
-                                    below = true,
-                                )
-                            }
-                        },
-                        onClick = { openBulkLogoPicker() },
-                    ),
-                    BulkActionButton(
-                        label = pinLabel,
-                        tone = BulkTone.AMBER,
-                        icon = { PinIcon(size = 16.dp, tint = BulkTone.AMBER.foreground(dark), filled = false) },
-                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
-                        onClick = { bulkPin() },
-                    ),
-                    BulkActionButton(
-                        label = archiveLabel,
-                        tone = BulkTone.BLUE,
-                        icon = { ArchiveIcon(size = 16.dp, tint = if (dark) Color(0xFF7DD3FC) else Color(0xFF0284C7)) },
-                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
-                        menuColor = if (dark) Color(0xFF7DD3FC) else Color(0xFF0284C7),
-                        onClick = { bulkArchive() },
-                    ),
+                )
+                if (inTrash) {
+                    add(
+                        BulkActionButton(
+                            label = restoreLabel,
+                            tone = BulkTone.GREEN,
+                            icon = { tint -> RestoreIcon(size = 16.dp, tint = tint) },
+                            enabled = canAct,
+                            // Its menu tone is emerald, not green.
+                            menuColor = if (dark) Color(0xFF34D399) else Color(0xFF059669),
+                            onClick = { bulkRestore() },
+                        ),
+                    )
+                } else {
+                    add(
+                        BulkActionButton(
+                            label = colorLabel,
+                            tone = BulkTone.VIOLET,
+                            icon = { Text("\uD83C\uDFA8", fontSize = 16.sp, lineHeight = 16.sp) },
+                            enabled = canAct,
+                            anchored = {
+                                if (showBulkColorPicker) {
+                                    NoteColorPopover(
+                                        currentColorKey = null,
+                                        dark = dark,
+                                        enabled = !bulkActionRunning,
+                                        onSelect = { colorKey -> bulkColor(colorKey) },
+                                        onDismiss = { showBulkColorPicker = false },
+                                        below = true,
+                                    )
+                                }
+                            },
+                            onClick = { showBulkColorPicker = true },
+                        ),
+                    )
+                    add(
+                        BulkActionButton(
+                            label = logoLabel,
+                            tone = BulkTone.CYAN,
+                            icon = { tint -> BulkLogoIcon(size = 16.dp, tint = tint) },
+                            enabled = canAct,
+                            anchored = {
+                                if (showBulkLogoPicker) {
+                                    LogoPickerPopover(
+                                        logos = bulkLogos,
+                                        dark = dark,
+                                        onPick = { logo -> bulkSetIcon(NoteIconDto(id = logo.id, src = logo.src, name = logo.name)) },
+                                        onUploadNew = {
+                                            showBulkLogoPicker = false
+                                            bulkLogoPickerLauncher.launch(
+                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                            )
+                                        },
+                                        onDelete = { logo ->
+                                            scope.launch {
+                                                if (repository.deleteLogo(logo.id)) bulkLogos = bulkLogos.filterNot { it.id == logo.id }
+                                            }
+                                        },
+                                        onDismiss = { showBulkLogoPicker = false },
+                                        selectedSrc = null,
+                                        below = true,
+                                    )
+                                }
+                            },
+                            onClick = { openBulkLogoPicker() },
+                        ),
+                    )
+                    if (secondaryView == null) {
+                        add(
+                            BulkActionButton(
+                                label = pinLabel,
+                                tone = BulkTone.AMBER,
+                                icon = { tint -> PinIcon(size = 16.dp, tint = tint, filled = false) },
+                                enabled = canAct,
+                                onClick = { bulkPin() },
+                            ),
+                        )
+                    }
+                    add(
+                        BulkActionButton(
+                            label = if (secondaryView == SidebarArchived) unarchiveLabel else archiveLabel,
+                            tone = BulkTone.BLUE,
+                            icon = { tint -> ArchiveIcon(size = 16.dp, tint = tint) },
+                            enabled = canAct,
+                            onClick = { bulkArchive() },
+                        ),
+                    )
+                }
+                add(
                     BulkActionButton(
                         label = exportZipLabel,
                         tone = BulkTone.GREEN,
-                        icon = { DownloadIcon(size = 20.dp, tint = if (dark) Color(0xFF4ADE80) else Color(0xFF16A34A)) },
-                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
-                        menuColor = if (dark) Color(0xFF4ADE80) else Color(0xFF16A34A),
+                        icon = { tint -> DownloadIcon(size = 20.dp, tint = tint) },
+                        enabled = canAct,
                         onClick = { bulkExportZip() },
                     ),
-                    BulkActionButton(
-                        label = if (allVisibleSelected) deselectAllLabel else selectAllLabel,
-                        tone = BulkTone.SLATE,
-                        icon = {
-                            SelectAllIcon(
-                                checked = allVisibleSelected,
-                                size = 16.dp,
-                                tint = if (dark) Color(0xFFCBD5E1) else Color(0xFF475569),
-                            )
-                        },
-                        enabled = !bulkActionRunning && visibleIds.isNotEmpty(),
-                        menuColor = if (dark) Color(0xFFCBD5E1) else Color(0xFF475569),
-                        onClick = { toggleSelectAllVisible() },
-                    ),
-                ),
+                )
+                if (visibleIds.isNotEmpty()) {
+                    add(
+                        BulkActionButton(
+                            label = if (allVisibleSelected) deselectAllLabel else selectAllLabel,
+                            tone = BulkTone.SLATE,
+                            icon = { tint -> SelectAllIcon(checked = allVisibleSelected, size = 16.dp, tint = tint) },
+                            enabled = !bulkActionRunning,
+                            onClick = { toggleSelectAllVisible() },
+                        ),
+                    )
+                }
+            }
+            SelectionActionBar(
+                selectedCount = selectedIds.size,
+                actions = actions,
                 onClose = { exitSelection() },
                 dark = dark,
                 modifier = Modifier.align(Alignment.TopCenter),
@@ -1095,10 +1254,12 @@ fun NativeNotesListScreen(
                     else -> when (activeTagFilter) {
                         SidebarAllImages -> stringResource(R.string.native_sidebar_all_images)
                         SidebarReminders -> stringResource(R.string.native_sidebar_reminders)
+                        SidebarArchived -> stringResource(R.string.native_sidebar_archived_notes)
+                        SidebarTrashed -> stringResource(R.string.native_trash_title)
                         else -> activeTagFilter
                     }
                 },
-                activeLens = activeTagFilter?.takeIf { it == SidebarAllImages || it == SidebarReminders },
+                activeView = activeTagFilter,
                 appName = container.branding.appName ?: stringResource(R.string.native_default_app_name),
                 brandingLogo = container.branding.logo,
                 syncState = syncState,
@@ -1169,7 +1330,8 @@ fun NativeNotesListScreen(
             )
         }
 
-        if (!selectionMode) {
+        // No creating from the archive or the trash (NotesComposer.jsx:165).
+        if (!selectionMode && secondaryView == null) {
             CreateNoteFab(
                 dark = dark,
                 open = fabOpen,
@@ -1205,44 +1367,67 @@ fun NativeNotesListScreen(
             tags = tagCounts,
             activeTag = activeTagFilter,
             activeTags = activeTagFilters,
-            onSelectNotes = { activeTagFilter = null; activeTagFilters = emptySet(); sidebarOpen = false },
+            onSelectNotes = { openView(null); sidebarOpen = false },
             onSelectTag = { tag, additive ->
-                activeTagFilter = null
-                activeTagFilters = if (additive) {
+                val tags = if (additive) {
                     val current = activeTagFilters.firstOrNull { it.equals(tag, ignoreCase = true) }
                     if (current != null) activeTagFilters - current else activeTagFilters + tag
                 } else {
                     if (activeTagFilters.size == 1 && activeTagFilters.first().equals(tag, ignoreCase = true)) emptySet()
                     else setOf(tag)
                 }
+                openView(null)
+                activeTagFilters = tags
                 if (!additive) sidebarOpen = false
             },
             onClearTagFilters = { activeTagFilters = emptySet() },
-            onSelectImages = { activeTagFilter = SidebarAllImages; activeTagFilters = emptySet(); sidebarOpen = false },
-            onSelectReminders = { activeTagFilter = SidebarReminders; activeTagFilters = emptySet(); sidebarOpen = false },
-            onOpenArchived = { sidebarOpen = false; onOpenArchived() },
-            onOpenTrash = { sidebarOpen = false; onOpenTrash() },
+            onSelectImages = { openView(SidebarAllImages); sidebarOpen = false },
+            onSelectReminders = { openView(SidebarReminders); sidebarOpen = false },
+            onSelectArchived = { openView(SidebarArchived); sidebarOpen = false },
+            onSelectTrash = { openView(SidebarTrashed); sidebarOpen = false },
             onClose = { sidebarOpen = false },
         )
 
+        val dialogBorder = if (dark) DarkBorderColor else LightBorderColor
+        val dialogText = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565)
         if (showBulkTrashConfirm) {
+            val forever = secondaryView == SidebarTrashed
             GkConfirmDialog(
-                title = trashLabel,
-                message = stringResource(R.string.native_bulk_trash_confirm_message, selectedIds.size),
-                confirmLabel = trashLabel,
+                title = if (forever) deleteForeverLabel else trashLabel,
+                message = if (forever) {
+                    stringResource(R.string.native_note_detail_permanent_delete_confirm_body)
+                } else {
+                    stringResource(R.string.native_bulk_trash_confirm_message, selectedIds.size)
+                },
+                confirmLabel = if (forever) deleteForeverLabel else trashLabel,
                 cancelLabel = stringResource(R.string.native_dialog_cancel),
                 themeId = themeId,
                 dark = dark,
-                borderColor = if (dark) DarkBorderColor else LightBorderColor,
+                borderColor = dialogBorder,
                 titleColor = titleColor,
-                subtextColor = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565),
+                subtextColor = dialogText,
                 variant = GkConfirmVariant.DANGER,
-                onConfirm = { bulkTrash() },
+                onConfirm = { bulkDelete() },
                 onDismiss = { showBulkTrashConfirm = false },
             )
         }
-
-
+        if (showEmptyTrashConfirm) {
+            val emptyTrashLabel = stringResource(R.string.native_trash_empty_action)
+            GkConfirmDialog(
+                title = emptyTrashLabel,
+                message = stringResource(R.string.native_trash_empty_confirm),
+                confirmLabel = emptyTrashLabel,
+                cancelLabel = stringResource(R.string.native_dialog_cancel),
+                themeId = themeId,
+                dark = dark,
+                borderColor = dialogBorder,
+                titleColor = titleColor,
+                subtextColor = dialogText,
+                variant = GkConfirmVariant.DANGER,
+                onConfirm = { emptyTrash() },
+                onDismiss = { showEmptyTrashConfirm = false },
+            )
+        }
 
         // The notification centre is a sheet over this screen, not a screen
         // of its own: that is where the web puts it too (it hangs off the
@@ -1267,6 +1452,10 @@ fun NativeNotesListScreen(
         )
     }
 }
+
+/** The drawer view's own list, for the two that have one: the archive and
+ *  the trash. */
+private fun secondaryViewOf(view: String?): String? = view.takeIf { it == SidebarArchived || it == SidebarTrashed }
 
 // Before the first measure: py-4 around the 44px title block, plus the rule.
 private val DefaultHeaderHeight = 77.dp
@@ -1300,9 +1489,8 @@ private fun NativeHeader(
     themeId: String,
     titleColor: Color,
     activeTagLabel: String?,
-    /** Which of the drawer's two lenses is on, if either: the header row
-     *  shows their own glyph rather than the tag one. */
-    activeLens: String?,
+    /** The drawer's view, whose own glyph the section line shows. */
+    activeView: String?,
     /** The instance's own name and logo, or null for the bundled ones. */
     appName: String,
     brandingLogo: String?,
@@ -1404,11 +1592,14 @@ private fun NativeHeader(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val accentColor = chrome.accent
+                        // NotesUI.jsx:211-218's order.
                         when {
-                            activeTagLabel == null -> NotesIcon(size = 12.dp, tint = accentColor)
-                            activeLens == SidebarAllImages -> SidebarImagesIcon(size = 12.dp, tint = accentColor)
-                            activeLens == SidebarReminders -> SidebarRemindersIcon(size = 12.dp, tint = accentColor)
-                            else -> TagIcon(size = 12.dp, tint = accentColor)
+                            activeView == SidebarAllImages -> SidebarImagesIcon(size = 12.dp, tint = accentColor)
+                            activeView == SidebarArchived -> SidebarArchiveIcon(size = 12.dp, tint = accentColor)
+                            activeView == SidebarTrashed -> SidebarTrashIcon(size = 12.dp, tint = accentColor)
+                            activeView == SidebarReminders -> SidebarRemindersIcon(size = 12.dp, tint = accentColor)
+                            activeTagLabel != null -> TagIcon(size = 12.dp, tint = accentColor)
+                            else -> NotesIcon(size = 12.dp, tint = accentColor)
                         }
                         Spacer(Modifier.width(4.dp))
                         Text(
@@ -2188,11 +2379,10 @@ private val DropOutlineWidth = 2.5.dp
 private val DropOutlineOffset = 4.dp
 private val DropOutlineColor = Color(0xFF6366F1)
 
-/** Wraps NoteCard with the touch reordering of the notes list, leaving
- *  NoteCard itself untouched: ArchivedNotesScreen.kt/SecondaryNotesScreen.kt
- *  render plain NoteCards with no reorder concept (see NoteEntity.position's
- *  own doc comment - those screens aren't Room-backed or position-aware),
- *  so the gesture plumbing has no business being on NoteCard itself.
+/** Wraps NoteCard with the touch reordering of the lists, leaving
+ *  NoteCard itself untouched: the assistant's cited notes are plain
+ *  NoteCards with no reorder concept, so the gesture plumbing has no
+ *  business being on NoteCard itself.
  *
  *  Like the web, the held card stays in place, dimmed to 35% and 97%, and
  *  the card under the finger gets the dashed drop outline. The bounds
@@ -2358,11 +2548,8 @@ private suspend fun AwaitPointerEventScope.consumeUntilUp(pointerId: PointerId) 
     }
 }
 
-// internal, not private: ArchivedNotesScreen.kt (same package, different
-// file) reuses this for the exact same card rendering. Kotlin's top-level
-// `private` is file-scoped.
 @Composable
-internal fun NoteCard(
+private fun NoteCard(
     note: NoteEntity,
     dark: Boolean,
     titleColor: Color,

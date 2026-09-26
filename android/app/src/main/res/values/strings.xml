@@ -76,7 +76,6 @@
     <string name="native_header_offline">Offline</string>
     <string name="native_sidebar_notes_all">Notes (All)</string>
     <string name="native_sidebar_archived_notes">Archived Notes</string>
-    <string name="native_notes_refresh">Refresh</string>
     <string name="native_notes_empty">No notes yet. Add one to get started!</string>
     <string name="native_notes_loading">Loading Notes…</string>
     <string name="native_notes_offline_view_not_loaded">Server is unreachable, this view could not be loaded. It will update automatically when the connection is restored.</string>
@@ -169,12 +168,10 @@
     <string name="native_sidebar_clear_tags">Clear</string>
     <string name="native_header_menu">Menu</string>
 
-    <string name="native_archived_title">Archived</string>
-    <string name="native_archived_empty">No archived notes.</string>
-    <string name="native_archived_error">Couldn\'t load archived notes: %1$s</string>
     <string name="native_trash_title">Trash</string>
     <string name="native_trash_empty">Trash is empty.</string>
-    <string name="native_trash_error">Couldn\'t load trash: %1$s</string>
+    <string name="native_trash_empty_action">Empty Trash</string>
+    <string name="native_trash_empty_confirm">Permanently delete all notes in trash? This cannot be undone.</string>
 
     <string name="native_settings_title">Settings</string>
     <string name="native_settings_action_error">Couldn\'t save: %1$s</string>

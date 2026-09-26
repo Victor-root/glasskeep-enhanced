@@ -25,10 +25,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,19 +56,15 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 
-/** One bulk-selection run over several note ids: which ones succeeded and
+/** One bulk-selection run over several note ids: how many succeeded and
  *  how many failed. Every action() call now enqueues onto the offline
  *  sync queue (see SyncQueueWorker.kt) rather than waiting on the server,
  *  so "succeeded" means enqueued, not server-confirmed, same as a single
  *  note's own queued actions (NoteDetailScreen.kt never waits on a server
  *  verdict either). "Failed" is a genuine local error (e.g. a Room write
  *  that threw), not a stale/read-only rejection: those aren't visible
- *  synchronously anymore. succeededIds lets a caller that isn't Room-backed
- *  (SecondaryNotesScreen.kt) patch its own local list precisely instead of
- *  guessing which ones actually went through. */
-data class BulkOutcome(val succeededIds: List<String>, val failed: Int) {
-    val succeeded: Int get() = succeededIds.size
-}
+ *  synchronously anymore. */
+data class BulkOutcome(val succeeded: Int, val failed: Int)
 
 /** Sequential, one enqueue at a time: there is no batch endpoint on the
  *  server, but unlike before this only ever costs a local Room write per
@@ -80,19 +74,19 @@ data class BulkOutcome(val succeededIds: List<String>, val failed: Int) {
  *  ExistingWorkPolicy.KEEP) rather than requiring every call site to
  *  remember it, the way NoteDetailScreen.kt's single-note actions do. */
 suspend fun runBulkAction(context: Context, ids: Collection<String>, action: suspend (String) -> Unit): BulkOutcome {
-    val succeededIds = mutableListOf<String>()
+    var succeeded = 0
     var failed = 0
     for (id in ids) {
         try {
             action(id)
-            succeededIds.add(id)
+            succeeded++
         } catch (t: Throwable) {
             NativeDebug.e("Bulk action failed for note $id", t)
             failed++
         }
     }
-    if (succeededIds.isNotEmpty()) SyncQueueWorker.triggerNow(context)
-    return BulkOutcome(succeededIds, failed)
+    if (succeeded > 0) SyncQueueWorker.triggerNow(context)
+    return BulkOutcome(succeeded, failed)
 }
 
 /** The always-visible checkbox NoteCard overlays in its top-end corner
@@ -125,7 +119,8 @@ internal fun SelectionCheckbox(selected: Boolean, dark: Boolean, onToggle: () ->
 
 /** The seven tints MultiSelectToolbar.jsx gives its buttons (:36-51), as
  *  the Tailwind v4 palette renders them: border, fill and glyph colour
- *  per tone, in light and dark. */
+ *  per tone, in light and dark, then the text colour the same tone takes
+ *  once folded into the overflow menu (its MENU_COLOR, :20-30). */
 enum class BulkTone(
     private val lightBorder: Color,
     private val lightBg: Color,
@@ -133,36 +128,63 @@ enum class BulkTone(
     private val darkBorder: Color,
     private val darkBg: Color,
     private val darkFg: Color,
+    private val lightMenu: Color,
+    private val darkMenu: Color,
 ) {
-    SLATE(Color(0xB3CAD5E2), Color(0xFFF1F5F9), Color(0xFF314158), Color(0x6662748E), Color(0xCC314158), Color(0xFFF1F5F9)),
-    VIOLET(Color(0xCCC4B4FF), Color(0xFFEDE9FE), Color(0xFF5D0EC0), Color(0x66A884FF), Color(0xA65E0EC0), Color(0xFFEDE9FE)),
-    AMBER(Color(0xCCFFD22F), Color(0xFFFEF3C6), Color(0xFF973C00), Color(0x66FFB900), Color(0x8C973C00), Color(0xFFFEF3C6)),
-    BLUE(Color(0xCC73D4FF), Color(0xFFDFF2FE), Color(0xFF00598A), Color(0x6600BCFF), Color(0x9900598A), Color(0xFFDFF2FE)),
-    RED(Color(0xCCFFA1AE), Color(0xFFFFE4E6), Color(0xFFC70036), Color(0x73FF647E), Color(0x8C8A0737), Color(0xFFFFE4E6)),
-    GREEN(Color(0xCC5EE8B5), Color(0xFFD0FAE5), Color(0xFF006045), Color(0x6600D492), Color(0x8C006045), Color(0xFFD0FAE5)),
-    CYAN(Color(0xCC52EAFC), Color(0xFFCEFAFE), Color(0xFF005F78), Color(0x6600D2F2), Color(0x8C005F78), Color(0xFFCEFAFE)),
+    SLATE(
+        Color(0xB3CAD5E2), Color(0xFFF1F5F9), Color(0xFF314158), Color(0x6662748E), Color(0xCC314158), Color(0xFFF1F5F9),
+        Color(0xFF475569), Color(0xFFCBD5E1),
+    ),
+    VIOLET(
+        Color(0xCCC4B4FF), Color(0xFFEDE9FE), Color(0xFF5D0EC0), Color(0x66A884FF), Color(0xA65E0EC0), Color(0xFFEDE9FE),
+        Color(0xFF7C3AED), Color(0xFFC4B5FD),
+    ),
+    AMBER(
+        Color(0xCCFFD22F), Color(0xFFFEF3C6), Color(0xFF973C00), Color(0x66FFB900), Color(0x8C973C00), Color(0xFFFEF3C6),
+        Color(0xFFD97706), Color(0xFFFBBF24),
+    ),
+    BLUE(
+        Color(0xCC73D4FF), Color(0xFFDFF2FE), Color(0xFF00598A), Color(0x6600BCFF), Color(0x9900598A), Color(0xFFDFF2FE),
+        Color(0xFF0284C7), Color(0xFF7DD3FC),
+    ),
+    RED(
+        Color(0xCCFFA1AE), Color(0xFFFFE4E6), Color(0xFFC70036), Color(0x73FF647E), Color(0x8C8A0737), Color(0xFFFFE4E6),
+        Color(0xFFDC2626), Color(0xFFF87171),
+    ),
+    GREEN(
+        Color(0xCC5EE8B5), Color(0xFFD0FAE5), Color(0xFF006045), Color(0x6600D492), Color(0x8C006045), Color(0xFFD0FAE5),
+        Color(0xFF16A34A), Color(0xFF4ADE80),
+    ),
+    CYAN(
+        Color(0xCC52EAFC), Color(0xFFCEFAFE), Color(0xFF005F78), Color(0x6600D2F2), Color(0x8C005F78), Color(0xFFCEFAFE),
+        Color(0xFF0891B2), Color(0xFF67E8F9),
+    ),
     ;
 
     fun border(dark: Boolean) = if (dark) darkBorder else lightBorder
     fun background(dark: Boolean) = if (dark) darkBg else lightBg
     fun foreground(dark: Boolean) = if (dark) darkFg else lightFg
+    fun menu(dark: Boolean) = if (dark) darkMenu else lightMenu
 }
 
 /** One 36dp square in the dock. [label] is the accessibility description
  *  and, on the web, the long-press tooltip: the compact mode every phone
- *  gets drops the button text entirely (MultiSelectToolbar.jsx:377). */
+ *  gets drops the button text entirely (MultiSelectToolbar.jsx:377). The
+ *  glyph takes the colour of wherever it lands, the button's or the
+ *  overflow menu's, as the web's currentColor icons do. */
 data class BulkActionButton(
     val label: String,
     val tone: BulkTone,
-    val icon: @Composable () -> Unit,
+    val icon: @Composable (tint: Color) -> Unit,
     val enabled: Boolean = true,
     /** Only the side-by-side button looks disabled on the web; the others
      *  stay opaque and simply ignore taps while unusable. */
     val dimWhenDisabled: Boolean = false,
-    /** Fill replacing the tone's (the side-by-side gradient). */
+    /** Fill replacing the tone's (the side-by-side gradient), under a
+     *  white glyph. */
     val gradient: Brush? = null,
-    /** Text colour of the entry once folded into the overflow menu. */
-    val menuColor: Color = Color.Unspecified,
+    /** The overflow menu's colour when it is not the tone's own. */
+    val menuColor: Color? = null,
     /** A popover anchored to the button (the colour picker). */
     val anchored: (@Composable () -> Unit)? = null,
     val onClick: () -> Unit,
@@ -322,7 +344,7 @@ private fun DockActionButton(action: BulkActionButton, dark: Boolean) {
             ) { action.onClick() },
         contentAlignment = Alignment.Center,
     ) {
-        action.icon()
+        action.icon(if (action.gradient != null) Color.White else action.tone.foreground(dark))
         action.anchored?.invoke()
     }
 }
@@ -370,15 +392,16 @@ private fun DockOverflowMenu(actions: List<BulkActionButton>, dark: Boolean) {
                         .padding(vertical = 4.dp),
                 ) {
                     actions.forEach { action ->
+                        val color = action.menuColor ?: action.tone.menu(dark)
                         PopoverMenuItem(
                             label = action.label,
-                            color = action.menuColor,
+                            color = color,
                             enabled = action.enabled,
                             onClick = {
                                 open = false
                                 action.onClick()
                             },
-                            icon = { Box(Modifier.width(20.dp), contentAlignment = Alignment.Center) { action.icon() } },
+                            icon = { Box(Modifier.width(20.dp), contentAlignment = Alignment.Center) { action.icon(color) } },
                         )
                     }
                 }
@@ -386,35 +409,3 @@ private fun DockOverflowMenu(actions: List<BulkActionButton>, dark: Boolean) {
         }
     }
 }
-
-/** Generic yes/no confirmation, the same AlertDialog shape already
- *  repeated per-note in NoteDetailScreen.kt (trash / permanent delete)
- *  and in SettingsScreen.kt (delete passkey): pulled out here rather
- *  than written a fourth time for the bulk trash/permanent-delete
- *  confirms below. */
-@Composable
-internal fun ConfirmActionDialog(
-    title: String,
-    body: String,
-    confirmLabel: String,
-    confirmColor: Color,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { Text(body) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(confirmLabel, color = confirmColor)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.native_note_detail_trash_confirm_cancel))
-            }
-        },
-    )
-}
-

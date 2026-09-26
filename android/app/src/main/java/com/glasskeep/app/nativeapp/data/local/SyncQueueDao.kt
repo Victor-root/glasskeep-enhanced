@@ -58,16 +58,13 @@ interface SyncQueueDao {
     /** Locally-created notes until their CREATE row is removed (including
      *  a failed row, so a refresh never erases unsynced user data), plus
      *  notes with a not-yet-confirmed archive/trash/restore/permanent-delete/
-     *  pin/reminder: notes list screens with a live, replaceable snapshot
-     *  (Room's own observeAll() cache for NativeNotesListScreen.kt, or
-     *  SecondaryNotesScreen.kt's own in-memory list) must not let a
-     *  same-moment refresh silently undo one of these actions while it's
-     *  still in flight (see NotesRepository.refresh()'s and
-     *  SecondaryNotesScreen.kt's own doc comments). One shared, wider
-     *  query rather than one per caller: a type irrelevant to a given
-     *  caller (e.g. PERMANENT_DELETE for Room, which never cached a
-     *  trashed note to begin with) is a harmless no-op there, cheaper
-     *  than keeping two near-duplicate queries in sync by hand. The
+     *  pin/reminder: the refresh of any of the three lists (active,
+     *  archived, trashed, see NoteDao.replaceAll's own doc comment) must
+     *  not silently undo one of these actions while it's still in flight.
+     *  One shared, wider query rather than one per list: a type
+     *  irrelevant to a given list (e.g. PERMANENT_DELETE for the active
+     *  one) is a harmless no-op there, cheaper than keeping near-duplicate
+     *  queries in sync by hand. The
      *  literal type names must keep matching SyncQueueType's own entries:
      *  Room requires a compile-time constant here, so this can't
      *  reference the enum directly the way STATUS_PENDING does above. */
@@ -79,16 +76,9 @@ interface SyncQueueDao {
     )
     suspend fun getProtectedNoteIds(): List<String>
 
-    /** Every note with anything still pending, of any type: drives a
-     *  list-level "still syncing" indicator (see NativeNotesListScreen.kt/
-     *  SecondaryNotesScreen.kt), deliberately untyped unlike
-     *  getProtectedNoteIds() above. A note queued from one screen (e.g. a
-     *  RESTORE queued from the trash screen) can legitimately need this
-     *  badge on a DIFFERENT screen (the active list it just got
-     *  optimistically reinserted into), so filtering by type per screen
-     *  would mean remembering to keep two lists in sync by hand; each
-     *  screen instead intersects this set against the note ids it's
-     *  actually rendering. */
+    /** Every note with anything still pending, of any type, deliberately
+     *  untyped unlike getProtectedNoteIds() above: while anything at all
+     *  waits, the health read runs on its quicker cadence (NativeNavHost). */
     @Query("SELECT DISTINCT noteId FROM sync_queue WHERE status = '${SyncQueueEntity.STATUS_PENDING}'")
     fun observePendingNoteIds(): Flow<List<String>>
 

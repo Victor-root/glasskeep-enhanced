@@ -74,7 +74,6 @@
     <string name="native_header_offline">Hors ligne</string>
     <string name="native_sidebar_notes_all">Notes (Toutes)</string>
     <string name="native_sidebar_archived_notes">Notes archivées</string>
-    <string name="native_notes_refresh">Actualiser</string>
     <string name="native_notes_empty">Aucune note pour le moment. Ajoutez-en une pour commencer !</string>
     <string name="native_notes_loading">Chargement des notes…</string>
     <string name="native_notes_offline_view_not_loaded">Le serveur est injoignable, cette vue n\'a pas pu être chargée. Elle se mettra à jour automatiquement quand la connexion sera rétablie.</string>
@@ -164,12 +163,10 @@
     <string name="native_sidebar_clear_tags">Tout effacer</string>
     <string name="native_header_menu">Menu</string>
 
-    <string name="native_archived_title">Archivées</string>
-    <string name="native_archived_empty">Aucune note archivée.</string>
-    <string name="native_archived_error">Impossible de charger les notes archivées : %1$s</string>
     <string name="native_trash_title">Corbeille</string>
     <string name="native_trash_empty">La corbeille est vide.</string>
-    <string name="native_trash_error">Impossible de charger la corbeille : %1$s</string>
+    <string name="native_trash_empty_action">Vider la corbeille</string>
+    <string name="native_trash_empty_confirm">Supprimer définitivement toutes les notes de la corbeille ? Cette action est irréversible.</string>
 
     <string name="native_settings_title">Paramètres</string>
     <string name="native_settings_action_error">Impossible d\'enregistrer : %1$s</string>
