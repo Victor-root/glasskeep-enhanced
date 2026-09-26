@@ -283,6 +283,7 @@ private fun TypographyBlockCard(
                 TypographySelect(
                     current = sizeLabel(block.size),
                     options = TypographyPresets.SIZE_PRESETS.map { sizeLabel(it) to it },
+                    themeId = themeId,
                     dark = dark,
                     titleColor = titleColor,
                     divider = divider,
@@ -297,6 +298,7 @@ private fun TypographyBlockCard(
                 TypographySelect(
                     current = stringResource(weightLabel(block.weight)),
                     options = TypographyPresets.WEIGHT_PRESETS.map { stringResource(weightLabel(it)) to it },
+                    themeId = themeId,
                     dark = dark,
                     titleColor = titleColor,
                     divider = divider,
@@ -329,6 +331,7 @@ private fun TypographyBlockCard(
                 TypographyToggle(
                     label = stringResource(R.string.native_typography_field_italic),
                     active = block.italic,
+                    themeId = themeId,
                     dark = dark,
                     titleColor = titleColor,
                     divider = divider,
@@ -337,6 +340,7 @@ private fun TypographyBlockCard(
                 TypographyToggle(
                     label = stringResource(R.string.native_typography_field_underline),
                     active = block.underline,
+                    themeId = themeId,
                     dark = dark,
                     titleColor = titleColor,
                     divider = divider,
@@ -373,6 +377,7 @@ private fun TypographyField(
 private fun <T> TypographySelect(
     current: String,
     options: List<Pair<String, T>>,
+    themeId: String?,
     dark: Boolean,
     titleColor: Color,
     divider: Color,
@@ -406,7 +411,7 @@ private fun <T> TypographySelect(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(6.dp))
-                            .background(if (label == current) (if (dark) RtActiveBgDark else RtActiveBgLight) else Color.Transparent)
+                            .background(if (label == current) WorkspaceTheme.rtActiveBg(themeId, dark) else Color.Transparent)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -416,7 +421,7 @@ private fun <T> TypographySelect(
                     ) {
                         Text(
                             label,
-                            color = if (label == current) (if (dark) RtActiveTextDark else RtActiveTextLight) else titleColor,
+                            color = if (label == current) WorkspaceTheme.rtActiveText(themeId, dark) else titleColor,
                             fontSize = 13.6.sp,
                         )
                     }
@@ -452,7 +457,7 @@ private fun TypographyColorRow(
                 .background(if (dark) Color.Black.copy(alpha = 0.35f) else Color.White)
                 .border(
                     width = if (current == null) 2.dp else 1.dp,
-                    color = if (current == null) Indigo.copy(alpha = 0.85f) else if (dark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.15f),
+                    color = if (current == null) WorkspaceTheme.rtAccent(themeId).copy(alpha = 0.85f) else if (dark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.15f),
                     shape = RoundedCornerShape(5.dp),
                 )
                 .semantics { contentDescription = defaultLabel }
@@ -481,7 +486,7 @@ private fun TypographyColorRow(
                     .background(richColorOf(swatch, dark) ?: Color.Transparent)
                     .border(
                         width = if (selected) 2.dp else 1.dp,
-                        color = if (selected) Indigo.copy(alpha = 0.85f) else if (dark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.15f),
+                        color = if (selected) WorkspaceTheme.rtAccent(themeId).copy(alpha = 0.85f) else if (dark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(5.dp),
                     )
                     .semantics { contentDescription = swatch }
@@ -531,13 +536,14 @@ private fun TypographyColorRow(
 private fun TypographyToggle(
     label: String,
     active: Boolean,
+    themeId: String?,
     dark: Boolean,
     titleColor: Color,
     divider: Color,
     onClick: () -> Unit,
     icon: @Composable (Color) -> Unit,
 ) {
-    val tint = if (active) (if (dark) RtActiveTextDark else RtActiveTextLight) else titleColor
+    val tint = if (active) WorkspaceTheme.rtActiveText(themeId, dark) else titleColor
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -546,14 +552,14 @@ private fun TypographyToggle(
             .clip(RoundedCornerShape(6.dp))
             .background(
                 when {
-                    active -> if (dark) RtActiveBgDark else RtActiveBgLight
+                    active -> WorkspaceTheme.rtActiveBg(themeId, dark)
                     dark -> Color.Black.copy(alpha = 0.35f)
                     else -> Color.White.copy(alpha = 0.55f)
                 },
             )
             .border(
                 width = 1.dp,
-                color = if (active) Indigo.copy(alpha = 0.45f) else divider,
+                color = if (active) WorkspaceTheme.rtAccent(themeId).copy(alpha = 0.45f) else divider,
                 shape = RoundedCornerShape(6.dp),
             )
             .clickable(

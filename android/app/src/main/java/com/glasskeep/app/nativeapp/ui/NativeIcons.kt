@@ -551,127 +551,104 @@ fun PeopleIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Co
     }
 }
 
-// The seven icons below back the rich-text toolbar (RichTextEditor.kt). Same
+// The icons below back the rich-text toolbar (RichTextToolbar.kt). Same
 // source discipline as the rest of this file: exact path data from the
 // Tabler Icons set (MIT) this project already vendors under
-// src/icons/editor/tabler/ for the web's own RichIcons.jsx, not eyeballed.
+// src/icons/editor/tabler/ for the web's own RichIcons.jsx, not eyeballed,
+// drawn at the toolbar's `.tabler-icon` stroke width, 1.75.
 
 @Composable
-fun BoldIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    // tabler/bold.svg, viewBox 24x24, stroke (not filled), strokeWidth 3,
-    // round caps/joins.
-    val path = remember {
-        PathParser().parsePathString("M7 5h6a3.5 3.5 0 0 1 0 7h-6l0 -7 M13 12h1a3.5 3.5 0 0 1 0 7h-7v-7").toPath()
-    }
+fun BoldIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M7 5h6a3.5 3.5 0 0 1 0 7h-6l0 -7 M13 12h1a3.5 3.5 0 0 1 0 7h-7v-7",
+    modifier, size, tint,
+)
+
+@Composable
+fun ItalicIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M11 5l6 0 M7 19l6 0 M14 5l-4 14",
+    modifier, size, tint,
+)
+
+/**
+ * RichIcons.jsx's variant-aware Underline: Tabler's U-curve over a base
+ * line drawn in the current underline [style] (simple, double, dotted,
+ * dashed, wavy) and [lineColor], the curve itself in [tint].
+ */
+@Composable
+fun UnderlineIcon(
+    modifier: Modifier = Modifier,
+    size: Dp = 24.dp,
+    tint: Color = Color.Black,
+    style: String? = null,
+    lineColor: Color? = null,
+) {
+    val curve = remember { PathParser().parsePathString("M7 5v5a5 5 0 0 0 10 0v-5").toPath() }
+    val wave = remember { PathParser().parsePathString("M5 19 q2.33 -2 4.66 0 t4.66 0 t4.66 0").toPath() }
     Canvas(modifier.size(size)) {
         val scale = this.size.minDimension / 24f
         scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            val stroke = Stroke(width = 1.75f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            val line = lineColor ?: tint
+            drawPath(curve, color = tint, style = stroke)
+            when (style) {
+                "wavy" -> drawPath(wave, color = line, style = stroke)
+                "double" -> {
+                    drawLine(line, Offset(5f, 18f), Offset(19f, 18f), strokeWidth = 1.75f, cap = StrokeCap.Round)
+                    drawLine(line, Offset(5f, 21f), Offset(19f, 21f), strokeWidth = 1.75f, cap = StrokeCap.Round)
+                }
+                "dotted", "dashed" -> drawLine(
+                    line, Offset(5f, 19f), Offset(19f, 19f), strokeWidth = 1.75f, cap = StrokeCap.Round,
+                    pathEffect = PathEffect.dashPathEffect(if (style == "dotted") floatArrayOf(0.01f, 3f) else floatArrayOf(3f, 2f)),
+                )
+                else -> drawLine(line, Offset(5f, 19f), Offset(19f, 19f), strokeWidth = 1.75f, cap = StrokeCap.Round)
+            }
         }
     }
 }
 
 @Composable
-fun ItalicIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    // tabler/italic.svg, viewBox 24x24, stroke (not filled), strokeWidth 2,
-    // round caps/joins.
-    val path = remember {
-        PathParser().parsePathString("M11 5l6 0 M7 19l6 0 M14 5l-4 14").toPath()
-    }
-    Canvas(modifier.size(size)) {
-        val scale = this.size.minDimension / 24f
-        scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        }
-    }
-}
+fun StrikeIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M5 12l14 0 M16 6.5a4 2 0 0 0 -4 -1.5h-1a3.5 3.5 0 0 0 0 7h2a3.5 3.5 0 0 1 0 7h-1.5a4 2 0 0 1 -4 -1.5",
+    modifier, size, tint,
+)
 
 @Composable
-fun UnderlineIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    // src/components/richtext/RichIcons.jsx's own default-variant Underline
-    // (U-curve + a plain base line, "simple" style, no color override),
-    // viewBox 24x24, stroke (not filled), strokeWidth 2, round caps/joins.
-    val path = remember {
-        PathParser().parsePathString("M7 5v5a5 5 0 0 0 10 0v-5 M5 19h14").toPath()
-    }
-    Canvas(modifier.size(size)) {
-        val scale = this.size.minDimension / 24f
-        scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        }
-    }
-}
+fun LinkIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M9 15l6 -6 M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464 " +
+        "M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463",
+    modifier, size, tint,
+)
 
+/** tabler/external-link.svg: the link popover's "Open" button. */
 @Composable
-fun StrikeIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    // tabler/strikethrough.svg, viewBox 24x24, stroke (not filled),
-    // strokeWidth 2, round caps/joins.
-    val path = remember {
-        PathParser().parsePathString(
-            "M5 12l14 0 M16 6.5a4 2 0 0 0 -4 -1.5h-1a3.5 3.5 0 0 0 0 7h2a3.5 3.5 0 0 1 0 7h-1.5a4 2 0 0 1 -4 -1.5"
-        ).toPath()
-    }
-    Canvas(modifier.size(size)) {
-        val scale = this.size.minDimension / 24f
-        scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        }
-    }
-}
-
-@Composable
-fun LinkIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    // tabler/link.svg, viewBox 24x24, stroke (not filled), strokeWidth 2,
-    // round caps/joins.
-    val path = remember {
-        PathParser().parsePathString(
-            "M9 15l6 -6 M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464 " +
-                "M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"
-        ).toPath()
-    }
-    Canvas(modifier.size(size)) {
-        val scale = this.size.minDimension / 24f
-        scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        }
-    }
-}
+fun ExternalLinkIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6 M11 13l9 -9 M15 4h5v5",
+    modifier, size, tint,
+)
 
 @Composable
 fun BulletListIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    // tabler/list.svg: 3 lines plus 3 dots, viewBox 24x24, strokeWidth 2,
-    // round caps/joins. Tabler draws each dot as a zero-length round-capped
-    // line ("M5 6l0 .01"); same as TagIcon's own dot above, that doesn't
-    // reliably rasterize through PathParser + Stroke, so the dots are drawn
-    // as small filled circles instead, same radius idea as TagIcon's.
+    // tabler/list.svg: 3 lines plus 3 dots. Tabler draws each dot as a
+    // zero-length round-capped line ("M5 6l0 .01"), which doesn't reliably
+    // rasterize through PathParser + Stroke, so the dots are circles as wide
+    // as the stroke.
     val path = remember {
         PathParser().parsePathString("M9 6l11 0 M9 12l11 0 M9 18l11 0").toPath()
     }
     Canvas(modifier.size(size)) {
         val scale = this.size.minDimension / 24f
         scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-            for (y in floatArrayOf(6f, 12f, 18f)) drawCircle(color = tint, radius = 1.4f, center = Offset(5f, y))
+            drawPath(path, color = tint, style = Stroke(width = 1.75f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            for (y in floatArrayOf(6f, 12f, 18f)) drawCircle(color = tint, radius = 0.875f, center = Offset(5f, y))
         }
     }
 }
 
 @Composable
-fun NumberedListIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    // tabler/list-numbers.svg, viewBox 24x24, stroke (not filled),
-    // strokeWidth 2, round caps/joins.
-    val path = remember {
-        PathParser().parsePathString(
-            "M11 6h9 M11 12h9 M12 18h8 M4 16a2 2 0 1 1 4 0c0 .591 -.5 1 -1 1.5l-3 2.5h4 M6 10v-6l-2 2"
-        ).toPath()
-    }
-    Canvas(modifier.size(size)) {
-        val scale = this.size.minDimension / 24f
-        scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        }
-    }
-}
+fun NumberedListIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M11 6h9 M11 12h9 M12 18h8 M4 16a2 2 0 1 1 4 0c0 .591 -.5 1 -1 1.5l-3 2.5h4 M6 10v-6l-2 2",
+    modifier, size, tint,
+)
 
 // The audio note's glyphs (AudioClipEditor.kt), from src/icons/index.jsx:
 // Tabler's filled player and microphone icons, and Feather's edit-3.

@@ -415,6 +415,14 @@ object WorkspaceTheme {
 
     fun rtAccent(id: String?): Color = forId(id).rtAccent
 
+    /** --rt-btn-active-bg / --rt-btn-active-text: the rich-text toolbar's
+     *  "on" state, the theme's --rt-accent at 14% (26% in dark mode) under
+     *  the accent itself (mixed 60% into white in dark mode). */
+    fun rtActiveBg(id: String?, dark: Boolean): Color = rtAccent(id).copy(alpha = if (dark) 0.26f else 0.14f)
+
+    fun rtActiveText(id: String?, dark: Boolean): Color =
+        if (dark) mix(rtAccent(id), Color.White, 0.6f) else rtAccent(id)
+
     /** --gk-accent-soft-bg / --gk-accent-soft-border: color-mix of the
      *  accent at 12% / 24% over transparent, i.e. the same color at that
      *  alpha. */

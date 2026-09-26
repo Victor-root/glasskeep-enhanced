@@ -25,9 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,7 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.FocusRequester
@@ -94,7 +91,6 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.RichAlign
@@ -107,9 +103,7 @@ import com.glasskeep.app.nativeapp.data.TypographyProfile
 import com.glasskeep.app.nativeapp.data.hasText
 import com.glasskeep.app.nativeapp.data.isHeading
 import com.glasskeep.app.nativeapp.data.isListItem
-import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkBorderColor
-import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBorderColor
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
@@ -1393,67 +1387,10 @@ private fun markTextColor(block: RichBlock, style: TextStyle, offset: Int, dark:
     block.marks.firstOrNull { it.type == RichMarkType.TEXT_COLOR && it.start <= offset && it.end > offset }
         ?.let { richColorOf(it.value, dark) } ?: style.color
 
-/** --rt-btn-active-bg / --rt-btn-active-text and --rt-divider
- *  (globalCSS.js:2855-2890). */
-internal val RtActiveBgLight = Color(0x246366F1)
-internal val RtActiveBgDark = Color(0x426366F1)
-internal val RtActiveTextLight = Color(0xFF6366F1)
-internal val RtActiveTextDark = Color(0xFFA1A3F7)
+/** --rt-divider (globalCSS.js:2854, 2880); the active pair follows the
+ *  theme (WorkspaceTheme.rtActiveBg / rtActiveText). */
 internal val RtDividerLight = Color(0x14000000)
 internal val RtDividerDark = Color(0x1AFFFFFF)
-
-@Composable
-fun RichLinkDialog(
-    dark: Boolean,
-    titleColor: Color,
-    subtextColor: Color,
-    borderColor: Color,
-    initialHref: String?,
-    onDismiss: () -> Unit,
-    onConfirm: (href: String) -> Unit,
-    onRemove: () -> Unit,
-) {
-    var text by remember(initialHref) { mutableStateOf(initialHref.orEmpty()) }
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(if (dark) DarkBgColor else Color.White)
-                .padding(20.dp),
-        ) {
-            Text(
-                stringResource(R.string.native_richtext_link_title),
-                color = titleColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-            )
-            Spacer(Modifier.height(14.dp))
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                placeholder = { Text(stringResource(R.string.native_richtext_link_placeholder)) },
-                singleLine = true,
-                colors = detailFieldColors(titleColor, subtextColor, borderColor),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(16.dp))
-            androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                if (initialHref != null) {
-                    TextButton(onClick = onRemove) {
-                        Text(stringResource(R.string.native_richtext_link_remove), color = Color(0xFFdc2626))
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.native_note_detail_trash_confirm_cancel), color = subtextColor)
-                }
-                TextButton(onClick = { onConfirm(text) }, enabled = text.isNotBlank()) {
-                    Text(stringResource(R.string.native_richtext_link_apply), color = Indigo, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-    }
-}
 
 /**
  * Markdown rendered read-only, for text the app receives rather than

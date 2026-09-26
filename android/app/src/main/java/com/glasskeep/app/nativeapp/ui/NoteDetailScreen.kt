@@ -258,10 +258,6 @@ private fun Editability.rebaselined(
  *  of this user's notes, and how many. Mirrors App.jsx's tagsWithCounts. */
 private data class TagCount(val tag: String, val count: Int)
 
-/** Which block/range a pending Link dialog request targets, and the href
- *  already applied there if any (prefilled, with a Remove option). */
-private data class LinkTarget(val blockId: String, val start: Int, val end: Int, val existingHref: String?)
-
 /**
  * Milestone: opening and safely editing a single note, every note type the
  * server knows about. Checklist notes get their own flat editor
@@ -384,8 +380,6 @@ fun NoteDetailScreen(
     var noteAiHasBeenOpened by remember { mutableStateOf(false) }
     var noteAiJob by remember { mutableStateOf<Job?>(null) }
     val aiClient = remember(serverUrl) { AiClient(serverUrl, container.tokenStore) }
-    var showLinkDialog by remember { mutableStateOf(false) }
-    var linkDialogTarget by remember { mutableStateOf<LinkTarget?>(null) }
 
     // Drawing notes: autosaved (debounced, see scheduleDrawingAutosave)
     // rather than through the shared title/body Save button, matching the
@@ -969,34 +963,6 @@ fun NoteDetailScreen(
         }
     }
 
-    fun closeLinkDialog() {
-        showLinkDialog = false
-        linkDialogTarget = null
-    }
-
-    fun setRichLink(href: String) {
-        val target = linkDialogTarget ?: return
-        val blocks = richBlocks ?: return
-        richBlocks = blocks.map { block ->
-            if (block.id == target.blockId) {
-                block.copy(marks = RichDoc.setMark(block.marks, RichMarkType.LINK, target.start, target.end, RichDoc.ensureSchemeUrl(href)))
-            } else {
-                block
-            }
-        }
-        closeLinkDialog()
-    }
-
-    fun removeRichLink() {
-        val target = linkDialogTarget ?: return
-        val blocks = richBlocks ?: return
-        richBlocks = blocks.map { block ->
-            if (block.id == target.blockId) block.copy(marks = RichDoc.clearMark(block.marks, RichMarkType.LINK, target.start, target.end))
-            else block
-        }
-        closeLinkDialog()
-    }
-
     /** Enter: an input rule the line break completes, else the split,
      *  with the word before it linked when it is an address. */
     fun splitRichBlock(id: String, position: Int) {
@@ -1038,10 +1004,6 @@ fun NoteDetailScreen(
             setAlign = ::setRichAlign,
             shiftIndent = ::shiftRichIndent,
             insertDivider = ::insertRichDivider,
-            requestLink = { id, start, end, existingHref ->
-                linkDialogTarget = LinkTarget(id, start, end, existingHref)
-                showLinkDialog = true
-            },
         )
     }
 
@@ -2495,6 +2457,7 @@ fun NoteDetailScreen(
                             state = richEditorState,
                             mode = richToolbarModeOf(container.editorPrefs.toolbarMode),
                             dark = dark,
+                            themeId = container.themeState.themeId,
                             titleColor = titleColor,
                             taskStrike = container.editorPrefs.taskStrike,
                             onTaskStrikeChange = { enabled ->
@@ -2896,21 +2859,6 @@ fun NoteDetailScreen(
                 onDismiss = { showPermanentDeleteConfirm = false },
                 onConfirm = { confirmPermanentDelete() },
             )
-        }
-
-        if (showLinkDialog) {
-            linkDialogTarget?.let { target ->
-                RichLinkDialog(
-                    dark = dark,
-                    titleColor = titleColor,
-                    subtextColor = subtextColor,
-                    borderColor = borderColor,
-                    initialHref = target.existingHref,
-                    onDismiss = { closeLinkDialog() },
-                    onConfirm = { href -> setRichLink(href) },
-                    onRemove = { removeRichLink() },
-                )
-            }
         }
 
         viewerIndex?.let { index ->
@@ -3455,7 +3403,8 @@ private fun NoteTagsPopover(
 
 
 // internal, not private: Kotlin's top-level `private` is file-scoped, and
-// RichTextEditor.kt's link dialog reuses this exact styling.
+// the sign-in, registration, password and admin screens reuse this exact
+// styling.
 @Composable
 internal fun detailFieldColors(textColor: Color, subtextColor: Color, borderColor: Color) =
     OutlinedTextFieldDefaults.colors(
