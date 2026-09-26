@@ -92,14 +92,15 @@ const val AdminFocusPasskeyDomain = "passkeyDomain"
  * server version, the pending registrations while there are any, and the
  * accordion sections, every one closed on arrival. [focus] opens it where
  * that setting lives; [liveEvents] are the server frames its lists follow
- * while it is open.
+ * while it is open; [encryption] outlives it, as the web's section does.
  */
 @Composable
-fun AdminScreen(
+internal fun AdminScreen(
     container: NativeAppContainer,
     serverUrl: String,
     focus: String?,
     liveEvents: SharedFlow<String>,
+    encryption: AdminEncryptionState,
     onBack: () -> Unit,
 ) {
     val dark = LocalGkDark.current
@@ -233,17 +234,15 @@ fun AdminScreen(
                     titleColor = titleColor,
                     borderColor = borderColor,
                 )
-                SettingsAccordionSection(
-                    title = stringResource(R.string.native_admin_encryption_section),
+                AdminEncryptionSection(
+                    encryption = encryption,
                     expanded = encryptionOpen,
+                    onToggle = { encryptionOpen = !encryptionOpen },
                     themeId = themeId,
                     dark = dark,
                     titleColor = titleColor,
-                    icon = { tint -> ShieldLockIcon(size = 20.dp, tint = tint) },
-                    onToggle = { encryptionOpen = !encryptionOpen },
-                ) {
-                    LegacyAdminSecuritySection(container, state.api, dark, titleColor, SettingsSubtleColor, borderColor)
-                }
+                    borderColor = borderColor,
+                )
                 SettingsAccordionSection(
                     title = stringResource(R.string.native_admin_federation_section),
                     expanded = federationOpen,

@@ -1,11 +1,9 @@
 package com.glasskeep.app.nativeapp.ui
 
-import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -13,14 +11,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -31,25 +26,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
-import com.glasskeep.app.nativeapp.NativeAppContainer
-import com.glasskeep.app.nativeapp.NativePasskeys
-import com.glasskeep.app.nativeapp.PasskeyCeremonyResult
-import com.glasskeep.app.nativeapp.data.network.ActivateEncryptionRequest
-import com.glasskeep.app.nativeapp.data.network.ChangeEncryptionPassphraseRequest
-import com.glasskeep.app.nativeapp.data.network.DeactivateEncryptionRequest
 import com.glasskeep.app.nativeapp.data.network.FederationAcceptRequest
 import com.glasskeep.app.nativeapp.data.network.FederationAddressRequest
 import com.glasskeep.app.nativeapp.data.network.FederationInviteRequest
@@ -57,144 +42,21 @@ import com.glasskeep.app.nativeapp.data.network.FederationLinkDto
 import com.glasskeep.app.nativeapp.data.network.FederationRenameRequest
 import com.glasskeep.app.nativeapp.data.network.FederationSelfNameRequest
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
-import com.glasskeep.app.nativeapp.data.network.InstanceStatusResponse
-import com.glasskeep.app.nativeapp.data.network.PasskeyDto
-import com.glasskeep.app.nativeapp.data.network.PromotePasskeyVerifyRequest
 import com.glasskeep.app.nativeapp.data.network.SelfUpdateModeDto
 import com.glasskeep.app.nativeapp.data.network.SelfUpdateStatusDto
 import com.glasskeep.app.nativeapp.data.network.StartSelfUpdateRequest
 import com.glasskeep.app.nativeapp.data.network.UpdateCheckDto
-import com.glasskeep.app.nativeapp.prfOutputOf
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
 import retrofit2.Response
 
-// The server version block and the AI, encryption and federation sections
-// as they were before the admin panel took the web's shape. Each is
-// replaced by its web rebuild in turn.
-
-@Composable
-internal fun LegacyAdminSecuritySection(
-    container: NativeAppContainer, api: GlassKeepApi, dark: Boolean, title: Color, subtext: Color, border: Color,
-) {
-    val activity = LocalView.current.context as Activity
-    val scope = rememberCoroutineScope()
-    var status by remember { mutableStateOf<InstanceStatusResponse?>(null) }
-    var passkeys by remember { mutableStateOf<List<PasskeyDto>>(emptyList()) }
-    var passphrase by remember { mutableStateOf("") }
-    var confirmation by remember { mutableStateOf("") }
-    var currentPassphrase by remember { mutableStateOf("") }
-    var newPassphrase by remember { mutableStateOf("") }
-    var newConfirmation by remember { mutableStateOf("") }
-    var recovery by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var confirmDeactivate by remember { mutableStateOf(false) }
-
-    suspend fun load() {
-        status = api.instanceStatus().requireBody("encryption status")
-        container.lockState.apply(status!!)
-        passkeys = runCatching { api.listPasskeys().requireBody("passkeys").passkeys }.getOrDefault(emptyList())
-    }
-    fun run(block: suspend () -> Unit) {
-        if (busy) return; busy = true; error = null
-        scope.launch { try { block(); load() } catch (t: Throwable) { error = t.message } finally { busy = false } }
-    }
-    LaunchedEffect(Unit) { try { load() } catch (t: Throwable) { error = t.message } }
-
-    AdminBlock {
-        AdminHeading(R.string.native_admin_encryption, title)
-        val state = status
-        if (state == null) AdminLoading() else {
-            AdminHintText(stringResource(if (!state.enabled) R.string.native_admin_encryption_off else if (state.locked) R.string.native_admin_encryption_locked else R.string.native_admin_encryption_on), subtext)
-            if (!state.enabled) {
-                AdminField(passphrase, { passphrase = it }, R.string.native_admin_passphrase, title, subtext, border, password = true)
-                AdminField(confirmation, { confirmation = it }, R.string.native_register_confirm, title, subtext, border, password = true)
-                AdminPrimary(stringResource(R.string.native_admin_activate), !busy && passphrase.length >= 8 && passphrase == confirmation) {
-                    run {
-                        val result = api.activateEncryption(ActivateEncryptionRequest(passphrase, confirmation)).requireBody("activate encryption")
-                        recovery = result.recoveryKey; passphrase = ""; confirmation = ""
-                    }
-                }
-            } else if (!state.locked) {
-                AdminHeading(R.string.native_admin_change_passphrase, title)
-                AdminField(currentPassphrase, { currentPassphrase = it }, R.string.native_admin_current_passphrase, title, subtext, border, password = true)
-                AdminField(newPassphrase, { newPassphrase = it }, R.string.native_admin_new_passphrase, title, subtext, border, password = true)
-                AdminField(newConfirmation, { newConfirmation = it }, R.string.native_register_confirm, title, subtext, border, password = true)
-                AdminPrimary(stringResource(R.string.native_admin_save), !busy && newPassphrase.length >= 8 && newPassphrase == newConfirmation) {
-                    run {
-                        api.changeEncryptionPassphrase(ChangeEncryptionPassphraseRequest(currentPassphrase, newPassphrase, newConfirmation)).requireBody("change passphrase")
-                        currentPassphrase = ""; newPassphrase = ""; newConfirmation = ""
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SmallAction(stringResource(R.string.native_admin_recovery_regenerate), enabled = !busy) {
-                        run { recovery = api.regenerateRecoveryKey().requireBody("recovery key").recoveryKey }
-                    }
-                    SmallAction(stringResource(R.string.native_lock_instance), danger = true, enabled = !busy) {
-                        run { api.lockInstance().requireBody("lock") }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                SmallAction(stringResource(R.string.native_admin_deactivate), danger = true, enabled = !busy) { confirmDeactivate = true }
-            }
-        }
-        recovery?.let {
-            AdminCard(dark, border) {
-                Text(stringResource(R.string.native_admin_recovery_once), color = Color(0xFFD97706), fontWeight = FontWeight.Bold)
-                Text(it, color = title, fontSize = 14.sp)
-            }
-        }
-        if (status?.enabled == true && status?.unlocked == true && passkeys.isNotEmpty()) {
-            Spacer(Modifier.height(18.dp))
-            AdminHeading(R.string.native_admin_passkey_unlock, title)
-            passkeys.forEach { key ->
-                AdminCard(dark, border) {
-                    Text(key.name ?: stringResource(R.string.native_settings_passkeys_untitled), color = title, fontWeight = FontWeight.SemiBold)
-                    AdminHintText(if (key.prfSupported) stringResource(R.string.native_admin_passkey_prf_yes) else stringResource(R.string.native_admin_passkey_prf_no), subtext)
-                    if (key.canUnlockInstance) {
-                        SmallAction(stringResource(R.string.native_admin_passkey_disable), danger = true, enabled = !busy) {
-                            run { api.disablePasskeyUnlock(key.credentialId).requireBody("disable passkey unlock") }
-                        }
-                    } else {
-                        SmallAction(stringResource(R.string.native_admin_passkey_enable), enabled = !busy && key.prfSupported) {
-                            run {
-                                val options = api.promotePasskeyOptions(key.credentialId).requireBody("passkey options")
-                                when (val ceremony = NativePasskeys.authenticate(activity, options.options.toString())) {
-                                    is PasskeyCeremonyResult.Failed -> error(ceremony.message)
-                                    is PasskeyCeremonyResult.Success -> {
-                                        val response = Json.parseToJsonElement(ceremony.responseJson)
-                                        val prf = prfOutputOf(response.jsonObject) ?: error("No PRF output")
-                                        api.promotePasskeyVerify(key.credentialId, PromotePasskeyVerifyRequest(response, options.challengeId, prf)).requireBody("enable passkey unlock")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        error?.let { AdminError(it) }
-    }
-    if (confirmDeactivate) {
-        ConfirmAdminDialog(
-            title = stringResource(R.string.native_admin_deactivate_title),
-            message = stringResource(R.string.native_admin_deactivate_body),
-            dark = dark,
-            onDismiss = { confirmDeactivate = false },
-        ) {
-            confirmDeactivate = false
-            run { api.deactivateEncryption(DeactivateEncryptionRequest(currentPassphrase)).requireBody("deactivate encryption") }
-        }
-    }
-}
+// The server version block and the federation section as they were
+// before the admin panel took the web's shape, until their web rebuilds
+// replace them.
 
 @Composable
 internal fun LegacyAdminFederationSection(api: GlassKeepApi, serverUrl: String, dark: Boolean, title: Color, subtext: Color, border: Color) {
@@ -378,15 +240,10 @@ private fun AdminCard(dark: Boolean, border: Color, content: @Composable ColumnS
 }
 
 @Composable
-private fun AdminField(
-    value: String, onValue: (String) -> Unit, label: Int, title: Color, subtext: Color, border: Color,
-    password: Boolean = false, numeric: Boolean = false,
-) {
+private fun AdminField(value: String, onValue: (String) -> Unit, label: Int, title: Color, subtext: Color, border: Color) {
     OutlinedTextField(
         value = value, onValueChange = onValue,
         label = { Text(stringResource(label)) }, singleLine = true,
-        visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
-        keyboardOptions = KeyboardOptions(keyboardType = if (numeric) KeyboardType.Decimal else if (password) KeyboardType.Password else KeyboardType.Text),
         colors = detailFieldColors(title, subtext, border), modifier = Modifier.fillMaxWidth(),
     )
 }
@@ -397,16 +254,11 @@ private fun AdminPrimary(label: String, enabled: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SmallAction(label: String, danger: Boolean = false, enabled: Boolean = true, selected: Boolean = false, onClick: () -> Unit) {
+private fun SmallAction(label: String, danger: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick, enabled = enabled,
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = if (danger) Color(0xFFDC2626) else if (selected) Color(0xFF6366F1) else Color.Unspecified),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = if (danger) Color(0xFFDC2626) else Color.Unspecified),
     ) { Text(label, fontSize = 12.sp, maxLines = 1) }
-}
-
-@Composable
-private fun AdminLoading() = Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
-    CircularProgressIndicator(Modifier.size(28.dp))
 }
 
 @Composable

@@ -3457,7 +3457,7 @@ private fun ConfirmDeleteDialog(
                 fontWeight = FontWeight.Normal,
                 onClick = onDismiss,
             )
-            GkDangerButton(
+            GkSolidButton(
                 label = confirmLabel,
                 enabled = enabled,
                 fontSize = 16.sp,

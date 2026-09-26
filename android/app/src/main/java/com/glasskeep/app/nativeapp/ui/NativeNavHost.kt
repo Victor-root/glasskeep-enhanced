@@ -460,6 +460,11 @@ fun NativeNavHost(
     }
     val lock = container.lockState
     val showUnlockScreen = lock.isLocked && (!signedIn || lock.overlayOpen)
+    // The admin panel's encryption section, kept for the whole session as
+    // the web keeps it mounted: a recovery key survives the panel closing.
+    val adminEncryption = remember(serverUrl, signedIn) {
+        AdminEncryptionState(context, api, lock, toasts, scope) { lockPokes++ }
+    }
 
     CompositionLocalProvider(
         LocalGkToasts provides toasts,
@@ -658,6 +663,7 @@ fun NativeNavHost(
                         serverUrl = serverUrl,
                         focus = backStackEntry.arguments?.getString("focus"),
                         liveEvents = adminEvents,
+                        encryption = adminEncryption,
                         onBack = { navController.popBackStack() },
                     )
                 }

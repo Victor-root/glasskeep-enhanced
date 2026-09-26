@@ -107,6 +107,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
@@ -1077,7 +1078,7 @@ internal fun GkConfirmDialog(
                 onClick = onDismiss,
             )
             when (variant) {
-                GkConfirmVariant.DANGER -> GkDangerButton(
+                GkConfirmVariant.DANGER -> GkSolidButton(
                     label = confirmLabel,
                     fontSize = 16.sp,
                     lineHeight = 24.sp,
@@ -1149,7 +1150,7 @@ internal fun GkChoiceDialog(
                 fontWeight = FontWeight.Normal,
                 onClick = onMild,
             )
-            GkDangerButton(
+            GkSolidButton(
                 label = drasticLabel,
                 modifier = Modifier.fillMaxWidth(),
                 fontSize = 16.sp,
@@ -1211,14 +1212,21 @@ internal fun GkSecondaryButton(
     }
 }
 
-/** The solid red confirmation button
- *  (`PasskeySettingsSection.jsx:585`), the one button the workspace
- *  themes deliberately leave alone (`gk-fixed-btn`). */
+/** A button in one flat colour: by default the solid red confirmation
+ *  button (`PasskeySettingsSection.jsx:585`), the one button the workspace
+ *  themes deliberately leave alone (`gk-fixed-btn`); the encryption
+ *  section's `rounded-md` indigo, amber and red ones pass their own. A
+ *  label that wraps stays centred, as a button's does. */
 @Composable
-internal fun GkDangerButton(
+internal fun GkSolidButton(
     label: String,
     modifier: Modifier = Modifier,
+    color: Color = DangerRed,
+    textColor: Color = Color.White,
     enabled: Boolean = true,
+    horizontalPadding: Dp = 16.dp,
+    verticalPadding: Dp = 8.dp,
+    cornerRadius: Dp = 8.dp,
     fontSize: TextUnit = 14.sp,
     lineHeight: TextUnit = 20.sp,
     fontWeight: FontWeight = FontWeight.SemiBold,
@@ -1227,18 +1235,25 @@ internal fun GkDangerButton(
     Box(
         modifier = modifier
             .alpha(if (enabled) 1f else 0.5f)
-            .clip(RoundedCornerShape(8.dp))
-            .background(DangerRed)
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(color)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 enabled = enabled,
                 role = Role.Button,
             ) { onClick() }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Color.White, fontSize = fontSize, lineHeight = lineHeight, fontWeight = fontWeight)
+        Text(
+            label,
+            color = textColor,
+            fontSize = fontSize,
+            lineHeight = lineHeight,
+            fontWeight = fontWeight,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -1247,10 +1262,12 @@ internal fun GkDangerButton(
  * `px-3 py-2` box inside a 1px `--border-light` edge, with a 2px
  * [focusRingColor] ring drawn outside that edge while focused (Tailwind's
  * `ring-2`, a box-shadow), and its label above it (14px/500, 4px gap).
- * The text is the page's 16px/24px unless the input is `text-sm`. With
- * [stretch] the box fills the height its caller gives it, the text kept
- * centred, the way a flex row stretches an input. Like a browser's input,
- * a field focused without a tap has its caret after the text.
+ * An input with no focus classes passes [browserFocusRing] for Chromium's
+ * own outline instead. The text is the page's 16px/24px unless the input
+ * is `text-sm`, the caret the text colour since the web never sets one.
+ * With [stretch] the box fills the height its caller gives it, the text
+ * kept centred, the way a flex row stretches an input. Like a browser's
+ * input, a field focused without a tap has its caret after the text.
  */
 @Composable
 internal fun GkTextField(
@@ -1264,6 +1281,7 @@ internal fun GkTextField(
     borderColor: Color,
     modifier: Modifier = Modifier,
     focusRingColor: Color = WorkspaceTheme.accent(themeId, dark),
+    browserFocusRing: Boolean = false,
     focusRequester: FocusRequester? = null,
     fontSize: TextUnit = 16.sp,
     lineHeight: TextUnit = 24.sp,
@@ -1272,6 +1290,8 @@ internal fun GkTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     stretch: Boolean = false,
     background: Color = Color.Transparent,
+    cornerRadius: Dp = 8.dp,
+    placeholderColor: Color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
     fontFamily: FontFamily? = null,
     enabled: Boolean = true,
 ) {
@@ -1292,7 +1312,7 @@ internal fun GkTextField(
             singleLine = true,
             enabled = enabled,
             textStyle = TextStyle(color = titleColor, fontSize = fontSize, lineHeight = lineHeight, fontFamily = fontFamily),
-            cursorBrush = SolidColor(WorkspaceTheme.accent(themeId, dark)),
+            cursorBrush = SolidColor(titleColor),
             keyboardOptions = keyboardOptions,
             keyboardActions = keyboardActions,
             visualTransformation = visualTransformation,
@@ -1301,9 +1321,15 @@ internal fun GkTextField(
                 .then(if (stretch) Modifier.weight(1f) else Modifier)
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .onFocusChanged { focused = it.isFocused }
-                .focusRing(focused, focusRingColor)
-                .background(background, RoundedCornerShape(8.dp))
-                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                .then(
+                    if (browserFocusRing) {
+                        Modifier.browserFocusRing(focused, cornerRadius)
+                    } else {
+                        Modifier.focusRing(focused, focusRingColor, cornerRadius)
+                    },
+                )
+                .background(background, RoundedCornerShape(cornerRadius))
+                .border(1.dp, borderColor, RoundedCornerShape(cornerRadius))
                 .padding(horizontal = 13.dp, vertical = 9.dp),
             decorationBox = { innerTextField ->
                 // Stretched, the line is centred in the taller box instead
@@ -1312,7 +1338,7 @@ internal fun GkTextField(
                     if (value.isEmpty()) {
                         Text(
                             placeholder,
-                            color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
+                            color = placeholderColor,
                             fontSize = fontSize,
                             lineHeight = lineHeight,
                             fontFamily = fontFamily,
@@ -1339,6 +1365,34 @@ internal fun Modifier.focusRing(focused: Boolean, color: Color, cornerRadius: Dp
         )
     }
 }
+
+/** Chromium's own `outline: auto` around a focused input: 2px of its
+ *  focus orange inside the rounded edge, over the border, and a 1px white
+ *  line just outside it, the same in both modes. */
+private fun Modifier.browserFocusRing(focused: Boolean, cornerRadius: Dp): Modifier = drawWithContent {
+    drawContent()
+    if (focused) {
+        val ring = 2.dp.toPx()
+        val halo = 1.dp.toPx()
+        val radius = cornerRadius.toPx()
+        drawRoundRect(
+            color = ChromiumFocusRingColor,
+            topLeft = Offset(ring / 2f, ring / 2f),
+            size = Size(size.width - ring, size.height - ring),
+            cornerRadius = CornerRadius(radius - ring / 2f),
+            style = Stroke(ring),
+        )
+        drawRoundRect(
+            color = Color.White,
+            topLeft = Offset(-halo / 2f, -halo / 2f),
+            size = Size(size.width + halo, size.height + halo),
+            cornerRadius = CornerRadius(radius + halo / 2f),
+            style = Stroke(halo),
+        )
+    }
+}
+
+private val ChromiumFocusRingColor = Color(0xFFE59700)
 
 /** The anchor button's window bounds and the window's width, as the popup
  *  reports them, and the side the panel opens on: everything
