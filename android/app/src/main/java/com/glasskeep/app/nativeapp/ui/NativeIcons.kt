@@ -673,46 +673,37 @@ fun NumberedListIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Colo
     }
 }
 
-// The three icons below back the audio note player (AudioClipEditor.kt).
-// Play/pause/stop are plain geometric shapes (a triangle, two bars, a
-// square), simple enough to draw directly rather than needing exact
-// vendored path data the way a lettered or curved glyph would.
+// The audio note's glyphs (AudioClipEditor.kt), from src/icons/index.jsx:
+// Tabler's filled player and microphone icons, and Feather's edit-3.
 
 @Composable
-fun PlayIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    Canvas(modifier.size(size)) {
-        val scale = this.size.minDimension / 24f
-        val path = Path().apply {
-            moveTo(7f * scale, 5f * scale)
-            lineTo(19f * scale, 12f * scale)
-            lineTo(7f * scale, 19f * scale)
-            close()
-        }
-        drawPath(path, color = tint)
-    }
-}
+fun PlayFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M6 4v16a1 1 0 0 0 1.524 .852l13 -8a1 1 0 0 0 0 -1.704l-13 -8a1 1 0 0 0 -1.524 .852z",
+    modifier, size, tint,
+)
 
 @Composable
-fun PauseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    Canvas(modifier.size(size)) {
-        val scale = this.size.minDimension / 24f
-        val barWidth = 5f * scale
-        val barHeight = 16f * scale
-        val top = 4f * scale
-        drawRoundRect(
-            color = tint,
-            topLeft = Offset(6f * scale, top),
-            size = Size(barWidth, barHeight),
-            cornerRadius = CornerRadius(1.5f * scale, 1.5f * scale),
-        )
-        drawRoundRect(
-            color = tint,
-            topLeft = Offset(13f * scale, top),
-            size = Size(barWidth, barHeight),
-            cornerRadius = CornerRadius(1.5f * scale, 1.5f * scale),
-        )
-    }
-}
+fun PauseFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M9 4h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h2a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2z" +
+        "M17 4h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h2a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2z",
+    modifier, size, tint,
+)
+
+@Composable
+fun MicrophoneFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M19 9a1 1 0 0 1 1 1a8 8 0 0 1 -6.999 7.938l-.001 2.062h3a1 1 0 0 1 0 2h-8a1 1 0 0 1 0 -2h3v-2.062" +
+        "a8 8 0 0 1 -7 -7.938a1 1 0 1 1 2 0a6 6 0 0 0 12 0a1 1 0 0 1 1 -1z" +
+        "M12 1a4 4 0 0 1 4 4v5a4 4 0 1 1 -8 0v-5a4 4 0 0 1 4 -4z",
+    modifier, size, tint,
+)
+
+/** The clip list's rename glyph (index.jsx PencilIcon, Feather edit-3):
+ *  a pencil over a baseline, stroke 2. */
+@Composable
+fun EditLineIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M12 20h9 M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z",
+    modifier, size, tint, 2f,
+)
 
 @Composable
 fun CheckSquareIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
@@ -1303,38 +1294,6 @@ fun CheckFilledIcon(modifier: Modifier = Modifier, size: Dp = 20.dp, tint: Color
     }
 }
 
-/** The audio player's transport arrows (AudioPlayer.jsx:318-344): a
- *  filled triangle against a bar. */
-@Composable
-fun PreviousTrackIcon(modifier: Modifier = Modifier, size: Dp = 18.dp, tint: Color = Color.Black) {
-    Canvas(modifier.size(size)) {
-        val unit = this.size.minDimension / 24f
-        drawRect(color = tint, topLeft = Offset(5f * unit, 6f * unit), size = Size(2f * unit, 12f * unit))
-        val triangle = Path().apply {
-            moveTo(19f * unit, 6f * unit)
-            lineTo(19f * unit, 18f * unit)
-            lineTo(9f * unit, 12f * unit)
-            close()
-        }
-        drawPath(triangle, color = tint)
-    }
-}
-
-@Composable
-fun NextTrackIcon(modifier: Modifier = Modifier, size: Dp = 18.dp, tint: Color = Color.Black) {
-    Canvas(modifier.size(size)) {
-        val unit = this.size.minDimension / 24f
-        drawRect(color = tint, topLeft = Offset(17f * unit, 6f * unit), size = Size(2f * unit, 12f * unit))
-        val triangle = Path().apply {
-            moveTo(5f * unit, 6f * unit)
-            lineTo(5f * unit, 18f * unit)
-            lineTo(15f * unit, 12f * unit)
-            close()
-        }
-        drawPath(triangle, color = tint)
-    }
-}
-
 /** The drawing toolbar's pen, a filled Material pencil
  *  (DrawingToolbar.jsx:26-30). */
 @Composable
@@ -1495,9 +1454,9 @@ fun SidebarTrashIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Colo
 
 /** tabler/chevron-right.svg. */
 @Composable
-fun ChevronRightIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+fun ChevronRightIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, strokeWidth: Float = 1.75f) = TablerIcon(
     "M9 6l6 6l-6 6",
-    modifier, size, tint,
+    modifier, size, tint, strokeWidth,
 )
 
 /** tabler/message-search.svg: the note's own AI conversation. */
@@ -1537,9 +1496,9 @@ fun ArrowDownIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color =
 
 /** tabler/chevron-left.svg. */
 @Composable
-fun ChevronLeftIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+fun ChevronLeftIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, strokeWidth: Float = 1.75f) = TablerIcon(
     "M15 6l-6 6l6 6",
-    modifier, size, tint,
+    modifier, size, tint, strokeWidth,
 )
 
 /** tabler/player-stop-filled.svg as the web draws it inside a

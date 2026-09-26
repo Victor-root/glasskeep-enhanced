@@ -283,9 +283,7 @@ fun NoteAiChatPanel(
                             .align(Alignment.BottomEnd)
                             .padding(12.dp)
                             .size(36.dp)
-                            // shadow-md
-                            .dropShadow(CircleShape, Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.10f), spread = (-1).dp, offset = DpOffset(0.dp, 4.dp)))
-                            .dropShadow(CircleShape, Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.10f), spread = (-2).dp, offset = DpOffset(0.dp, 2.dp)))
+                            .tailwindShadowMd(CircleShape)
                             .clip(CircleShape)
                             .background(background)
                             .border(1.dp, if (dark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.10f), CircleShape)

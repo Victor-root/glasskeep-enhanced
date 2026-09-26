@@ -88,11 +88,12 @@ object NoteExporter {
         }
     }
 
-    /** Shares one clip in its original encoding. Android's platform
-     *  decoders cannot reliably transcode every WebM/Opus source to MP3 or
-     *  WAV, but the lossless original option is always equivalent to the
-     *  web player's first download choice. */
-    fun exportAudio(context: Context, clip: AudioClipDto, displayName: String): Boolean {
+    /** One clip as the audio player's download menu offers it
+     *  (AudioPlayer.jsx:484-531): as recorded, or re-encoded to MP3 or WAV
+     *  by [AudioTranscoder], shared as `<baseName>.<ext>`. False when the
+     *  clip is not a base64 audio data URL or its conversion or sharing
+     *  failed; the caller decides what to fall back to. */
+    fun exportAudio(context: Context, clip: AudioClipDto, baseName: String, format: AudioDownloadFormat): Boolean {
         val match = Regex("^data:(audio/[a-zA-Z0-9.+-]+)(?:;[^,]*)?;base64,(.*)$", RegexOption.DOT_MATCHES_ALL)
             .find(clip.audioDataUrl)
         if (match == null) {
@@ -100,16 +101,30 @@ object NoteExporter {
             return false
         }
         val mimeType = clip.mimeType.ifBlank { match.groupValues[1] }
-        val extension = audioExtension(mimeType)
-        val requested = displayName.ifBlank { clip.name }.ifBlank { "recording" }
-        val baseName = requested.substringBeforeLast('.', requested).ifBlank { "recording" }
-        val file = File(File(context.cacheDir, "exports").apply { mkdirs() }, "${sanitizeFilename(baseName)}.$extension")
+        val name = sanitizeFilename(baseName)
+        val dir = File(context.cacheDir, "exports").apply { mkdirs() }
         return try {
-            file.writeBytes(Base64.decode(match.groupValues[2], Base64.DEFAULT))
-            shareFile(context, file, mimeType)
+            val bytes = Base64.decode(match.groupValues[2], Base64.DEFAULT)
+            val file: File
+            val sharedType: String
+            when (format) {
+                AudioDownloadFormat.ORIGINAL -> {
+                    file = File(dir, "$name.${audioExtension(mimeType)}").apply { writeBytes(bytes) }
+                    sharedType = mimeType
+                }
+                AudioDownloadFormat.MP3 -> {
+                    file = File(dir, "$name.mp3").also { AudioTranscoder.writeMp3(bytes, it) }
+                    sharedType = "audio/mpeg"
+                }
+                AudioDownloadFormat.WAV -> {
+                    file = File(dir, "$name.wav").also { AudioTranscoder.writeWav(bytes, it) }
+                    sharedType = "audio/wav"
+                }
+            }
+            shareFile(context, file, sharedType)
             true
         } catch (e: Exception) {
-            NativeDebug.e("NoteExporter.exportAudio failed", e)
+            NativeDebug.e("NoteExporter.exportAudio failed ($format)", e)
             false
         }
     }
@@ -205,3 +220,6 @@ object NoteExporter {
     fun sanitizeFilename(name: String): String =
         name.trim().replace(Regex("[/\\\\?%*:|\"<>]"), "-").take(64)
 }
+
+/** The audio player's three download choices (AudioPlayer.jsx:555-593). */
+enum class AudioDownloadFormat { ORIGINAL, MP3, WAV }

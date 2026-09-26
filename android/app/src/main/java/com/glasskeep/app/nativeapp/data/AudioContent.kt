@@ -6,9 +6,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.floatOrNull
-import kotlinx.serialization.json.longOrNull
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -24,10 +23,14 @@ data class AudioClipDto(
      *  reference. */
     val audioDataUrl: String,
     val mimeType: String,
-    /** Seconds, matching src/utils/audioNote.js's own `duration` unit. */
-    val duration: Float = 0f,
-    val size: Long = 0,
-    val createdAt: String = "",
+    /** Seconds, matching src/utils/audioNote.js's own `duration` unit.
+     *  This and the next two stay null when unknown, as the web keeps
+     *  them. */
+    val duration: Float? = null,
+    /** The recorded file's bytes; without it the storage gauge estimates
+     *  them from the base64 length. */
+    val size: Long? = null,
+    val createdAt: String? = null,
 )
 
 @Serializable
@@ -44,73 +47,55 @@ data class AudioContentDto(
 
 /**
  * Parser/encoder for an "audio" note's `content`, mirroring
- * validateAudioContent() (server/index.js) and parseAudioContent()/
- * serializeAudioContent() (src/utils/audioNote.js): a JSON object
- * `{version, clips: [{id, name, audioDataUrl, mimeType, duration, size,
- * createdAt}], text}`, or a legacy v1 single-clip object with the same
- * clip fields at the top level instead of a `clips` array (upgraded to v2
- * on read, same as the web does). Mirrors the rest of this app's
- * data-layer objects: never throws, and [parse] returns null rather than
- * guess when `content` is non-blank but isn't either shape, or contains a
- * clip whose MIME isn't in the same allow-list the server enforces on
- * write, so a genuinely corrupt or not-yet-understood note falls back to
- * NoteDetailScreen's existing "type not supported" notice.
+ * parseAudioContent()/serializeAudioContent() (src/utils/audioNote.js): a
+ * JSON object `{version, clips: [{id, name, audioDataUrl, mimeType,
+ * duration, size, createdAt}], text}`, or a legacy v1 single-clip object
+ * with the same clip fields at the top level instead of a `clips` array
+ * (upgraded to v2 on read). Just as lenient as the web: content it cannot
+ * read is an empty note, a clip without a data URL is dropped, and a
+ * missing id or MIME type is filled in (normalizeClip).
  */
 object AudioContent {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    // Byte for byte the same as ALLOWED_AUDIO_MIME_PREFIXES (server/index.js)
-    // and audioNote.js's own copy of it.
-    private val ALLOWED_MIME_PREFIXES = listOf(
-        "audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav", "audio/x-wav", "audio/aac",
-    )
-
-    fun parse(content: String?): AudioContentDto? {
+    fun parse(content: String?): AudioContentDto {
         if (content.isNullOrBlank()) return AudioContentDto()
-        return try {
-            val root = json.parseToJsonElement(content) as? JsonObject ?: return null
-            val clipsElement = root["clips"]
-            when {
-                clipsElement is JsonArray -> {
-                    val clips = clipsElement.map { el ->
-                        val obj = el as? JsonObject ?: return null
-                        parseClip(obj, synthesizeId = false) ?: return null
-                    }
-                    AudioContentDto(clips = clips, text = (root["text"] as? JsonPrimitive)?.contentOrNull ?: "")
-                }
-                root["audioDataUrl"] != null -> {
-                    val clip = parseClip(root, synthesizeId = true) ?: return null
-                    AudioContentDto(clips = listOf(clip), text = (root["text"] as? JsonPrimitive)?.contentOrNull ?: "")
-                }
-                else -> null
-            }
-        } catch (t: Throwable) {
-            NativeDebug.e("AudioContent.parse failed", t)
+        val root = try {
+            json.parseToJsonElement(content) as? JsonObject
+        } catch (e: Exception) {
+            NativeDebug.e("AudioContent.parse: not JSON", e)
             null
+        } ?: return AudioContentDto()
+        val text = root.string("text") ?: ""
+        val clips = root["clips"]
+        return when {
+            clips is JsonArray -> AudioContentDto(clips = clips.mapNotNull { (it as? JsonObject)?.let(::normalizeClip) }, text = text)
+            root.string("audioDataUrl")?.startsWith("data:") == true -> AudioContentDto(clips = listOfNotNull(normalizeClip(root)), text = text)
+            else -> AudioContentDto()
         }
     }
 
-    private fun parseClip(obj: JsonObject, synthesizeId: Boolean): AudioClipDto? {
-        val audioDataUrl = (obj["audioDataUrl"] as? JsonPrimitive)?.contentOrNull ?: return null
-        if (!isAllowedAudioDataUrl(audioDataUrl)) return null
-        val mimeType = (obj["mimeType"] as? JsonPrimitive)?.contentOrNull ?: return null
-        val id = (obj["id"] as? JsonPrimitive)?.contentOrNull
-            ?: if (synthesizeId) UUID.randomUUID().toString() else return null
+    /** normalizeClip (audioNote.js:56-68). */
+    private fun normalizeClip(obj: JsonObject): AudioClipDto? {
+        val audioDataUrl = obj.string("audioDataUrl")?.takeIf { it.startsWith("data:") } ?: return null
         return AudioClipDto(
-            id = id,
-            name = (obj["name"] as? JsonPrimitive)?.contentOrNull ?: "",
+            id = obj.string("id")?.takeIf { it.isNotEmpty() } ?: UUID.randomUUID().toString(),
+            name = obj.string("name") ?: "",
             audioDataUrl = audioDataUrl,
-            mimeType = mimeType,
-            duration = (obj["duration"] as? JsonPrimitive)?.floatOrNull ?: 0f,
-            size = (obj["size"] as? JsonPrimitive)?.longOrNull ?: 0L,
-            createdAt = (obj["createdAt"] as? JsonPrimitive)?.contentOrNull ?: "",
+            mimeType = obj.string("mimeType") ?: "audio/webm",
+            duration = obj.number("duration")?.floatOrNull,
+            size = obj.number("size")?.doubleOrNull?.toLong(),
+            createdAt = obj.string("createdAt"),
         )
     }
 
-    private fun isAllowedAudioDataUrl(dataUrl: String): Boolean {
-        val mime = dataUrl.substringAfter("data:", "").substringBefore(";").substringBefore(",")
-        return ALLOWED_MIME_PREFIXES.any { mime.startsWith(it) }
-    }
+    /** A field only when it holds a JSON string (`typeof === "string"`). */
+    private fun JsonObject.string(key: String): String? =
+        (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+    /** A field only when it holds a JSON number (`Number.isFinite`). */
+    private fun JsonObject.number(key: String): JsonPrimitive? =
+        (this[key] as? JsonPrimitive)?.takeIf { !it.isString && it.doubleOrNull != null }
 
     /** Always the modern v2 shape, never the legacy single-clip one, same
      *  "upgrade on next save" rule DrawingContent/NoteContent apply to

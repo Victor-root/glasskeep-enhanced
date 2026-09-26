@@ -715,7 +715,8 @@ internal fun SettingsCardButton(
 /**
  * The primary gradient button (`SettingsPanel.jsx:1543`, and every other
  * `btn-gradient` call site): `text-sm` 14px/20px/600 white on the button
- * gradient, 8px radius, no shadow at rest, `scale(0.98)` while pressed.
+ * gradient, 8px radius unless [shape] says otherwise (the audio note's
+ * `rounded-full` pills), no shadow at rest, `scale(0.98)` while pressed.
  * A dialog's buttons, which carry no `text-sm`, pass the 16px/24px body
  * size instead.
  */
@@ -733,6 +734,7 @@ internal fun GkGradientButton(
     // workspace accent (see GkConfirmVariant).
     gradient: Brush? = null,
     fontWeight: FontWeight = FontWeight.SemiBold,
+    shape: Shape = RoundedCornerShape(8.dp),
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
@@ -748,7 +750,7 @@ internal fun GkGradientButton(
         modifier = modifier
             .scale(scale)
             .alpha(if (enabled) 1f else 0.5f)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(shape)
             .background(gradient ?: WorkspaceTheme.buttonGradient(themeId))
             .clickable(
                 interactionSource = interactionSource,
@@ -1263,8 +1265,9 @@ internal fun GkTextField(
 }
 
 /** The anchor button's window bounds and the window's width, as the popup
- *  reports them: everything [FooterPopover] needs to place its panel. */
-private data class FooterPopoverAnchor(val bounds: IntRect, val windowWidth: Int)
+ *  reports them, and the side the panel opens on: everything
+ *  [FooterPopover] needs to place and draw its panel. */
+private data class FooterPopoverAnchor(val bounds: IntRect, val windowWidth: Int, val opensBelow: Boolean)
 
 /** Where a footer popover's panel lands, in window pixels, once both its
  *  anchor and its own natural width are known. [arrowLeft] is the arrow
@@ -1287,13 +1290,15 @@ private val FooterPopoverArrowCorner = 4.dp
  * footer button, [gap] above it, kept 8px from the screen edges, with the
  * web's rotated-square arrow pointing back down at the button. None of
  * them animates: the web only reveals them once they are positioned.
+ * Popover.jsx's other users, the audio player's download menu and storage
+ * details, open under their button instead ([below], [flip]).
  *
  * [width] fixes the card's width. Without it the card follows Popover.jsx:
  * measured where the button starts ([minWidth] at least), shifted left
  * when it overflows the screen, then re-flowed in the room left there.
  * [arrowEndInset] is the distance from the right edge under which the
  * arrow squares that bottom corner (32px in Popover.jsx, 36px in the
- * colour panel).
+ * colour panel). Without [arrow] the card keeps all four corners round.
  *
  * The caller places this inside the button's own Box: Compose hands the
  * position provider that button's window bounds, which is exactly what
@@ -1322,6 +1327,11 @@ internal fun FooterPopover(
     // Opens under the anchor with the arrow on top, for anchors near the
     // top of the screen (the selection dock).
     below: Boolean = false,
+    // With [below], Popover.jsx's own rule: when the card would run past
+    // the bottom of the window, it opens above instead, 8px from the top
+    // at most.
+    flip: Boolean = false,
+    arrow: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val density = LocalDensity.current
@@ -1336,7 +1346,7 @@ internal fun FooterPopover(
     val shadowPad = 16.dp
     var anchor by remember { mutableStateOf<FooterPopoverAnchor?>(null) }
     var placement by remember { mutableStateOf<FooterPopoverPlacement?>(null) }
-    val positionProvider = remember(density, gap, placement, below) {
+    val positionProvider = remember(density, gap, placement, below, flip) {
         object : PopupPositionProvider {
             override fun calculatePosition(
                 anchorBounds: IntRect,
@@ -1344,14 +1354,19 @@ internal fun FooterPopover(
                 layoutDirection: LayoutDirection,
                 popupContentSize: IntSize,
             ): IntOffset {
-                anchor = FooterPopoverAnchor(anchorBounds, windowSize.width)
                 val shadowPadPx = with(density) { shadowPad.roundToPx() }
                 val gapPx = with(density) { gap.roundToPx() }
-                return IntOffset(
-                    (placement?.left ?: anchorBounds.left) - shadowPadPx,
-                    if (below) anchorBounds.bottom + gapPx - shadowPadPx
-                    else anchorBounds.top - gapPx - popupContentSize.height + shadowPadPx,
-                )
+                val marginPx = with(density) { 8.dp.roundToPx() }
+                val panelHeight = popupContentSize.height - 2 * shadowPadPx
+                val flipped = flip && anchorBounds.bottom + gapPx + panelHeight + marginPx > windowSize.height
+                val opensBelow = below && !flipped
+                anchor = FooterPopoverAnchor(anchorBounds, windowSize.width, opensBelow)
+                val top = when {
+                    opensBelow -> anchorBounds.bottom + gapPx
+                    flipped -> maxOf(marginPx, anchorBounds.top - gapPx - panelHeight)
+                    else -> anchorBounds.top - gapPx - panelHeight
+                }
+                return IntOffset((placement?.left ?: anchorBounds.left) - shadowPadPx, top - shadowPadPx)
             }
         }
     }
@@ -1361,9 +1376,10 @@ internal fun FooterPopover(
         properties = PopupProperties(focusable = true),
     ) {
         val placed = placement
-        val arrowStart = if (placed?.squareBottomStart == true) FooterPopoverArrowCorner else cornerRadius
-        val arrowEnd = if (placed?.squareBottomEnd == true) FooterPopoverArrowCorner else cornerRadius
-        val shape = if (below) {
+        val opensBelow = anchor?.opensBelow ?: below
+        val arrowStart = if (arrow && placed?.squareBottomStart == true) FooterPopoverArrowCorner else cornerRadius
+        val arrowEnd = if (arrow && placed?.squareBottomEnd == true) FooterPopoverArrowCorner else cornerRadius
+        val shape = if (opensBelow) {
             RoundedCornerShape(topStart = arrowStart, topEnd = arrowEnd, bottomEnd = cornerRadius, bottomStart = cornerRadius)
         } else {
             RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius, bottomEnd = arrowEnd, bottomStart = arrowStart)
@@ -1406,7 +1422,7 @@ internal fun FooterPopover(
                 .drawWithContent {
                     if (placed == null) return@drawWithContent
                     drawContent()
-                    drawFooterPopoverArrow(placed.arrowLeft, background, arrowBorderColor, pointsUp = below)
+                    if (arrow) drawFooterPopoverArrow(placed.arrowLeft, background, arrowBorderColor, pointsUp = opensBelow)
                 },
         ) {
             Column(
@@ -1495,6 +1511,21 @@ internal fun Modifier.blockTouchesBelow(): Modifier = pointerInput(Unit) {}
 internal fun Modifier.tailwindShadowSm(shape: Shape): Modifier = this
     .dropShadow(shape, Shadow(radius = 3.dp, color = Color.Black.copy(alpha = 0.1f), offset = DpOffset(0.dp, 1.dp)))
     .dropShadow(shape, Shadow(radius = 2.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-1).dp, offset = DpOffset(0.dp, 1.dp)))
+
+/** `shadow-md`: 0 4px 6px -1px and 0 2px 4px -2px, both black 10%. */
+internal fun Modifier.tailwindShadowMd(shape: Shape): Modifier = this
+    .dropShadow(shape, Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-1).dp, offset = DpOffset(0.dp, 4.dp)))
+    .dropShadow(shape, Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-2).dp, offset = DpOffset(0.dp, 2.dp)))
+
+/** `shadow-lg`: 0 10px 15px -3px and 0 4px 6px -4px, both black 10%. */
+internal fun Modifier.tailwindShadowLg(shape: Shape): Modifier = this
+    .dropShadow(shape, Shadow(radius = 15.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-3).dp, offset = DpOffset(0.dp, 10.dp)))
+    .dropShadow(shape, Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-4).dp, offset = DpOffset(0.dp, 4.dp)))
+
+/** `shadow-xl`: 0 20px 25px -5px and 0 8px 10px -6px, both black 10%. */
+internal fun Modifier.tailwindShadowXl(shape: Shape): Modifier = this
+    .dropShadow(shape, Shadow(radius = 25.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-5).dp, offset = DpOffset(0.dp, 20.dp)))
+    .dropShadow(shape, Shadow(radius = 10.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-6).dp, offset = DpOffset(0.dp, 8.dp)))
 
 /** Holds a layout's coordinates without making them state: they change on
  *  every scroll, and only a gesture reads them. */

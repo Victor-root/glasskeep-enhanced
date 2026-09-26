@@ -212,4 +212,8 @@ dependencies {
     // it in localStorage; a native app has no such thing, and a session
     // token is not something to leave in plain SharedPreferences).
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // The audio player's "MP3" download (AudioTranscoder.kt): a pure Java
+    // port of LAME, the encoder the web bundles as lamejs.
+    implementation("de.sciss:jump3r:1.0.5")
 }

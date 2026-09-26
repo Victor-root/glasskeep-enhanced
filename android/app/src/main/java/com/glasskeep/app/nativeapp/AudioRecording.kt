@@ -6,7 +6,10 @@ import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.Build
+import android.os.SystemClock
 import android.util.Base64
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
@@ -17,17 +20,28 @@ import java.util.UUID
  * the MIME types the server's own validateAudioContent() accepts (it's
  * what Safari's MediaRecorder produces on the web side too).
  *
- * One instance records at most one clip at a time; call [cancel] or
- * [stopAndFinish] before [start]ing another.
+ * One instance records at most one clip at a time; call [stopAndFinish]
+ * before [start]ing another, and [close] once done with it. [start] and
+ * [stopAndFinish] run off the main thread while [close] may come from it,
+ * so the three take turns on the recorder itself.
  */
 class AudioRecorderController(private val context: Context) {
     private var recorder: MediaRecorder? = null
     private var outputFile: File? = null
+    private var closed = false
+
+    // useAudioRecorder.js's clock: wall time since the start, minus the
+    // time spent paused.
+    private var startedAt = 0L
+    private var pausedAt = 0L
+    private var pausedTotal = 0L
 
     /** True on success. False (and no recorder left running) if the
      *  platform refused to start, e.g. the mic is already in use by
-     *  another app, or genuinely unsupported hardware. */
+     *  another app, or genuinely unsupported hardware, or once closed. */
+    @Synchronized
     fun start(): Boolean {
+        if (closed) return false
         val file = File(context.cacheDir, "audio_rec_${UUID.randomUUID()}.m4a")
         @Suppress("DEPRECATION")
         val rec = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context) else MediaRecorder()
@@ -42,6 +56,9 @@ class AudioRecorderController(private val context: Context) {
             rec.start()
             recorder = rec
             outputFile = file
+            startedAt = SystemClock.elapsedRealtime()
+            pausedAt = 0L
+            pausedTotal = 0L
             true
         } catch (t: Throwable) {
             NativeDebug.e("AudioRecorderController.start failed", t)
@@ -51,42 +68,57 @@ class AudioRecorderController(private val context: Context) {
         }
     }
 
-    /** Stops the recording and returns its data: URL, MIME, duration
-     *  (seconds) and byte size, or null on any failure (including a
-     *  recording so short MediaRecorder captured nothing usable, the same
-     *  "stop() throws with no prior data" case the platform itself
-     *  documents). Must be called off the main thread: reads the whole
-     *  recorded file into memory to base64-encode it. */
-    fun stopAndFinish(): AudioRecordingResult? {
-        val rec = recorder
-        val file = outputFile
-        recorder = null
-        outputFile = null
-        if (rec == null || file == null) return null
-        return try {
+    /** How long the current recording has been capturing, pauses left
+     *  out. */
+    fun elapsedMs(): Long {
+        if (recorder == null) return 0L
+        val now = if (pausedAt != 0L) pausedAt else SystemClock.elapsedRealtime()
+        return (now - startedAt - pausedTotal).coerceAtLeast(0L)
+    }
+
+    /** Stops the recording and returns what it captured. Must be called
+     *  off the main thread: reads the whole recorded file into memory to
+     *  base64-encode it. */
+    fun stopAndFinish(): AudioRecordingOutcome {
+        val (rec, file) = synchronized(this) {
+            val taken = recorder to outputFile
+            recorder = null
+            outputFile = null
+            taken
+        }
+        if (rec == null || file == null) return AudioRecordingOutcome.Failed
+        try {
             try {
                 rec.stop()
             } finally {
                 rec.release()
             }
+        } catch (e: RuntimeException) {
+            // The platform's documented answer to a stop() that came before
+            // any audio did.
+            NativeDebug.e("AudioRecorderController.stopAndFinish: nothing captured", e)
+            file.delete()
+            return AudioRecordingOutcome.Empty
+        }
+        return try {
             val bytes = file.readBytes()
             if (bytes.isEmpty()) {
-                file.delete()
-                return null
+                AudioRecordingOutcome.Empty
+            } else {
+                AudioRecordingOutcome.Recorded(
+                    AudioRecordingResult(
+                        dataUrl = "data:audio/mp4;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP),
+                        mimeType = "audio/mp4",
+                        durationSeconds = readDurationMs(file) / 1000f,
+                        sizeBytes = bytes.size.toLong(),
+                    ),
+                )
             }
-            val durationMs = readDurationMs(file)
-            val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-            file.delete()
-            AudioRecordingResult(
-                dataUrl = "data:audio/mp4;base64,$base64",
-                mimeType = "audio/mp4",
-                durationSeconds = durationMs / 1000f,
-                sizeBytes = bytes.size.toLong(),
-            )
         } catch (t: Throwable) {
             NativeDebug.e("AudioRecorderController.stopAndFinish failed", t)
+            AudioRecordingOutcome.Failed
+        } finally {
             file.delete()
-            null
         }
     }
 
@@ -94,14 +126,29 @@ class AudioRecorderController(private val context: Context) {
      *  since API 24, this app's own minimum. Returns false when the
      *  platform refused (nothing is left in a broken state either way). */
     fun pause(): Boolean = try {
-        recorder?.pause() != null
+        val rec = recorder
+        if (rec == null) {
+            false
+        } else {
+            rec.pause()
+            pausedAt = SystemClock.elapsedRealtime()
+            true
+        }
     } catch (t: Throwable) {
         NativeDebug.e("AudioRecorderController.pause failed", t)
         false
     }
 
     fun resume(): Boolean = try {
-        recorder?.resume() != null
+        val rec = recorder
+        if (rec == null) {
+            false
+        } else {
+            rec.resume()
+            pausedTotal += SystemClock.elapsedRealtime() - pausedAt
+            pausedAt = 0L
+            true
+        }
     } catch (t: Throwable) {
         NativeDebug.e("AudioRecorderController.resume failed", t)
         false
@@ -111,8 +158,12 @@ class AudioRecorderController(private val context: Context) {
      *  the live storage gauge. Zero when nothing is recording. */
     fun currentBytes(): Long = outputFile?.length() ?: 0L
 
-    /** Discards an in-progress recording without saving anything. */
-    fun cancel() {
+    /** Discards any recording in progress for good: a [start] still
+     *  running finishes first and is stopped, a later one records
+     *  nothing. */
+    @Synchronized
+    fun close() {
+        closed = true
         val rec = recorder
         val file = outputFile
         recorder = null
@@ -120,7 +171,7 @@ class AudioRecorderController(private val context: Context) {
         try {
             rec?.stop()
         } catch (t: Throwable) {
-            NativeDebug.e("AudioRecorderController.cancel: stop failed (ignored)", t)
+            NativeDebug.e("AudioRecorderController.close: stop failed (ignored)", t)
         }
         rec?.release()
         file?.delete()
@@ -142,10 +193,18 @@ class AudioRecorderController(private val context: Context) {
 
 data class AudioRecordingResult(val dataUrl: String, val mimeType: String, val durationSeconds: Float, val sizeBytes: Long)
 
+/** How a recording ended: useAudioRecorder.js's READY, or its EMPTY and
+ *  RECORDING_FAILED errors. */
+sealed interface AudioRecordingOutcome {
+    data class Recorded(val result: AudioRecordingResult) : AudioRecordingOutcome
+    data object Empty : AudioRecordingOutcome
+    data object Failed : AudioRecordingOutcome
+}
+
 /** In-memory MediaDataSource over an already-decoded byte array, so a
- *  clip stored as a data: URL can be handed to MediaPlayer directly, no
- *  temp file needed for playback. */
-private class ByteArrayMediaDataSource(private val data: ByteArray) : MediaDataSource() {
+ *  clip stored as a data: URL can be handed to MediaPlayer (or
+ *  AudioTranscoder's MediaExtractor) directly, no temp file needed. */
+internal class ByteArrayMediaDataSource(private val data: ByteArray) : MediaDataSource() {
     override fun readAt(position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
         if (position >= data.size) return -1
         val length = minOf(size.toLong(), data.size - position).toInt()
@@ -159,7 +218,10 @@ private class ByteArrayMediaDataSource(private val data: ByteArray) : MediaDataS
 }
 
 /**
- * Plays one clip at a time through the platform's own MediaPlayer.
+ * Plays one clip at a time through the platform's own MediaPlayer, from
+ * the main thread: the clip is decoded from its data: URL in the
+ * background and prepared asynchronously, and every callback comes back
+ * on the main thread.
  *
  * Native-recorded clips (audio/mp4, AAC) are safe, standard Android
  * territory. An existing clip recorded by the web app is very often
@@ -167,45 +229,56 @@ private class ByteArrayMediaDataSource(private val data: ByteArray) : MediaDataS
  * Opus decoding itself is a mandatory Android codec, but the WebM
  * container demuxer inside the stock MediaPlayer/MediaExtractor stack has
  * a real, documented history of inconsistent support across OS versions
- * and OEMs. Rather than guess either way, [play] always attempts
- * playback and reports a real failure through [onError] (MediaPlayer's
- * own error listener, plus this class's own try/catch around prepare()),
- * so the caller can show "can't play this recording on this device"
- * instead of hanging or crashing when a given device's decoder actually
- * can't handle a given clip.
+ * and OEMs. Rather than guess either way, [load] always attempts playback
+ * and reports a real failure through its onError, so the caller can show
+ * "can't play this recording on this device" instead of hanging or
+ * crashing when a given device's decoder actually can't handle a clip.
  */
 class AudioPlayerController {
     private var player: MediaPlayer? = null
 
-    /** Must be called off the main thread: prepare() is synchronous I/O
-     *  and decoder setup. Returns false immediately if the data: URL
-     *  itself is malformed; a failure that only shows up once the decoder
-     *  actually runs is reported asynchronously through [onError] instead. */
-    fun play(dataUrl: String, onError: () -> Unit, onCompletion: () -> Unit): Boolean {
+    /** True once the loaded clip can play: paused or playing, no longer
+     *  preparing. */
+    var isReady = false
+        private set
+
+    /** Loads [dataUrl], replacing whatever was loaded; [onReady] runs once
+     *  it can start. A malformed URL or a decoder failure, now or later,
+     *  reaches [onError] with nothing left loaded. */
+    suspend fun load(dataUrl: String, onReady: () -> Unit, onError: () -> Unit, onCompletion: () -> Unit) {
         stop()
-        val base64 = dataUrl.substringAfter("base64,", "")
-        if (base64.isEmpty()) {
-            NativeDebug.e("AudioPlayerController.play: not a base64 data: URL")
-            return false
-        }
-        return try {
-            val bytes = Base64.decode(base64, Base64.DEFAULT)
-            val mp = MediaPlayer()
-            mp.setOnErrorListener { _, what, extra ->
-                NativeDebug.e("AudioPlayerController playback error what=$what extra=$extra")
-                onError()
-                true
+        val bytes = withContext(Dispatchers.Default) {
+            try {
+                Base64.decode(dataUrl.substringAfter("base64,", ""), Base64.DEFAULT)
+            } catch (e: IllegalArgumentException) {
+                NativeDebug.e("AudioPlayerController.load: not a base64 data: URL", e)
+                null
             }
-            mp.setOnCompletionListener { onCompletion() }
-            mp.setDataSource(ByteArrayMediaDataSource(bytes))
-            mp.prepare()
-            mp.start()
-            player = mp
-            true
-        } catch (t: Throwable) {
-            NativeDebug.e("AudioPlayerController.play failed", t)
+        }
+        if (bytes == null || bytes.isEmpty()) {
             onError()
-            false
+            return
+        }
+        val mp = MediaPlayer()
+        player = mp
+        mp.setOnPreparedListener {
+            isReady = true
+            onReady()
+        }
+        mp.setOnErrorListener { _, what, extra ->
+            NativeDebug.e("AudioPlayerController playback error what=$what extra=$extra")
+            stop()
+            onError()
+            true
+        }
+        mp.setOnCompletionListener { onCompletion() }
+        try {
+            mp.setDataSource(ByteArrayMediaDataSource(bytes))
+            mp.prepareAsync()
+        } catch (t: Throwable) {
+            NativeDebug.e("AudioPlayerController.load failed", t)
+            stop()
+            onError()
         }
     }
 
@@ -251,19 +324,16 @@ class AudioPlayerController {
         false
     }
 
-    /** Safe to call even with nothing playing. Must be called when the
-     *  screen goes away (see NoteDetailScreen's DisposableEffect): a
+    /** Safe to call even with nothing loaded. Must be called when the
+     *  screen goes away (see AudioClipsSection's DisposableEffect): a
      *  MediaPlayer holds a real native decoder resource that is never
      *  reclaimed on its own just because Compose stopped referencing it. */
     fun stop() {
         val p = player
         player = null
+        isReady = false
         try {
-            p?.stop()
-        } catch (t: Throwable) {
-            NativeDebug.e("AudioPlayerController.stop failed (ignored)", t)
-        }
-        try {
+            // Valid in every state, preparing included, and stops playback.
             p?.release()
         } catch (t: Throwable) {
             NativeDebug.e("AudioPlayerController.release failed (ignored)", t)

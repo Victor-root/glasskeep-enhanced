@@ -2636,7 +2636,7 @@ private fun DrawingCardPreview(
 /** NoteCard.jsx:428-467: up to ten recording rows, then "+N en plus". */
 @Composable
 private fun AudioCardPreview(note: NoteEntity, dark: Boolean, titleColor: Color) {
-    val clips = remember(note.content) { AudioContent.parse(note.content)?.clips.orEmpty() }
+    val clips = remember(note.content) { AudioContent.parse(note.content).clips }
     val subtle = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282)
     if (clips.isEmpty()) {
         Text(
@@ -2666,7 +2666,7 @@ private fun AudioCardPreview(note: NoteEntity, dark: Boolean, titleColor: Color)
                     Modifier.size(24.dp).shadow(1.dp, CircleShape).clip(CircleShape).background(badge),
                     contentAlignment = Alignment.Center,
                 ) {
-                    MicIcon(size = 14.dp, tint = Color.White)
+                    MicrophoneFilledIcon(size = 14.dp, tint = Color.White)
                 }
                 Text(
                     clip.name.ifBlank { stringResource(R.string.native_audio_clip_default_name, index + 1) },
@@ -2678,9 +2678,10 @@ private fun AudioCardPreview(note: NoteEntity, dark: Boolean, titleColor: Color)
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                if (clip.duration > 0f) {
+                val duration = clip.duration
+                if (duration != null && duration > 0f) {
                     Text(
-                        formatDuration(clip.duration),
+                        formatDuration(duration),
                         color = titleColor.copy(alpha = 0.7f),
                         fontSize = 11.sp,
                         lineHeight = 16.5.sp,

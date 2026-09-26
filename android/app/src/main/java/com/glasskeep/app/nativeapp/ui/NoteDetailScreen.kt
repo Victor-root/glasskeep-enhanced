@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -132,6 +133,7 @@ import androidx.compose.ui.unit.sp
 import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
+import com.glasskeep.app.nativeapp.AudioDownloadFormat
 import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
@@ -224,7 +226,7 @@ private data class Editability(
     val originalDrawingPaths: List<DrawingStrokeDto>? = null,
     val originalDrawingDimensions: DrawingDimensionsDto? = null,
     val originalDrawingCaptionText: String? = null,
-    /** True when AudioContent.parse approved an "audio" note's content.
+    /** True for an "audio" note, whatever AudioContent.parse made of it.
      *  Same autosave-no-button pattern as drawing (see scheduleAudioAutosave),
      *  the live, edited clip list is the top-level `audioClips` state. */
     val isAudioType: Boolean = false,
@@ -1156,7 +1158,7 @@ fun NoteDetailScreen(
         scheduleDrawingAutosave()
     }
 
-    // ---------- Audio note edits (AudioContent.parse-approved notes only) ----------
+    // ---------- Audio note edits ----------
 
     /** Same debounced shape as scheduleDrawingAutosave. */
     fun scheduleAudioAutosave() {
@@ -1387,8 +1389,15 @@ fun NoteDetailScreen(
         val live = liveNoteSnapshot() ?: current
         scope.launch(Dispatchers.IO) {
             val ok = if (live.type == "audio") {
-                val clip = AudioContent.parse(live.content)?.clips?.firstOrNull()
-                clip != null && NoteExporter.exportAudio(context, clip, clip.name.ifBlank { live.title })
+                // App.jsx:4805-4819: the first clip as recorded, named after
+                // the note.
+                val clip = AudioContent.parse(live.content).clips.firstOrNull()
+                clip != null && NoteExporter.exportAudio(
+                    context,
+                    clip,
+                    live.title.ifEmpty { "audio-${live.id}" },
+                    AudioDownloadFormat.ORIGINAL,
+                )
             } else {
                 NoteExporter.exportTextFile(
                     context,
@@ -1571,19 +1580,15 @@ fun NoteDetailScreen(
                 }
                 "audio" -> {
                     val audio = AudioContent.parse(fetched.content)
-                    if (audio != null) {
-                        Editability(
-                            isTextType = false,
-                            bodyEditable = false,
-                            isLegacyPlain = false,
-                            bodyPlainText = "",
-                            isAudioType = true,
-                            originalAudioClips = audio.clips,
-                            originalAudioCaptionText = audio.text,
-                        )
-                    } else {
-                        Editability(isTextType = false, bodyEditable = false, isLegacyPlain = false, bodyPlainText = "")
-                    }
+                    Editability(
+                        isTextType = false,
+                        bodyEditable = false,
+                        isLegacyPlain = false,
+                        bodyPlainText = "",
+                        isAudioType = true,
+                        originalAudioClips = audio.clips,
+                        originalAudioCaptionText = audio.text,
+                    )
                 }
                 else -> Editability(isTextType = false, bodyEditable = false, isLegacyPlain = false, bodyPlainText = "")
             }
@@ -2209,6 +2214,37 @@ fun NoteDetailScreen(
                 }
             }
 
+            // Outside the sticky bar on purpose: the title scrolls away
+            // with the content, which is what ModalHeader.jsx does on a
+            // phone (and only there). Its 20dp side padding against the
+            // body's 24dp is the web's own deliberate 4px offset.
+            @Composable
+            fun NoteTitle(edit: Editability) {
+                NoteTitleField(
+                    value = titleText,
+                    enabled = !isNoteReadOnly &&
+                        (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType),
+                    // The web drops the field entirely and prints the
+                    // title as text whenever the note shows its read
+                    // face (ModalHeader.jsx:265). Checklists are its
+                    // documented exception: their body stays
+                    // interactive, so their title does too.
+                    asText = (edit.isRichEditableType && viewMode) ||
+                        (edit.isDrawType && viewMode) ||
+                        (isNoteReadOnly && !edit.isChecklistType),
+                    titleColor = titleColor,
+                    placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
+                    onValueChange = { raw ->
+                        // Enter alone jumps to the body, typing
+                        // nothing (ModalHeader.jsx:65-80); any other
+                        // newline, a pasted one, is flattened to a
+                        // space: a title is single-line everywhere.
+                        val enterOnly = raw.count { it == '\n' } == 1 && raw.replace("\n", "") == titleText
+                        if (enterOnly) focusBodyFromTitle() else titleText = raw.replace(TitleNewlines, " ")
+                    },
+                )
+            }
+
             when {
                 loadError != null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(loadError.orEmpty(), color = ErrorColor, modifier = Modifier.padding(24.dp))
@@ -2245,6 +2281,48 @@ fun NoteDetailScreen(
                         }
                     }
                 }
+                editability?.isAudioType == true -> {
+                    val currentNote = note!!
+                    val stamp = editedStampText(currentNote, todayLabel, yesterdayLabel)
+                    // An audio note does not scroll: its body fills the note,
+                    // the clip list scrolling inside its own box, over a
+                    // bottom row pairing the storage gauge with the Edited
+                    // stamp (NoteModal.jsx:654, 756, 866-885).
+                    Column(Modifier.weight(1f).fillMaxWidth()) {
+                        NoteTitle(editability!!)
+                        NoteBanners(currentNote)
+                        ModalContentFade(
+                            key = viewMode,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
+                        ) {
+                            AudioClipsSection(
+                                clips = audioClips,
+                                noteTitle = titleText,
+                                accent = audioAccentColor(currentNote.color, dark),
+                                themeId = container.themeState.themeId,
+                                dark = dark,
+                                textColor = titleColor,
+                                borderColor = borderColor,
+                                readOnly = isNoteReadOnly,
+                                onClipAdded = { clip -> addAudioClip(clip) },
+                                onClipRemoved = { id -> removeAudioClip(id) },
+                                onClipRenamed = { id, newName -> renameAudioClip(id, newName) },
+                                modifier = Modifier.weight(1f),
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                AudioStorageGauge(usedBytes = totalClipBytes(audioClips), dark = dark, borderColor = borderColor)
+                                if (stamp != null) EditedStamp(stamp, currentNote.id, dark, Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
                 else -> {
                     val currentNote = note!!
                     val edit = editability!!
@@ -2259,34 +2337,7 @@ fun NoteDetailScreen(
                                 .onGloballyPositioned { contentCoordinates.value = it }
                                 .verticalScroll(contentScroll),
                         ) {
-                            // Outside the sticky bar on purpose: the title
-                            // scrolls away with the content, which is what
-                            // ModalHeader.jsx does on a phone (and only there).
-                            // Its 20dp side padding against the body's 24dp is
-                            // the web's own deliberate 4px offset.
-                            NoteTitleField(
-                                value = titleText,
-                                enabled = !isNoteReadOnly &&
-                                    (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType),
-                                // The web drops the field entirely and prints the
-                                // title as text whenever the note shows its read
-                                // face (ModalHeader.jsx:265). Checklists are its
-                                // documented exception: their body stays
-                                // interactive, so their title does too.
-                                asText = (edit.isRichEditableType && viewMode) ||
-                                    (edit.isDrawType && viewMode) ||
-                                    (isNoteReadOnly && !edit.isChecklistType),
-                                titleColor = titleColor,
-                                placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
-                                onValueChange = { raw ->
-                                    // Enter alone jumps to the body, typing
-                                    // nothing (ModalHeader.jsx:65-80); any other
-                                    // newline, a pasted one, is flattened to a
-                                    // space: a title is single-line everywhere.
-                                    val enterOnly = raw.count { it == '\n' } == 1 && raw.replace("\n", "") == titleText
-                                    if (enterOnly) focusBodyFromTitle() else titleText = raw.replace(TitleNewlines, " ")
-                                },
-                            )
+                            NoteTitle(edit)
 
                             if (edit.isTextType || edit.isChecklistType || edit.isDrawType) {
                                 NoteImagesSection(
@@ -2298,26 +2349,15 @@ fun NoteDetailScreen(
 
                             NoteBanners(currentNote)
 
-                            // .modal-content-fade: the content area is re-keyed on
-                            // view / edit / draw, and fades in 4px from below
-                            // (200ms ease-out) each time, drawing excepted.
-                            val contentFade = remember { Animatable(0f) }
-                            LaunchedEffect(viewMode) {
-                                contentFade.snapTo(0f)
-                                contentFade.animateTo(1f, tween(durationMillis = 200, easing = EaseOut))
-                            }
-                            Column(
+                            ModalContentFade(
+                                key = viewMode,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .graphicsLayer {
-                                        alpha = contentFade.value
-                                        translationY = (1f - contentFade.value) * 4.dp.toPx()
-                                    }
                                     .padding(
-                                        when {
-                                            edit.isDrawType -> PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp)
-                                            edit.isAudioType -> PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp)
-                                            else -> PaddingValues(start = 24.dp, top = 4.dp, end = 24.dp, bottom = 16.dp)
+                                        if (edit.isDrawType) {
+                                            PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp)
+                                        } else {
+                                            PaddingValues(start = 24.dp, top = 4.dp, end = 24.dp, bottom = 16.dp)
                                         },
                                     ),
                             ) {
@@ -2382,31 +2422,6 @@ fun NoteDetailScreen(
                                         }
                                     }
                                     DrawingPreview(paths = drawingPaths, dimensions = drawingDimensions, dark = dark)
-                                } else if (edit.isAudioType) {
-                                    AudioClipsSection(
-                                        clips = audioClips,
-                                        accent = audioAccentColor(currentNote.color, dark),
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        subtextColor = subtextColor,
-                                        borderColor = borderColor,
-                                        enabled = true,
-                                        onClipAdded = { clip -> addAudioClip(clip) },
-                                        onClipRemoved = { id -> removeAudioClip(id) },
-                                        onClipRenamed = { id, newName -> renameAudioClip(id, newName) },
-                                        onClipDownload = { clip ->
-                                            scope.launch(Dispatchers.IO) {
-                                                val ok = NoteExporter.exportAudio(
-                                                    context,
-                                                    clip,
-                                                    clip.name.ifBlank { titleText },
-                                                )
-                                                if (!ok) withContext(Dispatchers.Main) {
-                                                    toasts.error(downloadErrorMessage)
-                                                }
-                                            }
-                                        },
-                                    )
                                 } else if (!edit.isTextType) {
                                     Box(
                                         modifier = Modifier
@@ -3611,6 +3626,25 @@ private fun Modifier.footerShadow(dark: Boolean): Modifier = drawBehind {
 
 private const val FooterShadowSteps = 8
 
+/** `.modal-content-fade`: the note's content area, re-keyed on view /
+ *  edit / draw on the web, fades in 4px from below (200ms ease-out) as it
+ *  appears and each time [key] changes. */
+@Composable
+private fun ModalContentFade(key: Any?, modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val fade = remember { Animatable(0f) }
+    LaunchedEffect(key) {
+        fade.snapTo(0f)
+        fade.animateTo(1f, tween(durationMillis = 200, easing = EaseOut))
+    }
+    Column(
+        modifier = modifier.graphicsLayer {
+            alpha = fade.value
+            translationY = (1f - fade.value) * 4.dp.toPx()
+        },
+        content = content,
+    )
+}
+
 /** The "Edited:" line and its ⓘ, whose tooltip names the note id. */
 @Composable
 private fun EditedStamp(stamp: String, noteId: String, dark: Boolean, modifier: Modifier) {
@@ -4377,9 +4411,7 @@ private fun BoxScope.CollaboratorCountBadge(count: Int, dark: Boolean) {
             .align(Alignment.TopEnd)
             // The ring sits outside the 14px disc that -top-0.5/-right-0.5 place.
             .offset(x = 3.5.dp, y = (-3.5).dp)
-            // shadow-md
-            .dropShadow(CircleShape, Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.10f), spread = (-1).dp, offset = DpOffset(0.dp, 4.dp)))
-            .dropShadow(CircleShape, Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.10f), spread = (-2).dp, offset = DpOffset(0.dp, 2.dp)))
+            .tailwindShadowMd(CircleShape)
             .border(1.5.dp, if (dark) Color(0xFF1E2939) else Color.White, CircleShape)
             .padding(1.5.dp)
             .defaultMinSize(minWidth = 14.dp, minHeight = 14.dp)

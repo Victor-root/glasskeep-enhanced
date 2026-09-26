@@ -96,7 +96,6 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -1386,9 +1385,7 @@ private fun ChecklistSectionColorPicker(
     ) {
         Column(
             modifier = Modifier
-                // shadow-xl.
-                .dropShadow(shape, Shadow(radius = 25.dp, color = Color.Black.copy(alpha = 0.10f), spread = (-5).dp, offset = DpOffset(0.dp, 20.dp)))
-                .dropShadow(shape, Shadow(radius = 10.dp, color = Color.Black.copy(alpha = 0.10f), spread = (-6).dp, offset = DpOffset(0.dp, 8.dp)))
+                .tailwindShadowXl(shape)
                 .clip(shape)
                 .background(if (dark) Color(0xFF1E2939) else Color.White)
                 .border(1.dp, if (dark) DarkBorderColor else LightBorderColor, shape)
