@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
@@ -15,6 +16,8 @@ import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -1947,7 +1950,7 @@ fun NoteDetailScreen(
     // Neither a raw recording nor a drawing being drawn has anything to
     // ask about, so neither offers the panel (NoteModal.jsx:522-525).
     val noteAiAvailable = container.shellPrefs.aiAssistantEnabled &&
-        editability?.isAudioType != true && editability?.isDrawType != true
+        editability?.isAudioType != true && !(editability?.isDrawType == true && drawingCanvasMode)
     val imageButtonColor = if (dark) Color(0xFF7dd3fc) else Color(0xFF0284c7)
 
     // The panel is a .glass-card: a 1px border at the screen edges, with
@@ -2806,8 +2809,13 @@ fun NoteDetailScreen(
         }
 
         // Over the whole note, the web's own `.note-ai-panel-mobile`
-        // (a fixed inset-0 layer, NoteModal.jsx:1131-1143).
-        if (noteAiOpen && noteAiAvailable) {
+        // (a fixed inset-0 layer, NoteModal.jsx:1131-1143), sliding in from
+        // the right in 0.32s and back out in 0.28s.
+        AnimatedVisibility(
+            visible = noteAiOpen && noteAiAvailable,
+            enter = slideInHorizontally(tween(320, easing = CubicBezierEasing(0.22f, 1f, 0.36f, 1f))) { it },
+            exit = slideOutHorizontally(tween(280, easing = CubicBezierEasing(0.55f, 0f, 0.55f, 0.6f))) { it },
+        ) {
             NoteAiChatPanel(
                 messages = noteAiMessages,
                 loading = noteAiLoading,
@@ -2815,8 +2823,7 @@ fun NoteDetailScreen(
                 saved = noteAiSaved,
                 background = modalBg,
                 dark = dark,
-                titleColor = titleColor,
-                borderColor = borderColor,
+                typography = container.editorPrefs.typography.activeProfile,
                 onSend = { question -> sendNoteAiMessage(question) },
                 onStop = { stopNoteAi() },
                 // Back keeps the thread, the X throws it away unless it

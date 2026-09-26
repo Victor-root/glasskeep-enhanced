@@ -47,10 +47,14 @@ object MarkdownDoc {
     }
 
     /** Markdown as blocks. Empty (or blank) input gives one empty
-     *  paragraph, same as the web's own emptyRichDoc(). */
-    fun toRichBlocks(markdown: String): List<RichBlock> {
+     *  paragraph, same as the web's own emptyRichDoc(). [keepBlankLines]
+     *  is renderSafeMarkdown's reading (utils/markdown.jsx), where every
+     *  blank line becomes a one-line spacer, fenced code excepted. */
+    fun toRichBlocks(markdown: String, keepBlankLines: Boolean = false): List<RichBlock> {
         if (markdown.isBlank()) return listOf(RichDoc.newBlock())
-        val lines = markdown.replace("\r\n", "\n").replace('\r', '\n').split("\n")
+        val normalized = markdown.replace("\r\n", "\n").replace('\r', '\n')
+        val source = if (keepBlankLines) markBlankLines(normalized) else normalized
+        val lines = source.split("\n")
         val blocks = mutableListOf<RichBlock>()
         val paragraph = mutableListOf<String>()
 
@@ -81,6 +85,12 @@ object MarkdownDoc {
                     RichDoc.newBlock(RichBlockKind.CODE_BLOCK)
                         .copy(text = body.joinToString("\n"), language = language),
                 )
+                index++
+                continue
+            }
+            if (line == BLANK_LINE_MARKER) {
+                flushParagraph()
+                blocks.add(RichDoc.newBlock())
                 index++
                 continue
             }
@@ -151,6 +161,25 @@ object MarkdownDoc {
         }
         flushParagraph()
         return blocks.ifEmpty { listOf(RichDoc.newBlock()) }
+    }
+
+    private const val BLANK_LINE_MARKER = "\u0000blank\u0000"
+    private val CODE_FENCE_SPAN = Regex("```[\\s\\S]*?```")
+    private val BLANK_RUN = Regex("\n{2,}")
+    private val CODE_PLACEHOLDER = Regex("\u0000code(\\d+)\u0000")
+
+    /** renderSafeMarkdown's spacers: a run of n newlines outside fenced
+     *  code keeps its paragraph break and gains n - 1 spacer lines. */
+    private fun markBlankLines(text: String): String {
+        val code = mutableListOf<String>()
+        val shielded = CODE_FENCE_SPAN.replace(text) { match ->
+            code.add(match.value)
+            "\u0000code${code.size - 1}\u0000"
+        }
+        val marked = BLANK_RUN.replace(shielded) { match ->
+            "\n\n" + "$BLANK_LINE_MARKER\n\n".repeat(match.value.length - 1)
+        }
+        return CODE_PLACEHOLDER.replace(marked) { match -> code[match.groupValues[1].toInt()] }
     }
 
     /** One list nesting step is two spaces on the web's own exporter, but

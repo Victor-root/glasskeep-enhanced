@@ -1896,7 +1896,7 @@ private fun AiAnswerCard(
             AiThinkingLine()
         } else if (answer != null) {
             RichTextReader(
-                blocks = remember(answer) { MarkdownDoc.toRichBlocks(answer) },
+                blocks = remember(answer) { MarkdownDoc.toRichBlocks(answer, keepBlankLines = true) },
                 typography = TypographyPresets.DEFAULT.activeProfile,
                 taskStrike = false,
                 dark = dark,
@@ -2467,7 +2467,7 @@ internal fun NoteCard(
                         val richDoc = NoteContent.parseRichDoc(note.content)
                         val raw = richDoc?.let { NoteContent.docToPlainText(it) } ?: note.content
                         val source = if (raw.length > 350) raw.take(350).trimEnd() + "…" else raw
-                        MarkdownDoc.toRichBlocks(source).take(8)
+                        MarkdownDoc.toRichBlocks(source, keepBlankLines = true).take(8)
                     }
                 }
                 if (previewBlocks.any { it.text.isNotBlank() || it.kind == com.glasskeep.app.nativeapp.data.RichBlockKind.DIVIDER }) {

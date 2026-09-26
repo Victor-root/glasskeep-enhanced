@@ -1498,9 +1498,10 @@ fun ChevronLeftIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color
     modifier, size, tint,
 )
 
-/** tabler/player-stop-filled.svg. */
+/** tabler/player-stop-filled.svg as the web draws it inside a
+ *  `.tabler-icon`, whose rule strips the fill: an outlined square. */
 @Composable
-fun StopFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+fun PlayerStopIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
     "M17 4h-10a3 3 0 0 0 -3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3 -3v-10a3 3 0 0 0 -3 -3z",
     modifier, size, tint,
 )

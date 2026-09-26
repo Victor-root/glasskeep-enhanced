@@ -1144,11 +1144,11 @@ fun RichLinkDialog(
  * and emphasis look like a note's.
  */
 @Composable
-fun MarkdownText(markdown: String, color: Color, dark: Boolean) {
-    val blocks = remember(markdown) { MarkdownDoc.toRichBlocks(markdown) }
+fun MarkdownText(markdown: String, color: Color, dark: Boolean, typography: TypographyProfile) {
+    val blocks = remember(markdown) { MarkdownDoc.toRichBlocks(markdown, keepBlankLines = true) }
     RichTextReader(
         blocks = blocks,
-        typography = TypographyPresets.DEFAULT.activeProfile,
+        typography = typography,
         taskStrike = false,
         dark = dark,
         titleColor = color,
