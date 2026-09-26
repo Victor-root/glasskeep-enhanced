@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Response
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.concurrent.TimeUnit
 
 /**
  * Attaches `Authorization: Bearer <token>` to every request once the user
@@ -27,6 +28,28 @@ private class AuthInterceptor(private val tokenStore: TokenStore) : Interceptor 
             chain.request()
         }
         return chain.proceed(request)
+    }
+}
+
+/** The header a service method sets to give its request its own timeout,
+ *  in milliseconds; [RequestTimeoutInterceptor] applies it and takes it
+ *  off before the request leaves. */
+internal const val REQUEST_TIMEOUT_HEADER = "X-GlassKeep-Timeout-Ms"
+
+/**
+ * The web's `api(path, { timeoutMs })` for the few requests that wait on
+ * something slower than the server itself (an AI provider's first answer):
+ * their connect, write and read timeouts become the one they declare.
+ */
+private class RequestTimeoutInterceptor : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val timeoutMs = request.header(REQUEST_TIMEOUT_HEADER)?.toIntOrNull() ?: return chain.proceed(request)
+        return chain
+            .withConnectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+            .withWriteTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+            .withReadTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+            .proceed(request.newBuilder().removeHeader(REQUEST_TIMEOUT_HEADER).build())
     }
 }
 
@@ -73,6 +96,7 @@ object ApiClientFactory {
     fun okHttpClient(tokenStore: TokenStore, onInstanceLocked: () -> Unit): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(AuthInterceptor(tokenStore))
+            .addInterceptor(RequestTimeoutInterceptor())
             .addInterceptor(InstanceLockInterceptor(onInstanceLocked))
             // A no-op in release, see NetworkLogging.kt's two versions.
             .addNetworkLogging()

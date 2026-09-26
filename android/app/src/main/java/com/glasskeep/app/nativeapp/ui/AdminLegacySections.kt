@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -49,9 +48,6 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativePasskeys
 import com.glasskeep.app.nativeapp.PasskeyCeremonyResult
 import com.glasskeep.app.nativeapp.data.network.ActivateEncryptionRequest
-import com.glasskeep.app.nativeapp.data.network.AdminAiSettingsDto
-import com.glasskeep.app.nativeapp.data.network.AdminAiSettingsRequest
-import com.glasskeep.app.nativeapp.data.network.AdminAiTestRequest
 import com.glasskeep.app.nativeapp.data.network.ChangeEncryptionPassphraseRequest
 import com.glasskeep.app.nativeapp.data.network.DeactivateEncryptionRequest
 import com.glasskeep.app.nativeapp.data.network.FederationAcceptRequest
@@ -82,70 +78,6 @@ import retrofit2.Response
 // The server version block and the AI, encryption and federation sections
 // as they were before the admin panel took the web's shape. Each is
 // replaced by its web rebuild in turn.
-
-@Composable
-internal fun LegacyAdminAiSection(api: GlassKeepApi, dark: Boolean, title: Color, subtext: Color, border: Color) {
-    val scope = rememberCoroutineScope()
-    var config by remember { mutableStateOf<AdminAiSettingsDto?>(null) }
-    var enabled by remember { mutableStateOf(false) }
-    var share by remember { mutableStateOf(false) }
-    var privateEndpoints by remember { mutableStateOf(false) }
-    var baseUrl by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
-    var temperature by remember { mutableStateOf("0.3") }
-    var maxTokens by remember { mutableStateOf("800") }
-    var busy by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
-
-    fun apply(fresh: AdminAiSettingsDto) {
-        config = fresh; enabled = fresh.enabled; share = fresh.allowServerAiForUsers
-        privateEndpoints = fresh.allowPrivateAiForUsers; baseUrl = fresh.baseUrl; model = fresh.model
-        temperature = fresh.temperature.toString(); maxTokens = fresh.maxTokens.toString(); apiKey = ""
-    }
-    fun body() = AdminAiSettingsRequest(
-        enabled, baseUrl.trim(), model.trim(), temperature.toDoubleOrNull()?.coerceIn(0.0, 2.0) ?: 0.3,
-        maxTokens.toIntOrNull()?.coerceIn(1, 32768) ?: 800, share && enabled, privateEndpoints && enabled,
-        apiKey = apiKey.takeIf { it.isNotEmpty() },
-    )
-    LaunchedEffect(Unit) {
-        try { apply(api.getAdminAiSettings().requireBody("AI settings")) } catch (t: Throwable) { message = t.message }
-    }
-    fun run(block: suspend () -> Unit) {
-        if (busy) return; busy = true; message = null
-        scope.launch { try { block() } catch (t: Throwable) { message = t.message } finally { busy = false } }
-    }
-
-    AdminBlock {
-        AdminHeading(R.string.native_admin_ai_server, title)
-        CheckRow(stringResource(R.string.native_admin_ai_enabled), enabled, title) { enabled = it; if (!it) { share = false; privateEndpoints = false } }
-        CheckRow(stringResource(R.string.native_admin_ai_share), share, title, enabled) { share = it }
-        CheckRow(stringResource(R.string.native_admin_ai_private), privateEndpoints, title, enabled) { privateEndpoints = it }
-        AdminField(baseUrl, { baseUrl = it }, R.string.native_admin_ai_url, title, subtext, border)
-        AdminField(model, { model = it }, R.string.native_admin_ai_model, title, subtext, border)
-        AdminField(apiKey, { apiKey = it }, if (config?.hasApiKey == true) R.string.native_admin_ai_key_keep else R.string.native_admin_ai_key, title, subtext, border, password = true)
-        if (config?.hasApiKey == true) {
-            SmallAction(stringResource(R.string.native_admin_ai_key_clear), danger = true, enabled = !busy) {
-                run { apply(api.putAdminAiSettings(body().copy(apiKey = "")).requireBody("clear AI key")); message = "OK" }
-            }
-        }
-        AdminField(temperature, { temperature = it }, R.string.native_admin_ai_temperature, title, subtext, border, numeric = true)
-        AdminField(maxTokens, { maxTokens = it }, R.string.native_admin_ai_tokens, title, subtext, border, numeric = true)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallAction(stringResource(R.string.native_admin_ai_test), enabled = !busy) {
-                run {
-                    val request = body()
-                    val result = api.testAdminAi(AdminAiTestRequest(request.baseUrl, request.model, request.temperature, request.maxTokens, request.apiKey)).requireBody("AI test")
-                    message = result.reply ?: stringResourceUnavailable
-                }
-            }
-            AdminPrimary(stringResource(R.string.native_admin_save), !busy) {
-                run { apply(api.putAdminAiSettings(body()).requireBody("save AI")); message = "OK" }
-            }
-        }
-        message?.let { AdminHintText(it, if (it == "OK") Color(0xFF16A34A) else subtext) }
-    }
-}
 
 @Composable
 internal fun LegacyAdminSecuritySection(
@@ -460,14 +392,6 @@ private fun AdminField(
 }
 
 @Composable
-private fun CheckRow(label: String, checked: Boolean, color: Color, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = color, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        Checkbox(checked = checked, onCheckedChange = onChange, enabled = enabled)
-    }
-}
-
-@Composable
 private fun AdminPrimary(label: String, enabled: Boolean, onClick: () -> Unit) {
     Button(onClick = onClick, enabled = enabled, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))) { Text(label) }
 }
@@ -510,4 +434,3 @@ private suspend fun <T> Response<T>.requireBody(action: String): T {
     throw IllegalStateException("$action: HTTP ${code()}${if (detail.isBlank()) "" else " · $detail"}")
 }
 
-private const val stringResourceUnavailable = "Connection succeeded"

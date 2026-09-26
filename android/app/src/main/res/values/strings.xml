@@ -923,18 +923,6 @@
     <string name="native_admin_confirm">Confirm</string>
     <string name="native_admin_cancel">Cancel</string>
     <string name="native_admin_remove">Remove</string>
-    <string name="native_admin_ai_server">Server AI configuration</string>
-    <string name="native_admin_ai_enabled">Enable AI on this instance</string>
-    <string name="native_admin_ai_share">Allow users to use the server AI</string>
-    <string name="native_admin_ai_private">Allow user AI endpoints on the private network</string>
-    <string name="native_admin_ai_url">OpenAI-compatible base URL</string>
-    <string name="native_admin_ai_model">Model</string>
-    <string name="native_admin_ai_key">API key</string>
-    <string name="native_admin_ai_key_keep">API key (leave blank to keep current key)</string>
-    <string name="native_admin_ai_key_clear">Clear stored API key</string>
-    <string name="native_admin_ai_temperature">Temperature (0–2)</string>
-    <string name="native_admin_ai_tokens">Maximum tokens</string>
-    <string name="native_admin_ai_test">Test connection</string>
     <string name="native_admin_encryption">At-rest encryption</string>
     <string name="native_admin_encryption_off">Encryption is disabled. Activating it encrypts all existing notes.</string>
     <string name="native_admin_encryption_on">Encryption is enabled and the instance is unlocked.</string>
@@ -1121,6 +1109,15 @@
     <string name="native_admin_background_removed">Background removed</string>
     <string name="native_admin_upload_failed">Upload failed.</string>
     <string name="native_admin_ai_section">AI assistant</string>
+    <string name="native_admin_ai_enable_label">Enable server AI</string>
+    <string name="native_admin_ai_enable_desc">When off, the server-wide AI integration is fully disabled.</string>
+    <string name="native_admin_ai_share_label">Share server AI with users</string>
+    <string name="native_admin_ai_share_desc">When on, users can opt to use this server AI from their own settings. They never see the base URL, model or API key.</string>
+    <string name="native_admin_ai_private_label">Let users reach local addresses</string>
+    <string name="native_admin_ai_private_desc">Allows each user to point their own provider at a private network address, such as a model running on their own machine. Off by default: without it, any account could make the server connect to a machine on your network and read back what answered. Pointing at the provider configured above never needs this.</string>
+    <string name="native_admin_ai_provider_label">Provider</string>
+    <string name="native_admin_ai_provider_value">OpenAI-compatible</string>
+    <string name="native_admin_ai_provider_hint">Works with any endpoint exposing /v1/chat/completions: Ollama, Open WebUI, LiteLLM, LM Studio, OpenAI, OpenRouter, …</string>
     <string name="native_admin_encryption_section">At-rest encryption (server-side)</string>
     <string name="native_admin_federation_section">Cross-server collaboration</string>
     <!-- The web's t("error"): there is no such key, so it prints the key itself. -->

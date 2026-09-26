@@ -110,6 +110,7 @@ fun AdminScreen(
     val scope = rememberCoroutineScope()
     val state = remember(serverUrl) { AdminPanelState(context, container, serverUrl, scope) }
     val power = remember(serverUrl) { ServerPower(context, state.api, toasts, activity) }
+    val ai = remember(serverUrl) { AdminAiState(context, state.api, toasts) }
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
     val scrollState = rememberScrollState()
@@ -126,8 +127,16 @@ fun AdminScreen(
     var confirmPower by remember { mutableStateOf<PowerAction?>(null) }
 
     // openAdminPanel(): everything is read afresh each time it opens.
-    LaunchedEffect(state) { state.loadAll() }
-    LaunchedEffect(state, liveEvents) { liveEvents.collect { state.onLiveEvent(it) } }
+    LaunchedEffect(state) {
+        launch { state.loadAll() }
+        launch { ai.load() }
+    }
+    LaunchedEffect(state, liveEvents) {
+        liveEvents.collect { type ->
+            state.onLiveEvent(type)
+            if (type == "admin_ai_settings_updated") ai.reload()
+        }
+    }
     // Sent from the settings' passkey notice, the panel opens with that
     // section unfolding (App.jsx:7576) and the row is pointed out until
     // its flag clears, 3.6s on (AdminPanel.jsx:119-124).
@@ -215,17 +224,15 @@ fun AdminScreen(
                     titleColor = titleColor,
                     borderColor = borderColor,
                 )
-                SettingsAccordionSection(
-                    title = stringResource(R.string.native_admin_ai_section),
+                AdminAiSection(
+                    ai = ai,
                     expanded = aiOpen,
+                    onToggle = { aiOpen = !aiOpen },
                     themeId = themeId,
                     dark = dark,
                     titleColor = titleColor,
-                    icon = { tint -> BrainIcon(size = 20.dp, tint = tint) },
-                    onToggle = { aiOpen = !aiOpen },
-                ) {
-                    LegacyAdminAiSection(state.api, dark, titleColor, SettingsSubtleColor, borderColor)
-                }
+                    borderColor = borderColor,
+                )
                 SettingsAccordionSection(
                     title = stringResource(R.string.native_admin_encryption_section),
                     expanded = encryptionOpen,

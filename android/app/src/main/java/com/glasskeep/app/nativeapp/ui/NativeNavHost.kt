@@ -166,7 +166,7 @@ fun NativeNavHost(
                 adminEvents.tryEmit(type)
                 when (type) {
                     "admin_settings_updated", "logo_added", "logo_deleted" -> brandingPokes++
-                    in AdminListEvents -> Unit
+                    in AdminPanelEvents -> Unit
                     else -> {
                         preferencePokes++
                         if (type == "user_ai_settings_updated") aiSettingsPokes++
@@ -785,12 +785,13 @@ private val NoteRise = 14.dp
 
 private const val AdminRoute = "admin?focus={focus}"
 
-/** The frames that only change the admin panel's own lists. */
-private val AdminListEvents = setOf(
+/** The frames only the admin panel follows. */
+private val AdminPanelEvents = setOf(
     "pending_user_registered",
     "pending_user_resolved",
     "user_list_changed",
     "user_deleted_notification",
+    "admin_ai_settings_updated",
 )
 
 /** The full-width sheets that slide in from the right over the notes. */

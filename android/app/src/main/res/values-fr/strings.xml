@@ -912,18 +912,6 @@
     <string name="native_admin_confirm">Confirmer</string>
     <string name="native_admin_cancel">Annuler</string>
     <string name="native_admin_remove">Retirer</string>
-    <string name="native_admin_ai_server">Configuration de l’IA serveur</string>
-    <string name="native_admin_ai_enabled">Activer l’IA sur cette instance</string>
-    <string name="native_admin_ai_share">Autoriser les utilisateurs à employer l’IA serveur</string>
-    <string name="native_admin_ai_private">Autoriser les endpoints IA utilisateurs sur le réseau privé</string>
-    <string name="native_admin_ai_url">URL de base compatible OpenAI</string>
-    <string name="native_admin_ai_model">Modèle</string>
-    <string name="native_admin_ai_key">Clé API</string>
-    <string name="native_admin_ai_key_keep">Clé API (laisser vide pour conserver la clé actuelle)</string>
-    <string name="native_admin_ai_key_clear">Effacer la clé API enregistrée</string>
-    <string name="native_admin_ai_temperature">Température (0–2)</string>
-    <string name="native_admin_ai_tokens">Nombre maximal de tokens</string>
-    <string name="native_admin_ai_test">Tester la connexion</string>
     <string name="native_admin_encryption">Chiffrement au repos</string>
     <string name="native_admin_encryption_off">Le chiffrement est désactivé. Son activation chiffre toutes les notes existantes.</string>
     <string name="native_admin_encryption_on">Le chiffrement est activé et l’instance est déverrouillée.</string>
@@ -1110,6 +1098,15 @@
     <string name="native_admin_background_removed">Arrière-plan supprimé</string>
     <string name="native_admin_upload_failed">Échec du téléchargement.</string>
     <string name="native_admin_ai_section">Assistant IA</string>
+    <string name="native_admin_ai_enable_label">Activer l\'IA serveur</string>
+    <string name="native_admin_ai_enable_desc">Lorsqu\'elle est désactivée, l\'intégration IA globale du serveur est entièrement coupée.</string>
+    <string name="native_admin_ai_share_label">Partager l\'IA serveur avec les utilisateurs</string>
+    <string name="native_admin_ai_share_desc">Si activé, les utilisateurs peuvent choisir d\'utiliser cette IA serveur depuis leurs propres paramètres. Ils ne voient jamais l\'URL de base, le modèle ni la clé API.</string>
+    <string name="native_admin_ai_private_label">Autoriser les adresses locales pour les utilisateurs</string>
+    <string name="native_admin_ai_private_desc">Permet à chaque utilisateur de pointer son propre fournisseur vers une adresse de réseau privé, par exemple un modèle tournant sur sa machine. Désactivé par défaut : sans cela, n\'importe quel compte pourrait faire connecter le serveur à une machine de votre réseau et lire ce qui a répondu. Pointer vers le fournisseur configuré ci-dessus ne le nécessite jamais.</string>
+    <string name="native_admin_ai_provider_label">Fournisseur</string>
+    <string name="native_admin_ai_provider_value">Compatible OpenAI</string>
+    <string name="native_admin_ai_provider_hint">Compatible avec tout endpoint exposant /v1/chat/completions : Ollama, Open WebUI, LiteLLM, LM Studio, OpenAI, OpenRouter, …</string>
     <string name="native_admin_encryption_section">Chiffrement des données au repos (côté serveur)</string>
     <string name="native_admin_federation_section">Collaboration entre serveurs</string>
 </resources>

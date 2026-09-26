@@ -114,7 +114,6 @@ import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightTitleColor
 import com.glasskeep.app.update.ReleaseInfo
 import com.glasskeep.app.update.UpdateManager
-import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -633,14 +632,6 @@ internal fun SettingsScreen(
         apiKey = aiDraft.apiKey.takeIf { it.isNotEmpty() },
     )
 
-    /** The failed test's line (UserAiSettingsSection.jsx:211-223): the
-     *  reason reworded, plus the provider's own detail it would drop. */
-    fun aiTestFailure(raw: String): String {
-        val localized = context.localizedServerError(raw, R.string.native_settings_ai_test_failed)
-        val detail = (AiProviderErrorRegex.find(raw) ?: AiUnreachableErrorRegex.find(raw))?.groupValues?.get(1)
-        return if (detail != null && detail !in localized) "$localized : $detail" else localized
-    }
-
     fun saveAiSettings(request: UserAiSettingsRequest, successMessage: String?) {
         if (savingAi) return
         savingAi = true
@@ -684,11 +675,11 @@ internal fun SettingsScreen(
                     val reply = result.reply?.takeIf { it.isNotEmpty() }
                     AiTestOutcome(true, if (reply != null) "$aiTestOkMessage : $reply" else aiTestOkMessage)
                 } else {
-                    AiTestOutcome(false, aiTestFailure(result.error.orEmpty()))
+                    AiTestOutcome(false, context.aiTestFailureText(result.error.orEmpty()))
                 }
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen testUserAi failed", t)
-                aiTestOutcome = AiTestOutcome(false, aiTestFailure(context.requestErrorText(t)))
+                aiTestOutcome = AiTestOutcome(false, context.aiTestFailureText(context.requestErrorText(t)))
             } finally {
                 testingAi = false
             }
@@ -1616,20 +1607,9 @@ internal fun SettingsScreen(
     }
 }
 
-/** Number() on a typed field: blank reads as 0, and so does anything
- *  that is not a number at all. */
-private fun jsNumberOf(text: String): Double = text.trim().toDoubleOrNull()?.takeIf { it.isFinite() } ?: 0.0
-
-/** A number as JavaScript prints it: a whole one without its ".0". */
-private fun jsNumberText(value: Double): String =
-    if (value % 1.0 == 0.0 && abs(value) < 1e15) value.toLong().toString() else value.toString()
-
 /** What PasskeySettingsSection.jsx reads as the user closing the system
  *  sheet rather than a failure. */
 internal val PasskeyCancelRegex = Regex("""not[\s_-]*allowed|cancel|abort|interrupt|annul""", RegexOption.IGNORE_CASE)
-
-private val AiProviderErrorRegex = Regex("""^AI provider error:\s*(.+)$""")
-private val AiUnreachableErrorRegex = Regex("""^Failed to reach AI provider\s*\((.+)\)\.?$""")
 
 /** f-droid.org resolves to whichever F-Droid client is installed; the
  *  section only shows this when the APK came from one of them. */

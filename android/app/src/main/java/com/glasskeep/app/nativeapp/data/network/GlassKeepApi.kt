@@ -9,6 +9,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Headers
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -262,15 +263,18 @@ data class AdminAiSettingsDto(
     val allowPrivateAiForUsers: Boolean = false,
 )
 
+/** Body for PUT /api/admin/ai/settings, which keeps whatever is left
+ *  out: the switches send only themselves, like the web. An empty
+ *  [apiKey] removes the stored key. */
 @Serializable
-data class AdminAiSettingsRequest(
-    val enabled: Boolean,
-    val baseUrl: String,
-    val model: String,
-    val temperature: Double,
-    val maxTokens: Int,
-    val allowServerAiForUsers: Boolean,
-    val allowPrivateAiForUsers: Boolean,
+data class AdminAiSettingsPatch(
+    val enabled: Boolean? = null,
+    val baseUrl: String? = null,
+    val model: String? = null,
+    val temperature: Double? = null,
+    val maxTokens: Int? = null,
+    val allowServerAiForUsers: Boolean? = null,
+    val allowPrivateAiForUsers: Boolean? = null,
     val apiKey: String? = null,
 )
 
@@ -1270,8 +1274,10 @@ interface GlassKeepApi {
     suspend fun getAdminAiSettings(): Response<AdminAiSettingsDto>
 
     @PUT("api/admin/ai/settings")
-    suspend fun putAdminAiSettings(@Body body: AdminAiSettingsRequest): Response<AdminAiSettingsDto>
+    suspend fun putAdminAiSettings(@Body body: AdminAiSettingsPatch): Response<AdminAiSettingsDto>
 
+    // Both tests wait up to a minute for the provider, as the web does.
+    @Headers("$REQUEST_TIMEOUT_HEADER: 60000")
     @POST("api/admin/ai/test")
     suspend fun testAdminAi(@Body body: AdminAiTestRequest): Response<AdminAiTestResponse>
 
@@ -1382,6 +1388,7 @@ interface GlassKeepApi {
     @PUT("api/user/ai/settings")
     suspend fun setUserAiSettings(@Body body: UserAiSettingsRequest): Response<UserAiSettingsDto>
 
+    @Headers("$REQUEST_TIMEOUT_HEADER: 60000")
     @POST("api/user/ai/test")
     suspend fun testUserAi(@Body body: UserAiTestRequest): Response<UserAiTestResponse>
 

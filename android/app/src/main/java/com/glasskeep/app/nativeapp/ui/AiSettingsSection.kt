@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.network.UserAiSettingsDto
+import kotlin.math.abs
 
 /** Everything the section needs from its host, so the section itself
  *  stays a pure rendering of one [UserAiSettingsDto] plus the draft
@@ -172,204 +174,21 @@ fun AiSettingsSection(
         AiPrivacyWarning(amber = settings.mode != "server", dark = dark)
 
         if (settings.mode == "custom") {
-            AiField(
-                label = stringResource(R.string.native_settings_ai_base_url),
-                value = draft.baseUrl,
-                placeholder = stringResource(R.string.native_settings_ai_base_url_placeholder),
-                hint = stringResource(R.string.native_settings_ai_base_url_hint),
-                enabled = !busy,
-                keyboardType = KeyboardType.Uri,
+            AiProviderFields(
+                draft = draft,
+                hasApiKey = settings.hasApiKey,
+                busy = busy,
                 themeId = themeId,
                 dark = dark,
                 titleColor = titleColor,
                 borderColor = borderColor,
-                onValueChange = { onDraftChange(draft.copy(baseUrl = it)) },
-            )
-            AiField(
-                label = stringResource(R.string.native_settings_ai_model),
-                value = draft.model,
-                placeholder = stringResource(R.string.native_settings_ai_model_placeholder),
-                hint = stringResource(R.string.native_settings_ai_model_hint),
-                enabled = !busy,
-                themeId = themeId,
-                dark = dark,
-                titleColor = titleColor,
-                borderColor = borderColor,
-                onValueChange = { onDraftChange(draft.copy(model = it)) },
-            )
-
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                AiFieldLabel(stringResource(R.string.native_settings_ai_api_key))
-                // `flex gap-2`: the input stretches to the reveal button's
-                // height when there is one.
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    GkTextField(
-                        value = draft.apiKey,
-                        onValueChange = { if (!busy) onDraftChange(draft.copy(apiKey = it)) },
-                        label = null,
-                        // A stored key is never sent back, so the field
-                        // stays empty and its placeholder says so.
-                        placeholder = stringResource(
-                            if (settings.hasApiKey) R.string.native_settings_ai_api_key_placeholder_set
-                            else R.string.native_settings_ai_api_key_placeholder
-                        ),
-                        themeId = themeId,
-                        dark = dark,
-                        titleColor = titleColor,
-                        borderColor = borderColor,
-                        modifier = Modifier.weight(1f).fillMaxHeight().alpha(if (busy) 0.5f else 1f),
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrectEnabled = false,
-                            keyboardType = if (draft.showApiKey) KeyboardType.Text else KeyboardType.Password,
-                            imeAction = ImeAction.Next,
-                        ),
-                        visualTransformation = if (draft.showApiKey) {
-                            VisualTransformation.None
-                        } else {
-                            PasswordVisualTransformation()
-                        },
-                        stretch = true,
-                    )
-                    if (!settings.hasApiKey || draft.apiKey.isNotEmpty()) {
-                        val revealLabel = stringResource(
-                            if (draft.showApiKey) R.string.native_common_hide else R.string.native_common_show
-                        )
-                        // `px-3 py-2` around a 20px icon that sits on the
-                        // text baseline of the button's 24px line: 9dp
-                        // above it, the line's descent added under it.
-                        Box(
-                            modifier = Modifier
-                                .alpha(if (busy) 0.5f else 1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                                .semantics { contentDescription = revealLabel }
-                                .gkTooltip(revealLabel)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    enabled = !busy,
-                                    role = Role.Button,
-                                ) { onDraftChange(draft.copy(showApiKey = !draft.showApiKey)) }
-                                .padding(start = 13.dp, end = 13.dp, top = 9.dp, bottom = 15.5.dp),
-                        ) {
-                            if (draft.showApiKey) {
-                                EyeOffIcon(size = 20.dp, tint = titleColor)
-                            } else {
-                                EyeIcon(size = 20.dp, tint = titleColor)
-                            }
-                        }
-                    }
-                }
-                // `flex-wrap justify-between gap-2`: the hint takes the
-                // whole line, the link wraps under it.
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        stringResource(R.string.native_settings_ai_api_key_hint),
-                        color = SettingsSubtleColor,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                    )
-                    if (settings.hasApiKey) {
-                        Text(
-                            stringResource(R.string.native_settings_ai_api_key_clear),
-                            color = DangerRed,
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp,
-                            modifier = Modifier
-                                .alpha(if (busy) 0.5f else 1f)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    enabled = !busy,
-                                    role = Role.Button,
-                                ) { onClearApiKey() },
-                        )
-                    }
-                }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    AiField(
-                        label = stringResource(R.string.native_settings_ai_temperature),
-                        value = draft.temperature,
-                        placeholder = "",
-                        hint = null,
-                        enabled = !busy,
-                        keyboardType = KeyboardType.Decimal,
-                        themeId = themeId,
-                        dark = dark,
-                        titleColor = titleColor,
-                        borderColor = borderColor,
-                        modifier = Modifier.weight(1f),
-                        onValueChange = { onDraftChange(draft.copy(temperature = it)) },
-                    )
-                    AiField(
-                        label = stringResource(R.string.native_settings_ai_max_tokens),
-                        value = draft.maxTokens,
-                        placeholder = "",
-                        hint = null,
-                        enabled = !busy,
-                        keyboardType = KeyboardType.Number,
-                        themeId = themeId,
-                        dark = dark,
-                        titleColor = titleColor,
-                        borderColor = borderColor,
-                        modifier = Modifier.weight(1f),
-                        // The form's last field: its Go key submits it,
-                        // like tapping Save.
-                        imeAction = ImeAction.Go,
-                        onImeAction = onSave,
-                        onValueChange = { onDraftChange(draft.copy(maxTokens = it)) },
-                    )
-                }
-                Text(
-                    stringResource(R.string.native_settings_ai_advanced_hint),
-                    color = SettingsSubtleColor,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-        }
-
-        testOutcome?.let { outcome ->
-            val fg = if (outcome.ok) {
-                if (dark) Color(0xFFA4F4CF) else Color(0xFF006045)
-            } else {
-                if (dark) Color(0xFFFFC9C9) else Color(0xFF9F0712)
-            }
-            val bg = if (outcome.ok) {
-                if (dark) Color(0x4D004F3C) else Color(0xFFECFDF5)
-            } else {
-                if (dark) Color(0x4D81171A) else Color(0xFFFEF2F2)
-            }
-            val edge = if (outcome.ok) {
-                if (dark) Color(0xFF006045) else Color(0xFFA4F4CF)
-            } else {
-                if (dark) Color(0xFF9F0712) else Color(0xFFFFC9C9)
-            }
-            Text(
-                outcome.message,
-                color = fg,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(bg)
-                    .border(1.dp, edge, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 13.dp, vertical = 9.dp),
+                onDraftChange = onDraftChange,
+                onClearApiKey = onClearApiKey,
+                onSave = onSave,
             )
         }
+
+        testOutcome?.let { AiTestOutcomeBox(it, dark) }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             GkSecondaryButton(
@@ -401,6 +220,228 @@ fun AiSettingsSection(
             }
         }
     }
+}
+
+/**
+ * The provider fields UserAiSettingsSection.jsx shows for an endpoint of
+ * your own and AiAdminSection.jsx for the server's: the base URL and
+ * model, the key (never shown once stored, with its reveal button while
+ * one is typed and the link removing the stored one), and the two
+ * advanced numbers, whose Go key saves the form.
+ */
+@Composable
+internal fun AiProviderFields(
+    draft: AiSettingsDraft,
+    hasApiKey: Boolean,
+    busy: Boolean,
+    themeId: String?,
+    dark: Boolean,
+    titleColor: Color,
+    borderColor: Color,
+    onDraftChange: (AiSettingsDraft) -> Unit,
+    onClearApiKey: () -> Unit,
+    onSave: () -> Unit,
+) {
+    AiField(
+        label = stringResource(R.string.native_settings_ai_base_url),
+        value = draft.baseUrl,
+        placeholder = stringResource(R.string.native_settings_ai_base_url_placeholder),
+        hint = stringResource(R.string.native_settings_ai_base_url_hint),
+        enabled = !busy,
+        keyboardType = KeyboardType.Uri,
+        themeId = themeId,
+        dark = dark,
+        titleColor = titleColor,
+        borderColor = borderColor,
+        onValueChange = { onDraftChange(draft.copy(baseUrl = it)) },
+    )
+    AiField(
+        label = stringResource(R.string.native_settings_ai_model),
+        value = draft.model,
+        placeholder = stringResource(R.string.native_settings_ai_model_placeholder),
+        hint = stringResource(R.string.native_settings_ai_model_hint),
+        enabled = !busy,
+        themeId = themeId,
+        dark = dark,
+        titleColor = titleColor,
+        borderColor = borderColor,
+        onValueChange = { onDraftChange(draft.copy(model = it)) },
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        AiFieldLabel(stringResource(R.string.native_settings_ai_api_key))
+        // `flex gap-2`: the input stretches to the reveal button's
+        // height when there is one.
+        Row(
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            GkTextField(
+                value = draft.apiKey,
+                onValueChange = { if (!busy) onDraftChange(draft.copy(apiKey = it)) },
+                label = null,
+                // A stored key is never sent back, so the field
+                // stays empty and its placeholder says so.
+                placeholder = stringResource(
+                    if (hasApiKey) R.string.native_settings_ai_api_key_placeholder_set
+                    else R.string.native_settings_ai_api_key_placeholder
+                ),
+                themeId = themeId,
+                dark = dark,
+                titleColor = titleColor,
+                borderColor = borderColor,
+                modifier = Modifier.weight(1f).fillMaxHeight().alpha(if (busy) 0.5f else 1f),
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                keyboardOptions = KeyboardOptions(
+                    autoCorrectEnabled = false,
+                    keyboardType = if (draft.showApiKey) KeyboardType.Text else KeyboardType.Password,
+                    imeAction = ImeAction.Next,
+                ),
+                visualTransformation = if (draft.showApiKey) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                stretch = true,
+            )
+            if (!hasApiKey || draft.apiKey.isNotEmpty()) {
+                val revealLabel = stringResource(
+                    if (draft.showApiKey) R.string.native_common_hide else R.string.native_common_show
+                )
+                // `px-3 py-2` around a 20px icon that sits on the
+                // text baseline of the button's 24px line: 9dp
+                // above it, the line's descent added under it.
+                Box(
+                    modifier = Modifier
+                        .alpha(if (busy) 0.5f else 1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                        .semantics { contentDescription = revealLabel }
+                        .gkTooltip(revealLabel)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            enabled = !busy,
+                            role = Role.Button,
+                        ) { onDraftChange(draft.copy(showApiKey = !draft.showApiKey)) }
+                        .padding(start = 13.dp, end = 13.dp, top = 9.dp, bottom = 15.5.dp),
+                ) {
+                    if (draft.showApiKey) {
+                        EyeOffIcon(size = 20.dp, tint = titleColor)
+                    } else {
+                        EyeIcon(size = 20.dp, tint = titleColor)
+                    }
+                }
+            }
+        }
+        // `flex-wrap justify-between gap-2`: the hint takes the
+        // whole line, the link wraps under it.
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(R.string.native_settings_ai_api_key_hint),
+                color = SettingsSubtleColor,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+            )
+            if (hasApiKey) {
+                Text(
+                    stringResource(R.string.native_settings_ai_api_key_clear),
+                    color = DangerRed,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    modifier = Modifier
+                        .alpha(if (busy) 0.5f else 1f)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            enabled = !busy,
+                            role = Role.Button,
+                        ) { onClearApiKey() },
+                )
+            }
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            AiField(
+                label = stringResource(R.string.native_settings_ai_temperature),
+                value = draft.temperature,
+                placeholder = "",
+                hint = null,
+                enabled = !busy,
+                keyboardType = KeyboardType.Decimal,
+                themeId = themeId,
+                dark = dark,
+                titleColor = titleColor,
+                borderColor = borderColor,
+                modifier = Modifier.weight(1f),
+                onValueChange = { onDraftChange(draft.copy(temperature = it)) },
+            )
+            AiField(
+                label = stringResource(R.string.native_settings_ai_max_tokens),
+                value = draft.maxTokens,
+                placeholder = "",
+                hint = null,
+                enabled = !busy,
+                keyboardType = KeyboardType.Number,
+                themeId = themeId,
+                dark = dark,
+                titleColor = titleColor,
+                borderColor = borderColor,
+                modifier = Modifier.weight(1f),
+                // The form's last field: its Go key submits it,
+                // like tapping Save.
+                imeAction = ImeAction.Go,
+                onImeAction = onSave,
+                onValueChange = { onDraftChange(draft.copy(maxTokens = it)) },
+            )
+        }
+        Text(
+            stringResource(R.string.native_settings_ai_advanced_hint),
+            color = SettingsSubtleColor,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+}
+
+/** The Test button's verdict: green with the provider's reply, red with
+ *  the reason it failed. */
+@Composable
+internal fun AiTestOutcomeBox(outcome: AiTestOutcome, dark: Boolean) {
+    val fg = if (outcome.ok) {
+        if (dark) Color(0xFFA4F4CF) else Color(0xFF006045)
+    } else {
+        if (dark) Color(0xFFFFC9C9) else Color(0xFF9F0712)
+    }
+    val bg = if (outcome.ok) {
+        if (dark) Color(0x4D004F3C) else Color(0xFFECFDF5)
+    } else {
+        if (dark) Color(0x4D81171A) else Color(0xFFFEF2F2)
+    }
+    val edge = if (outcome.ok) {
+        if (dark) Color(0xFF006045) else Color(0xFFA4F4CF)
+    } else {
+        if (dark) Color(0xFF9F0712) else Color(0xFFFFC9C9)
+    }
+    Text(
+        outcome.message,
+        color = fg,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .border(1.dp, edge, RoundedCornerShape(8.dp))
+            .padding(horizontal = 13.dp, vertical = 9.dp),
+    )
 }
 
 /** One of the two provider tiles: a bordered box that takes the accent
@@ -447,7 +488,7 @@ private fun AiModeCard(
 /** The banner both modes carry: blue for the server's own AI, amber for
  *  an endpoint of your own, since that one is the user's to vet. */
 @Composable
-private fun AiPrivacyWarning(amber: Boolean, dark: Boolean) {
+internal fun AiPrivacyWarning(amber: Boolean, dark: Boolean) {
     val fg = when {
         amber && dark -> Color(0xFFFEF3C6)
         amber -> Color(0xFF7B3306)
@@ -489,7 +530,7 @@ private fun AiPrivacyWarning(amber: Boolean, dark: Boolean) {
 /** `text-xs font-semibold uppercase tracking-wide text-gray-500`: the
  *  small caption above each of the section's fields. */
 @Composable
-private fun AiFieldLabel(text: String) {
+internal fun AiFieldLabel(text: String) {
     Text(
         text.uppercase(),
         color = SettingsSubtleColor,
@@ -510,7 +551,7 @@ private fun AiField(
     placeholder: String,
     hint: String?,
     enabled: Boolean,
-    themeId: String,
+    themeId: String?,
     dark: Boolean,
     titleColor: Color,
     borderColor: Color,
@@ -546,3 +587,23 @@ private fun AiField(
         }
     }
 }
+
+/** Number() on a typed field: blank reads as 0, and so does anything
+ *  that is not a number at all. */
+internal fun jsNumberOf(text: String): Double = text.trim().toDoubleOrNull()?.takeIf { it.isFinite() } ?: 0.0
+
+/** A number as JavaScript prints it: a whole one without its ".0". */
+internal fun jsNumberText(value: Double): String =
+    if (value % 1.0 == 0.0 && abs(value) < 1e15) value.toLong().toString() else value.toString()
+
+/** A failed test's line (UserAiSettingsSection.jsx:211-223 and its admin
+ *  twin): the reason reworded, plus the provider's own detail it would
+ *  drop, since the button is there to diagnose. */
+internal fun Context.aiTestFailureText(raw: String): String {
+    val localized = localizedServerError(raw, R.string.native_settings_ai_test_failed)
+    val detail = (AiProviderErrorRegex.find(raw) ?: AiUnreachableErrorRegex.find(raw))?.groupValues?.get(1)
+    return if (detail != null && detail !in localized) "$localized : $detail" else localized
+}
+
+private val AiProviderErrorRegex = Regex("""^AI provider error:\s*(.+)$""")
+private val AiUnreachableErrorRegex = Regex("""^Failed to reach AI provider\s*\((.+)\)\.?$""")
