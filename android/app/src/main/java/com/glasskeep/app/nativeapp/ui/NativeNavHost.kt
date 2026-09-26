@@ -71,6 +71,7 @@ import com.glasskeep.app.nativeapp.syncReminderAlarms
 import com.glasskeep.app.reminders.ReminderSyncWorker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -151,6 +152,8 @@ fun NativeNavHost(
     // The last share/revoke frame the server pushed, waiting to become a
     // pill (the web's own showShareNotificationToast, App.jsx:3841).
     var liveNotification by remember { mutableStateOf<NotificationDto?>(null) }
+    // What the admin panel reloads its lists on while it is open.
+    val adminEvents = remember { MutableSharedFlow<String>(extraBufferCapacity = 16) }
     val realtimeClient = remember(serverUrl) {
         RealtimeClient(
             serverUrl = serverUrl,
@@ -160,8 +163,10 @@ fun NativeNavHost(
             onInstanceUnlocked = { lockPokes++ },
             onLiveNotification = { liveNotification = it },
             onAuxiliaryEvent = { type ->
+                adminEvents.tryEmit(type)
                 when (type) {
                     "admin_settings_updated", "logo_added", "logo_deleted" -> brandingPokes++
+                    in AdminListEvents -> Unit
                     else -> {
                         preferencePokes++
                         if (type == "user_ai_settings_updated") aiSettingsPokes++
@@ -546,11 +551,11 @@ fun NativeNavHost(
                         )
                     }
                 }
-                // Under the settings panel the notes list neither fades nor
-                // moves: it sits behind the web's instant bg-black/50 scrim
-                // while the panel slides in, and is simply there again,
-                // with no scrim, the moment the panel starts sliding out
-                // (SettingsPanel.jsx:286-295).
+                // Under the settings and admin panels the notes list neither
+                // fades nor moves: it sits behind the web's instant
+                // bg-black/50 scrim while the panel slides in, and is simply
+                // there again, with no scrim, the moment the panel starts
+                // sliding out (SettingsPanel.jsx:286-295, AdminPanel.jsx:477).
                 // An open note leaves it in place too, under the web's
                 // `scrimFadeIn` 50% black (200ms in, 180ms out).
                 composable(
@@ -567,7 +572,7 @@ fun NativeNavHost(
                     },
                 ) {
                     val nextRoute = navController.currentBackStackEntryAsState().value?.destination?.route
-                    val coveredBySettings = transition.targetState == EnterExitState.PostExit && nextRoute == "settings"
+                    val coveredByPanel = transition.targetState == EnterExitState.PostExit && nextRoute in SidePanelRoutes
                     // Which overlay last covered the list, kept after it pops
                     // so its scrim can fade back out.
                     var coveringRoute by remember { mutableStateOf<String?>(null) }
@@ -603,7 +608,7 @@ fun NativeNavHost(
                                 }
                             },
                         )
-                        if (coveredBySettings) {
+                        if (coveredByPanel) {
                             Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f)))
                         }
                         if (noteScrim > 0f) {
@@ -611,24 +616,19 @@ fun NativeNavHost(
                         }
                     }
                 }
-                // The web's settings panel is a full-width sheet that slides in
-                // from the right in 200ms (SettingsPanel.jsx:295), with nothing
-                // else animated; the route reproduces that entrance and its
-                // mirror image on the way out.
+                // The web's settings panel, a full-width sheet sliding in from
+                // the right.
                 composable(
                     route = "settings",
-                    enterTransition = {
-                        slideInHorizontally(
-                            animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
-                            initialOffsetX = { it },
-                        )
+                    enterTransition = { SidePanelEnter },
+                    // Handing over to the admin panel, this one stays put
+                    // until the other has slid over it: the web slides it out
+                    // underneath, over the notes list, which is not composed
+                    // here at that moment.
+                    exitTransition = {
+                        if (targetState.destination.route == AdminRoute) ExitTransition.KeepUntilTransitionsFinished else null
                     },
-                    popExitTransition = {
-                        slideOutHorizontally(
-                            animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
-                            targetOffsetX = { it },
-                        )
-                    },
+                    popExitTransition = { SidePanelExit },
                 ) {
                     SettingsScreen(
                         container = container,
@@ -646,14 +646,18 @@ fun NativeNavHost(
                         },
                     )
                 }
+                // The admin panel is the same sliding sheet (AdminPanel.jsx:486).
                 composable(
-                    route = "admin?focus={focus}",
+                    route = AdminRoute,
                     arguments = listOf(navArgument("focus") { type = NavType.StringType; nullable = true; defaultValue = null }),
+                    enterTransition = { SidePanelEnter },
+                    popExitTransition = { SidePanelExit },
                 ) { backStackEntry ->
                     AdminScreen(
                         container = container,
                         serverUrl = serverUrl,
                         focus = backStackEntry.arguments?.getString("focus"),
+                        liveEvents = adminEvents,
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -779,8 +783,32 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
 private const val NoteRoute = "notes/{noteId}?new={new}"
 private val NoteRise = 14.dp
 
+private const val AdminRoute = "admin?focus={focus}"
+
+/** The frames that only change the admin panel's own lists. */
+private val AdminListEvents = setOf(
+    "pending_user_registered",
+    "pending_user_resolved",
+    "user_list_changed",
+    "user_deleted_notification",
+)
+
+/** The full-width sheets that slide in from the right over the notes. */
+private val SidePanelRoutes = setOf("settings", AdminRoute)
+
 /** Overlays the notes list stays in place under, rather than fading. */
-private val ListOverlayRoutes = setOf("settings", NoteRoute)
+private val ListOverlayRoutes = SidePanelRoutes + NoteRoute
+
+/** A side sheet's 200ms slide in from the right edge, and back out
+ *  (SettingsPanel.jsx:295): nothing else of it animates. */
+private val SidePanelEnter = slideInHorizontally(
+    animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
+    initialOffsetX = { it },
+)
+private val SidePanelExit = slideOutHorizontally(
+    animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
+    targetOffsetX = { it },
+)
 
 // syncEngine.js's own health-check cadences (its lines 20-22), which the
 // read above follows: it is both this app's reachability probe and its
@@ -794,7 +822,7 @@ private val SignedOutRoutes = setOf("login", "register", "login-secret")
 
 /** The instance's public branding and its admin's sign-in slogan
  *  (App.jsx:4885), both read without a session. */
-private suspend fun reloadBranding(container: NativeAppContainer, serverUrl: String) {
+internal suspend fun reloadBranding(container: NativeAppContainer, serverUrl: String) {
     val api = container.api(serverUrl)
     runCatching { api.getBranding() }
         .getOrNull()

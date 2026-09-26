@@ -1,17 +1,17 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.app.Activity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Context
+import androidx.annotation.StringRes
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -25,16 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,844 +33,657 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
-import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
-import com.glasskeep.app.nativeapp.NativePasskeys
-import com.glasskeep.app.nativeapp.PasskeyCeremonyResult
-import com.glasskeep.app.nativeapp.data.network.ActivateEncryptionRequest
-import com.glasskeep.app.nativeapp.data.network.AdminAiSettingsDto
-import com.glasskeep.app.nativeapp.data.network.AdminAiSettingsRequest
-import com.glasskeep.app.nativeapp.data.network.AdminAiTestRequest
-import com.glasskeep.app.nativeapp.data.network.AdminBackgroundPatch
-import com.glasskeep.app.nativeapp.data.network.AdminLogoPatch
+import com.glasskeep.app.nativeapp.data.bodyOrRefusal
 import com.glasskeep.app.nativeapp.data.network.AdminSettingsDto
-import com.glasskeep.app.nativeapp.data.network.AdminSettingsPatch
 import com.glasskeep.app.nativeapp.data.network.AdminUserDto
-import com.glasskeep.app.nativeapp.data.network.BrandingDto
-import com.glasskeep.app.nativeapp.data.network.ChangeEncryptionPassphraseRequest
 import com.glasskeep.app.nativeapp.data.network.CreateAdminUserRequest
-import com.glasskeep.app.nativeapp.data.network.DeactivateEncryptionRequest
-import com.glasskeep.app.nativeapp.data.network.FederationAcceptRequest
-import com.glasskeep.app.nativeapp.data.network.FederationActionResponse
-import com.glasskeep.app.nativeapp.data.network.FederationAddressRequest
-import com.glasskeep.app.nativeapp.data.network.FederationInviteRequest
-import com.glasskeep.app.nativeapp.data.network.FederationLinkDto
-import com.glasskeep.app.nativeapp.data.network.FederationRenameRequest
-import com.glasskeep.app.nativeapp.data.network.FederationSelfNameRequest
+import com.glasskeep.app.nativeapp.data.network.DeletedAdminUserDto
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
-import com.glasskeep.app.nativeapp.data.network.InstanceStatusResponse
-import com.glasskeep.app.nativeapp.data.network.PasskeyDto
 import com.glasskeep.app.nativeapp.data.network.PendingUserDto
-import com.glasskeep.app.nativeapp.data.network.PromotePasskeyVerifyRequest
-import com.glasskeep.app.nativeapp.data.network.SelfUpdateModeDto
-import com.glasskeep.app.nativeapp.data.network.SelfUpdateStatusDto
-import com.glasskeep.app.nativeapp.data.network.StartSelfUpdateRequest
 import com.glasskeep.app.nativeapp.data.network.UpdateAdminUserRequest
-import com.glasskeep.app.nativeapp.data.network.UpdateCheckDto
-import com.glasskeep.app.nativeapp.prfOutputOf
-import com.glasskeep.app.ui.ButtonGradient
+import com.glasskeep.app.nativeapp.data.refusal
+import com.glasskeep.app.nativeapp.restartApp
 import com.glasskeep.app.ui.DarkBorderColor
-import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightBorderColor
-import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
+import kotlinx.coroutines.withTimeoutOrNull
 import retrofit2.Response
-
-private enum class AdminTab(val label: Int) {
-    USERS(R.string.native_admin_tab_users),
-    BRANDING(R.string.native_admin_tab_branding),
-    AI(R.string.native_admin_tab_ai),
-    SECURITY(R.string.native_admin_tab_security),
-    FEDERATION(R.string.native_admin_tab_federation),
-    SERVER(R.string.native_admin_tab_server),
-}
+import java.io.IOException
 
 /** What [AdminScreen]'s `focus` names: the passkey domain field, which
  *  the settings' passkey notice sends an admin to. */
 const val AdminFocusPasskeyDomain = "passkeyDomain"
 
-/** Complete phone administration surface. Every mutation goes through the
- * same authenticated endpoints as AdminPanel.jsx; none opens web content.
- * [focus] opens it where that setting lives. */
+/**
+ * AdminPanel.jsx on a phone: a full-width sheet in the status bar colour,
+ * its header with the two server commands, then one scrolling column: the
+ * server version, the pending registrations while there are any, and the
+ * accordion sections, every one closed on arrival. [focus] opens it where
+ * that setting lives; [liveEvents] are the server frames its lists follow
+ * while it is open.
+ */
 @Composable
-fun AdminScreen(container: NativeAppContainer, serverUrl: String, focus: String?, onBack: () -> Unit) {
+fun AdminScreen(
+    container: NativeAppContainer,
+    serverUrl: String,
+    focus: String?,
+    liveEvents: SharedFlow<String>,
+    onBack: () -> Unit,
+) {
     val dark = LocalGkDark.current
-    val api = remember(serverUrl) { container.api(serverUrl) }
-    var tab by remember { mutableStateOf(if (focus == AdminFocusPasskeyDomain) AdminTab.BRANDING else AdminTab.USERS) }
-    val title = if (dark) DarkTitleColor else LightTitleColor
-    val subtext = if (dark) DarkSubtextColor else LightSubtextColor
-    val border = if (dark) DarkBorderColor else LightBorderColor
-    val background = WorkspaceTheme.appBackground(container.themeState.themeId, dark)
-
-    Column(Modifier.fillMaxSize().background(background).windowInsetsPadding(WindowInsets.systemBars)) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier.clip(RoundedCornerShape(8.dp)).clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) { onBack() }.padding(8.dp),
-            ) { BackArrowIcon(size = 22.dp, tint = title) }
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.native_admin_title), color = title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        }
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            AdminTab.entries.forEach { entry ->
-                val selected = tab == entry
-                Text(
-                    stringResource(entry.label),
-                    color = if (selected) Color.White else title,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .then(if (selected) Modifier.background(ButtonGradient) else Modifier.border(1.dp, border, RoundedCornerShape(999.dp)))
-                        .clickable { tab = entry }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                )
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        Box(Modifier.weight(1f)) {
-            when (tab) {
-                AdminTab.USERS -> AdminUsersSection(api, dark, title, subtext, border)
-                AdminTab.BRANDING -> AdminBrandingSection(container, api, dark, title, subtext, border)
-                AdminTab.AI -> AdminAiSection(api, dark, title, subtext, border)
-                AdminTab.SECURITY -> AdminSecuritySection(container, api, dark, title, subtext, border)
-                AdminTab.FEDERATION -> AdminFederationSection(api, serverUrl, dark, title, subtext, border)
-                AdminTab.SERVER -> AdminServerSection(api, dark, title, subtext, border)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AdminUsersSection(api: GlassKeepApi, dark: Boolean, title: Color, subtext: Color, border: Color) {
-    val scope = rememberCoroutineScope()
-    var users by remember { mutableStateOf<List<AdminUserDto>>(emptyList()) }
-    var pending by remember { mutableStateOf<List<PendingUserDto>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var newName by remember { mutableStateOf("") }
-    var newEmail by remember { mutableStateOf("") }
-    var newPassword by remember { mutableStateOf("") }
-    var newAdmin by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<AdminUserDto?>(null) }
-    var deleting by remember { mutableStateOf<AdminUserDto?>(null) }
-
-    suspend fun load() {
-        loading = true
-        try {
-            users = api.getAdminUsers().requireBody("users")
-            pending = api.getPendingUsers().requireBody("pending users")
-            error = null
-        } catch (t: Throwable) {
-            error = t.message
-        } finally { loading = false }
-    }
-    fun act(block: suspend () -> Unit) {
-        if (busy) return
-        busy = true
-        scope.launch {
-            try { block(); load() } catch (t: Throwable) { error = t.message } finally { busy = false }
-        }
-    }
-    LaunchedEffect(Unit) { load() }
-
-    AdminScroll {
-        AdminHeading(R.string.native_admin_pending, title)
-        if (pending.isEmpty() && !loading) AdminHint(R.string.native_admin_pending_empty, subtext)
-        pending.forEach { user ->
-            AdminCard(dark, border) {
-                Text(user.name, color = title, fontWeight = FontWeight.SemiBold)
-                Text(user.email, color = subtext, fontSize = 13.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SmallAction(stringResource(R.string.native_admin_reject), danger = true, enabled = !busy) {
-                        act { api.rejectPendingUser(user.id).requireBody("reject") }
-                    }
-                    SmallAction(stringResource(R.string.native_admin_approve), enabled = !busy) {
-                        act { api.approvePendingUser(user.id).requireBody("approve") }
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        AdminHeading(R.string.native_admin_create_user, title)
-        AdminField(newName, { newName = it }, R.string.native_register_name, title, subtext, border)
-        AdminField(newEmail, { newEmail = it }, R.string.native_login_username, title, subtext, border)
-        AdminField(newPassword, { newPassword = it }, R.string.native_register_password, title, subtext, border, password = true)
-        CheckRow(stringResource(R.string.native_admin_is_admin), newAdmin, title) { newAdmin = it }
-        AdminPrimary(stringResource(R.string.native_admin_create), !busy && newName.isNotBlank() && newEmail.isNotBlank() && newPassword.length >= 6) {
-            act {
-                api.createAdminUser(CreateAdminUserRequest(newName.trim(), newEmail.trim(), newPassword, newAdmin)).requireBody("create user")
-                newName = ""; newEmail = ""; newPassword = ""; newAdmin = false
-            }
-        }
-        Spacer(Modifier.height(20.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            AdminHeading(R.string.native_admin_users, title, Modifier.weight(1f))
-            SmallAction(stringResource(R.string.native_admin_refresh), enabled = !loading) { scope.launch { load() } }
-        }
-        if (loading) AdminLoading()
-        users.forEach { user ->
-            AdminCard(dark, border) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(user.name, color = title, fontWeight = FontWeight.SemiBold)
-                        Text(user.email, color = subtext, fontSize = 13.sp)
-                        Text(
-                            stringResource(R.string.native_admin_user_stats, user.notes, formatBytes(user.storageBytes)),
-                            color = subtext, fontSize = 12.sp,
-                        )
-                    }
-                    if (user.isAdmin) Text("ADMIN", color = Color(0xFF16A34A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SmallAction(stringResource(R.string.native_admin_edit), enabled = !busy) { editing = user }
-                    SmallAction(stringResource(R.string.native_admin_delete), danger = true, enabled = !busy) { deleting = user }
-                }
-            }
-        }
-        error?.let { AdminError(it) }
-    }
-
-    editing?.let { user ->
-        EditUserDialog(user, dark, title, subtext, border, onDismiss = { editing = null }) { name, email, password, admin ->
-            act { api.updateAdminUser(user.id, UpdateAdminUserRequest(name, email, password.ifBlank { null }, admin)).requireBody("update user") }
-            editing = null
-        }
-    }
-    deleting?.let { user ->
-        ConfirmAdminDialog(
-            title = stringResource(R.string.native_admin_delete_user_title),
-            message = stringResource(R.string.native_admin_delete_user_body, user.name),
-            dark = dark,
-            onDismiss = { deleting = null },
-        ) {
-            act { api.deleteAdminUser(user.id).requireBody("delete user") }
-            deleting = null
-        }
-    }
-}
-
-@Composable
-private fun EditUserDialog(
-    user: AdminUserDto, dark: Boolean, title: Color, subtext: Color, border: Color,
-    onDismiss: () -> Unit, onSave: (String, String, String, Boolean) -> Unit,
-) {
-    var name by remember(user.id) { mutableStateOf(user.name) }
-    var email by remember(user.id) { mutableStateOf(user.email) }
-    var password by remember(user.id) { mutableStateOf("") }
-    var admin by remember(user.id) { mutableStateOf(user.isAdmin) }
-    Dialog(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(if (dark) Color(0xFF282828) else Color.White).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            AdminHeading(R.string.native_admin_edit_user, title)
-            AdminField(name, { name = it }, R.string.native_register_name, title, subtext, border)
-            AdminField(email, { email = it }, R.string.native_login_username, title, subtext, border)
-            AdminField(password, { password = it }, R.string.native_admin_new_password_optional, title, subtext, border, password = true)
-            CheckRow(stringResource(R.string.native_admin_is_admin), admin, title) { admin = it }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.native_dialog_cancel)) }
-                Spacer(Modifier.width(8.dp))
-                Button(onClick = { onSave(name.trim(), email.trim(), password, admin) }) { Text(stringResource(R.string.native_admin_save)) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AdminBrandingSection(
-    container: NativeAppContainer, api: GlassKeepApi, dark: Boolean, title: Color, subtext: Color, border: Color,
-) {
+    val themeId = container.themeState.themeId
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var settings by remember { mutableStateOf<AdminSettingsDto?>(null) }
-    var loading by remember { mutableStateOf(true) }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var appName by remember { mutableStateOf("") }
-    var slogan by remember { mutableStateOf("") }
-    var domain by remember { mutableStateOf("") }
-    var blur by remember { mutableStateOf(0f) }
-
-    fun apply(fresh: AdminSettingsDto) {
-        settings = fresh; appName = fresh.appName; slogan = fresh.loginSlogan
-        domain = fresh.passkeyDomain; blur = fresh.loginBackgroundBlur.toFloat()
-        container.branding.apply(fresh.toBrandingDto(publicBackground = fresh.loginBackground))
-    }
-    suspend fun load() {
-        loading = true
-        try { apply(api.getAdminSettings().requireBody("admin settings")); error = null }
-        catch (t: Throwable) { error = t.message } finally { loading = false }
-    }
-    fun save(block: suspend () -> AdminSettingsDto) {
-        if (busy) return
-        busy = true
-        scope.launch { try { apply(block()); error = null } catch (t: Throwable) { error = t.message } finally { busy = false } }
-    }
-    val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) save {
-            val data = withContext(Dispatchers.Default) { ImageCompression.compressToDataUrl(context, uri, 512, 88) }
-                ?: throw IllegalArgumentException("Invalid image")
-            api.patchAdminLogo(AdminLogoPatch(data)).requireBody("logo")
-        }
-    }
-    val backgroundPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) save {
-            val data = withContext(Dispatchers.Default) { ImageCompression.compressToDataUrl(context, uri, 1920, 85) }
-                ?: throw IllegalArgumentException("Invalid image")
-            api.patchAdminBackground(AdminBackgroundPatch(data)).requireBody("background")
-        }
-    }
-    LaunchedEffect(Unit) { load() }
-
-    AdminScroll {
-        if (loading) AdminLoading()
-        settings?.let { current ->
-            AdminHeading(R.string.native_admin_registration, title)
-            CheckRow(stringResource(R.string.native_admin_allow_accounts), current.allowNewAccounts, title) { enabled ->
-                save { api.patchAdminSettings(AdminSettingsPatch(allowNewAccounts = enabled)).requireBody("registration") }
-            }
-            Spacer(Modifier.height(12.dp))
-            AdminHeading(R.string.native_admin_identity, title)
-            AdminField(appName, { appName = it.take(10) }, R.string.native_admin_app_name, title, subtext, border)
-            AdminField(slogan, { slogan = it.take(200) }, R.string.native_admin_slogan, title, subtext, border)
-            AdminField(domain, { domain = it }, R.string.native_admin_passkey_domain, title, subtext, border)
-            AdminHintText(
-                current.passkeyDomainState.effective.ifBlank { stringResource(R.string.native_admin_passkey_domain_hint) },
-                subtext,
-            )
-            AdminPrimary(stringResource(R.string.native_admin_save), !busy) {
-                save {
-                    api.patchAdminSettings(
-                        AdminSettingsPatch(appName = appName.trim(), loginSlogan = slogan, passkeyDomain = domain.trim().lowercase()),
-                    ).requireBody("branding")
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            AdminHeading(R.string.native_admin_login_theme, title)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("glasskeep", "emerald", "amber", "rosewood", "graphite", "blush").forEach { theme ->
-                    SmallAction(theme, enabled = !busy, selected = current.loginTheme == theme) {
-                        save { api.patchAdminSettings(AdminSettingsPatch(loginTheme = theme)).requireBody("login theme") }
-                    }
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            AdminHeading(R.string.native_admin_logo, title)
-            current.logo?.let { rememberDecodedImage(it)?.let { bitmap -> androidx.compose.foundation.Image(bitmap, null, Modifier.size(72.dp)) } }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SmallAction(stringResource(R.string.native_admin_choose_image), enabled = !busy) { logoPicker.launch("image/*") }
-                if (current.logo != null) SmallAction(stringResource(R.string.native_admin_remove), danger = true, enabled = !busy) {
-                    save { api.patchAdminLogo(AdminLogoPatch(null)).requireBody("remove logo") }
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            AdminHeading(R.string.native_admin_login_background, title)
-            current.loginBackground?.let { rememberDecodedImage(it)?.let { bitmap -> androidx.compose.foundation.Image(bitmap, null, Modifier.fillMaxWidth().height(140.dp)) } }
-            Text(stringResource(R.string.native_admin_blur, blur.toInt()), color = title, fontSize = 13.sp)
-            Slider(value = blur, onValueChange = { blur = it }, valueRange = 0f..20f, steps = 19, onValueChangeFinished = {
-                save { api.patchAdminSettings(AdminSettingsPatch(loginBackgroundBlur = blur.toInt())).requireBody("blur") }
-            })
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SmallAction(stringResource(R.string.native_admin_choose_image), enabled = !busy) { backgroundPicker.launch("image/*") }
-                if (current.loginBackground != null) SmallAction(stringResource(R.string.native_admin_remove), danger = true, enabled = !busy) {
-                    save { api.patchAdminBackground(AdminBackgroundPatch(null)).requireBody("remove background") }
-                }
-            }
-        }
-        error?.let { AdminError(it) }
-    }
-}
-
-@Composable
-private fun AdminAiSection(api: GlassKeepApi, dark: Boolean, title: Color, subtext: Color, border: Color) {
-    val scope = rememberCoroutineScope()
-    var config by remember { mutableStateOf<AdminAiSettingsDto?>(null) }
-    var enabled by remember { mutableStateOf(false) }
-    var share by remember { mutableStateOf(false) }
-    var privateEndpoints by remember { mutableStateOf(false) }
-    var baseUrl by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
-    var temperature by remember { mutableStateOf("0.3") }
-    var maxTokens by remember { mutableStateOf("800") }
-    var busy by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
-
-    fun apply(fresh: AdminAiSettingsDto) {
-        config = fresh; enabled = fresh.enabled; share = fresh.allowServerAiForUsers
-        privateEndpoints = fresh.allowPrivateAiForUsers; baseUrl = fresh.baseUrl; model = fresh.model
-        temperature = fresh.temperature.toString(); maxTokens = fresh.maxTokens.toString(); apiKey = ""
-    }
-    fun body() = AdminAiSettingsRequest(
-        enabled, baseUrl.trim(), model.trim(), temperature.toDoubleOrNull()?.coerceIn(0.0, 2.0) ?: 0.3,
-        maxTokens.toIntOrNull()?.coerceIn(1, 32768) ?: 800, share && enabled, privateEndpoints && enabled,
-        apiKey = apiKey.takeIf { it.isNotEmpty() },
-    )
-    LaunchedEffect(Unit) {
-        try { apply(api.getAdminAiSettings().requireBody("AI settings")) } catch (t: Throwable) { message = t.message }
-    }
-    fun run(block: suspend () -> Unit) {
-        if (busy) return; busy = true; message = null
-        scope.launch { try { block() } catch (t: Throwable) { message = t.message } finally { busy = false } }
-    }
-
-    AdminScroll {
-        AdminHeading(R.string.native_admin_ai_server, title)
-        CheckRow(stringResource(R.string.native_admin_ai_enabled), enabled, title) { enabled = it; if (!it) { share = false; privateEndpoints = false } }
-        CheckRow(stringResource(R.string.native_admin_ai_share), share, title, enabled) { share = it }
-        CheckRow(stringResource(R.string.native_admin_ai_private), privateEndpoints, title, enabled) { privateEndpoints = it }
-        AdminField(baseUrl, { baseUrl = it }, R.string.native_admin_ai_url, title, subtext, border)
-        AdminField(model, { model = it }, R.string.native_admin_ai_model, title, subtext, border)
-        AdminField(apiKey, { apiKey = it }, if (config?.hasApiKey == true) R.string.native_admin_ai_key_keep else R.string.native_admin_ai_key, title, subtext, border, password = true)
-        if (config?.hasApiKey == true) {
-            SmallAction(stringResource(R.string.native_admin_ai_key_clear), danger = true, enabled = !busy) {
-                run { apply(api.putAdminAiSettings(body().copy(apiKey = "")).requireBody("clear AI key")); message = "OK" }
-            }
-        }
-        AdminField(temperature, { temperature = it }, R.string.native_admin_ai_temperature, title, subtext, border, numeric = true)
-        AdminField(maxTokens, { maxTokens = it }, R.string.native_admin_ai_tokens, title, subtext, border, numeric = true)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallAction(stringResource(R.string.native_admin_ai_test), enabled = !busy) {
-                run {
-                    val request = body()
-                    val result = api.testAdminAi(AdminAiTestRequest(request.baseUrl, request.model, request.temperature, request.maxTokens, request.apiKey)).requireBody("AI test")
-                    message = result.reply ?: stringResourceUnavailable
-                }
-            }
-            AdminPrimary(stringResource(R.string.native_admin_save), !busy) {
-                run { apply(api.putAdminAiSettings(body()).requireBody("save AI")); message = "OK" }
-            }
-        }
-        message?.let { AdminHintText(it, if (it == "OK") Color(0xFF16A34A) else subtext) }
-    }
-}
-
-@Composable
-private fun AdminSecuritySection(
-    container: NativeAppContainer, api: GlassKeepApi, dark: Boolean, title: Color, subtext: Color, border: Color,
-) {
     val activity = LocalView.current.context as Activity
+    val toasts = LocalGkToasts.current
     val scope = rememberCoroutineScope()
-    var status by remember { mutableStateOf<InstanceStatusResponse?>(null) }
-    var passkeys by remember { mutableStateOf<List<PasskeyDto>>(emptyList()) }
-    var passphrase by remember { mutableStateOf("") }
-    var confirmation by remember { mutableStateOf("") }
-    var currentPassphrase by remember { mutableStateOf("") }
-    var newPassphrase by remember { mutableStateOf("") }
-    var newConfirmation by remember { mutableStateOf("") }
-    var recovery by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var confirmDeactivate by remember { mutableStateOf(false) }
+    val state = remember(serverUrl) { AdminPanelState(context, container, serverUrl, scope) }
+    val power = remember(serverUrl) { ServerPower(context, state.api, toasts, activity) }
+    val titleColor = if (dark) DarkTitleColor else LightTitleColor
+    val borderColor = if (dark) DarkBorderColor else LightBorderColor
+    val scrollState = rememberScrollState()
+    val content = remember { CoordinatesHolder() }
 
-    suspend fun load() {
-        status = api.instanceStatus().requireBody("encryption status")
-        container.lockState.apply(status!!)
-        passkeys = runCatching { api.listPasskeys().requireBody("passkeys").passkeys }.getOrDefault(emptyList())
-    }
-    fun run(block: suspend () -> Unit) {
-        if (busy) return; busy = true; error = null
-        scope.launch { try { block(); load() } catch (t: Throwable) { error = t.message } finally { busy = false } }
-    }
-    LaunchedEffect(Unit) { try { load() } catch (t: Throwable) { error = t.message } }
+    var highlightDomain by rememberSaveable { mutableStateOf(focus == AdminFocusPasskeyDomain) }
+    var pendingOpen by rememberSaveable { mutableStateOf(false) }
+    var siteOpen by rememberSaveable { mutableStateOf(false) }
+    var usersOpen by rememberSaveable { mutableStateOf(false) }
+    var createOpen by rememberSaveable { mutableStateOf(false) }
+    var aiOpen by rememberSaveable { mutableStateOf(false) }
+    var encryptionOpen by rememberSaveable { mutableStateOf(false) }
+    var federationOpen by rememberSaveable { mutableStateOf(false) }
+    var confirmPower by remember { mutableStateOf<PowerAction?>(null) }
 
-    AdminScroll {
-        AdminHeading(R.string.native_admin_encryption, title)
-        val state = status
-        if (state == null) AdminLoading() else {
-            AdminHintText(stringResource(if (!state.enabled) R.string.native_admin_encryption_off else if (state.locked) R.string.native_admin_encryption_locked else R.string.native_admin_encryption_on), subtext)
-            if (!state.enabled) {
-                AdminField(passphrase, { passphrase = it }, R.string.native_admin_passphrase, title, subtext, border, password = true)
-                AdminField(confirmation, { confirmation = it }, R.string.native_register_confirm, title, subtext, border, password = true)
-                AdminPrimary(stringResource(R.string.native_admin_activate), !busy && passphrase.length >= 8 && passphrase == confirmation) {
-                    run {
-                        val result = api.activateEncryption(ActivateEncryptionRequest(passphrase, confirmation)).requireBody("activate encryption")
-                        recovery = result.recoveryKey; passphrase = ""; confirmation = ""
-                    }
-                }
-            } else if (!state.locked) {
-                AdminHeading(R.string.native_admin_change_passphrase, title)
-                AdminField(currentPassphrase, { currentPassphrase = it }, R.string.native_admin_current_passphrase, title, subtext, border, password = true)
-                AdminField(newPassphrase, { newPassphrase = it }, R.string.native_admin_new_passphrase, title, subtext, border, password = true)
-                AdminField(newConfirmation, { newConfirmation = it }, R.string.native_register_confirm, title, subtext, border, password = true)
-                AdminPrimary(stringResource(R.string.native_admin_save), !busy && newPassphrase.length >= 8 && newPassphrase == newConfirmation) {
-                    run {
-                        api.changeEncryptionPassphrase(ChangeEncryptionPassphraseRequest(currentPassphrase, newPassphrase, newConfirmation)).requireBody("change passphrase")
-                        currentPassphrase = ""; newPassphrase = ""; newConfirmation = ""
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SmallAction(stringResource(R.string.native_admin_recovery_regenerate), enabled = !busy) {
-                        run { recovery = api.regenerateRecoveryKey().requireBody("recovery key").recoveryKey }
-                    }
-                    SmallAction(stringResource(R.string.native_lock_instance), danger = true, enabled = !busy) {
-                        run { api.lockInstance().requireBody("lock") }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                SmallAction(stringResource(R.string.native_admin_deactivate), danger = true, enabled = !busy) { confirmDeactivate = true }
-            }
+    // openAdminPanel(): everything is read afresh each time it opens.
+    LaunchedEffect(state) { state.loadAll() }
+    LaunchedEffect(state, liveEvents) { liveEvents.collect { state.onLiveEvent(it) } }
+    // Sent from the settings' passkey notice, the panel opens with that
+    // section unfolding (App.jsx:7576) and the row is pointed out until
+    // its flag clears, 3.6s on (AdminPanel.jsx:119-124).
+    LaunchedEffect(Unit) {
+        if (highlightDomain) {
+            siteOpen = true
+            delay(3_600)
+            highlightDomain = false
         }
-        recovery?.let {
-            AdminCard(dark, border) {
-                Text(stringResource(R.string.native_admin_recovery_once), color = Color(0xFFD97706), fontWeight = FontWeight.Bold)
-                Text(it, color = title, fontSize = 14.sp)
-            }
-        }
-        if (status?.enabled == true && status?.unlocked == true && passkeys.isNotEmpty()) {
-            Spacer(Modifier.height(18.dp))
-            AdminHeading(R.string.native_admin_passkey_unlock, title)
-            passkeys.forEach { key ->
-                AdminCard(dark, border) {
-                    Text(key.name ?: stringResource(R.string.native_settings_passkeys_untitled), color = title, fontWeight = FontWeight.SemiBold)
-                    AdminHintText(if (key.prfSupported) stringResource(R.string.native_admin_passkey_prf_yes) else stringResource(R.string.native_admin_passkey_prf_no), subtext)
-                    if (key.canUnlockInstance) {
-                        SmallAction(stringResource(R.string.native_admin_passkey_disable), danger = true, enabled = !busy) {
-                            run { api.disablePasskeyUnlock(key.credentialId).requireBody("disable passkey unlock") }
-                        }
-                    } else {
-                        SmallAction(stringResource(R.string.native_admin_passkey_enable), enabled = !busy && key.prfSupported) {
-                            run {
-                                val options = api.promotePasskeyOptions(key.credentialId).requireBody("passkey options")
-                                when (val ceremony = NativePasskeys.authenticate(activity, options.options.toString())) {
-                                    is PasskeyCeremonyResult.Failed -> error(ceremony.message)
-                                    is PasskeyCeremonyResult.Success -> {
-                                        val response = Json.parseToJsonElement(ceremony.responseJson)
-                                        val prf = prfOutputOf(response.jsonObject) ?: error("No PRF output")
-                                        api.promotePasskeyVerify(key.credentialId, PromotePasskeyVerifyRequest(response, options.challengeId, prf)).requireBody("enable passkey unlock")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        error?.let { AdminError(it) }
     }
-    if (confirmDeactivate) {
-        ConfirmAdminDialog(
-            title = stringResource(R.string.native_admin_deactivate_title),
-            message = stringResource(R.string.native_admin_deactivate_body),
-            dark = dark,
-            onDismiss = { confirmDeactivate = false },
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(WorkspaceTheme.statusBarColor(themeId, dark))
+            .drawBehind { drawRect(borderColor, size = Size(1.dp.toPx(), size.height)) },
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(start = 1.dp)
+                .windowInsetsPadding(WindowInsets.systemBars),
         ) {
-            confirmDeactivate = false
-            run { api.deactivateEncryption(DeactivateEncryptionRequest(currentPassphrase)).requireBody("deactivate encryption") }
+            AdminHeader(
+                themeId = themeId,
+                dark = dark,
+                titleColor = titleColor,
+                serverOffline = container.syncStatus.serverReachable == false,
+                running = power.running,
+                onPower = { confirmPower = it },
+                onClose = onBack,
+            )
+            Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(scrollState)
+                    .onGloballyPositioned { content.value = it }
+                    .padding(16.dp),
+            ) {
+                Box(Modifier.padding(bottom = 24.dp)) {
+                    LegacyAdminUpdateBlock(state.api, dark, titleColor, SettingsSubtleColor, borderColor)
+                }
+                if (state.pending.isNotEmpty()) {
+                    AdminPendingSection(
+                        state = state,
+                        expanded = pendingOpen,
+                        onToggle = { pendingOpen = !pendingOpen },
+                        themeId = themeId,
+                        dark = dark,
+                        titleColor = titleColor,
+                        borderColor = borderColor,
+                    )
+                }
+                AdminSiteSection(
+                    state = state,
+                    container = container,
+                    expanded = siteOpen,
+                    onToggle = { siteOpen = !siteOpen },
+                    highlightDomain = highlightDomain,
+                    scrollState = scrollState,
+                    content = content,
+                    themeId = themeId,
+                    dark = dark,
+                    titleColor = titleColor,
+                    borderColor = borderColor,
+                )
+                AdminUsersSection(
+                    state = state,
+                    currentUserId = container.tokenStore.profile?.id,
+                    expanded = usersOpen,
+                    onToggle = { usersOpen = !usersOpen },
+                    themeId = themeId,
+                    dark = dark,
+                    titleColor = titleColor,
+                    borderColor = borderColor,
+                )
+                AdminCreateUserSection(
+                    state = state,
+                    expanded = createOpen,
+                    onToggle = { createOpen = !createOpen },
+                    themeId = themeId,
+                    dark = dark,
+                    titleColor = titleColor,
+                    borderColor = borderColor,
+                )
+                SettingsAccordionSection(
+                    title = stringResource(R.string.native_admin_ai_section),
+                    expanded = aiOpen,
+                    themeId = themeId,
+                    dark = dark,
+                    titleColor = titleColor,
+                    icon = { tint -> BrainIcon(size = 20.dp, tint = tint) },
+                    onToggle = { aiOpen = !aiOpen },
+                ) {
+                    LegacyAdminAiSection(state.api, dark, titleColor, SettingsSubtleColor, borderColor)
+                }
+                SettingsAccordionSection(
+                    title = stringResource(R.string.native_admin_encryption_section),
+                    expanded = encryptionOpen,
+                    themeId = themeId,
+                    dark = dark,
+                    titleColor = titleColor,
+                    icon = { tint -> ShieldLockIcon(size = 20.dp, tint = tint) },
+                    onToggle = { encryptionOpen = !encryptionOpen },
+                ) {
+                    LegacyAdminSecuritySection(container, state.api, dark, titleColor, SettingsSubtleColor, borderColor)
+                }
+                SettingsAccordionSection(
+                    title = stringResource(R.string.native_admin_federation_section),
+                    expanded = federationOpen,
+                    themeId = themeId,
+                    dark = dark,
+                    titleColor = titleColor,
+                    icon = { tint -> ServerIcon(size = 20.dp, tint = tint) },
+                    onToggle = { federationOpen = !federationOpen },
+                ) {
+                    LegacyAdminFederationSection(state.api, serverUrl, dark, titleColor, SettingsSubtleColor, borderColor)
+                }
+            }
         }
+    }
+
+    confirmPower?.let { action ->
+        val restart = action == PowerAction.RESTART
+        GkConfirmDialog(
+            title = stringResource(if (restart) R.string.native_admin_restart_title else R.string.native_admin_shutdown_title),
+            message = stringResource(if (restart) R.string.native_admin_restart_confirm else R.string.native_admin_shutdown_confirm),
+            confirmLabel = stringResource(if (restart) R.string.native_admin_restart_confirm_btn else R.string.native_admin_shutdown_confirm_btn),
+            cancelLabel = stringResource(R.string.native_dialog_cancel),
+            themeId = themeId,
+            dark = dark,
+            borderColor = borderColor,
+            titleColor = titleColor,
+            subtextColor = if (dark) DialogBodyDark else DialogBodyLight,
+            variant = GkConfirmVariant.DANGER,
+            onConfirm = { scope.launch { if (restart) power.restart() else power.shutdown() } },
+            onDismiss = { confirmPower = null },
+        )
+    }
+    power.progress?.let { PowerProgressDialog(it, dark, titleColor, borderColor) }
+    state.alert?.let { message ->
+        GkAlertDialog(
+            message = message,
+            themeId = themeId,
+            dark = dark,
+            borderColor = borderColor,
+            textColor = titleColor,
+            onDismiss = { state.alert = null },
+        )
     }
 }
 
+/**
+ * The panel's header: the red shield and the title, then the power and
+ * restart buttons (gone while the server is unreachable, dimmed while
+ * either command runs, the running one's icon spinning) and the close X.
+ */
 @Composable
-private fun AdminFederationSection(api: GlassKeepApi, serverUrl: String, dark: Boolean, title: Color, subtext: Color, border: Color) {
-    val scope = rememberCoroutineScope()
-    var links by remember { mutableStateOf<List<FederationLinkDto>>(emptyList()) }
-    var selfName by remember { mutableStateOf("") }
-    var peerUrl by remember { mutableStateOf("") }
-    var peerLabel by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val localBaseUrl = remember(serverUrl) { serverUrl.trimEnd('/') }
-
-    suspend fun load() {
-        val result = api.getFederationLinks().requireBody("federation")
-        links = result.links; selfName = result.selfName
-    }
-    fun run(block: suspend () -> Unit) {
-        if (busy) return; busy = true; error = null
-        scope.launch { try { block(); load() } catch (t: Throwable) { error = t.message } finally { busy = false } }
-    }
-    LaunchedEffect(Unit) { try { load() } catch (t: Throwable) { error = t.message } }
-
-    AdminScroll {
-        AdminHeading(R.string.native_admin_federation_identity, title)
-        AdminField(selfName, { selfName = it.take(24) }, R.string.native_admin_federation_name, title, subtext, border)
-        AdminPrimary(stringResource(R.string.native_admin_save), !busy && selfName.isNotBlank()) {
-            run { api.setFederationSelfName(FederationSelfNameRequest(selfName.trim())).requireBody("federation name") }
-        }
-        Spacer(Modifier.height(18.dp))
-        AdminHeading(R.string.native_admin_federation_invite, title)
-        AdminField(peerUrl, { peerUrl = it }, R.string.native_admin_federation_url, title, subtext, border)
-        AdminField(peerLabel, { peerLabel = it }, R.string.native_admin_federation_label, title, subtext, border)
-        AdminPrimary(stringResource(R.string.native_admin_federation_pair), !busy && peerUrl.isNotBlank() && selfName.isNotBlank()) {
-            run {
-                api.inviteFederation(FederationInviteRequest(peerUrl.trim(), localBaseUrl, peerLabel.trim().ifBlank { null })).requireBody("federation invite")
-                peerUrl = ""; peerLabel = ""
-            }
-        }
-        Spacer(Modifier.height(20.dp))
-        AdminHeading(R.string.native_admin_federation_links, title)
-        if (links.isEmpty()) AdminHint(R.string.native_admin_federation_empty, subtext)
-        links.forEach { link ->
-            FederationLinkCard(link, dark, title, subtext, border, !busy,
-                onAccept = { run { api.acceptFederation(link.id, FederationAcceptRequest(localBaseUrl, link.peerLabel)).requireBody("accept federation") } },
-                onRefuse = { run { api.refuseFederation(link.id).requireBody("refuse federation") } },
-                onResend = { run { api.resendFederation(link.id, FederationAcceptRequest(localBaseUrl, link.peerLabel)).requireBody("resend federation") } },
-                onRecheck = { run { api.recheckFederation(link.id).requireBody("recheck federation") } },
-                onRename = { label -> run { api.renameFederation(link.id, FederationRenameRequest(label)).requireBody("rename federation") } },
-                onAddress = { address -> run { api.updateFederationAddress(link.id, FederationAddressRequest(address)).requireBody("update address") } },
-                onUnpair = { run { api.unpairFederation(link.id).requireBody("unpair federation") } },
+private fun AdminHeader(
+    themeId: String?,
+    dark: Boolean,
+    titleColor: Color,
+    serverOffline: Boolean,
+    running: PowerAction?,
+    onPower: (PowerAction) -> Unit,
+    onClose: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(Modifier.weight(1f, fill = false), verticalAlignment = Alignment.CenterVertically) {
+            ShieldCheckIcon(size = 20.dp, tint = if (dark) Color(0xFFFF6467) else Color(0xFFE7000B))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                stringResource(R.string.native_notes_admin_panel),
+                color = titleColor,
+                fontSize = 18.sp,
+                lineHeight = 28.sp,
+                fontWeight = FontWeight.SemiBold,
             )
         }
-        error?.let { AdminError(it) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (!serverOffline) {
+                PowerButton(
+                    label = stringResource(R.string.native_admin_shutdown_server),
+                    themeId = themeId,
+                    enabled = running == null,
+                    onClick = { onPower(PowerAction.SHUTDOWN) },
+                ) {
+                    val angle = if (running == PowerAction.SHUTDOWN) rememberSpinAngle() else 0f
+                    PowerIcon(Modifier.rotate(angle), size = 20.dp, tint = Color.White)
+                }
+                PowerButton(
+                    label = stringResource(R.string.native_admin_restart_server),
+                    themeId = themeId,
+                    enabled = running == null,
+                    onClick = { onPower(PowerAction.RESTART) },
+                ) {
+                    val angle = if (running == PowerAction.RESTART) rememberSpinAngle() else 0f
+                    RefreshIcon(Modifier.rotate(angle), size = 20.dp, tint = Color.White)
+                }
+            }
+            SidePanelCloseButton(titleColor, onClose)
+        }
     }
 }
 
+/** One of the header's 36px gradient squares, pressed down to 0.98. */
 @Composable
-private fun FederationLinkCard(
-    link: FederationLinkDto, dark: Boolean, title: Color, subtext: Color, border: Color, enabled: Boolean,
-    onAccept: () -> Unit, onRefuse: () -> Unit, onResend: () -> Unit, onRecheck: () -> Unit,
-    onRename: (String) -> Unit, onAddress: (String) -> Unit, onUnpair: () -> Unit,
+private fun PowerButton(
+    label: String,
+    themeId: String?,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit,
 ) {
-    var label by remember(link.id, link.peerLabel) { mutableStateOf(link.peerLabel.orEmpty()) }
-    var address by remember(link.id, link.peerBaseUrl) { mutableStateOf(link.peerBaseUrl) }
-    AdminCard(dark, border) {
-        Text(link.peerLabel ?: link.peerBaseUrl, color = title, fontWeight = FontWeight.SemiBold)
-        Text("${link.status} · ${link.state}", color = if (link.state == "online") Color(0xFF16A34A) else subtext, fontSize = 12.sp)
-        link.lastError?.let { Text(it, color = Color(0xFFDC2626), fontSize = 12.sp) }
-        if (link.status == "incoming_pending") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SmallAction(stringResource(R.string.native_admin_reject), danger = true, enabled = enabled, onClick = onRefuse)
-                SmallAction(stringResource(R.string.native_admin_approve), enabled = enabled, onClick = onAccept)
-            }
-        } else if (link.status == "outgoing_pending") {
-            SmallAction(stringResource(R.string.native_admin_cancel), danger = true, enabled = enabled, onClick = onRefuse)
-        } else {
-            AdminField(label, { label = it.take(24) }, R.string.native_admin_federation_label, title, subtext, border)
-            AdminField(address, { address = it }, R.string.native_admin_federation_url, title, subtext, border)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SmallAction(stringResource(R.string.native_admin_save_name), enabled = enabled) { onRename(label.trim()) }
-                SmallAction(stringResource(R.string.native_admin_save_address), enabled = enabled) { onAddress(address.trim()) }
-                SmallAction(stringResource(R.string.native_admin_recheck), enabled = enabled, onClick = onRecheck)
-                if (link.status in setOf("refused", "cancelled", "revoked")) SmallAction(stringResource(R.string.native_admin_resend), enabled = enabled, onClick = onResend)
-                SmallAction(stringResource(R.string.native_admin_unpair), danger = true, enabled = enabled, onClick = onUnpair)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AdminServerSection(api: GlassKeepApi, dark: Boolean, title: Color, subtext: Color, border: Color) {
-    val scope = rememberCoroutineScope()
-    var update by remember { mutableStateOf<UpdateCheckDto?>(null) }
-    var mode by remember { mutableStateOf<SelfUpdateModeDto?>(null) }
-    var status by remember { mutableStateOf<SelfUpdateStatusDto?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var confirmation by remember { mutableStateOf<String?>(null) }
-
-    suspend fun load() {
-        update = api.checkServerUpdate().requireBody("update check")
-        mode = api.selfUpdateMode().requireBody("update mode")
-        val statusResponse = api.selfUpdateStatus()
-        status = if (statusResponse.code() == 204) null else statusResponse.requireBody("update status")
-    }
-    fun run(block: suspend () -> Unit) {
-        if (busy) return; busy = true; error = null
-        scope.launch { try { block(); load() } catch (t: Throwable) { error = t.message } finally { busy = false } }
-    }
-    LaunchedEffect(Unit) { try { load() } catch (t: Throwable) { error = t.message } }
-    LaunchedEffect(status?.inProgress) {
-        while (status?.inProgress == true) {
-            delay(1_500)
-            runCatching { api.selfUpdateStatus() }.getOrNull()?.let { response ->
-                if (response.isSuccessful) status = response.body()
-            }
-        }
-    }
-
-    AdminScroll {
-        AdminHeading(R.string.native_admin_server_update, title)
-        update?.let { info ->
-            AdminCard(dark, border) {
-                Text(stringResource(R.string.native_admin_version_current, info.currentVersion ?: "?"), color = title)
-                Text(stringResource(R.string.native_admin_version_latest, info.latestVersion ?: "?"), color = subtext)
-                Text(stringResource(if (info.updateAvailable) R.string.native_admin_update_available else R.string.native_admin_up_to_date), color = if (info.updateAvailable) Color(0xFFD97706) else Color(0xFF16A34A))
-                if (info.updateAvailable && mode?.oneClickAvailable == true && info.latestVersion != null) {
-                    AdminPrimary(stringResource(R.string.native_admin_update_now), !busy && status?.inProgress != true) { confirmation = "update" }
-                }
-                if (mode?.oneClickAvailable != true) AdminHintText(mode?.reason ?: stringResource(R.string.native_admin_update_manual), subtext)
-            }
-        }
-        status?.let { progress ->
-            AdminCard(dark, border) {
-                Text(progress.state ?: "idle", color = title, fontWeight = FontWeight.SemiBold)
-                Text(progress.message ?: progress.step.orEmpty(), color = subtext, fontSize = 13.sp)
-                if (progress.inProgress) SmallAction(stringResource(R.string.native_admin_cancel_update), danger = true, enabled = !busy) {
-                    run { api.cancelSelfUpdate().requireBody("cancel update") }
-                }
-            }
-        }
-        Spacer(Modifier.height(18.dp))
-        AdminHeading(R.string.native_admin_server_power, title)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallAction(stringResource(R.string.native_admin_restart), danger = true, enabled = !busy) { confirmation = "restart" }
-            SmallAction(stringResource(R.string.native_admin_shutdown), danger = true, enabled = !busy) { confirmation = "shutdown" }
-            SmallAction(stringResource(R.string.native_admin_refresh), enabled = !busy) { run { } }
-        }
-        error?.let { AdminError(it) }
-    }
-    confirmation?.let { action ->
-        val isUpdate = action == "update"
-        ConfirmAdminDialog(
-            title = stringResource(if (isUpdate) R.string.native_admin_update_confirm_title else if (action == "restart") R.string.native_admin_restart else R.string.native_admin_shutdown),
-            message = stringResource(if (isUpdate) R.string.native_admin_update_confirm_body else R.string.native_admin_power_confirm),
-            dark = dark,
-            onDismiss = { confirmation = null },
-        ) {
-            confirmation = null
-            run {
-                when (action) {
-                    "update" -> api.startSelfUpdate(StartSelfUpdateRequest(update?.latestVersion ?: error("No version"))).requireBody("start update")
-                    "restart" -> api.restartServer().requireBody("restart")
-                    else -> api.shutdownServer().requireBody("shutdown")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AdminScroll(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) { content() }
-}
-
-@Composable
-private fun AdminHeading(res: Int, color: Color, modifier: Modifier = Modifier) {
-    Text(stringResource(res), color = color, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = modifier)
-}
-
-@Composable
-private fun AdminHint(res: Int, color: Color) = Text(stringResource(res), color = color, fontSize = 13.sp)
-
-@Composable
-private fun AdminHintText(value: String, color: Color) = Text(value, color = color, fontSize = 13.sp)
-
-@Composable
-private fun AdminCard(dark: Boolean, border: Color, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(if (dark) Color(0xFF242424) else Color.White)
-            .border(1.dp, border, RoundedCornerShape(12.dp)).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) { content() }
-}
-
-@Composable
-private fun AdminField(
-    value: String, onValue: (String) -> Unit, label: Int, title: Color, subtext: Color, border: Color,
-    password: Boolean = false, numeric: Boolean = false,
-) {
-    OutlinedTextField(
-        value = value, onValueChange = onValue,
-        label = { Text(stringResource(label)) }, singleLine = true,
-        visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
-        keyboardOptions = KeyboardOptions(keyboardType = if (numeric) KeyboardType.Decimal else if (password) KeyboardType.Password else KeyboardType.Text),
-        colors = detailFieldColors(title, subtext, border), modifier = Modifier.fillMaxWidth(),
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.98f else 1f,
+        animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
+        label = "powerButtonScale",
     )
-}
-
-@Composable
-private fun CheckRow(label: String, checked: Boolean, color: Color, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = color, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        Checkbox(checked = checked, onCheckedChange = onChange, enabled = enabled)
+    Box(
+        modifier = Modifier
+            .scale(scale)
+            .alpha(if (enabled) 1f else 0.5f)
+            .size(36.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(WorkspaceTheme.buttonGradient(themeId))
+            .semantics { contentDescription = label }
+            .gkTooltip(label)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+            ) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        icon()
     }
 }
 
-@Composable
-private fun AdminPrimary(label: String, enabled: Boolean, onClick: () -> Unit) {
-    Button(onClick = onClick, enabled = enabled, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))) { Text(label) }
-}
+/**
+ * useAdminActions.js: the panel's settings and lists, and the requests
+ * that change them. A failure the web raises as a blocking `alert()` lands
+ * in [alert], which the WebView showed as its own message dialog.
+ */
+internal class AdminPanelState(
+    private val context: Context,
+    private val container: NativeAppContainer,
+    private val serverUrl: String,
+    private val scope: CoroutineScope,
+) {
+    val api: GlassKeepApi = container.api(serverUrl)
 
-@Composable
-private fun SmallAction(label: String, danger: Boolean = false, enabled: Boolean = true, selected: Boolean = false, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick, enabled = enabled,
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = if (danger) Color(0xFFDC2626) else if (selected) Color(0xFF6366F1) else Color.Unspecified),
-    ) { Text(label, fontSize = 12.sp, maxLines = 1) }
-}
+    /** The web's own defaults until the first read lands. */
+    var settings by mutableStateOf(AdminSettingsDto(allowNewAccounts = true))
+        private set
+    var users by mutableStateOf<List<AdminUserDto>>(emptyList())
+        private set
+    var pending by mutableStateOf<List<PendingUserDto>>(emptyList())
+        private set
+    var alert by mutableStateOf<String?>(null)
 
-@Composable
-private fun AdminLoading() = Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
-    CircularProgressIndicator(Modifier.size(28.dp))
-}
+    suspend fun loadAll() = coroutineScope {
+        launch { loadSettings() }
+        launch { loadUsers() }
+        launch { loadPending() }
+    }
 
-@Composable
-private fun AdminError(value: String) = Text(value, color = Color(0xFFDC2626), fontSize = 13.sp)
+    private suspend fun loadSettings() {
+        read("GET /api/admin/settings") { getAdminSettings() }?.let { settings = it }
+    }
 
-@Composable
-private fun ConfirmAdminDialog(title: String, message: String, dark: Boolean, onDismiss: () -> Unit, onConfirm: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(if (dark) Color(0xFF282828) else Color.White).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text(title, color = if (dark) DarkTitleColor else LightTitleColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Text(message, color = if (dark) DarkSubtextColor else LightSubtextColor, fontSize = 14.sp)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.native_dialog_cancel)) }
-                Spacer(Modifier.width(8.dp))
-                Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))) { Text(stringResource(R.string.native_admin_confirm)) }
+    private suspend fun loadUsers() {
+        read("GET /api/admin/users") { getAdminUsers() }?.let { users = it }
+    }
+
+    private suspend fun loadPending() {
+        read("GET /api/admin/pending-users") { getPendingUsers() }?.let { pending = it }
+    }
+
+    /** A read that fails leaves the panel as it was: the web only logs it. */
+    private suspend fun <T : Any> read(request: String, call: suspend GlassKeepApi.() -> Response<T>): T? = try {
+        api.call().bodyOrRefusal(request)
+    } catch (t: CancellationException) {
+        throw t
+    } catch (t: Throwable) {
+        NativeDebug.e("Admin read failed: $request", t)
+        null
+    }
+
+    /** The frames App.jsx reloads the panel's lists on. A resolved
+     *  registration reads the users too: the frame's outcome is not passed
+     *  on, and only an approval changes them. */
+    suspend fun onLiveEvent(type: String) {
+        when (type) {
+            "pending_user_registered" -> loadPending()
+            "pending_user_resolved" -> {
+                loadPending()
+                loadUsers()
             }
+            "user_list_changed", "user_deleted_notification" -> loadUsers()
+            "admin_settings_updated" -> loadSettings()
+        }
+    }
+
+    /** updateAdminSettings(): the settings as stored, or null once the
+     *  refusal is on screen. The live branding is read again after it. */
+    suspend fun updateSettings(request: suspend GlassKeepApi.() -> Response<AdminSettingsDto>): AdminSettingsDto? = try {
+        api.request().bodyOrRefusal("PATCH /api/admin/settings").also { fresh ->
+            settings = fresh
+            container.branding.loginSlogan = fresh.loginSlogan
+            scope.launch { reloadBranding(container, serverUrl) }
+        }
+    } catch (t: CancellationException) {
+        throw t
+    } catch (t: Throwable) {
+        alert = failureText(t, R.string.native_admin_failed_update_settings)
+        null
+    }
+
+    /** createUser(): true once the account exists. */
+    suspend fun createUser(request: CreateAdminUserRequest): Boolean = try {
+        val created = api.createAdminUser(request).bodyOrRefusal("POST /api/admin/users")
+        users = listOf(created) + users
+        true
+    } catch (t: CancellationException) {
+        throw t
+    } catch (t: Throwable) {
+        alert = failureText(t, R.string.native_admin_failed_create_user)
+        false
+    }
+
+    /** deleteUser(): who the server says it deleted, or null. */
+    suspend fun deleteUser(id: Int): DeletedAdminUserDto? = try {
+        val response = api.deleteAdminUser(id).bodyOrRefusal("DELETE /api/admin/users/$id")
+        users = users.filterNot { it.id == id }
+        response.deletedUser
+    } catch (t: CancellationException) {
+        throw t
+    } catch (t: Throwable) {
+        alert = failureText(t, R.string.native_admin_failed_delete_user)
+        null
+    }
+
+    /** updateUser(), which throws: the edit dialog toasts the failure. The
+     *  answer carries no counts, so the row keeps the ones it had. */
+    suspend fun updateUser(id: Int, request: UpdateAdminUserRequest) {
+        val updated = api.updateAdminUser(id, request).bodyOrRefusal("PATCH /api/admin/users/$id")
+        users = users.map {
+            if (it.id == id) updated.copy(notes = it.notes, storageBytes = it.storageBytes, avatarUrl = it.avatarUrl) else it
+        }
+    }
+
+    /** approvePendingUser(): null once done, else the failure, alerted and
+     *  handed back for the panel's own toast. */
+    suspend fun approve(id: Int): String? = try {
+        val user = api.approvePendingUser(id).bodyOrRefusal("POST /api/admin/pending-users/$id/approve")
+        pending = pending.filterNot { it.id == id }
+        users = listOf(user) + users
+        null
+    } catch (t: CancellationException) {
+        throw t
+    } catch (t: Throwable) {
+        failureText(t, R.string.native_admin_failed_approve_user).also { alert = it }
+    }
+
+    /** rejectPendingUser(), answered like [approve]. */
+    suspend fun reject(id: Int): String? = try {
+        api.rejectPendingUser(id).bodyOrRefusal("POST /api/admin/pending-users/$id/reject")
+        pending = pending.filterNot { it.id == id }
+        null
+    } catch (t: CancellationException) {
+        throw t
+    } catch (t: Throwable) {
+        failureText(t, R.string.native_admin_failed_reject_user).also { alert = it }
+    }
+
+    /** localizeServerError(e.message, fallback). */
+    fun failureText(t: Throwable, @StringRes fallback: Int): String =
+        context.localizedServerError(context.requestErrorText(t), fallback)
+}
+
+/** The header's two server commands. */
+internal enum class PowerAction { RESTART, SHUTDOWN }
+
+/** What the centred card says while a command runs: waiting, or done with
+ *  [secondsLeft] before the app starts over. */
+private data class PowerProgress(val action: PowerAction, val secondsLeft: Int? = null)
+
+/**
+ * AdminPanel.jsx's handleRestart / handleShutdown once confirmed: the
+ * request, then /api/health read every 1.5s until the server is back with
+ * a new start time (restart, 60s at most) or stops answering (shutdown,
+ * 30s at most), then a countdown and the app starts over, the native side
+ * of the page reload.
+ */
+private class ServerPower(
+    private val context: Context,
+    private val api: GlassKeepApi,
+    private val toasts: ToastController,
+    private val activity: Activity,
+) {
+    /** isRestarting / isShuttingDown. */
+    var running by mutableStateOf<PowerAction?>(null)
+        private set
+    var progress by mutableStateOf<PowerProgress?>(null)
+        private set
+
+    suspend fun restart() {
+        running = PowerAction.RESTART
+        progress = PowerProgress(PowerAction.RESTART)
+        try {
+            val startedBefore = api.startedAt() ?: System.currentTimeMillis()
+            val response = api.restartServer()
+            if (!response.isSuccessful) return fail(response.refusal("POST /api/admin/restart").error)
+            val deadline = System.currentTimeMillis() + 60_000
+            while (true) {
+                delay(1_500)
+                if (System.currentTimeMillis() > deadline) return timeOut(R.string.native_admin_restart_timeout)
+                val startedAt = api.startedAt()
+                if (startedAt != null && startedAt > startedBefore) break
+            }
+            running = null
+            countDown(PowerAction.RESTART, 5)
+        } catch (t: CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            NativeDebug.e("Server restart failed", t)
+            fail(null)
+        }
+    }
+
+    suspend fun shutdown() {
+        running = PowerAction.SHUTDOWN
+        progress = PowerProgress(PowerAction.SHUTDOWN)
+        try {
+            val response = api.shutdownServer()
+            if (!response.isSuccessful) return fail(response.refusal("POST /api/admin/shutdown").error)
+            val deadline = System.currentTimeMillis() + 30_000
+            while (true) {
+                delay(1_500)
+                if (System.currentTimeMillis() > deadline) return timeOut(R.string.native_admin_shutdown_timeout)
+                if (!api.answers()) break
+            }
+            running = null
+            countDown(PowerAction.SHUTDOWN, 3)
+        } catch (t: CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            NativeDebug.e("Server shutdown failed", t)
+            fail(null)
+        }
+    }
+
+    /** The refusal's own text, reworded, else the web's `t("error")`. */
+    private fun fail(error: String?) {
+        toasts.error(context.localizedServerError(error, R.string.native_admin_missing_error_key))
+        running = null
+        progress = null
+    }
+
+    private fun timeOut(@StringRes message: Int) {
+        running = null
+        progress = null
+        toasts.error(context.getString(message))
+    }
+
+    private suspend fun countDown(action: PowerAction, seconds: Int) {
+        var left = seconds
+        progress = PowerProgress(action, left)
+        while (left > 0) {
+            delay(1_000)
+            left--
+            progress = PowerProgress(action, left)
+        }
+        restartApp(activity)
+    }
+}
+
+/** GET /api/health's start time, or null while the server gives none
+ *  (down, starting, a proxy's error page). */
+private suspend fun GlassKeepApi.startedAt(): Long? = try {
+    health().takeIf { it.isSuccessful }?.body()?.startedAt
+} catch (t: CancellationException) {
+    throw t
+} catch (t: Exception) {
+    null
+}
+
+/** Whether /api/health answers at all within 3s, whatever it says. */
+private suspend fun GlassKeepApi.answers(): Boolean = try {
+    withTimeoutOrNull(3_000) { health() } != null
+} catch (t: IOException) {
+    false
+} catch (t: CancellationException) {
+    throw t
+} catch (t: Exception) {
+    true
+}
+
+/** The centred card over a restart or shutdown, which nothing dismisses:
+ *  the command's icon turning while it waits, a check once it is done. */
+@Composable
+private fun PowerProgressDialog(progress: PowerProgress, dark: Boolean, titleColor: Color, borderColor: Color) {
+    val restart = progress.action == PowerAction.RESTART
+    val done = progress.secondsLeft != null
+    GkDialog(
+        onDismissRequest = {},
+        dark = dark,
+        borderColor = borderColor,
+        dismissOnClickOutside = false,
+        maxWidth = 384.dp,
+        scrimAlpha = 0.5f,
+    ) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            when {
+                done -> TablerCheckIcon(size = 20.dp, tint = titleColor)
+                restart -> RefreshIcon(Modifier.rotate(rememberSpinAngle()), size = 20.dp, tint = titleColor)
+                else -> PowerIcon(Modifier.rotate(rememberSpinAngle()), size = 20.dp, tint = titleColor)
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                stringResource(
+                    when {
+                        !done && restart -> R.string.native_admin_restart_in_progress
+                        !done -> R.string.native_admin_shutdown_in_progress
+                        restart -> R.string.native_admin_restart_done
+                        else -> R.string.native_admin_shutdown_done
+                    },
+                ),
+                color = titleColor,
+                fontSize = 18.sp,
+                lineHeight = 28.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                when {
+                    done -> stringResource(R.string.native_admin_reload_in, progress.secondsLeft ?: 0)
+                    restart -> stringResource(R.string.native_admin_restart_waiting)
+                    else -> stringResource(R.string.native_admin_shutdown_waiting)
+                },
+                color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
-
-private fun AdminSettingsDto.toBrandingDto(publicBackground: String?) = BrandingDto(
-    appName = appName, logo = logo, loginBackground = publicBackground,
-    loginBackgroundColor = loginBackgroundColor, loginBackgroundHash = loginBackgroundHash,
-    loginBackgroundBlur = loginBackgroundBlur, loginTheme = loginTheme,
-)
-
-private fun formatBytes(bytes: Long): String {
-    if (bytes <= 0) return "0 B"
-    val units = listOf("B", "KB", "MB", "GB", "TB")
-    var value = bytes.toDouble(); var index = 0
-    while (value >= 1024 && index < units.lastIndex) { value /= 1024; index++ }
-    return if (value >= 100) "%.0f %s".format(value, units[index]) else "%.1f %s".format(value, units[index])
-}
-
-private suspend fun <T> Response<T>.requireBody(action: String): T {
-    val body = body()
-    if (isSuccessful && body != null) return body
-    val detail = runCatching { errorBody()?.string() }.getOrNull().orEmpty()
-    throw IllegalStateException("$action: HTTP ${code()}${if (detail.isBlank()) "" else " · $detail"}")
-}
-
-private const val stringResourceUnavailable = "Connection succeeded"

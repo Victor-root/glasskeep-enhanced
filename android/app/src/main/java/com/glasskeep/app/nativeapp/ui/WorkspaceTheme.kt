@@ -423,6 +423,11 @@ object WorkspaceTheme {
     fun rtActiveText(id: String?, dark: Boolean): Color =
         if (dark) mix(rtAccent(id), Color.White, 0.6f) else rtAccent(id)
 
+    /** `.gk-range`'s thumb ring: --rt-accent, mixed 65% into white in dark
+     *  mode (globalCSS.js:2806, 2827). */
+    fun rangeThumbBorder(id: String?, dark: Boolean): Color =
+        if (dark) mix(rtAccent(id), Color.White, 0.65f) else rtAccent(id)
+
     /** --gk-accent-soft-bg / --gk-accent-soft-border: color-mix of the
      *  accent at 12% / 24% over transparent, i.e. the same color at that
      *  alpha. */

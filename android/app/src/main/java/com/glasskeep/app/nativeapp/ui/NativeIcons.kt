@@ -1024,14 +1024,19 @@ fun BoldCheckIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color =
 
 /** The web's spinner arc, turning once a second like `animate-spin`. */
 @Composable
-fun SpinnerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    val angle by rememberInfiniteTransition(label = "spinner").animateFloat(
+fun SpinnerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) =
+    WebIcon("M21 12a9 9 0 1 1 -6.219 -8.56", modifier.rotate(rememberSpinAngle()), size, tint)
+
+/** Tailwind's `animate-spin`: a full turn a second, linear, forever. */
+@Composable
+internal fun rememberSpinAngle(): Float {
+    val angle by rememberInfiniteTransition(label = "spin").animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(tween(durationMillis = 1000, easing = LinearEasing)),
-        label = "spinnerAngle",
+        label = "spinAngle",
     )
-    WebIcon("M21 12a9 9 0 1 1 -6.219 -8.56", modifier.rotate(angle), size, tint)
+    return angle
 }
 
 @Composable
@@ -2080,6 +2085,66 @@ fun CameraIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Co
     "M5 7h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2 " +
         "M9 13a3 3 0 1 0 6 0a3 3 0 0 0 -6 0",
     modifier, size, tint, strokeWidth,
+)
+
+/** tabler/home-lock.svg: the admin panel's login page settings. */
+@Composable
+fun HomeLockIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M5 12h-2l9 -9l8 8 M5 12v7a2 2 0 0 0 2 2h6 M9 21v-6a2 2 0 0 1 2 -2h2c.688 0 1.294 .347 1.654 .875 " +
+        "M17 19a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-2 M18 18v-1.5a1.5 1.5 0 1 1 3 0v1.5",
+    modifier, size, tint,
+)
+
+/** tabler/user-circle.svg: a pending registration's row. */
+@Composable
+fun UserCircleIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0 M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0 " +
+        "M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855",
+    modifier, size, tint,
+)
+
+/** tabler/signature.svg: the custom app name row. */
+@Composable
+fun SignatureIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 17c3.333 -3.333 5 -6 5 -8c0 -3 -1 -3 -2 -3s-2.032 1.085 -2 3c.034 2.048 1.658 4.877 2.5 6c1.5 2 2.5 2.5 3.5 1" +
+        "l2 -3c.333 2.667 1.333 4 3 4c.53 0 2.639 -2 3 -2c.517 0 1.517 .667 3 2",
+    modifier, size, tint,
+)
+
+/** tabler/photo-hexagon.svg: the custom logo row. */
+@Composable
+fun PhotoHexagonIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M15 8h.01 M19.875 6.27c.7 .398 1.13 1.143 1.125 1.948v7.284c0 .809 -.443 1.555 -1.158 1.948l-6.75 4.27" +
+        "a2.269 2.269 0 0 1 -2.184 0l-6.75 -4.27a2.225 2.225 0 0 1 -1.158 -1.948v-7.285c0 -.809 .443 -1.554 1.158 -1.947" +
+        "l6.75 -3.98a2.33 2.33 0 0 1 2.25 0l6.75 3.98h-.033 M3.5 15.5l4.5 -4.5c.928 -.893 2.072 -.893 3 0l5 5 " +
+        "M14 14l1 -1c.928 -.893 2.072 -.893 3 0l2.5 2.5",
+    modifier, size, tint,
+)
+
+/** tabler/background.svg: the login background row. */
+@Composable
+fun BackgroundIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 8l4 -4 M14 4l-10 10 M4 20l16 -16 M20 10l-10 10 M20 16l-4 4",
+    modifier, size, tint,
+)
+
+/** tabler/droplet-filled.svg as a `.tabler-icon` draws it: stroked, not
+ *  filled (the blur row). */
+@Composable
+fun DropletIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M10.708 2.372a2.382 2.382 0 0 0 -.71 .686l-4.892 7.26c-1.981 3.314 -1.22 7.466 1.767 9.882" +
+        "c2.969 2.402 7.286 2.402 10.254 0c2.987 -2.416 3.748 -6.569 1.795 -9.836l-4.919 -7.306" +
+        "c-.722 -1.075 -2.192 -1.376 -3.295 -.686z",
+    modifier, size, tint,
+)
+
+/** tabler/paint.svg: the login page theme row. */
+@Composable
+fun PaintIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M5 5a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -2 " +
+        "M19 6h1a2 2 0 0 1 2 2a5 5 0 0 1 -5 5l-5 0v2 " +
+        "M10 16a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -4",
+    modifier, size, tint,
 )
 
 /** tabler/power.svg. */

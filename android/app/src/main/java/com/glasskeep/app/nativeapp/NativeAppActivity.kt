@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -15,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
+import com.glasskeep.app.MainActivity
 import com.glasskeep.app.nativeapp.ui.LocalGkDark
 import com.glasskeep.app.nativeapp.ui.NativeNavHost
 import com.glasskeep.app.nativeapp.ui.WorkspaceTheme
@@ -166,3 +168,12 @@ private fun systemBarColor(signedIn: Boolean, noteOverrideArgb: Int?, themeId: S
     } else {
         WorkspaceTheme.statusBarColor(loginThemeId ?: WorkspaceTheme.DEFAULT_ID, dark).toArgb()
     }
+
+/** The app started over from its launcher entry, every screen dropped: the
+ *  native side of the web's `window.location.reload()`. */
+internal fun restartApp(activity: Activity) {
+    val intent = Intent(activity, MainActivity::class.java)
+    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    activity.startActivity(intent)
+    activity.finish()
+}

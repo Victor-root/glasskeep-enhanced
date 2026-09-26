@@ -283,7 +283,11 @@ class RealtimeClient(
             "reminder_due",
             "test_notification",
         )
+        /** Frames other screens react to; the two admin pills above are
+         *  here too, for the admin panel's lists. */
         private val AUXILIARY_EVENT_TYPES = setOf(
+            "pending_user_registered",
+            "user_deleted_notification",
             "admin_settings_updated",
             "user_settings_updated",
             "user_profile_updated",

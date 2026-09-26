@@ -95,12 +95,15 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
@@ -150,6 +153,9 @@ internal val CssEase = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)
 
 /** Plain CSS `ease-out`, the curve of the notification swipe. */
 internal val CssEaseOut = CubicBezierEasing(0f, 0f, 0.58f, 1f)
+
+/** Plain CSS `ease-in-out`: the floating cards, the attention pulse. */
+internal val CssEaseInOut = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
 
 /** `cubic-bezier(.22,.61,.36,1)`: gkNotifIn and gkMobileToastIn. */
 internal val GkNotifInEasing = CubicBezierEasing(0.22f, 0.61f, 0.36f, 1f)
@@ -495,7 +501,8 @@ private fun SettingsPill(background: Color, tint: Color, icon: @Composable (Colo
  * web's grid-rows transition. The chevron keeps the text colour open or
  * closed: `.tabler-icon`'s unlayered `color: inherit` (globalCSS.js:3322)
  * beats both of its Tailwind colour classes. Every section starts
- * closed, as the web's empty `openSections` map does.
+ * closed, as the web's empty `openSections` map does. [titleTrailing]
+ * follows the title 8dp on (the admin panel's count pills).
  */
 @Composable
 internal fun SettingsAccordionSection(
@@ -507,6 +514,7 @@ internal fun SettingsAccordionSection(
     icon: @Composable (Color) -> Unit,
     onToggle: () -> Unit,
     contentSpacing: Dp = 12.dp,
+    titleTrailing: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val chevronRotation by animateFloatAsState(
@@ -531,7 +539,11 @@ internal fun SettingsAccordionSection(
             Spacer(Modifier.width(12.dp))
             SettingsSectionIcon(themeId, dark, icon)
             Spacer(Modifier.width(12.dp))
-            Text(title, color = titleColor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(title, color = titleColor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f, fill = false))
+            if (titleTrailing != null) {
+                Spacer(Modifier.width(8.dp))
+                titleTrailing()
+            }
         }
         AnimatedVisibility(
             visible = expanded,
@@ -550,6 +562,27 @@ internal fun SettingsAccordionSection(
                 content = content,
             )
         }
+    }
+}
+
+/** The X closing a side panel (settings, admin): `p-2 rounded` around the
+ *  24px CloseIcon, in the title colour, with its "Close" tooltip. */
+@Composable
+internal fun SidePanelCloseButton(titleColor: Color, onClose: () -> Unit) {
+    val label = stringResource(R.string.native_common_close)
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .semantics { contentDescription = label }
+            .gkTooltip(label)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) { onClose() }
+            .padding(8.dp),
+    ) {
+        CloseIcon(size = 24.dp, tint = titleColor)
     }
 }
 
@@ -1239,6 +1272,8 @@ internal fun GkTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     stretch: Boolean = false,
     background: Color = Color.Transparent,
+    fontFamily: FontFamily? = null,
+    enabled: Boolean = true,
 ) {
     var focused by remember { mutableStateOf(false) }
     var fieldState by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
@@ -1255,7 +1290,8 @@ internal fun GkTextField(
                 if (next.text != value) onValueChange(next.text)
             },
             singleLine = true,
-            textStyle = TextStyle(color = titleColor, fontSize = fontSize, lineHeight = lineHeight),
+            enabled = enabled,
+            textStyle = TextStyle(color = titleColor, fontSize = fontSize, lineHeight = lineHeight, fontFamily = fontFamily),
             cursorBrush = SolidColor(WorkspaceTheme.accent(themeId, dark)),
             keyboardOptions = keyboardOptions,
             keyboardActions = keyboardActions,
@@ -1279,6 +1315,7 @@ internal fun GkTextField(
                             color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
                             fontSize = fontSize,
                             lineHeight = lineHeight,
+                            fontFamily = fontFamily,
                         )
                     }
                     innerTextField()

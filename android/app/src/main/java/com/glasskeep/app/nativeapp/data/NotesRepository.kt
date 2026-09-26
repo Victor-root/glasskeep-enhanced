@@ -156,6 +156,11 @@ internal fun Response<*>.refusal(request: String): ServerRefusal =
     ServerRefusal(code(), serverError(), request, authenticated = raw().request.header("Authorization") != null)
         .also { NativeDebug.e(it.message.orEmpty()) }
 
+/** The body of an accepted request, or its [refusal]: what the web's api()
+ *  resolves with or throws. */
+internal fun <T : Any> Response<T>.bodyOrRefusal(request: String): T =
+    body()?.takeIf { isSuccessful } ?: throw refusal(request)
+
 /** Outcome of PATCH .../collaborate/:userId; a refusal carries the
  *  server's `error` text, like AddCollaboratorResult's. */
 sealed class SetCollaboratorAccessResult {

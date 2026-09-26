@@ -1,7 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.app.Activity
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -34,10 +33,10 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.glasskeep.app.MainActivity
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.restartApp
 import com.glasskeep.app.ui.ButtonGradient
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
@@ -50,10 +49,7 @@ import com.glasskeep.app.ui.LightTitleColor
 internal suspend fun switchServer(container: NativeAppContainer, activity: Activity, toasts: ToastController) {
     try {
         container.clearForServerChange()
-        val intent = Intent(activity, MainActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        activity.startActivity(intent)
-        activity.finish()
+        restartApp(activity)
     } catch (t: Throwable) {
         NativeDebug.e("changeServer failed", t)
         toasts.error(activity.getString(R.string.native_change_server_error))

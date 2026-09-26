@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -85,6 +84,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -105,7 +105,6 @@ import com.glasskeep.app.nativeapp.data.network.ProfileDto
 import com.glasskeep.app.nativeapp.data.network.UserAiSettingsDto
 import com.glasskeep.app.nativeapp.data.network.UserAiSettingsRequest
 import com.glasskeep.app.nativeapp.data.network.UserAiTestRequest
-import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.isUserCancellation
 import com.glasskeep.app.nativeapp.prfOutputOf
 import com.glasskeep.app.ui.DarkBorderColor
@@ -115,9 +114,6 @@ import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightTitleColor
 import com.glasskeep.app.update.ReleaseInfo
 import com.glasskeep.app.update.UpdateManager
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
@@ -777,21 +773,7 @@ internal fun SettingsScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
-                val closeLabel = stringResource(R.string.native_common_close)
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .semantics { contentDescription = closeLabel }
-                        .gkTooltip(closeLabel)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onBack() }
-                        .padding(8.dp),
-                ) {
-                    CloseIcon(size = 24.dp, tint = titleColor)
-                }
+                SidePanelCloseButton(titleColor, onBack)
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
 
@@ -2674,7 +2656,7 @@ private fun PasskeyRow(
             }
         }
         Text(
-            passkey.lastUsedAt?.let { stringResource(R.string.native_settings_passkeys_last_used, formatPasskeyDate(it)) }
+            passkey.lastUsedAt?.let { stringResource(R.string.native_settings_passkeys_last_used, localeDateTimeString(it)) }
                 ?: stringResource(R.string.native_settings_passkeys_never_used),
             color = mutedColor,
             fontSize = 12.sp,
@@ -2791,15 +2773,6 @@ private fun PasskeySmallButton(
     }
 }
 
-/** `new Date(iso).toLocaleString()`, the web's own passkey date: the
- *  numeric date with its full year and the time with its seconds. */
-private fun formatPasskeyDate(iso: String): String {
-    val ms = parseIsoToEpochMillis(iso) ?: return iso
-    val locale = Locale.getDefault()
-    val pattern = DateFormat.getBestDateTimePattern(locale, "yMdjms")
-    return SimpleDateFormat(pattern, locale).format(Date(ms))
-}
-
 /** The dialog the web's passkey section opens to name a key
  *  (PasskeyTextDialog): a title, its prompt and the name field, focused
  *  at once; Enter or the confirm button close it before the action runs. */
@@ -2878,10 +2851,20 @@ private fun PasskeyNameDialog(
 // (same package, different files) reuse this for the same
 // avatar-with-initials-fallback rendering, UserAvatar.jsx on the web.
 // Kotlin's top-level `private` is file-scoped. Without [onClick] it is a
-// plain picture, and a tap goes to whatever row it sits in.
+// plain picture, and a tap goes to whatever row it sits in. [dark] is
+// false where the web leaves UserAvatar's own prop out (the admin's user
+// list), and [fontSize] its `textSize` class.
 @Composable
-internal fun AvatarCircle(avatarUrl: String?, name: String, size: Dp, onClick: (() -> Unit)? = null) {
-    val dark = LocalGkDark.current
+internal fun AvatarCircle(
+    avatarUrl: String?,
+    name: String,
+    size: Dp,
+    onClick: (() -> Unit)? = null,
+    dark: Boolean = LocalGkDark.current,
+    // text-2xl (24px) at the 64px profile size, text-xs (12px) at the
+    // 32px collaborator size.
+    fontSize: TextUnit = (size.value * 0.375f).sp,
+) {
     val bitmap = avatarUrl?.let { rememberDecodedImage(it) }
     val label = stringResource(R.string.native_settings_avatar_description)
     Box(
@@ -2914,9 +2897,7 @@ internal fun AvatarCircle(avatarUrl: String?, name: String, size: Dp, onClick: (
                 name.trim().take(1).uppercase().ifBlank { "?" },
                 color = if (dark) AvatarFallbackFgDark else AvatarFallbackFgLight,
                 fontWeight = FontWeight.SemiBold,
-                // text-2xl (24px) at the 64px profile size, text-xs
-                // (12px) at the 32px collaborator size.
-                fontSize = (size.value * 0.375f).sp,
+                fontSize = fontSize,
             )
         }
     }
@@ -2929,10 +2910,11 @@ private val AvatarFallbackFgLight = Color(0xFF432DD7)
 private val AvatarFallbackBgDark = Color(0x40615FFF)
 private val AvatarFallbackFgDark = Color(0xFFA3B3FF)
 
-/** The theme picker (`WorkspaceThemeSection.jsx:63-100`): two columns of
- *  cards, each a 36px swatch band over a labelled foot. */
+/** The theme picker (`WorkspaceThemeSection.jsx:63-100`, and the admin's
+ *  login page theme in LoginBrandingSection.jsx): two columns of cards,
+ *  each a 36px swatch band over a labelled foot. */
 @Composable
-private fun ThemeGrid(
+internal fun ThemeGrid(
     currentThemeId: String,
     dark: Boolean,
     titleColor: Color,

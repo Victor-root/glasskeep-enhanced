@@ -125,7 +125,7 @@ internal fun Modifier.authCard(colors: AuthShellColors): Modifier = this
     .padding(24.dp)
 
 /** `.glass-card`'s fill, for the theme toggle and slogan pills. */
-private fun glassFill(dark: Boolean): Color = if (dark) Color(0xEB282828) else Color(0xEBFFFFFF)
+internal fun glassFill(dark: Boolean): Color = if (dark) Color(0xEB282828) else Color(0xEBFFFFFF)
 
 /**
  * AuthShell.jsx, the frame shared by every signed-out screen, at phone
@@ -453,12 +453,12 @@ private const val CreditsAuthorUrl = "https://github.com/nikunjsingh93"
 private const val CreditsMaintainerUrl = "https://github.com/Victor-root/glasskeep-enhanced"
 
 /** The admin's login background: still loading, drawn, or given up on. */
-private class LoginBackground(val bitmap: ImageBitmap?, val failed: Boolean)
+internal class LoginBackground(val bitmap: ImageBitmap?, val failed: Boolean)
 
 /** Fetches the login background with the app's own HTTP client and lets
  *  Android decode it; no browser or image-loader dependency is involved. */
 @Composable
-private fun rememberLoginBackground(container: NativeAppContainer, ref: String): LoginBackground {
+internal fun rememberLoginBackground(container: NativeAppContainer, ref: String): LoginBackground {
     var state by remember(ref) { mutableStateOf(LoginBackground(bitmap = null, failed = false)) }
     LaunchedEffect(ref) {
         val bitmap = withContext(Dispatchers.IO) {
@@ -494,12 +494,13 @@ private fun decodeDataUrl(dataUrl: String): ImageBitmap? = runCatching {
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
 }.getOrNull()
 
+/** The veil dark mode lays over the admin's photo, `rgba(17,17,17,.55)`. */
+internal val LoginBackgroundVeil = Color(0x8C111111)
+
 /**
- * `.login-custom-bg`: the photo, cover-cropped on a layer that overscans
- * the screen by twice the blur so its soft edges fall outside, under the
- * dark mode's veil (light mode shows it raw). It fades in over 400ms when
- * there is a placeholder colour to fade from, and is simply there
- * otherwise.
+ * `.login-custom-bg`: the photo under the dark mode's veil (light mode
+ * shows it raw). It fades in over 400ms when there is a placeholder
+ * colour to fade from, and is simply there otherwise.
  */
 @Composable
 private fun LoginBackgroundLayer(bitmap: ImageBitmap?, hasPlaceholder: Boolean, blur: Int, dark: Boolean) {
@@ -508,27 +509,33 @@ private fun LoginBackgroundLayer(bitmap: ImageBitmap?, hasPlaceholder: Boolean, 
         animationSpec = if (hasPlaceholder) tween(durationMillis = 400, easing = CssEase) else snap(),
         label = "loginBackgroundFade",
     )
-    val density = LocalDensity.current
     Box(Modifier.fillMaxSize().clipToBounds().graphicsLayer { alpha = layerAlpha }) {
-        if (bitmap != null) {
-            val overscan = with(density) { (2 * blur).dp.roundToPx() }
-            // CSS blur(Npx) is a Gaussian of standard deviation N; Android
-            // turns a blur radius r into sigma = 0.57735 r + 0.5.
-            val radius = with(density) { ((blur.dp.toPx() - 0.5f) / 0.57735f).coerceAtLeast(0f).toDp() }
-            Image(
-                bitmap = bitmap,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .layout { measurable, constraints ->
-                        val placeable = measurable.measure(
-                            Constraints.fixed(constraints.maxWidth + 2 * overscan, constraints.maxHeight + 2 * overscan),
-                        )
-                        layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-overscan, -overscan) }
-                    }
-                    .then(if (blur > 0) Modifier.blur(radius, BlurredEdgeTreatment.Unbounded) else Modifier),
-            )
-        }
-        if (dark) Box(Modifier.fillMaxSize().background(Color(0x8C111111)))
+        if (bitmap != null) BlurredCoverImage(bitmap, blur.dp)
+        if (dark) Box(Modifier.fillMaxSize().background(LoginBackgroundVeil))
     }
+}
+
+/** A photo cover-cropped over its box and CSS-blurred by [blur], on a
+ *  layer that overscans the box by twice the blur so the soft edges fall
+ *  outside it (`inset: -2×blur`). */
+@Composable
+internal fun BlurredCoverImage(bitmap: ImageBitmap, blur: Dp) {
+    val density = LocalDensity.current
+    val overscan = with(density) { (blur * 2).roundToPx() }
+    // CSS blur(Npx) is a Gaussian of standard deviation N; Android turns a
+    // blur radius r into sigma = 0.57735 r + 0.5.
+    val radius = with(density) { ((blur.toPx() - 0.5f) / 0.57735f).coerceAtLeast(0f).toDp() }
+    Image(
+        bitmap = bitmap,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(
+                    Constraints.fixed(constraints.maxWidth + 2 * overscan, constraints.maxHeight + 2 * overscan),
+                )
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-overscan, -overscan) }
+            }
+            .then(if (blur > 0.dp) Modifier.blur(radius, BlurredEdgeTreatment.Unbounded) else Modifier),
+    )
 }
