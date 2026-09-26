@@ -522,15 +522,16 @@ private fun docBlocksOf(markdown: String): List<DocBlock> {
     val out = mutableListOf<DocBlock>()
     for (block in MarkdownDoc.toRichBlocks(markdown)) {
         val previous = out.lastOrNull()
+        val quote = block.quotes.firstOrNull()
         when {
-            block.quote != null -> if (previous != null && previous.quote?.id == block.quote.id) {
+            quote != null -> if (previous != null && previous.quote?.id == quote.id) {
                 val offset = previous.text.length + 1
                 out[out.lastIndex] = previous.copy(
                     text = previous.text + " " + block.text,
                     marks = previous.marks + block.marks.map { it.copy(start = it.start + offset, end = it.end + offset) },
                 )
             } else {
-                out.add(DocBlock(block.kind, block.text, block.marks, quote = block.quote))
+                out.add(DocBlock(block.kind, block.text, block.marks, quote = quote))
             }
             block.kind == RichBlockKind.PARAGRAPH -> if (block.text.isNotEmpty()) {
                 out.add(DocBlock(block.kind, block.text.replace('\n', ' '), block.marks))

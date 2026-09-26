@@ -10,7 +10,8 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Quotes holding more than paragraphs, each case checked against what the
+/** Quotes holding more than paragraphs, quotes inside quotes, and what a
+ *  list item holds after its paragraph, each case checked against what the
  *  web editor leaves in the same situation. */
 class RichQuoteTest {
     @Test
@@ -43,7 +44,7 @@ class RichQuoteTest {
             ),
             blocks.map { it.kind },
         )
-        assertEquals(1, blocks.map { it.quote?.id }.distinct().size)
+        assertEquals(1, blocks.map { it.quotes.single().id }.distinct().size)
         assertEquals(
             "blockquote[heading(Title),paragraph(Body),bulletList[listItem[paragraph(Item)]],codeBlock(code),horizontalRule]",
             shape(RichDoc.encode(blocks)),
@@ -52,11 +53,9 @@ class RichQuoteTest {
 
     @Test
     fun twoQuotesInARowStayTwoQuotes() {
-        val blocks = requireNotNull(
-            RichDoc.parse(envelope("""${quote("""{"type":"paragraph","content":[{"type":"text","text":"a"}]}""")},${quote("""{"type":"paragraph","content":[{"type":"text","text":"b"}]}""")}""")),
-        )
+        val blocks = requireNotNull(RichDoc.parse(envelope("${quote(paragraph("a"))},${quote(paragraph("b"))}")))
 
-        assertNotEquals(blocks[0].quote?.id, blocks[1].quote?.id)
+        assertNotEquals(blocks[0].quotes, blocks[1].quotes)
         assertEquals("blockquote[paragraph(a)] blockquote[paragraph(b)]", shape(RichDoc.encode(blocks)))
     }
 
@@ -70,21 +69,33 @@ class RichQuoteTest {
 
         val block = requireNotNull(RichDoc.parse(content)).single()
 
-        assertEquals(1, block.quote?.indent)
+        assertEquals(1, block.quotes.single().indent)
         assertEquals(2, block.indent)
         assertEquals("blockquote{indent=1}[paragraph{indent=2}(a)]", shape(RichDoc.encode(listOf(block)), withIndent = true))
     }
 
     @Test
-    fun quoteInsideAQuoteLeavesTheNoteReadOnly() {
-        val content = envelope(quote(quote("""{"type":"paragraph","content":[{"type":"text","text":"a"}]}""")))
+    fun quoteInsideAQuoteStaysEditable() {
+        val content = envelope(quote("${quote(paragraph("in"))},${paragraph("out")}"))
+
+        val blocks = requireNotNull(RichDoc.parse(content))
+
+        assertEquals(listOf(2, 1), blocks.map { it.quotes.size })
+        assertEquals("blockquote[blockquote[paragraph(in)],paragraph(out)]", shape(RichDoc.encode(blocks)))
+    }
+
+    @Test
+    fun quoteInsideAListItemLeavesTheNoteReadOnly() {
+        val content = envelope(
+            """{"type":"bulletList","content":[{"type":"listItem","content":[${paragraph("a")},${quote(paragraph("b"))}]}]}""",
+        )
 
         assertNull(RichDoc.parse(content))
     }
 
     @Test
     fun listUnderAQuoteStaysOutOfIt() {
-        val quoted = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "in", quote = RichQuote())
+        val quoted = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "in", quotes = listOf(RichQuote()))
         val after = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "out", nestLevel = 1)
 
         assertEquals(
@@ -95,9 +106,9 @@ class RichQuoteTest {
 
     @Test
     fun enterOnAnEmptyItemOfAQuotedListLeavesTheListNotTheQuote() {
-        val quote = RichQuote()
-        val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "a", quote = quote)
-        val empty = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(quote = quote)
+        val quotes = listOf(RichQuote())
+        val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "a", quotes = quotes)
+        val empty = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(quotes = quotes)
 
         val edit = requireNotNull(RichEdits.split(listOf(item, empty), empty.id, 0))
 
@@ -106,12 +117,12 @@ class RichQuoteTest {
 
     @Test
     fun enterOnAnEmptyLineInTheMiddleOfAQuoteSplitsItThenLeavesIt() {
-        val quote = RichQuote()
-        val empty = RichDoc.newBlock().copy(quote = quote)
+        val quotes = listOf(RichQuote())
+        val empty = RichDoc.newBlock().copy(quotes = quotes)
         val blocks = listOf(
-            RichDoc.newBlock().copy(text = "a", quote = quote),
+            RichDoc.newBlock().copy(text = "a", quotes = quotes),
             empty,
-            RichDoc.newBlock().copy(text = "b", quote = quote),
+            RichDoc.newBlock().copy(text = "b", quotes = quotes),
         )
 
         val split = requireNotNull(RichEdits.split(blocks, empty.id, 0)).blocks
@@ -125,9 +136,9 @@ class RichQuoteTest {
     fun backspaceUnderAQuoteMovesTheBlockIntoItAndJoinsTheQuoteBelow() {
         val below = RichDoc.newBlock().copy(text = "p")
         val blocks = listOf(
-            RichDoc.newBlock().copy(text = "a", quote = RichQuote()),
+            RichDoc.newBlock().copy(text = "a", quotes = listOf(RichQuote())),
             below,
-            RichDoc.newBlock().copy(text = "b", quote = RichQuote()),
+            RichDoc.newBlock().copy(text = "b", quotes = listOf(RichQuote())),
         )
 
         val edit = requireNotNull(RichEdits.joinBackward(blocks, below.id))
@@ -137,39 +148,41 @@ class RichQuoteTest {
 
     @Test
     fun backspaceAtTheStartOfAQuoteLeavesItUnlessAnotherQuoteIsRightAbove() {
-        val first = RichDoc.newBlock(RichBlockKind.HEADING_2).copy(text = "t", quote = RichQuote())
+        val first = RichDoc.newBlock(RichBlockKind.HEADING_2).copy(text = "t", quotes = listOf(RichQuote()))
         val lifted = requireNotNull(RichEdits.joinBackward(listOf(RichDoc.newBlock().copy(text = "x"), first), first.id))
         assertEquals("paragraph(x) heading(t)", shape(RichDoc.encode(lifted.blocks)))
 
-        val second = RichDoc.newBlock().copy(text = "b", quote = RichQuote())
-        val merged = requireNotNull(RichEdits.joinBackward(listOf(RichDoc.newBlock().copy(text = "a", quote = RichQuote()), second), second.id))
+        val second = RichDoc.newBlock().copy(text = "b", quotes = listOf(RichQuote()))
+        val merged = requireNotNull(
+            RichEdits.joinBackward(listOf(RichDoc.newBlock().copy(text = "a", quotes = listOf(RichQuote())), second), second.id),
+        )
         assertEquals("blockquote[paragraph(a),paragraph(b)]", shape(RichDoc.encode(merged.blocks)))
     }
 
     @Test
     fun quoteButtonWrapsAHeadingAloneAndLiftsAQuotedItemOutOfItsList() {
         val heading = RichDoc.newBlock(RichBlockKind.HEADING_2).copy(text = "t")
-        val quote = RichQuote()
-        val wrapped = requireNotNull(RichEdits.toggleQuote(listOf(RichDoc.newBlock().copy(text = "a", quote = quote), heading), heading.id))
+        val quotes = listOf(RichQuote())
+        val wrapped = requireNotNull(RichEdits.toggleQuote(listOf(RichDoc.newBlock().copy(text = "a", quotes = quotes), heading), heading.id))
         assertEquals("blockquote[paragraph(a)] blockquote[heading(t)]", shape(RichDoc.encode(wrapped.blocks)))
 
         val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "i")
         assertNull(RichEdits.toggleQuote(listOf(item), item.id))
 
-        val quotedItem = item.copy(quote = quote)
+        val quotedItem = item.copy(quotes = quotes)
         val lifted = requireNotNull(RichEdits.toggleQuote(listOf(quotedItem), quotedItem.id))
         assertEquals("blockquote[paragraph(i)]", shape(RichDoc.encode(lifted.blocks)))
     }
 
     @Test
     fun styleGalleryOnAQuotedItemClearsItsWholeListOutOfTheQuote() {
-        val quote = RichQuote()
-        val first = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "b", quote = quote)
+        val quotes = listOf(RichQuote())
+        val first = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "b", quotes = quotes)
         val blocks = listOf(
-            RichDoc.newBlock().copy(text = "a", quote = quote),
+            RichDoc.newBlock().copy(text = "a", quotes = quotes),
             first,
-            RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "c", quote = quote),
-            RichDoc.newBlock().copy(text = "d", quote = quote),
+            RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "c", quotes = quotes),
+            RichDoc.newBlock().copy(text = "d", quotes = quotes),
         )
 
         val edit = requireNotNull(RichEdits.setKind(blocks, first.id, RichBlockKind.HEADING_2))
@@ -182,7 +195,7 @@ class RichQuoteTest {
 
     @Test
     fun paragraphStyleOnAQuotedParagraphTakesItOutOfTheQuote() {
-        val paragraph = RichDoc.newBlock().copy(text = "a", quote = RichQuote())
+        val paragraph = RichDoc.newBlock().copy(text = "a", quotes = listOf(RichQuote()))
 
         val edit = requireNotNull(RichEdits.setKind(listOf(paragraph), paragraph.id, RichBlockKind.PARAGRAPH))
 
@@ -193,8 +206,8 @@ class RichQuoteTest {
     @Test
     fun indentInAQuoteMovesBothTheBlockAndTheQuote() {
         val quote = RichQuote()
-        val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "b", quote = quote)
-        val blocks = listOf(RichDoc.newBlock().copy(text = "a", quote = quote), item)
+        val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "b", quotes = listOf(quote))
+        val blocks = listOf(RichDoc.newBlock().copy(text = "a", quotes = listOf(quote)), item)
 
         val edit = requireNotNull(RichEdits.shiftIndent(blocks, item.id, 1))
 
@@ -202,17 +215,18 @@ class RichQuoteTest {
             "blockquote{indent=1}[paragraph(a),bulletList[listItem{indent=1}[paragraph(b)]]]",
             shape(RichDoc.encode(edit.blocks), withIndent = true),
         )
-        assertEquals(false, RichEdits.canShiftIndent(item.copy(quote = quote.copy(indent = 1)), -1))
+        val quoteOnly = blocks.map { it.copy(quotes = listOf(quote.copy(indent = 1))) }
+        assertEquals(false, RichEdits.canShiftIndent(quoteOnly, item.id, -1))
     }
 
     @Test
     fun eraserTakesTheBlockOutOfItsQuoteWithDefaultAttributes() {
-        val quote = RichQuote()
-        val middle = RichDoc.newBlock().copy(text = "b", quote = quote, align = RichAlign.CENTER, indent = 2)
+        val quotes = listOf(RichQuote())
+        val middle = RichDoc.newBlock().copy(text = "b", quotes = quotes, align = RichAlign.CENTER, indent = 2)
         val blocks = listOf(
-            RichDoc.newBlock().copy(text = "a", quote = quote),
+            RichDoc.newBlock().copy(text = "a", quotes = quotes),
             middle,
-            RichDoc.newBlock().copy(text = "c", quote = quote),
+            RichDoc.newBlock().copy(text = "c", quotes = quotes),
         )
 
         val edit = requireNotNull(RichEdits.clearFormatting(blocks, middle.id, 0, 1))
@@ -226,9 +240,8 @@ class RichQuoteTest {
 
     @Test
     fun quoteShortcutJoinsTheQuoteRightAbove() {
-        val quote = RichQuote()
         val heading = RichDoc.newBlock(RichBlockKind.HEADING_2).copy(text = "> t")
-        val blocks = listOf(RichDoc.newBlock().copy(text = "a", quote = quote), heading)
+        val blocks = listOf(RichDoc.newBlock().copy(text = "a", quotes = listOf(RichQuote())), heading)
 
         val result = requireNotNull(RichInputRules.typed(blocks, heading.id, "> t", emptyList(), 2, " "))
 
@@ -237,7 +250,7 @@ class RichQuoteTest {
 
     @Test
     fun ruleEndingAQuoteGetsAnEmptyLineInsideIt() {
-        val paragraph = RichDoc.newBlock().copy(text = "a", quote = RichQuote())
+        val paragraph = RichDoc.newBlock().copy(text = "a", quotes = listOf(RichQuote()))
         val blocks = listOf(paragraph, RichDoc.newBlock().copy(text = "z"))
 
         val edit = requireNotNull(RichEdits.insertDivider(blocks, paragraph.id, 1, 1))
@@ -253,7 +266,259 @@ class RichQuoteTest {
         assertEquals("blockquote[paragraph(a),paragraph(b)] blockquote[paragraph(c)]", shape(RichDoc.encode(blocks)))
     }
 
-    private fun quote(node: String): String = """{"type":"blockquote","content":[$node]}"""
+    @Test
+    fun enterOnAnEmptyLineEndingAnInnerQuoteMovesItToTheOuterOne() {
+        val outer = RichQuote()
+        val inner = listOf(outer, RichQuote())
+        val empty = RichDoc.newBlock().copy(quotes = inner)
+        val blocks = listOf(
+            RichDoc.newBlock().copy(text = "in", quotes = inner),
+            empty,
+            RichDoc.newBlock().copy(text = "out", quotes = listOf(outer)),
+        )
+
+        val edit = requireNotNull(RichEdits.split(blocks, empty.id, 0))
+
+        assertEquals("blockquote[blockquote[paragraph(in)],paragraph(),paragraph(out)]", shape(RichDoc.encode(edit.blocks)))
+    }
+
+    @Test
+    fun backspaceUnderAnInnerQuoteMovesTheLineIntoIt() {
+        val outer = RichQuote()
+        val line = RichDoc.newBlock().copy(text = "out", quotes = listOf(outer))
+        val blocks = listOf(RichDoc.newBlock().copy(text = "in", quotes = listOf(outer, RichQuote())), line)
+
+        val edit = requireNotNull(RichEdits.joinBackward(blocks, line.id))
+
+        assertEquals("blockquote[blockquote[paragraph(in),paragraph(out)]]", shape(RichDoc.encode(edit.blocks)))
+    }
+
+    @Test
+    fun quoteShortcutInAQuoteNestsAnotherOne() {
+        val line = RichDoc.newBlock().copy(text = "> in", quotes = listOf(RichQuote(), RichQuote()))
+
+        val result = requireNotNull(RichInputRules.typed(listOf(line), line.id, "> in", emptyList(), 2, " "))
+
+        assertEquals("blockquote[blockquote[blockquote[paragraph(in)]]]", shape(RichDoc.encode(result.edit.blocks)))
+    }
+
+    @Test
+    fun eraserLiftsEachInnerQuoteOutOfTheOnesAroundIt() {
+        val q1 = RichQuote()
+        val q2 = RichQuote()
+        val q3 = RichQuote()
+        val line = RichDoc.newBlock().copy(text = "in", quotes = listOf(q1, q2, q3))
+        val blocks = listOf(
+            RichDoc.newBlock().copy(text = "o", quotes = listOf(q1)),
+            RichDoc.newBlock().copy(text = "m", quotes = listOf(q1, q2)),
+            line,
+            RichDoc.newBlock().copy(text = "in2", quotes = listOf(q1, q2, q3)),
+            RichDoc.newBlock().copy(text = "m2", quotes = listOf(q1, q2)),
+        )
+
+        val edit = requireNotNull(RichEdits.clearFormatting(blocks, line.id, 0, 0))
+
+        assertEquals(
+            "blockquote[paragraph(o)] blockquote[paragraph(m)] paragraph(in) blockquote[paragraph(in2)] blockquote[paragraph(m2)]",
+            shape(RichDoc.encode(edit.blocks)),
+        )
+    }
+
+    @Test
+    fun indentInAnInnerQuoteMovesEveryQuote() {
+        val outer = RichQuote()
+        val line = RichDoc.newBlock().copy(text = "in", quotes = listOf(outer, RichQuote()))
+        val blocks = listOf(line, RichDoc.newBlock().copy(text = "out", quotes = listOf(outer)))
+
+        val edit = requireNotNull(RichEdits.shiftIndent(blocks, line.id, 1))
+
+        assertEquals(
+            "blockquote{indent=1}[blockquote{indent=1}[paragraph{indent=1}(in)],paragraph(out)]",
+            shape(RichDoc.encode(edit.blocks), withIndent = true),
+        )
+    }
+
+    @Test
+    fun ruleTheWebPutsInAListItemStaysEditable() {
+        val blocks = requireNotNull(RichDoc.parse(ruleInItem()))
+
+        assertEquals(
+            listOf(RichBlockKind.BULLET_ITEM, RichBlockKind.DIVIDER, RichBlockKind.PARAGRAPH, RichBlockKind.BULLET_ITEM),
+            blocks.map { it.kind },
+        )
+        assertEquals(listOf(0, 1, 1, 0), blocks.map { it.nestLevel })
+        assertEquals(
+            "bulletList[listItem[paragraph(aa),horizontalRule,paragraph(xyz)],listItem[paragraph(bb)]]",
+            shape(RichDoc.encode(blocks)),
+        )
+    }
+
+    @Test
+    fun enterInALineAnItemHoldsStartsTheNextItem() {
+        val blocks = requireNotNull(RichDoc.parse(ruleInItem()))
+
+        val edit = requireNotNull(RichEdits.split(blocks, blocks[2].id, 1))
+
+        assertEquals(
+            "bulletList[listItem[paragraph(aa),horizontalRule,paragraph(x)],listItem[paragraph(yz)],listItem[paragraph(bb)]]",
+            shape(RichDoc.encode(edit.blocks)),
+        )
+    }
+
+    @Test
+    fun enterOnTheEmptyLastLineOfAnItemLeavesTheList() {
+        val blocks = requireNotNull(RichDoc.parse(ruleInItem())).let { it.replaceAt(2, listOf(it[2].copy(text = ""))) }
+
+        val edit = requireNotNull(RichEdits.split(blocks, blocks[2].id, 0))
+
+        assertEquals(
+            "bulletList[listItem[paragraph(aa),horizontalRule]] paragraph() bulletList[listItem[paragraph(bb)]]",
+            shape(RichDoc.encode(edit.blocks)),
+        )
+    }
+
+    @Test
+    fun backspaceInALineAnItemHoldsLiftsTheWholeItem() {
+        val blocks = requireNotNull(RichDoc.parse(ruleInItem()))
+
+        val edit = requireNotNull(RichEdits.joinBackward(blocks, blocks[2].id))
+
+        assertEquals(
+            "paragraph(aa) horizontalRule paragraph(xyz) bulletList[listItem[paragraph(bb)]]",
+            shape(RichDoc.encode(edit.blocks)),
+        )
+    }
+
+    @Test
+    fun backspaceAtAnItemJoinsTheLastLineOfTheItemAbove() {
+        val blocks = requireNotNull(RichDoc.parse(ruleInItem()))
+
+        val edit = requireNotNull(RichEdits.joinBackward(blocks, blocks[3].id))
+
+        assertEquals("bulletList[listItem[paragraph(aa),horizontalRule,paragraph(xyzbb)]]", shape(RichDoc.encode(edit.blocks)))
+    }
+
+    @Test
+    fun backspaceAtAnItemUnderAnItemHoldingAListLiftsIt() {
+        val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "bb")
+        val blocks = listOf(
+            RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "aa"),
+            RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "nn", nestLevel = 1),
+            item,
+        )
+
+        val edit = requireNotNull(RichEdits.joinBackward(blocks, item.id))
+
+        assertEquals(
+            "bulletList[listItem[paragraph(aa),bulletList[listItem[paragraph(nn)]]]] paragraph(bb)",
+            shape(RichDoc.encode(edit.blocks)),
+        )
+    }
+
+    @Test
+    fun liftingANestedItemTakesWhatItHolds() {
+        val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "bb", nestLevel = 1)
+        val blocks = listOf(
+            RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "aa"),
+            item,
+            RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "c1", nestLevel = 2),
+            RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "c2", nestLevel = 2),
+        )
+
+        val edit = requireNotNull(RichEdits.joinBackward(blocks, item.id))
+
+        assertEquals(
+            "bulletList[listItem[paragraph(aa)],listItem[paragraph(bb),bulletList[listItem[paragraph(c1)],listItem[paragraph(c2)]]]]",
+            shape(RichDoc.encode(edit.blocks)),
+        )
+    }
+
+    @Test
+    fun enterOnAnEmptyItemHoldingAListSplitsIt() {
+        val empty = RichDoc.newBlock(RichBlockKind.BULLET_ITEM)
+        val blocks = listOf(
+            empty,
+            RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "c1", nestLevel = 1),
+            RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "zz"),
+        )
+
+        val edit = requireNotNull(RichEdits.split(blocks, empty.id, 0))
+
+        assertEquals(
+            "bulletList[listItem[paragraph()],listItem[paragraph(),bulletList[listItem[paragraph(c1)]]],listItem[paragraph(zz)]]",
+            shape(RichDoc.encode(edit.blocks)),
+        )
+    }
+
+    @Test
+    fun ruleButtonInAListItemPutsTheRuleInsideIt() {
+        val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "aa")
+        val blocks = listOf(item, RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "bb"))
+
+        val edit = requireNotNull(RichEdits.insertDivider(blocks, item.id, 2, 2))
+
+        assertEquals(
+            "bulletList[listItem[paragraph(aa),horizontalRule,paragraph()],listItem[paragraph(bb)]]",
+            shape(RichDoc.encode(edit.blocks)),
+        )
+        assertEquals(edit.blocks[2].id, edit.focusId)
+    }
+
+    @Test
+    fun codeCarvedOutOfAListItemStaysInIt() {
+        val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "aa bb")
+
+        val edit = requireNotNull(RichEdits.toggleCodeBlock(listOf(item), item.id, 0, 2))
+
+        assertEquals("bulletList[listItem[paragraph(),codeBlock(aa),paragraph( bb)]]", shape(RichDoc.encode(edit.blocks)))
+    }
+
+    @Test
+    fun taskButtonOnALineAnItemHoldsNestsATaskList() {
+        val blocks = requireNotNull(RichDoc.parse(ruleInItem()))
+
+        val edit = requireNotNull(RichEdits.setKind(blocks, blocks[2].id, RichBlockKind.TASK_ITEM))
+
+        assertEquals(
+            "bulletList[listItem[paragraph(aa),horizontalRule,taskList[taskItem[paragraph(xyz)]]],listItem[paragraph(bb)]]",
+            shape(RichDoc.encode(edit.blocks)),
+        )
+    }
+
+    @Test
+    fun indentInANestedItemMovesItsParentToo() {
+        val nested = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "bb", nestLevel = 1)
+        val blocks = listOf(RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "aa"), nested)
+
+        val edit = requireNotNull(RichEdits.shiftIndent(blocks, nested.id, 1))
+
+        assertEquals(
+            "bulletList[listItem{indent=1}[paragraph(aa),bulletList[listItem{indent=1}[paragraph(bb)]]]]",
+            shape(RichDoc.encode(edit.blocks), withIndent = true),
+        )
+    }
+
+    @Test
+    fun linesPastedInAListItemStayInIt() {
+        val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "aa")
+
+        val edit = requireNotNull(RichEdits.insertLines(listOf(item), item.id, "aay\nz", emptyList(), 2, 5))
+
+        assertEquals("bulletList[listItem[paragraph(aay),paragraph(z)]]", shape(RichDoc.encode(edit.blocks)))
+    }
+
+    /** A bullet list whose first item holds a rule and a line after its
+     *  paragraph: what the web's separator button leaves in an item. */
+    private fun ruleInItem(): String = envelope(
+        """{"type":"bulletList","content":[
+            {"type":"listItem","attrs":{"indent":0},"content":[${paragraph("aa")},{"type":"horizontalRule"},${paragraph("xyz")}]},
+            {"type":"listItem","attrs":{"indent":0},"content":[${paragraph("bb")}]}
+        ]}""",
+    )
+
+    private fun paragraph(text: String): String = """{"type":"paragraph","content":[{"type":"text","text":"$text"}]}"""
+
+    private fun quote(nodes: String): String = """{"type":"blockquote","content":[$nodes]}"""
 
     private fun envelope(nodes: String): String =
         """{"v":1,"format":"tiptap","doc":{"type":"doc","content":[$nodes]}}"""

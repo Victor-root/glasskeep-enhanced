@@ -123,8 +123,8 @@ object MarkdownDoc {
             }
             if (quoted != null) {
                 flushParagraph()
-                if (quote == null) quote = RichQuote()
-                blocks.add(inlineBlock(RichBlockKind.PARAGRAPH, quoted.groupValues[1]).copy(quote = quote))
+                val holder = quote ?: RichQuote().also { quote = it }
+                blocks.add(inlineBlock(RichBlockKind.PARAGRAPH, quoted.groupValues[1]).copy(quotes = listOf(holder)))
                 index++
                 continue
             }

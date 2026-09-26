@@ -174,6 +174,7 @@ fun RichFormatToolbar(
     val activeBlock = blocks.find { it.id == state.activeId }
     val selection = state.safeSelectionIn(activeBlock)
     val enabled = activeBlock != null
+    val listKinds = activeBlock?.let { RichEdits.listKindsAt(blocks, it.id) }.orEmpty()
     val colors = remember(themeId, dark) { RichToolbarColors(themeId, dark) }
     var openPopover by remember { mutableStateOf<RichPopoverKind?>(null) }
     var linkTarget by remember { mutableStateOf<RichLinkTarget?>(null) }
@@ -468,7 +469,7 @@ fun RichFormatToolbar(
         val bulletButton: @Composable FlowRowScope.() -> Unit = {
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_bullet_list),
-                active = activeBlock?.kind == RichBlockKind.BULLET_ITEM,
+                active = RichBlockKind.BULLET_ITEM in listKinds,
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
@@ -479,7 +480,7 @@ fun RichFormatToolbar(
         val numberedButton: @Composable FlowRowScope.() -> Unit = {
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_numbered_list),
-                active = activeBlock?.kind == RichBlockKind.NUMBERED_ITEM,
+                active = RichBlockKind.NUMBERED_ITEM in listKinds,
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
@@ -502,7 +503,7 @@ fun RichFormatToolbar(
                 },
             ) { open ->
                 RichSplitButton(
-                    active = activeBlock?.kind == RichBlockKind.TASK_ITEM,
+                    active = RichBlockKind.TASK_ITEM in listKinds,
                     chevronActive = open,
                     enabled = enabled,
                     colors = colors,
@@ -712,7 +713,7 @@ fun RichFormatToolbar(
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_indent),
                         active = false,
-                        enabled = enabled && RichEdits.canShiftIndent(activeBlock, 1),
+                        enabled = enabled && RichEdits.canShiftIndent(blocks, activeBlock.id, 1),
                         colors = colors,
                         titleColor = titleColor,
                         fixedTint = IndentTint,
@@ -721,7 +722,7 @@ fun RichFormatToolbar(
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_outdent),
                         active = false,
-                        enabled = enabled && RichEdits.canShiftIndent(activeBlock, -1),
+                        enabled = enabled && RichEdits.canShiftIndent(blocks, activeBlock.id, -1),
                         colors = colors,
                         titleColor = titleColor,
                         fixedTint = OutdentTint,
@@ -747,7 +748,7 @@ fun RichFormatToolbar(
                     ) { tint -> InlineCodeIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_quote),
-                        active = activeBlock?.quote != null,
+                        active = activeBlock != null && activeBlock.quotes.isNotEmpty(),
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,

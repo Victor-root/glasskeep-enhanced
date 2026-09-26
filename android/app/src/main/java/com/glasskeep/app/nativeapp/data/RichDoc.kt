@@ -43,7 +43,7 @@ enum class RichBlockKind {
 enum class RichAlign { LEFT, CENTER, RIGHT, JUSTIFY }
 
 /**
- * The blockquote a block sits in. [id] is local only, never serialized: it
+ * A blockquote holding blocks. [id] is local only, never serialized: it
  * tells apart two quotes that follow each other, which the web keeps as two
  * cards. [indent] is the quote's own Indent attribute.
  */
@@ -56,12 +56,16 @@ data class RichQuote(val id: String = UUID.randomUUID().toString(), val indent: 
  * [indent] is the Indent extension's attribute: on the `<li>` of a bullet
  * or ordered item, on the paragraph of a task item (Indent.js skips only
  * listItem paragraphs), on the node itself everywhere else. [nestLevel] is
- * a list item's structural depth: 0 for an item of a top-level list, 1 for
- * an item of a list nested inside another item (Tab / sinkListItem on the
- * web), and so on. It is always 0 on anything that is not a list item.
+ * how many list items hold the block: for a list item, 0 in a top-level
+ * list, 1 in a list nested inside another item (Tab / sinkListItem on the
+ * web), and so on; for anything else, 0 outside any list, 1 for a
+ * paragraph, heading, code block or rule a top-level item holds after its
+ * own paragraph (where the web puts a rule or a pasted line typed in an
+ * item), and so on.
  *
- * [quote] is the quote holding the block, null outside any: consecutive
- * blocks of one quote make one blockquote, lists and headings included.
+ * [quotes] are the quotes holding the block, outermost first, none outside
+ * any: consecutive blocks of one quote make one blockquote, lists, headings
+ * and quotes included. A quote never sits inside a list item here.
  *
  * [checked] only means anything on a [RichBlockKind.TASK_ITEM], and
  * [language] only on a [RichBlockKind.CODE_BLOCK]; both are carried
@@ -78,7 +82,7 @@ data class RichBlock(
     val checked: Boolean = false,
     val language: String? = null,
     val nestLevel: Int = 0,
-    val quote: RichQuote? = null,
+    val quotes: List<RichQuote> = emptyList(),
 )
 
 /**
@@ -96,15 +100,16 @@ data class RichBlock(
  * three textStyle attributes (colour, font family, font size).
  *
  * The editor model is flat: a list, blockquote or task list becomes a run
- * of consecutive blocks. Structurally nested Tiptap lists keep their depth
- * in [RichBlock.nestLevel], the blocks of a blockquote carry it in
- * [RichBlock.quote], and [encode] nests both back the same way, so one
+ * of consecutive blocks. Structurally nested Tiptap lists, and the blocks a
+ * list item holds after its paragraph, keep their depth in
+ * [RichBlock.nestLevel], the blocks of a blockquote carry it in
+ * [RichBlock.quotes], and [encode] nests both back the same way, so one
  * editable text field per visible line never changes the structure of a
  * note written on the web.
  *
  * [parse] still returns null rather than guess for anything outside that
- * vocabulary: a heading beyond level 5, a quote inside a quote, a table, an
- * image node. NoteDetailScreen's existing "formatting not
+ * vocabulary: a heading beyond level 5, a quote inside a list item, a
+ * table, an image node. NoteDetailScreen's existing "formatting not
  * available" fallback then opens the note read-only-ish in plain text, so
  * a round-trip through this editor can never quietly drop formatting.
  */
@@ -143,22 +148,26 @@ object RichDoc {
         val blocks = mutableListOf<RichBlock>()
         for (node in topLevel.take(maxNodes)) {
             val obj = node as? JsonObject ?: return null
-            blocks.addAll(parseNode(obj, inQuote = false) ?: return null)
+            blocks.addAll(parseNode(obj, quotes = emptyList(), depth = 0) ?: return null)
         }
         return blocks.ifEmpty { null }
     }
 
-    /** One block node of the doc or of a blockquote, as its blocks. */
-    private fun parseNode(node: JsonObject, inQuote: Boolean): List<RichBlock>? = when (nodeType(node)) {
-        "paragraph" -> parseTextBlock(node, RichBlockKind.PARAGRAPH)?.let(::listOf)
-        "heading" -> parseHeading(node)?.let(::listOf)
-        "bulletList" -> parseList(node, RichBlockKind.BULLET_ITEM)
-        "orderedList" -> parseList(node, RichBlockKind.NUMBERED_ITEM)
-        "taskList" -> parseTaskList(node)
-        "blockquote" -> if (inQuote) null else parseBlockquote(node)
-        "codeBlock" -> parseCodeBlock(node)?.let(::listOf)
-        "horizontalRule" -> listOf(newBlock(RichBlockKind.DIVIDER))
-        else -> null
+    /** One block node, as its blocks: held by [quotes], and by [depth] list
+     *  items when it follows an item's own paragraph. */
+    private fun parseNode(node: JsonObject, quotes: List<RichQuote>, depth: Int): List<RichBlock>? {
+        val block = when (nodeType(node)) {
+            "paragraph" -> parseTextBlock(node, RichBlockKind.PARAGRAPH)
+            "heading" -> parseHeading(node)
+            "codeBlock" -> parseCodeBlock(node)
+            "horizontalRule" -> newBlock(RichBlockKind.DIVIDER)
+            "bulletList" -> return parseList(node, RichBlockKind.BULLET_ITEM, quotes, depth)
+            "orderedList" -> return parseList(node, RichBlockKind.NUMBERED_ITEM, quotes, depth)
+            "taskList" -> return parseTaskList(node, quotes, depth)
+            "blockquote" -> return if (depth == 0) parseBlockquote(node, quotes) else null
+            else -> null
+        } ?: return null
+        return listOf(block.copy(nestLevel = depth, quotes = quotes))
     }
 
     private fun nodeType(node: JsonObject): String? = (node["type"] as? JsonPrimitive)?.contentOrNull
@@ -178,13 +187,15 @@ object RichDoc {
         return parseTextBlock(node, kind)
     }
 
-    /** `list -> listItem[] -> [paragraph, nestedList*]`. Nested children
-     *  follow their parent item in document order, one [RichBlock.nestLevel]
-     *  deeper. The Indent extension's attribute lives on the `<li>`. */
+    /** `list -> listItem[] -> [paragraph, block*]`. What an item holds after
+     *  its paragraph (nested lists, paragraphs, headings, code, rules)
+     *  follows it in document order, one [RichBlock.nestLevel] deeper. The
+     *  Indent extension's attribute lives on the `<li>`. */
     private fun parseList(
         node: JsonObject,
         itemKind: RichBlockKind,
-        nestingDepth: Int = 0,
+        quotes: List<RichQuote>,
+        nestingDepth: Int,
     ): List<RichBlock>? {
         if (!attrsAreKnown(node["attrs"] as? JsonObject, extraAllowedKeys = setOf("start"))) return null
         val items = node["content"] as? JsonArray ?: return null
@@ -199,10 +210,10 @@ object RichDoc {
             val paragraphNode = itemContent[0] as? JsonObject ?: return null
             if (nodeType(paragraphNode) != "paragraph") return null
             val block = parseTextBlock(paragraphNode, itemKind) ?: return null
-            blocks.add(block.copy(indent = readIndent(itemAttrs), nestLevel = nestingDepth))
+            blocks.add(block.copy(indent = readIndent(itemAttrs), nestLevel = nestingDepth, quotes = quotes))
             for (child in itemContent.drop(1)) {
                 val childObj = child as? JsonObject ?: return null
-                blocks.addAll(parseNestedList(childObj, nestingDepth + 1) ?: return null)
+                blocks.addAll(parseNode(childObj, quotes, nestingDepth + 1) ?: return null)
             }
         }
         return blocks
@@ -212,7 +223,7 @@ object RichDoc {
      *  attribute of its own: Indent.js puts it on the item's paragraph. An
      *  indent on the taskItem itself is only ever one an earlier version of
      *  this app wrote, still read so those notes keep their look. */
-    private fun parseTaskList(node: JsonObject, nestingDepth: Int = 0): List<RichBlock>? {
+    private fun parseTaskList(node: JsonObject, quotes: List<RichQuote>, nestingDepth: Int): List<RichBlock>? {
         if (!attrsAreKnown(node["attrs"] as? JsonObject)) return null
         val items = node["content"] as? JsonArray ?: return null
         val blocks = mutableListOf<RichBlock>()
@@ -232,39 +243,32 @@ object RichDoc {
                     checked = checked,
                     indent = block.indent.takeIf { it > 0 } ?: readIndent(itemAttrs),
                     nestLevel = nestingDepth,
+                    quotes = quotes,
                 ),
             )
             for (child in itemContent.drop(1)) {
                 val childObj = child as? JsonObject ?: return null
-                blocks.addAll(parseNestedList(childObj, nestingDepth + 1) ?: return null)
+                blocks.addAll(parseNode(childObj, quotes, nestingDepth + 1) ?: return null)
             }
         }
         return blocks
     }
 
-    private fun parseNestedList(node: JsonObject, nestingDepth: Int): List<RichBlock>? =
-        when (nodeType(node)) {
-            "bulletList" -> parseList(node, RichBlockKind.BULLET_ITEM, nestingDepth)
-            "orderedList" -> parseList(node, RichBlockKind.NUMBERED_ITEM, nestingDepth)
-            "taskList" -> parseTaskList(node, nestingDepth)
-            else -> null
-        }
-
     /** A blockquote's children (`block+`: paragraphs, headings, lists, code,
-     *  rules) become their own blocks, each carrying the one [RichQuote]
-     *  that holds the quote's indent. An empty quote keeps one empty
-     *  paragraph. */
-    private fun parseBlockquote(node: JsonObject): List<RichBlock>? {
+     *  rules, quotes) become their own blocks, each held by the quotes
+     *  around this one and by this one, whose [RichQuote] keeps its indent.
+     *  An empty quote keeps one empty paragraph. */
+    private fun parseBlockquote(node: JsonObject, outer: List<RichQuote>): List<RichBlock>? {
         val attrs = node["attrs"] as? JsonObject
         if (!attrsAreKnown(attrs)) return null
-        val quote = RichQuote(indent = readIndent(attrs))
+        val quotes = outer + RichQuote(indent = readIndent(attrs))
         val content = node["content"] as? JsonArray ?: return null
         val blocks = mutableListOf<RichBlock>()
         for (child in content) {
             val childObj = child as? JsonObject ?: return null
-            blocks.addAll(parseNode(childObj, inQuote = true) ?: return null)
+            blocks.addAll(parseNode(childObj, quotes, depth = 0) ?: return null)
         }
-        return blocks.ifEmpty { listOf(newBlock()) }.map { it.copy(quote = quote) }
+        return blocks.ifEmpty { listOf(newBlock().copy(quotes = quotes)) }
     }
 
     /** A code block's content is plain text with real newlines in it (no
@@ -430,32 +434,12 @@ object RichDoc {
     /** Serializes [blocks] back into the same envelope [parse] reads.
      *  Consecutive blocks of one quote are regrouped into their blockquote
      *  and consecutive same-kind blocks into the one nested node Tiptap
-     *  expects (a list, a task list), list items are nested back under
-     *  their parent item by [RichBlock.nestLevel]; only the attrs this
-     *  editor actually sets are emitted, everything else is left for
-     *  Tiptap's own schema defaults to fill in on the other end. */
+     *  expects (a list, a task list), list items and what they hold are
+     *  nested back under their parent item by [RichBlock.nestLevel]; only
+     *  the attrs this editor actually sets are emitted, everything else is
+     *  left for Tiptap's own schema defaults to fill in on the other end. */
     fun encode(blocks: List<RichBlock>): String {
-        val normalized = normalizeNesting(blocks)
-        val nodes = mutableListOf<JsonObject>()
-        var i = 0
-        while (i < normalized.size) {
-            val quote = normalized[i].quote
-            var end = i + 1
-            while (end < normalized.size && normalized[end].quote?.id == quote?.id) end++
-            val content = encodeNodes(normalized.subList(i, end))
-            if (quote == null) {
-                nodes.addAll(content)
-            } else {
-                nodes.add(
-                    buildJsonObject {
-                        put("type", "blockquote")
-                        if (quote.indent > 0) put("attrs", buildJsonObject { put("indent", quote.indent) })
-                        put("content", JsonArray(content))
-                    },
-                )
-            }
-            i = end
-        }
+        val nodes = encodeQuoted(normalizeNesting(blocks), depth = 0)
         val doc = buildJsonObject {
             put("type", "doc")
             put("content", JsonArray(nodes.ifEmpty { listOf(buildJsonObject { put("type", "paragraph") }) }))
@@ -468,40 +452,58 @@ object RichDoc {
         return envelope.toString()
     }
 
-    /** The nodes of [blocks], all in the same quote or in none. */
+    /** The nodes of [blocks], all held by the same [depth] quotes: a run of
+     *  them held by one quote more becomes that blockquote. */
+    private fun encodeQuoted(blocks: List<RichBlock>, depth: Int): List<JsonObject> {
+        val nodes = mutableListOf<JsonObject>()
+        var i = 0
+        while (i < blocks.size) {
+            val quote = blocks[i].quotes.getOrNull(depth)
+            var end = i + 1
+            while (end < blocks.size && blocks[end].quotes.getOrNull(depth)?.id == quote?.id) end++
+            val run = blocks.subList(i, end)
+            if (quote == null) {
+                nodes.addAll(encodeNodes(run))
+            } else {
+                nodes.add(
+                    buildJsonObject {
+                        put("type", "blockquote")
+                        if (quote.indent > 0) put("attrs", buildJsonObject { put("indent", quote.indent) })
+                        put("content", JsonArray(encodeQuoted(run, depth + 1)))
+                    },
+                )
+            }
+            i = end
+        }
+        return nodes
+    }
+
+    /** The nodes of [blocks], all held by the same quotes. */
     private fun encodeNodes(blocks: List<RichBlock>): List<JsonObject> {
         val nodes = mutableListOf<JsonObject>()
         var i = 0
         while (i < blocks.size) {
             val block = blocks[i]
-            when (block.kind) {
-                RichBlockKind.BULLET_ITEM, RichBlockKind.NUMBERED_ITEM, RichBlockKind.TASK_ITEM -> {
-                    // One top-level list: its own items plus everything
-                    // nested under them.
-                    var end = i + 1
-                    while (end < blocks.size && blocks[end].kind.isListItem &&
-                        (blocks[end].nestLevel > 0 || blocks[end].kind == block.kind)
-                    ) {
-                        end++
-                    }
-                    nodes.add(encodeList(blocks.subList(i, end)))
-                    i = end
-                }
-                RichBlockKind.CODE_BLOCK -> {
-                    nodes.add(encodeCodeBlock(block))
-                    i++
-                }
-                RichBlockKind.DIVIDER -> {
-                    nodes.add(buildJsonObject { put("type", "horizontalRule") })
-                    i++
-                }
-                else -> {
-                    nodes.add(encodeTextBlock(block))
-                    i++
-                }
+            if (block.kind.isListItem) {
+                // One top-level list: its own items plus everything nested
+                // in them.
+                var end = i + 1
+                while (end < blocks.size && (blocks[end].nestLevel > 0 || blocks[end].kind == block.kind)) end++
+                nodes.add(encodeList(blocks.subList(i, end)))
+                i = end
+            } else {
+                nodes.add(encodeLeaf(block))
+                i++
             }
         }
         return nodes
+    }
+
+    /** A paragraph, heading, code block or rule. */
+    private fun encodeLeaf(block: RichBlock): JsonObject = when (block.kind) {
+        RichBlockKind.CODE_BLOCK -> encodeCodeBlock(block)
+        RichBlockKind.DIVIDER -> buildJsonObject { put("type", "horizontalRule") }
+        else -> encodeTextBlock(block)
     }
 
     /** One list: [items] starts with an item of the list's own level, every
@@ -531,7 +533,8 @@ object RichDoc {
         }
     }
 
-    /** A list item and the lists nested under it, one per run of same-kind
+    /** A list item and what it holds after its paragraph, in order: its
+     *  own blocks, and the lists nested in it, one per run of same-kind
      *  children. A bullet or ordered item carries its indent on the `<li>`
      *  so the marker and the text shift together (Indent.js:69-75); a task
      *  item has no indent attribute, its paragraph carries it. */
@@ -539,10 +542,15 @@ object RichDoc {
         val nested = mutableListOf<JsonObject>()
         var c = 0
         while (c < children.size) {
-            val level = children[c].nestLevel
+            val child = children[c]
+            if (!child.kind.isListItem) {
+                nested.add(encodeLeaf(child))
+                c++
+                continue
+            }
             var end = c + 1
             while (end < children.size &&
-                (children[end].nestLevel > level || children[end].kind == children[c].kind)
+                (children[end].nestLevel > child.nestLevel || children[end].kind == child.kind)
             ) {
                 end++
             }
@@ -561,15 +569,16 @@ object RichDoc {
         }
     }
 
-    /** A list item can only sit one level below the item before it in the
-     *  same quote, and a list always starts at the top level; anything else
-     *  (left behind by deleting a parent item, for instance) is pulled back
-     *  up. Non-list blocks never carry a level. */
+    /** A block can only sit in the list items holding the block before it,
+     *  or in the one that block opens, and only when both are in the same
+     *  quotes: a list always starts at the top level of its quote; anything
+     *  else (left behind by deleting a parent item, for instance) is pulled
+     *  back up. */
     fun normalizeNesting(blocks: List<RichBlock>): List<RichBlock> {
         var previous: RichBlock? = null
         return blocks.map { block ->
-            val maxLevel = previous?.takeIf { it.kind.isListItem && it.sharesQuoteWith(block) }?.let { it.nestLevel + 1 } ?: 0
-            val level = if (block.kind.isListItem) block.nestLevel.coerceIn(0, maxLevel) else 0
+            val maxLevel = previous?.takeIf { it.sharesQuoteWith(block) }?.listDepth ?: 0
+            val level = block.nestLevel.coerceIn(0, maxLevel)
             val fixed = if (level == block.nestLevel) block else block.copy(nestLevel = level)
             previous = fixed
             fixed
@@ -925,5 +934,15 @@ val RichBlockKind.isListItem: Boolean
     get() = this == RichBlockKind.BULLET_ITEM || this == RichBlockKind.NUMBERED_ITEM ||
         this == RichBlockKind.TASK_ITEM
 
-/** Whether [other] sits in the same quote as this block, or like it in none. */
-fun RichBlock.sharesQuoteWith(other: RichBlock?): Boolean = other != null && other.quote?.id == quote?.id
+/** Whether [other] sits in the same quotes as this block, or like it in
+ *  none. */
+fun RichBlock.sharesQuoteWith(other: RichBlock?): Boolean =
+    other != null && other.quotes.size == quotes.size && other.quotes.startsWith(quotes)
+
+/** Whether these quotes begin with the quotes [outer]. */
+fun List<RichQuote>.startsWith(outer: List<RichQuote>): Boolean =
+    size >= outer.size && outer.indices.all { this[it].id == outer[it].id }
+
+/** How many list items hold this block's text: a list item holds its own. */
+val RichBlock.listDepth: Int
+    get() = if (kind.isListItem) nestLevel + 1 else nestLevel
