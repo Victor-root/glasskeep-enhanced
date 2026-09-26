@@ -90,9 +90,16 @@ data class GkToast(
     val persistent: Boolean = false,
     val actionLabel: String? = null,
     val action: (() -> Unit)? = null,
-    /** The bordered second button (Refuser next to Approuver). */
+    /** The second button (Refuser next to Approuver). */
     val secondaryActionLabel: String? = null,
     val secondaryAction: (() -> Unit)? = null,
+    /** Bordered and in the text colour, as the pending-user reject is; a
+     *  plain second action (a pairing request's Decline) looks like the
+     *  first. */
+    val secondaryOutlined: Boolean = true,
+    /** The web's `actionLayout: "below"`: the pill takes the full width
+     *  and its actions go on their own row under the text. */
+    val stacked: Boolean = false,
     /** Overrides the user's configured duration for this one pill. */
     val durationMs: Long? = null,
 )
@@ -148,21 +155,23 @@ class ToastController {
         secondaryAction: (() -> Unit)? = null,
         serverId: Int? = null,
         persistent: Boolean = false,
-    ) {
+        secondaryOutlined: Boolean = true,
+        stacked: Boolean = false,
+    ): Long? {
         val category = NotifCategory.of(type, variant.categoryKey)
         val settings = prefs
-        if (settings != null && !settings.allowsNotification(category)) return
+        if (settings != null && !settings.allowsNotification(category)) return null
         // A row replayed at launch and pushed live again shows once.
-        if (serverId != null && queue.any { it.serverId == serverId }) return
+        if (serverId != null && queue.any { it.serverId == serverId }) return null
         val id = nextId++
         // A pill echoing a server row is already in serverHistory.
-        if (type == null) {
+        if (serverId == null) {
             localHistory.add(
                 0,
                 NotificationDto(
-                    id = -id.toInt(),
+                    id = localHistoryId(id),
                     senderUserId = 0,
-                    type = "",
+                    type = type.orEmpty(),
                     noteTitle = title.orEmpty(),
                     variant = variant.name.lowercase(),
                     message = message.toString(),
@@ -185,18 +194,31 @@ class ToastController {
                 action = action,
                 secondaryActionLabel = secondaryActionLabel,
                 secondaryAction = secondaryAction,
+                secondaryOutlined = secondaryOutlined,
+                stacked = stacked,
                 durationMs = durationMs,
             ),
         )
         if (settings != null && settings.ringsFor(category)) NotificationDing.play()
+        return id
     }
 
-    fun error(message: String) = show(message, NotifVariant.ERROR)
+    fun error(message: String) {
+        show(message, NotifVariant.ERROR)
+    }
 
-    fun success(message: String, icon: String? = null) = show(message, NotifVariant.SUCCESS, icon = icon)
+    fun success(message: String, icon: String? = null) {
+        show(message, NotifVariant.SUCCESS, icon = icon)
+    }
 
     internal fun dismiss(id: Long) {
         queue.removeAll { it.id == id }
+    }
+
+    /** The web's remove(): off the screen and out of the history alike. */
+    internal fun remove(id: Long) {
+        dismiss(id)
+        localHistory.removeAll { it.id == localHistoryId(id) }
     }
 
     /** Opening the bell dismisses every active notification (the web's
@@ -208,12 +230,16 @@ class ToastController {
     /** A tap on the pill or one of its actions: NotificationMobileToast.jsx
      *  removes the notification, from the history and the server alike. */
     internal fun resolve(toast: GkToast) {
-        dismiss(toast.id)
+        remove(toast.id)
         val serverId = toast.serverId ?: return
         serverHistory = serverHistory.filterNot { it.id == serverId }
         removeServerRow?.invoke(serverId)
     }
 }
+
+/** A pill's own row in the centre's history: negative, so it can never
+ *  meet a server row's id. */
+private fun localHistoryId(toastId: Long): Int = -toastId.toInt()
 
 /** Available to every screen; NativeNavHost provides the real one. */
 val LocalGkToasts = staticCompositionLocalOf { ToastController() }
@@ -283,6 +309,7 @@ fun GkToastHost(
         Box(
             modifier = Modifier
                 .widthIn(max = 420.dp)
+                .then(if (current.stacked) Modifier.fillMaxWidth() else Modifier)
                 .graphicsLayer {
                     alpha = entry.value
                     translationY = (1f - entry.value) * (if (position == ToastPosition.TOP) -24.dp.toPx() else 24.dp.toPx())
@@ -293,76 +320,31 @@ fun GkToastHost(
                     indication = null,
                 ) { controller.resolve(current) },
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(11.dp),
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
-            ) {
-                Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
-                    NotifGlyph(current.icon?.takeIf { it in PillSemanticIcons }, current.variant, 18.dp)
-                }
+            if (current.stacked) {
+                // The grid of `.gk-mobile-toast--stacked`: glyph and text on
+                // top, the actions under the text, flush right.
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                 ) {
-                    current.title?.let {
-                        Text(
-                            it,
-                            color = textColor,
-                            fontSize = 13.sp,
-                            lineHeight = 16.9.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                        PillGlyph(current, Modifier.padding(top = 1.dp))
+                        PillText(current, textColor, wrapTitle = true, modifier = Modifier.weight(1f))
                     }
-                    Text(
-                        current.message,
-                        color = textColor.copy(alpha = 0.85f),
-                        fontSize = 12.5.sp,
-                        lineHeight = 16.25.sp,
-                    )
+                    if (current.actionLabel != null) {
+                        PillActions(current, controller, textColor, dark, Modifier.align(Alignment.End).offset(x = 4.dp))
+                    }
                 }
-                if (current.actionLabel != null) Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+            } else {
+                Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.offset(x = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(11.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
                 ) {
-                    Text(
-                        current.actionLabel,
-                        color = current.variant.accent,
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) {
-                                current.action?.invoke()
-                                controller.resolve(current)
-                            }
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                    )
-                    if (current.secondaryActionLabel != null) {
-                        val secondaryShape = RoundedCornerShape(8.dp)
-                        Text(
-                            current.secondaryActionLabel,
-                            color = textColor,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .clip(secondaryShape)
-                                .border(1.dp, if (dark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.18f), secondaryShape)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                ) {
-                                    current.secondaryAction?.invoke()
-                                    controller.resolve(current)
-                                }
-                                .padding(horizontal = 9.dp, vertical = 3.dp),
-                        )
+                    PillGlyph(current)
+                    PillText(current, textColor, wrapTitle = false, modifier = Modifier.weight(1f, fill = false))
+                    if (current.actionLabel != null) {
+                        PillActions(current, controller, textColor, dark, Modifier.offset(x = 4.dp))
                     }
                 }
             }
@@ -391,6 +373,87 @@ fun GkToastHost(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PillGlyph(toast: GkToast, modifier: Modifier = Modifier) {
+    Box(modifier.size(22.dp), contentAlignment = Alignment.Center) {
+        NotifGlyph(toast.icon?.takeIf { it in PillSemanticIcons }, toast.variant, 18.dp)
+    }
+}
+
+/** The title over the message. A single-row pill cuts its title short; a
+ *  stacked one lets it wrap. */
+@Composable
+private fun PillText(toast: GkToast, textColor: Color, wrapTitle: Boolean, modifier: Modifier) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = modifier) {
+        toast.title?.let {
+            Text(
+                it,
+                color = textColor,
+                fontSize = 13.sp,
+                lineHeight = 16.9.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = if (wrapTitle) Int.MAX_VALUE else 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            toast.message,
+            color = textColor.copy(alpha = 0.85f),
+            fontSize = 12.5.sp,
+            lineHeight = 16.25.sp,
+        )
+    }
+}
+
+/** `.gk-mobile-toast__action`: bold accent text buttons, the outlined
+ *  second one in the text colour; a stacked pill makes them roomier. */
+@Composable
+private fun PillActions(toast: GkToast, controller: ToastController, textColor: Color, dark: Boolean, modifier: Modifier) {
+    val fontSize = if (toast.stacked) 13.sp else 12.5.sp
+    val lineHeight = if (toast.stacked) 16.9.sp else 16.25.sp
+    @Composable
+    fun Action(label: String, outlined: Boolean, onClick: (() -> Unit)?) {
+        val shape = RoundedCornerShape(8.dp)
+        Text(
+            label,
+            color = if (outlined) textColor else toast.variant.accent,
+            fontSize = fontSize,
+            lineHeight = lineHeight,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .clip(shape)
+                .then(
+                    if (outlined) {
+                        Modifier.border(1.dp, if (dark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.18f), shape)
+                    } else {
+                        Modifier
+                    },
+                )
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) {
+                    onClick?.invoke()
+                    controller.resolve(toast)
+                }
+                .padding(
+                    horizontal = if (toast.stacked) 12.dp else if (outlined) 9.dp else 10.dp,
+                    vertical = if (toast.stacked) 6.dp else if (outlined) 3.dp else 4.dp,
+                )
+                // The CSS border adds to the padding instead of eating it.
+                .then(if (outlined) Modifier.padding(1.dp) else Modifier),
+        )
+    }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier,
+    ) {
+        toast.actionLabel?.let { Action(it, outlined = false, onClick = toast.action) }
+        toast.secondaryActionLabel?.let { Action(it, outlined = toast.secondaryOutlined, onClick = toast.secondaryAction) }
     }
 }
 

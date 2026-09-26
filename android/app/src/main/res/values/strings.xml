@@ -1206,6 +1206,23 @@
     <string name="native_fed_err_clock_skew">The two servers\' clocks differ by %1$s. Sync the time (NTP) on both machines.</string>
     <string name="native_fed_err_clock_skew_unknown">The two servers\' clocks do not agree. Sync the time (NTP) on both machines.</string>
     <string name="native_fed_err_http">The peer returned HTTP error %1$s.</string>
+    <string name="native_fed_invite_received_title">Pairing request</string>
+    <string name="native_fed_invite_received">%1$s wants to pair with your server</string>
+    <string name="native_fed_invite_received_from">%1$s wants to pair with your server, at the address %2$s</string>
+    <string name="native_fed_invite_verify_address">Only accept if you recognise this address.</string>
+    <string name="native_fed_accepted_toast">Server paired</string>
+    <string name="native_fed_refused_toast">Pairing request declined</string>
+    <string name="native_fed_action_failed">Action failed. Please try again.</string>
+    <string name="native_fed_conn_title">Cross-server link</string>
+    <string name="native_fed_peer_offline">%1$s is offline</string>
+    <string name="native_fed_peer_online">%1$s is back online</string>
+    <string name="native_fed_peer_unlocked">%1$s has been unlocked</string>
+    <string name="native_fed_peer_locked">%1$s is locked (encryption locked)</string>
+    <string name="native_fed_peer_incompatible">%1$s is out of date</string>
+    <string name="native_fed_linked_toast">%1$s accepted your pairing request</string>
+    <string name="native_fed_declined_toast">%1$s declined your pairing request</string>
+    <string name="native_fed_cancelled_toast">%1$s cancelled their pairing invitation</string>
+    <string name="native_fed_dissociated_toast">%1$s unpaired from your server</string>
     <!-- The web's t("error"): there is no such key, so it prints the key itself. -->
     <string name="native_admin_missing_error_key" translatable="false">error</string>
 </resources>

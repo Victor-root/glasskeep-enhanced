@@ -1195,4 +1195,21 @@
     <string name="native_fed_err_clock_skew">Les horloges des deux serveurs diffèrent de %1$s. Synchronisez l’heure (NTP) sur les deux machines.</string>
     <string name="native_fed_err_clock_skew_unknown">Les horloges des deux serveurs ne concordent pas. Synchronisez l’heure (NTP) sur les deux machines.</string>
     <string name="native_fed_err_http">Erreur HTTP %1$s renvoyée par le pair.</string>
+    <string name="native_fed_invite_received_title">Demande d\'appairage</string>
+    <string name="native_fed_invite_received">%1$s souhaite s\'associer à votre serveur</string>
+    <string name="native_fed_invite_received_from">%1$s souhaite s\'associer à votre serveur, à l\'adresse %2$s</string>
+    <string name="native_fed_invite_verify_address">N\'acceptez que si vous reconnaissez cette adresse.</string>
+    <string name="native_fed_accepted_toast">Serveur associé</string>
+    <string name="native_fed_refused_toast">Demande d\'appairage refusée</string>
+    <string name="native_fed_action_failed">Échec de l\'action. Veuillez réessayer.</string>
+    <string name="native_fed_conn_title">Liaison entre serveurs</string>
+    <string name="native_fed_peer_offline">%1$s est hors ligne</string>
+    <string name="native_fed_peer_online">%1$s est de nouveau en ligne</string>
+    <string name="native_fed_peer_unlocked">%1$s a été déverrouillé</string>
+    <string name="native_fed_peer_locked">%1$s est verrouillé (chiffrement non déverrouillé)</string>
+    <string name="native_fed_peer_incompatible">%1$s n\'est pas à jour</string>
+    <string name="native_fed_linked_toast">%1$s a accepté votre demande d\'appairage</string>
+    <string name="native_fed_declined_toast">%1$s a refusé votre demande d\'appairage</string>
+    <string name="native_fed_cancelled_toast">%1$s a annulé son invitation d\'appairage</string>
+    <string name="native_fed_dissociated_toast">%1$s s\'est dissocié de votre serveur</string>
 </resources>

@@ -59,6 +59,7 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.data.FederationEvent
 import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
 import com.glasskeep.app.nativeapp.data.RealtimeClient
@@ -154,6 +155,8 @@ fun NativeNavHost(
     var liveNotification by remember { mutableStateOf<NotificationDto?>(null) }
     // What the admin panel reloads its lists on while it is open.
     val adminEvents = remember { MutableSharedFlow<String>(extraBufferCapacity = 16) }
+    // The same federation frames whole, for the pairing notices.
+    val federationEvents = remember { MutableSharedFlow<FederationEvent>(extraBufferCapacity = 16) }
     val realtimeClient = remember(serverUrl) {
         RealtimeClient(
             serverUrl = serverUrl,
@@ -173,7 +176,10 @@ fun NativeNavHost(
                     }
                 }
             },
-            onFederationEvent = { event -> adminEvents.tryEmit(event.type) },
+            onFederationEvent = { event ->
+                adminEvents.tryEmit(event.type)
+                federationEvents.tryEmit(event)
+            },
         )
     }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -465,6 +471,16 @@ fun NativeNavHost(
     // the web keeps it mounted: a recovery key survives the panel closing.
     val adminEncryption = remember(serverUrl, signedIn) {
         AdminEncryptionState(context, api, lock, toasts, scope) { lockPokes++ }
+    }
+    // FederationInviteWatcher.jsx, which the web mounts for administrators.
+    val federationWatcher = remember(serverUrl, signedIn) {
+        FederationInviteWatcher(context, api, toasts, scope, originOf(serverUrl) ?: serverUrl.trimEnd('/'))
+    }
+    val isAdmin = container.shellPrefs.isAdmin
+    LaunchedEffect(federationWatcher, isAdmin) {
+        if (!signedIn || !isAdmin) return@LaunchedEffect
+        federationWatcher.catchUp()
+        federationEvents.collect { federationWatcher.onEvent(it) }
     }
 
     CompositionLocalProvider(
