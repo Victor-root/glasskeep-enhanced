@@ -1182,6 +1182,14 @@ fun ChevronDownIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color
     modifier, size, tint, strokeWidth,
 )
 
+/** SectionHeader.jsx's "no colour" option: a circle of radius 10 crossed
+ *  corner to corner, stroke 1.5. */
+@Composable
+fun NoColorIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0 M19 5l-14 14",
+    modifier, size, tint, 1.5f,
+)
+
 /** The heroicons chevron the web draws inline (`M19 9l-7 7-7-7`): wider
  *  and lower than Tabler's. */
 @Composable

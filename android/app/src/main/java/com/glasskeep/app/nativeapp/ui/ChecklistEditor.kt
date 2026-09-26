@@ -27,6 +27,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -43,6 +45,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -51,13 +54,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.ChecklistBlock
@@ -66,6 +78,8 @@ import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.ChecklistPreview
 import com.glasskeep.app.nativeapp.data.ChecklistSectionData
+import com.glasskeep.app.ui.DarkBorderColor
+import com.glasskeep.app.ui.LightBorderColor
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlin.math.abs
@@ -177,12 +191,23 @@ fun ChecklistEditorBody(
         onEntriesChange(ChecklistItems.normalize(updated), persist)
     }
 
-    fun insertItemAt(index: Int) {
+    /** Adds an empty row at [index] of [base] and focuses it. */
+    fun insertItemAt(index: Int, base: List<ChecklistEntry> = entries) {
         val item = ChecklistItems.newItem()
-        val updated = entries.toMutableList()
+        val updated = base.toMutableList()
         updated.add(index.coerceIn(0, updated.size), item)
         commitEntries(updated)
         onFocusItem(item.id)
+    }
+
+    /** Where a new row of a section goes: right under its header with the
+     *  "top" preference, after its last row otherwise
+     *  (insertAtSectionStart / insertAtSectionEnd). */
+    fun sectionInsertIndex(base: List<ChecklistEntry>, sectionId: String): Int {
+        val markerIndex = base.indexOfFirst { it.id == sectionId }
+        if (markerIndex < 0) return base.size
+        if (insertPosition == "top") return markerIndex + 1
+        return (markerIndex + 1 until base.size).firstOrNull { base[it] is ChecklistSectionData } ?: base.size
     }
 
     /** Enter inside a row: the new row lands above or below it depending
@@ -201,31 +226,18 @@ fun ChecklistEditorBody(
         insertItemAt(if (insertPosition == "top") 0 else if (firstMarker < 0) entries.size else firstMarker)
     }
 
-    /** "Add to section…": right under its header with the "top"
-     *  preference, after its last row otherwise (insertAtSectionStart /
-     *  insertAtSectionEnd). */
-    fun addItemInSection(sectionId: String) {
-        val markerIndex = entries.indexOfFirst { it.id == sectionId }
-        if (markerIndex < 0) return
-        if (insertPosition == "top") {
-            insertItemAt(markerIndex + 1)
-            return
-        }
-        var last = markerIndex
-        for (i in markerIndex + 1 until entries.size) {
-            if (entries[i] is ChecklistSectionData) break
-            last = i
-        }
-        insertItemAt(last + 1)
+    /** Enter in a section's title: the new title and a new row in that
+     *  section land together, and the row takes the focus. */
+    fun renameSectionAndAddItem(sectionId: String, title: String) {
+        val renamed = entries.map { if (it.id == sectionId && it is ChecklistSectionData) it.copy(title = title) else it }
+        insertItemAt(sectionInsertIndex(renamed, sectionId), renamed)
     }
 
     fun addSection() {
         // The marker comes with one empty row under it, so the new
-        // section is never born empty (ChecklistEditor.jsx:198-208).
-        val newSection = ChecklistItems.newSection()
-        val newItem = ChecklistItems.newItem()
-        commitEntries(entries + newSection + newItem)
-        onFocusItem(newItem.id)
+        // section is never born empty; its untitled header takes the
+        // focus itself (ChecklistEditor.jsx:198-208).
+        commitEntries(entries + ChecklistItems.newSection() + ChecklistItems.newItem())
     }
 
     // max-sm:-mx-4: the list reaches 16dp past the note's text gutter.
@@ -324,7 +336,8 @@ fun ChecklistEditorBody(
                         onBlur = { commitEntries(entries) },
                         onEnter = { id -> addItemAdjacent(id) },
                         onRemove = { id -> commitEntries(entries.filterNot { it.id == id }) },
-                        onAddToSection = { block.section?.let { addItemInSection(it.id) } },
+                        onAddToSection = { block.section?.let { insertItemAt(sectionInsertIndex(entries, it.id)) } },
+                        onSectionEnter = { sectionId, title -> renameSectionAndAddItem(sectionId, title) },
                         onSectionChange = { updatedSection ->
                             commitEntries(entries.map { if (it.id == updatedSection.id) updatedSection else it })
                         },
@@ -464,6 +477,7 @@ private fun ChecklistSectionBlock(
     onRemove: (String) -> Unit,
     onAddToSection: () -> Unit,
     onSectionChange: (ChecklistSectionData) -> Unit,
+    onSectionEnter: (sectionId: String, title: String) -> Unit,
     onSectionRemove: (String) -> Unit,
 ) {
     val section = block.section
@@ -548,11 +562,13 @@ private fun ChecklistSectionBlock(
                     accent = accent,
                     uncheckedCount = unchecked.size,
                     dark = dark,
+                    borderColor = borderColor,
                     onDragStart = onSectionDragStart,
                     onDragDelta = onSectionDragDelta,
                     onDragEnd = onSectionDragEnd,
                     onDragCancel = onSectionDragCancel,
                     onChange = onSectionChange,
+                    onEnter = { title -> onSectionEnter(section.id, title) },
                     onRemove = { onSectionRemove(section.id) },
                 )
                 if (!collapsed) {
@@ -842,16 +858,28 @@ private fun ChecklistSectionHeader(
     accent: Color?,
     uncheckedCount: Int,
     dark: Boolean,
+    borderColor: Color,
     onDragStart: () -> Unit,
     onDragDelta: (Float) -> Unit,
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit,
     onChange: (ChecklistSectionData) -> Unit,
+    onEnter: (title: String) -> Unit,
     onRemove: () -> Unit,
 ) {
     // text-gray-700 / dark:text-gray-200.
     val titleColor = if (dark) Color(0xFFE5E7EB) else Color(0xFF364153)
+    // An untitled section opens straight into its title, focused with
+    // everything selected; the title is written back trimmed, once, when
+    // it loses the focus, or with Enter, which also starts a row in it.
     var editingTitle by remember(section.id) { mutableStateOf(section.title.isBlank()) }
+    var draft by remember(section.id) { mutableStateOf(TextFieldValue(section.title, TextRange(0, section.title.length))) }
+    var titleFocused by remember(section.id) { mutableStateOf(false) }
+    var enterPressed by remember(section.id) { mutableStateOf(false) }
+    val titleFocus = remember(section.id) { FocusRequester() }
+    LaunchedEffect(editingTitle) {
+        if (editingTitle) titleFocus.requestFocus()
+    }
     var pickerOpen by remember(section.id) { mutableStateOf(false) }
     var confirmingRemove by remember(section.id) { mutableStateOf(false) }
     val collapseLabel = stringResource(
@@ -866,7 +894,7 @@ private fun ChecklistSectionHeader(
     // The confirmation falls back to a plain delete button after three
     // seconds, same as the web (SectionHeader.jsx:179-185).
     if (confirmingRemove) {
-        androidx.compose.runtime.LaunchedEffect(section.id, confirmingRemove) {
+        LaunchedEffect(section.id, confirmingRemove) {
             kotlinx.coroutines.delay(3000)
             confirmingRemove = false
         }
@@ -924,7 +952,7 @@ private fun ChecklistSectionHeader(
             )
             if (pickerOpen) {
                 ChecklistSectionColorPicker(
-                    selected = section.color,
+                    selected = section.color ?: NoSectionColor,
                     dark = dark,
                     onSelect = { color -> onChange(section.copy(color = color)); pickerOpen = false },
                     onDismiss = { pickerOpen = false },
@@ -944,23 +972,46 @@ private fun ChecklistSectionHeader(
         ) {
             ChecklistChevron(collapsed = section.collapsed, dark = dark)
         }
+        val titlePlaceholder = stringResource(R.string.native_checklist_section_title_placeholder)
         if (editingTitle) {
             BasicTextField(
-                value = section.title,
-                onValueChange = { onChange(section.copy(title = it)) },
+                value = draft,
+                onValueChange = { draft = it },
                 singleLine = true,
                 textStyle = TextStyle(color = titleColor, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
                 cursorBrush = SolidColor(titleColor),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { editingTitle = false }),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        enterPressed = true
+                        editingTitle = false
+                        onEnter(draft.text.trim())
+                    },
+                ),
                 modifier = Modifier
                     .weight(1f)
-                    .onFocusChanged { state -> if (!state.isFocused) editingTitle = false },
+                    .focusRequester(titleFocus)
+                    .onFocusChanged { state ->
+                        if (titleFocused && !state.isFocused) {
+                            if (enterPressed) {
+                                enterPressed = false
+                            } else {
+                                editingTitle = false
+                                val title = draft.text.trim()
+                                if (title != section.title) onChange(section.copy(title = title))
+                            }
+                        }
+                        titleFocused = state.isFocused
+                    }
+                    // border-b in --border-light, under the 20dp line.
+                    .bottomHairline(borderColor)
+                    .padding(bottom = 1.dp),
                 decorationBox = { innerTextField ->
-                    if (section.title.isEmpty()) {
+                    if (draft.text.isEmpty()) {
+                        // The input's own placeholder: its text at half strength.
                         Text(
-                            stringResource(R.string.native_checklist_section_title_placeholder),
-                            color = if (dark) PlaceholderDark else PlaceholderLight,
+                            titlePlaceholder,
+                            color = titleColor.copy(alpha = 0.5f),
                             fontSize = 14.sp,
                             lineHeight = 20.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -971,7 +1022,7 @@ private fun ChecklistSectionHeader(
             )
         } else {
             Text(
-                section.title,
+                section.title.ifEmpty { titlePlaceholder },
                 color = titleColor,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
@@ -982,7 +1033,10 @@ private fun ChecklistSectionHeader(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         role = Role.Button,
-                    ) { editingTitle = true },
+                    ) {
+                        draft = TextFieldValue(section.title, TextRange(0, section.title.length))
+                        editingTitle = true
+                    },
             )
         }
         Box(
@@ -1023,65 +1077,85 @@ private fun ChecklistSectionHeader(
     }
 }
 
-/** ColorPicker (SectionHeader.jsx:34-104): five 32px dots per row, the
- *  "no colour" crossed circle first, and a white-then-colour ring on the
- *  selected one. */
+/** The key the web stores for "no colour" (SectionHeader.jsx:76). */
+private const val NoSectionColor = "none"
+
+/**
+ * ColorPicker (SectionHeader.jsx:34-104): a 210dp panel 6dp under the
+ * dot, its left edge on the dot's but kept 8dp inside the screen, shown
+ * and hidden at once: five 32dp dots per row, "no colour" first, the
+ * picked one ringed white then in its own colour, outside the dot.
+ */
 @Composable
 private fun ChecklistSectionColorPicker(
-    selected: String?,
+    selected: String,
     dark: Boolean,
-    onSelect: (String?) -> Unit,
+    onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val borderColor = if (dark) Color(0x4D4B5563) else Color(0x4DD1D5DB)
-    FooterPopover(
-        gap = 6.dp,
-        width = 216.dp,
-        cornerRadius = 8.dp,
-        elevation = 16.dp,
-        background = if (dark) Color(0xFF1F2937) else Color.White,
-        borderColor = borderColor,
-        onDismiss = onDismiss,
+    val density = LocalDensity.current
+    val positionProvider = remember(density) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset {
+                val margin = with(density) { 8.dp.roundToPx() }
+                val panelWidth = with(density) { 216.dp.roundToPx() }
+                val left = minOf(anchorBounds.left, windowSize.width - panelWidth - margin).coerceAtLeast(margin)
+                return IntOffset(left, anchorBounds.bottom + with(density) { 6.dp.roundToPx() })
+            }
+        }
+    }
+    val shape = RoundedCornerShape(8.dp)
+    // gray-400 / dark:gray-500, the crossed circle's stroke.
+    val noneTint = if (dark) PlaceholderDark else HandleDotLight
+    Popup(
+        popupPositionProvider = positionProvider,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
     ) {
-        val entries: List<Pair<String?, Color?>> = listOf(null to null) + ChecklistSectionColors.map { it.first to it.second }
         Column(
-            modifier = Modifier.padding(8.dp),
+            modifier = Modifier
+                // shadow-xl.
+                .dropShadow(shape, Shadow(radius = 25.dp, color = Color.Black.copy(alpha = 0.10f), spread = (-5).dp, offset = DpOffset(0.dp, 20.dp)))
+                .dropShadow(shape, Shadow(radius = 10.dp, color = Color.Black.copy(alpha = 0.10f), spread = (-6).dp, offset = DpOffset(0.dp, 8.dp)))
+                .clip(shape)
+                .background(if (dark) Color(0xFF1E2939) else Color.White)
+                .border(1.dp, if (dark) DarkBorderColor else LightBorderColor, shape)
+                .padding(9.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            entries.chunked(5).forEach { row ->
+            val options: List<Pair<String, Color?>> = listOf(NoSectionColor to null) + ChecklistSectionColors
+            options.chunked(5).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { (key, color) ->
-                        val isSelected = key == selected
-                        val label = if (key == null) stringResource(R.string.native_checklist_no_color) else key
+                        val label = if (color == null) stringResource(R.string.native_checklist_no_color) else key
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
-                                .clip(CircleShape)
-                                .then(if (color != null) Modifier.background(color) else Modifier)
                                 .then(
-                                    if (isSelected) {
-                                        Modifier.border(
-                                            width = 3.5.dp,
-                                            color = color ?: Color(0xFF94A3B8),
-                                            shape = CircleShape,
-                                        )
-                                    } else if (color == null) {
-                                        Modifier.border(1.5.dp, if (dark) PlaceholderDark else HandleDotLight, CircleShape)
+                                    if (key == selected) {
+                                        // box-shadow: 0 0 0 2px white, 0 0 0 3.5px <colour>.
+                                        Modifier
+                                            .dropShadow(CircleShape, Shadow(radius = 0.dp, color = color ?: Color(0xFF94A3B8), spread = 3.5.dp))
+                                            .dropShadow(CircleShape, Shadow(radius = 0.dp, color = Color.White, spread = 2.dp))
                                     } else {
                                         Modifier
                                     },
                                 )
+                                .clip(CircleShape)
+                                .then(if (color != null) Modifier.background(color) else Modifier)
                                 .semantics { contentDescription = label }
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
                                     role = Role.Button,
                                 ) { onSelect(key) },
-                            contentAlignment = Alignment.Center,
                         ) {
-                            if (color == null) {
-                                Text("∕", color = if (dark) PlaceholderDark else HandleDotLight, fontSize = 18.sp)
-                            }
+                            if (color == null) NoColorIcon(size = 32.dp, tint = noneTint)
                         }
                     }
                 }
