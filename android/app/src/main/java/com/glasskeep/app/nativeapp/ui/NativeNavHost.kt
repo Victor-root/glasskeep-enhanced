@@ -173,6 +173,7 @@ fun NativeNavHost(
                     }
                 }
             },
+            onFederationEvent = { event -> adminEvents.tryEmit(event.type) },
         )
     }
     val lifecycleOwner = LocalLifecycleOwner.current

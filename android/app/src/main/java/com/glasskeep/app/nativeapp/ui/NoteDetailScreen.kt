@@ -60,7 +60,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -174,7 +173,6 @@ import com.glasskeep.app.nativeapp.data.toEntity
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
-import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
@@ -3400,22 +3398,6 @@ private fun NoteTagsPopover(
         }
     }
 }
-
-
-// internal, not private: Kotlin's top-level `private` is file-scoped, and
-// the sign-in, registration, password and admin screens reuse this exact
-// styling.
-@Composable
-internal fun detailFieldColors(textColor: Color, subtextColor: Color, borderColor: Color) =
-    OutlinedTextFieldDefaults.colors(
-        focusedTextColor = textColor,
-        unfocusedTextColor = textColor,
-        focusedBorderColor = Indigo,
-        unfocusedBorderColor = borderColor,
-        focusedLabelColor = Indigo,
-        unfocusedLabelColor = subtextColor,
-        cursorColor = Indigo,
-    )
 
 /** ConfirmDeleteDialog.jsx's plain and trashed variants: a centred card
  *  over a `bg-black/40` scrim, title, one line of explanation, then Cancel

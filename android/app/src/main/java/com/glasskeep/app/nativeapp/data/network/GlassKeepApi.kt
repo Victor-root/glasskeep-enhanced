@@ -343,6 +343,8 @@ data class FederationLinkDto(
     val peerReachable: Boolean? = null,
     val peerLocked: Boolean? = null,
     val peerAppVersion: String? = null,
+    val peerProtocol: Int? = null,
+    val localProtocol: Int? = null,
     val protocolCompatible: Boolean? = null,
     val lastSeenAt: String? = null,
     val lastError: String? = null,
@@ -357,6 +359,9 @@ data class FederationLinksResponse(
 
 @Serializable
 data class FederationSelfNameRequest(val name: String)
+
+@Serializable
+data class FederationSelfNameResponse(val selfName: String? = null)
 
 @Serializable
 data class FederationInviteRequest(val peerBaseUrl: String, val localBaseUrl: String, val label: String? = null)
@@ -1306,7 +1311,7 @@ interface GlassKeepApi {
     suspend fun getFederationLinks(): Response<FederationLinksResponse>
 
     @PUT("api/admin/federation/self-name")
-    suspend fun setFederationSelfName(@Body body: FederationSelfNameRequest): Response<FederationLinksResponse>
+    suspend fun setFederationSelfName(@Body body: FederationSelfNameRequest): Response<FederationSelfNameResponse>
 
     @POST("api/admin/federation/invite")
     suspend fun inviteFederation(@Body body: FederationInviteRequest): Response<FederationActionResponse>
@@ -1329,6 +1334,8 @@ interface GlassKeepApi {
     @DELETE("api/admin/federation/links/{id}")
     suspend fun unpairFederation(@Path("id") id: String): Response<OkResponse>
 
+    // A re-check waits on the server's own probe of the peer, as the web does.
+    @Headers("$REQUEST_TIMEOUT_HEADER: 15000")
     @POST("api/admin/federation/links/{id}/recheck")
     suspend fun recheckFederation(@Path("id") id: String): Response<FederationActionResponse>
 

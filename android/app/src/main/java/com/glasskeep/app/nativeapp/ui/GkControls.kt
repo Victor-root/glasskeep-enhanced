@@ -1291,6 +1291,7 @@ internal fun GkTextField(
     stretch: Boolean = false,
     background: Color = Color.Transparent,
     cornerRadius: Dp = 8.dp,
+    verticalPadding: Dp = 9.dp,
     placeholderColor: Color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
     fontFamily: FontFamily? = null,
     enabled: Boolean = true,
@@ -1330,7 +1331,7 @@ internal fun GkTextField(
                 )
                 .background(background, RoundedCornerShape(cornerRadius))
                 .border(1.dp, borderColor, RoundedCornerShape(cornerRadius))
-                .padding(horizontal = 13.dp, vertical = 9.dp),
+                .padding(horizontal = 13.dp, vertical = verticalPadding),
             decorationBox = { innerTextField ->
                 // Stretched, the line is centred in the taller box instead
                 // of filling it from the top.

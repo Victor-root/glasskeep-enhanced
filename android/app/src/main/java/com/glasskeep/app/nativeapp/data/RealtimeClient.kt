@@ -23,6 +23,20 @@ import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
 
+/** A federation_* frame: which link, which peer, and for a connectivity
+ *  change the state it left and the one it reached. */
+data class FederationEvent(
+    val type: String,
+    val linkId: String?,
+    val peerBaseUrl: String?,
+    val peerLabel: String?,
+    val state: String?,
+    val previousState: String?,
+    /** federation_refused: the peer withdrew its own invitation rather
+     *  than declining ours. */
+    val cancelled: Boolean,
+)
+
 /**
  * Long-lived connection to GET /api/events (server/index.js), so a note
  * changed on another device, or by a collaborator, shows up here without
@@ -62,6 +76,9 @@ class RealtimeClient(
     /** Settings/branding/admin events invalidate native secondary state.
      *  The host performs the appropriately scoped re-read. */
     private val onAuxiliaryEvent: (String) -> Unit,
+    /** Every federation_* frame, which App.jsx forwards whole to the
+     *  admin's federation panel and pairing notices. */
+    private val onFederationEvent: (FederationEvent) -> Unit,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -173,6 +190,20 @@ class RealtimeClient(
         )
     }.getOrNull()
 
+    private fun federationEventOf(type: String, data: String): FederationEvent? = runCatching {
+        val root = json.parseToJsonElement(data) as? JsonObject ?: return null
+        fun str(key: String) = (root[key] as? JsonPrimitive)?.contentOrNull
+        FederationEvent(
+            type = type,
+            linkId = str("linkId"),
+            peerBaseUrl = str("peerBaseUrl"),
+            peerLabel = str("peerLabel"),
+            state = str("state"),
+            previousState = str("previousState"),
+            cancelled = (root["cancelled"] as? JsonPrimitive)?.booleanOrNull == true,
+        )
+    }.getOrNull()
+
     private inner class Listener : EventSourceListener() {
         override fun onOpen(eventSource: EventSource, response: Response) {
             NativeDebug.d("RealtimeClient connected")
@@ -216,6 +247,10 @@ class RealtimeClient(
             if (payloadType != null && payloadType in AUXILIARY_EVENT_TYPES) {
                 NativeDebug.d("RealtimeClient auxiliary event type=$payloadType")
                 onAuxiliaryEvent(payloadType)
+            }
+            if (payloadType != null && payloadType.startsWith("federation_")) {
+                NativeDebug.d("RealtimeClient federation event type=$payloadType")
+                federationEventOf(payloadType, data)?.let(onFederationEvent)
             }
             // At-rest encryption's two lock-state frames, the one pair the
             // server sends to EVERY connected client rather than to one
@@ -300,8 +335,6 @@ class RealtimeClient(
             "notifications_cleared",
             "notification_delivered",
             "notification_removed",
-            "federation_peer_updated",
-            "federation_user_updated",
         )
         private const val RECONNECT_BASE_DELAY_MS = 1000L
         private const val RECONNECT_MAX_DELAY_MS = 30000L

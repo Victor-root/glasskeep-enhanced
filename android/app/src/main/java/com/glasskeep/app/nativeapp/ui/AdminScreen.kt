@@ -112,6 +112,9 @@ internal fun AdminScreen(
     val state = remember(serverUrl) { AdminPanelState(context, container, serverUrl, scope) }
     val power = remember(serverUrl) { ServerPower(context, state.api, toasts, activity) }
     val ai = remember(serverUrl) { AdminAiState(context, state.api, toasts) }
+    val federation = remember(serverUrl) {
+        AdminFederationState(context, state.api, originOf(serverUrl) ?: serverUrl.trimEnd('/'), toasts, scope)
+    }
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
     val scrollState = rememberScrollState()
@@ -136,6 +139,7 @@ internal fun AdminScreen(
         liveEvents.collect { type ->
             state.onLiveEvent(type)
             if (type == "admin_ai_settings_updated") ai.reload()
+            if (type.startsWith("federation_")) federation.load(silent = true)
         }
     }
     // Sent from the settings' passkey notice, the panel opens with that
@@ -243,17 +247,15 @@ internal fun AdminScreen(
                     titleColor = titleColor,
                     borderColor = borderColor,
                 )
-                SettingsAccordionSection(
-                    title = stringResource(R.string.native_admin_federation_section),
+                AdminFederationSection(
+                    federation = federation,
                     expanded = federationOpen,
+                    onToggle = { federationOpen = !federationOpen },
                     themeId = themeId,
                     dark = dark,
                     titleColor = titleColor,
-                    icon = { tint -> ServerIcon(size = 20.dp, tint = tint) },
-                    onToggle = { federationOpen = !federationOpen },
-                ) {
-                    LegacyAdminFederationSection(state.api, serverUrl, dark, titleColor, SettingsSubtleColor, borderColor)
-                }
+                    borderColor = borderColor,
+                )
             }
         }
     }

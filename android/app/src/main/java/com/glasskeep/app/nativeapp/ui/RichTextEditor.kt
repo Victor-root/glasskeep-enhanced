@@ -888,7 +888,7 @@ private fun CodeCopyButton(text: String, noteColor: String?, dark: Boolean, modi
             .padding(horizontal = 7.2.dp, vertical = 3.2.dp),
     ) {
         Text(
-            stringResource(if (copied) R.string.native_richtext_copied else R.string.native_richtext_copy),
+            stringResource(if (copied) R.string.native_common_copied else R.string.native_common_copy),
             color = if (dark) Color.White else Color.Black.copy(alpha = 0.75f),
             fontSize = 12.sp,
             lineHeight = 18.sp,

@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -1252,6 +1253,30 @@ fun IndentIncreaseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Co
     modifier, size, tint,
 )
 
+/** tabler/circle-check.svg. */
+@Composable
+fun CircleCheckIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0 M9 12l2 2l4 -4",
+    modifier, size, tint,
+)
+
+/** tabler/alert-triangle.svg. */
+@Composable
+fun TablerAlertTriangleIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M12 9v4 M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87" +
+        "l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z M12 16h.01",
+    modifier, size, tint,
+)
+
+/** tabler/tag.svg. */
+@Composable
+fun TablerTagIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M7.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 " +
+        "M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592 -5.592a2.41 2.41 0 0 0 0 -3.408" +
+        "l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a2 2 0 0 0 -2 2z",
+    modifier, size, tint,
+)
+
 /** tabler/check.svg, the settings pickers' "current choice" mark. */
 @Composable
 fun TablerCheckIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
@@ -1651,20 +1676,34 @@ fun UserXIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Col
     modifier, size, tint,
 )
 
-/** tabler/world-www.svg. */
+/** tabler/world-www.svg. [wwwTint] paints the three "www" strokes, the
+ *  way FederationIcons.jsx's WorldWwwIcon puts them in the accent. */
 @Composable
-fun WorldWwwIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
-    "M19.5 7a9 9 0 0 0 -7.5 -4a8.991 8.991 0 0 0 -7.484 4 " +
-        "M11.5 3a16.989 16.989 0 0 0 -1.826 4 " +
-        "M12.5 3a16.989 16.989 0 0 1 1.828 4 " +
-        "M19.5 17a9 9 0 0 1 -7.5 4a8.991 8.991 0 0 1 -7.484 -4 " +
-        "M11.5 21a16.989 16.989 0 0 1 -1.826 -4 " +
-        "M12.5 21a16.989 16.989 0 0 0 1.828 -4 " +
-        "M2 10l1 4l1.5 -4l1.5 4l1 -4 " +
-        "M17 10l1 4l1.5 -4l1.5 4l1 -4 " +
-        "M9.5 10l1 4l1.5 -4l1.5 4l1 -4",
-    modifier, size, tint,
-)
+fun WorldWwwIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, wwwTint: Color = tint) {
+    val globe = remember {
+        PathParser().parsePathString(
+            "M19.5 7a9 9 0 0 0 -7.5 -4a8.991 8.991 0 0 0 -7.484 4 " +
+                "M11.5 3a16.989 16.989 0 0 0 -1.826 4 " +
+                "M12.5 3a16.989 16.989 0 0 1 1.828 4 " +
+                "M19.5 17a9 9 0 0 1 -7.5 4a8.991 8.991 0 0 1 -7.484 -4 " +
+                "M11.5 21a16.989 16.989 0 0 1 -1.826 -4 " +
+                "M12.5 21a16.989 16.989 0 0 0 1.828 -4",
+        ).toPath()
+    }
+    val www = remember {
+        PathParser().parsePathString(
+            "M2 10l1 4l1.5 -4l1.5 4l1 -4 M17 10l1 4l1.5 -4l1.5 4l1 -4 M9.5 10l1 4l1.5 -4l1.5 4l1 -4",
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        val stroke = Stroke(width = 1.75f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(globe, tint, style = stroke)
+            drawPath(www, wwwTint, style = stroke)
+        }
+    }
+}
 
 /** tabler/circle-check-filled.svg. */
 @Composable
@@ -1859,14 +1898,22 @@ private fun TablerFilledIcon(pathData: String, modifier: Modifier, size: Dp, tin
     }
 }
 
-@Composable
-fun AlertFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+/** tabler/alert-triangle-filled.svg. */
+private const val AlertFilledPath =
     "M12 1.67c.955 0 1.845 .467 2.39 1.247l.105 .16l8.114 13.548a2.914 2.914 0 0 1 -2.307 4.363l-.195 .008" +
         "h-16.225a2.914 2.914 0 0 1 -2.582 -4.2l.099 -.185l8.11 -13.538a2.914 2.914 0 0 1 2.491 -1.403z" +
         "m.01 13.33l-.127 .007a1 1 0 0 0 0 1.986l.117 .007l.127 -.007a1 1 0 0 0 0 -1.986l-.117 -.007z" +
-        "m-.01 -7a1 1 0 0 0 -.993 .883l-.007 .117v4l.007 .117a1 1 0 0 0 1.986 0l.007 -.117v-4l-.007 -.117a1 1 0 0 0 -.993 -.883z",
-    modifier, size, tint,
-)
+        "m-.01 -7a1 1 0 0 0 -.993 .883l-.007 .117v4l.007 .117a1 1 0 0 0 1.986 0l.007 -.117v-4l-.007 -.117a1 1 0 0 0 -.993 -.883z"
+
+@Composable
+fun AlertFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) =
+    TablerFilledIcon(AlertFilledPath, modifier, size, tint)
+
+/** The same glyph under a bare `.tabler-icon`, whose stroke-only styling
+ *  outlines its shapes instead of filling them (the federation HTTPS note). */
+@Composable
+fun AlertFilledOutlineIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) =
+    TablerIcon(AlertFilledPath, modifier, size, tint)
 
 @Composable
 fun InfoFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
@@ -1937,13 +1984,95 @@ fun WifiOffIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = C
 )
 
 /** tabler/server.svg: the peer a mirrored note belongs to. */
+private const val ServerPath =
+    "M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-2 " +
+        "M3 15a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -2 " +
+        "M7 8l0 .01 M7 16l0 .01 M11 8h6 M11 16h6"
+
 @Composable
-fun ServerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
-    "M3 4m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z " +
-        "M3 12m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z " +
-        "M7 8l0 .01 M7 16l0 .01",
-    modifier, size, tint,
-)
+fun ServerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) =
+    TablerIcon(ServerPath, modifier, size, tint)
+
+/** FederationIcons.jsx's ServerCheckIcon: the server with a bold check
+ *  hanging off its bottom-right corner, both in [tint]. */
+@Composable
+fun ServerCheckIcon(modifier: Modifier = Modifier, size: Dp = 22.dp, tint: Color = Color.Black) =
+    ServerWithBadge(modifier, size, tint, tint, "M5 12l5 5l10 -10", badgeSide = 0.58f, badgeRight = -0.26f, badgeBottom = -0.24f)
+
+/** FederationIcons.jsx's ServerPlusIcon: the 20px server centred in its
+ *  24px box, a bold plus in [plusTint] off the box's corner. */
+@Composable
+fun ServerPlusIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, plusTint: Color = tint) =
+    ServerWithBadge(modifier, size, tint, plusTint, "M12 6v12M6 12h12", badgeSide = 0.6f, badgeRight = -0.24f, badgeBottom = -0.22f, glyphScale = 20f / 24f)
+
+/** The server glyph at [glyphScale] of its box, and a 24-unit badge path
+ *  stroked at 3 in a square of [badgeSide] of the box, placed by its CSS
+ *  `right` / `bottom` offsets (negative: past the edge). */
+@Composable
+private fun ServerWithBadge(
+    modifier: Modifier,
+    size: Dp,
+    tint: Color,
+    badgeTint: Color,
+    badgePath: String,
+    badgeSide: Float,
+    badgeRight: Float,
+    badgeBottom: Float,
+    glyphScale: Float = 1f,
+) {
+    val server = remember { PathParser().parsePathString(ServerPath).toPath() }
+    val badge = remember(badgePath) { PathParser().parsePathString(badgePath).toPath() }
+    Canvas(modifier.size(size)) {
+        val box = this.size.minDimension
+        val glyph = box * glyphScale
+        val inset = (box - glyph) / 2f
+        translate(inset, inset) {
+            scale(glyph / 24f, glyph / 24f, pivot = Offset.Zero) {
+                drawPath(server, tint, style = Stroke(width = 1.75f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
+        }
+        val side = box * badgeSide
+        translate(box - side - box * badgeRight, box - side - box * badgeBottom) {
+            scale(side / 24f, side / 24f, pivot = Offset.Zero) {
+                drawPath(badge, badgeTint, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
+        }
+    }
+}
+
+/** FederationIcons.jsx's ServerUserIcon: the server-cog shell (a server
+ *  with its bottom-right corner cut away) and a filled user in [userTint]
+ *  dropped into the cut, both 20px layers centred in the 24px box. */
+@Composable
+fun ServerUserIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, userTint: Color = tint) {
+    val shell = remember {
+        PathParser().parsePathString(
+            "M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-2 " +
+                "M12 20h-6a3 3 0 0 1 -3 -3v-2a3 3 0 0 1 3 -3h10.5 M7 8v.01 M7 16v.01",
+        ).toPath()
+    }
+    val user = remember {
+        PathParser().parsePathString(
+            "M12 3.5a5 5 0 1 1 -5 5l.005 -.217a5 5 0 0 1 4.995 -4.783z " +
+                "M14 14a5 5 0 0 1 5 5v1a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-1a5 5 0 0 1 5 -5h4z",
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val box = this.size.minDimension
+        val layer = box * 20f / 24f
+        val inset = (box - layer) / 2f
+        translate(inset, inset) {
+            scale(layer / 24f, layer / 24f, pivot = Offset.Zero) {
+                drawPath(shell, tint, style = Stroke(width = 1.75f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                translate(10.8f, 11.3f) {
+                    scale(0.6f, 0.6f, pivot = Offset.Zero) {
+                        drawPath(user, userTint)
+                    }
+                }
+            }
+        }
+    }
+}
 
 /** tabler/photo-circle-plus, the web's own LogoIcon (icons/index.jsx:504):
  *  the note's icon, in the footer and in the image sub-menu. Drawn as a
