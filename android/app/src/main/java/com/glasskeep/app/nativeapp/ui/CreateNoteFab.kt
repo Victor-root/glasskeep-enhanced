@@ -76,6 +76,7 @@ fun CreateNoteScrim(open: Boolean) {
 @Composable
 fun CreateNoteFab(
     dark: Boolean,
+    themeId: String,
     open: Boolean,
     onOpenChange: (Boolean) -> Unit,
     onCreateText: () -> Unit,
@@ -153,7 +154,13 @@ fun CreateNoteFab(
                     .size(56.dp)
                     .scale(fabScale)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(FabGradient)
+                    .background(
+                        if (WorkspaceTheme.forId(themeId).id == WorkspaceTheme.DEFAULT_ID) {
+                            FabGradient
+                        } else {
+                            WorkspaceTheme.buttonGradient(themeId)
+                        },
+                    )
                     .semantics { contentDescription = addNoteLabel }
                     .clickable(
                         interactionSource = fabInteractionSource,
@@ -233,6 +240,8 @@ private fun DialButton(
     }
 }
 
+/** The button's own `from-indigo-500 to-violet-600` to the bottom right,
+ *  which every other theme's btn-gradient rule replaces (globalCSS.js:338). */
 private val FabGradient = cssToBottomRightGradient(listOf(Color(0xFF615FFF), Color(0xFF7F22FE)))
 
 private data class DialColors(

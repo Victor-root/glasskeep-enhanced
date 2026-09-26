@@ -280,6 +280,8 @@ fun NoteDetailScreen(
     /** Unarchived while open, which takes the list under it out of the
      *  archive (App.jsx:4855-4859). */
     onUnarchived: () -> Unit = {},
+    /** Its pane in the side-by-side view, or null alone on screen. */
+    splitPane: SplitPane? = null,
 ) {
     val dark = LocalGkDark.current
     val context = LocalContext.current
@@ -1927,6 +1929,7 @@ fun NoteDetailScreen(
                             noteAiOpen -> "noteAiOpen"
                             showReminderPicker -> "showReminderPicker"
                             showFormatSheet -> "showFormatSheet"
+                            splitPane == SplitPane.BOTTOM -> "no"
                             else -> "else(goBack)"
                         }
                     } handler",
@@ -1953,7 +1956,9 @@ fun NoteDetailScreen(
             if (BuildConfig.DEBUG) Log.d("GKBack", "showFormatSheet handler fired")
             showFormatSheet = false
         }
-    } else {
+    } else if (splitPane != SplitPane.BOTTOM) {
+        // Side by side, back closes the top note, the web's primary one
+        // (App.jsx:5009).
         BackHandler {
             if (BuildConfig.DEBUG) Log.d("GKBack", "else(goBack) handler fired")
             goBack()
@@ -1973,7 +1978,9 @@ fun NoteDetailScreen(
     // rest of the screen does. The collaboration modal hands them its own
     // surface while it is open, and the note's colour back after.
     val systemBarColor = if (showCollaborators) collaboratorsSurface(dark) else modalBg
-    LaunchedEffect(systemBarColor) { container.statusBarOverride.value = systemBarColor.toArgb() }
+    // Keyed on the pane too: the note left alone once the other pane of a
+    // side-by-side view closes takes the bars back after that one let go.
+    LaunchedEffect(systemBarColor, splitPane) { container.statusBarOverride.value = systemBarColor.toArgb() }
     DisposableEffect(Unit) { onDispose { container.statusBarOverride.value = null } }
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor

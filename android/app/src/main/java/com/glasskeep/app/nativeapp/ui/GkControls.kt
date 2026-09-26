@@ -162,8 +162,9 @@ internal val CssEaseOut = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 /** Plain CSS `ease-in-out`: the floating cards, the attention pulse. */
 internal val CssEaseInOut = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
 
-/** `cubic-bezier(.22,.61,.36,1)`: gkNotifIn and gkMobileToastIn. */
-internal val GkNotifInEasing = CubicBezierEasing(0.22f, 0.61f, 0.36f, 1f)
+/** `cubic-bezier(.22,.61,.36,1)`: gkNotifIn, gkMobileToastIn, the
+ *  selection dock and the side-by-side panes. */
+internal val GkGlideEasing = CubicBezierEasing(0.22f, 0.61f, 0.36f, 1f)
 
 /** Tailwind's `animate-pulse`: opacity 1 → .5 → 1 every 2s on
  *  `cubic-bezier(0.4, 0, 0.6, 1)`. That curve is symmetric, so playing the

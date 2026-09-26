@@ -289,7 +289,7 @@ fun GkToastHost(
     // burst swaps in place, like the web's kept DOM node.
     val entry = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
-        entry.animateTo(1f, tween(durationMillis = 220, easing = GkNotifInEasing))
+        entry.animateTo(1f, tween(durationMillis = 220, easing = GkGlideEasing))
     }
 
     val cardColor = if (dark) Color(0xFF12121C).copy(alpha = 0.97f) else Color(0xFFFCFCFF).copy(alpha = 0.97f)

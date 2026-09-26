@@ -392,6 +392,9 @@ fun NativeNavHost(
     }
 
     val density = LocalDensity.current
+    // noteModalOut on a phone: a fade and a 14px drop, 180ms ease-in.
+    val noteModalOut = fadeOut(tween(180, easing = EaseIn)) +
+        slideOutVertically(tween(180, easing = EaseIn)) { with(density) { NoteRise.roundToPx() } }
 
     toasts.removeServerRow = { id -> scope.launch { repository.removeNotifications(listOf(id)) } }
 
@@ -754,14 +757,7 @@ fun NativeNavHost(
                             null
                         }
                     },
-                    popExitTransition = {
-                        if (targetState.destination.route == "notes") {
-                            fadeOut(tween(180, easing = EaseIn)) +
-                                slideOutVertically(tween(180, easing = EaseIn)) { with(density) { NoteRise.roundToPx() } }
-                        } else {
-                            null
-                        }
-                    },
+                    popExitTransition = { if (targetState.destination.route == "notes") noteModalOut else null },
                 ) { backStackEntry ->
                     val noteId = backStackEntry.arguments?.getString("noteId") ?: return@composable
                     NoteDetailScreen(
@@ -773,18 +769,29 @@ fun NativeNavHost(
                         onUnarchived = { onNoteUnarchived() },
                     )
                 }
-                composable("compare/{firstId}/{secondId}") { backStackEntry ->
+                // Side by side: the two panes pop in over the list, which
+                // stays in place under them, and the note they leave behind
+                // closes like any other.
+                composable(
+                    route = CompareRoute,
+                    enterTransition = { EnterTransition.None },
+                    popExitTransition = { if (targetState.destination.route == "notes") noteModalOut else null },
+                ) { backStackEntry ->
                     val firstId = backStackEntry.arguments?.getString("firstId") ?: return@composable
                     val secondId = backStackEntry.arguments?.getString("secondId") ?: return@composable
+                    // sbsMobilePaneIn's 220ms, run as part of the navigation
+                    // so the list stays under the panes until they are in.
+                    val appear by transition.animateFloat(
+                        transitionSpec = { tween(220, easing = GkGlideEasing) },
+                        label = "sbsPaneIn",
+                    ) { state -> if (state == EnterExitState.PreEnter) 0f else 1f }
                     SideBySideNotesScreen(
                         container = container,
                         serverUrl = serverUrl,
                         firstId = firstId,
                         secondId = secondId,
-                        onKeepOnly = { survivor ->
-                            navController.popBackStack()
-                            navController.navigate("notes/$survivor")
-                        },
+                        appear = { appear },
+                        onClose = { navController.popBackStack() },
                         onUnarchived = { onNoteUnarchived() },
                     )
                 }
@@ -875,6 +882,8 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
 private const val NoteRoute = "notes/{noteId}?new={new}"
 private val NoteRise = 14.dp
 
+private const val CompareRoute = "compare/{firstId}/{secondId}"
+
 private const val AdminRoute = "admin?focus={focus}"
 
 /** The frames only the admin panel follows. */
@@ -890,7 +899,7 @@ private val AdminPanelEvents = setOf(
 private val SidePanelRoutes = setOf("settings", AdminRoute)
 
 /** Overlays the notes list stays in place under, rather than fading. */
-private val ListOverlayRoutes = SidePanelRoutes + NoteRoute
+private val ListOverlayRoutes = SidePanelRoutes + NoteRoute + CompareRoute
 
 /** A side sheet's 200ms slide in from the right edge, and back out
  *  (SettingsPanel.jsx:295): nothing else of it animates. */

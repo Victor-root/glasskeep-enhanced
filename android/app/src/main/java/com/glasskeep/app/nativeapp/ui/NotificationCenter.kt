@@ -252,7 +252,7 @@ fun NotificationCenter(
                         val entry = remember { Animatable(if (notification.id in enteredIds) 1f else 0f) }
                         LaunchedEffect(Unit) {
                             enteredIds += notification.id
-                            entry.animateTo(1f, tween(220, easing = GkNotifInEasing))
+                            entry.animateTo(1f, tween(220, easing = GkGlideEasing))
                         }
                         NotificationCard(
                             modifier = Modifier.graphicsLayer {

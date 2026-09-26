@@ -1334,6 +1334,7 @@ fun NativeNotesListScreen(
         if (!selectionMode && secondaryView == null) {
             CreateNoteFab(
                 dark = dark,
+                themeId = themeId,
                 open = fabOpen,
                 onOpenChange = { fabOpen = it },
                 onCreateText = { createNote(repository::createTextNote) },

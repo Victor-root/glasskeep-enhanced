@@ -1,7 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.content.Context
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -216,18 +215,17 @@ internal fun SelectionActionBar(
     val closeLabel = stringResource(R.string.native_bulk_exit)
     val dividerColor = if (dark) Color(0xFFA78BFA).copy(alpha = 0.22f) else Color(0xFF7C3AED).copy(alpha = 0.22f)
     val closeColor = if (dark) Color(0xFFEDE9FE) else Color(0xFF7008E7)
-    val dockEasing = CubicBezierEasing(0.22f, 0.61f, 0.36f, 1f)
 
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
     val progress by animateFloatAsState(
         targetValue = if (shown) 1f else 0f,
-        animationSpec = tween(durationMillis = 220, easing = dockEasing),
+        animationSpec = tween(durationMillis = 220, easing = GkGlideEasing),
         label = "multiDockIn",
     )
     val top by animateDpAsState(
         targetValue = if (headerVisible) 80.dp else 8.dp,
-        animationSpec = tween(durationMillis = 180, easing = dockEasing),
+        animationSpec = tween(durationMillis = 180, easing = GkGlideEasing),
         label = "multiDockTop",
     )
 
