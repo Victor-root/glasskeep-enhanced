@@ -21,7 +21,6 @@
     <!-- Native application strings. -->
     <string name="native_login_password">Password</string>
     <string name="native_login_submit">Sign In</string>
-    <string name="native_login_error_network">Couldn\'t reach the server: %1$s</string>
     <string name="native_login_passkey_signin">Sign in with a passkey</string>
     <string name="native_login_passkey_in_progress">Signing in…</string>
     <string name="native_login_forgot_password">Forgot username/password?</string>
@@ -776,9 +775,12 @@
     <string name="native_instance_locked_unlocking">Unlocking\u2026</string>
     <string name="native_instance_locked_cli_hint">If the web UI is unreachable, run \"cd /opt/glass-keep/app &amp;&amp; npm run unlock-instance\" on the server (Docker users: run the equivalent inside the container).</string>
     <string name="native_instance_locked_back_to_offline">Back to my offline notes</string>
-    <string name="native_unlock_failed">Unlock failed (code %1$d).</string>
+    <string name="native_unlock_failed">Unlock failed.</string>
     <string name="native_err_invalid_passphrase">Invalid passphrase.</string>
     <string name="native_err_invalid_recovery_key">Invalid recovery key.</string>
+    <string name="native_err_invalid_recovery_key_format">Invalid recovery key format.</string>
+    <string name="native_err_passphrase_required">Passphrase is required.</string>
+    <string name="native_err_recovery_key_required">Recovery key is required.</string>
     <string name="native_err_too_many_unlock">Too many unlock attempts. Please try again later.</string>
     <string name="native_err_plaintext_http">Refusing to send the unlock secret over plaintext HTTP. Use HTTPS, set TRUST_PROXY=true if you have a reverse proxy, or unlock from localhost.</string>
     <string name="native_err_encryption_not_enabled">At-rest encryption is not enabled.</string>

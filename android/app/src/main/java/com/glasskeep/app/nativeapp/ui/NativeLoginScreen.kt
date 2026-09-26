@@ -385,7 +385,8 @@ private fun SignInShortcuts(
                     }
                 }
             } catch (t: Throwable) {
-                val message = context.requestErrorText(t)
+                // passkeyClient.js reads its answers with a bare fetch().
+                val message = fetchErrorText(t)
                 error = if (PasskeyCancelRegex.containsMatchIn(message)) {
                     context.getString(R.string.native_login_passkey_cancelled)
                 } else {

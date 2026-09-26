@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -50,7 +51,10 @@ internal val AuthLinkColor = Color(0xFF4F39F6)
  * bg-transparent` at the page's 16px/24px (42dp tall), text-gray-900 /
  * gray-100 with the caret in the same colour, and the focus ring outside
  * the unchanged border in the login theme's colour. [minHeight] makes it
- * the secret-key `<textarea>`, several lines from the top.
+ * the secret-key `<textarea>`, several lines from the top. The unlock
+ * screen's taller `py-3` field passes its [verticalPadding], its [fill]
+ * and no placeholder class, which leaves the placeholder at half the
+ * text colour (Tailwind's preflight).
  */
 @Composable
 internal fun AuthTextField(
@@ -65,14 +69,24 @@ internal fun AuthTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     textStyle: TextStyle = TextStyle.Default,
+    verticalPadding: Dp = 8.dp,
+    fill: Color = Color.Transparent,
+    preflightPlaceholder: Boolean = false,
+    enabled: Boolean = true,
 ) {
     val dark = LocalGkDark.current
     val textColor = if (dark) Color(0xFFF3F4F6) else Color(0xFF101828)
+    val placeholderColor = when {
+        preflightPlaceholder -> textColor.copy(alpha = 0.5f)
+        dark -> Color(0xFF99A1AF)
+        else -> Color(0xFF6A7282)
+    }
     var focused by remember { mutableStateOf(false) }
     val style = textStyle.merge(TextStyle(color = textColor, fontSize = 16.sp, lineHeight = 24.sp))
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
+        enabled = enabled,
         singleLine = minHeight == null,
         textStyle = style,
         cursorBrush = SolidColor(textColor),
@@ -85,15 +99,13 @@ internal fun AuthTextField(
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .focusRing(focused, WorkspaceTheme.fieldFocusRing(colors.themeId, dark))
+            .background(fill, RoundedCornerShape(8.dp))
             .border(1.dp, colors.border, RoundedCornerShape(8.dp))
-            .padding(horizontal = 17.dp, vertical = 9.dp),
+            .padding(horizontal = 17.dp, vertical = verticalPadding + 1.dp),
         decorationBox = { innerTextField ->
             Box {
                 if (value.isEmpty()) {
-                    Text(
-                        placeholder,
-                        style = style.copy(color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282)),
-                    )
+                    Text(placeholder, style = style.copy(color = placeholderColor))
                 }
                 innerTextField()
             }

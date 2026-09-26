@@ -45,20 +45,34 @@ internal fun Context.localizedServerError(message: String?, @StringRes fallback:
     return getString(known.second)
 }
 
-/**
- * LoginView.jsx's reading of a failed sign-in: a 401 without a reason is
- * the credentials being refused (localizeSecretRejection), a request that
- * failed with one is reworded, anything else is the unexpected-error line.
- */
+/** serverErrors.js's localizeSecretRejection(): a 401 without a reason
+ *  is the typed secret being refused ([rejected]); anything else is the
+ *  request's message, reworded, with [fallback] when it has none. */
+internal fun Context.secretRejectionText(t: Throwable, @StringRes rejected: Int, @StringRes fallback: Int): String =
+    if (t is ServerRefusal && t.status == 401 && t.error.isNullOrEmpty()) {
+        getString(rejected)
+    } else {
+        localizedServerError(requestErrorText(t), fallback)
+    }
+
+/** LoginView.jsx's reading of a failed sign-in: a refused secret as above,
+ *  a request that failed with a reason reworded, anything else the
+ *  unexpected-error line. */
 internal fun Context.loginErrorText(t: Throwable): String = when {
-    t is ServerRefusal && t.status == 401 && t.error.isNullOrEmpty() -> getString(R.string.native_err_invalid_credentials)
-    t is ServerRefusal && t.status == 401 -> localizedServerError(t.error, R.string.native_login_failed)
+    t is ServerRefusal && t.status == 401 -> secretRejectionText(t, R.string.native_err_invalid_credentials, R.string.native_login_failed)
     t is ServerRefusal || t is IOException -> localizedServerError(requestErrorText(t), R.string.native_login_unexpected_error)
     else -> getString(R.string.native_login_unexpected_error)
 }
 
 /** The needles of serverErrors.js the app can run into, in its order. */
 private val ServerErrorPatterns = listOf(
+    "Invalid passphrase" to R.string.native_err_invalid_passphrase,
+    "Invalid recovery key format" to R.string.native_err_invalid_recovery_key_format,
+    "Invalid recovery key" to R.string.native_err_invalid_recovery_key,
+    "Passphrase is required" to R.string.native_err_passphrase_required,
+    "Recovery key is required" to R.string.native_err_recovery_key_required,
+    "Too many unlock attempts" to R.string.native_err_too_many_unlock,
+    "Refusing to accept" to R.string.native_err_plaintext_http,
     "Invalid email or password" to R.string.native_err_invalid_credentials,
     "Too many sign-in attempts" to R.string.native_err_too_many_sign_in,
     "Invalid token" to R.string.native_err_invalid_token,
@@ -70,7 +84,9 @@ private val ServerErrorPatterns = listOf(
     "Name, email, and password are required" to R.string.native_err_name_email_password_required,
     "New password must be at least" to R.string.native_err_new_password_too_short,
     "Password must be at least" to R.string.native_err_password_too_short,
+    "Encryption is not enabled" to R.string.native_err_encryption_not_enabled,
     "Unlock the instance first" to R.string.native_err_unlock_first,
+    "Instance is locked" to R.string.native_instance_locked_title,
     "New account creation is currently disabled" to R.string.native_err_registration_disabled,
     "Email already registered" to R.string.native_err_email_already_registered,
     "Email already in use by another user" to R.string.native_err_email_in_use_by_another,

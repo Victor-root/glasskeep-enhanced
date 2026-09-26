@@ -19,7 +19,6 @@
     <string name="dialog_no">Non</string>
     <string name="native_login_password">Mot de passe</string>
     <string name="native_login_submit">Se connecter</string>
-    <string name="native_login_error_network">Impossible de joindre le serveur : %1$s</string>
     <string name="native_login_passkey_signin">Se connecter avec une clé d\'accès</string>
     <string name="native_login_passkey_in_progress">Connexion…</string>
     <string name="native_login_forgot_password">Nom d\'utilisateur / mot de passe oublié ?</string>
@@ -765,9 +764,12 @@
     <string name="native_instance_locked_unlocking">D\u00e9verrouillage\u2026</string>
     <string name="native_instance_locked_cli_hint">Si l\'interface web est inaccessible, lancez \u00ab cd /opt/glass-keep/app &amp;&amp; npm run unlock-instance \u00bb sur le serveur (utilisateurs Docker : la commande \u00e9quivalente dans le conteneur).</string>
     <string name="native_instance_locked_back_to_offline">Revenir \u00e0 mes notes hors-ligne</string>
-    <string name="native_unlock_failed">\u00c9chec du d\u00e9verrouillage (code %1$d).</string>
+    <string name="native_unlock_failed">Échec du déverrouillage.</string>
     <string name="native_err_invalid_passphrase">Passphrase incorrecte.</string>
     <string name="native_err_invalid_recovery_key">Recovery key invalide.</string>
+    <string name="native_err_invalid_recovery_key_format">Format de recovery key invalide.</string>
+    <string name="native_err_passphrase_required">La passphrase est requise.</string>
+    <string name="native_err_recovery_key_required">La recovery key est requise.</string>
     <string name="native_err_too_many_unlock">Trop de tentatives de d\u00e9verrouillage. R\u00e9essayez plus tard.</string>
     <string name="native_err_plaintext_http">Refus d\'envoyer le secret de d\u00e9verrouillage en HTTP non chiffr\u00e9. Utilisez HTTPS, posez TRUST_PROXY=true si vous avez un reverse proxy, ou d\u00e9verrouillez depuis localhost.</string>
     <string name="native_err_encryption_not_enabled">Le chiffrement au repos n\'est pas activ\u00e9.</string>

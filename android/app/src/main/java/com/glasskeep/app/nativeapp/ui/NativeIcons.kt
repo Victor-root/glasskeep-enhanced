@@ -990,6 +990,14 @@ private fun WebIcon(pathData: String, modifier: Modifier, size: Dp, tint: Color,
     }
 }
 
+/** The heroicons arrow of the unlock screen's "back to my offline notes":
+ *  a longer shaft than [ArrowLeftIcon]'s. */
+@Composable
+fun LongArrowLeftIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M10 19l-7-7m0 0l7-7m-7 7h18",
+    modifier, size, tint,
+)
+
 /** icons/index.jsx `Sun`, the sign-in screens' theme toggle: a small
  *  disc and eight short rays (the header's [SunIcon] is another glyph). */
 @Composable

@@ -1,6 +1,7 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.app.Activity
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,45 +9,48 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
@@ -56,27 +60,20 @@ import com.glasskeep.app.nativeapp.data.network.UnlockPasskeyVerifyRequest
 import com.glasskeep.app.nativeapp.data.network.UnlockPassphraseRequest
 import com.glasskeep.app.nativeapp.data.network.UnlockRecoveryRequest
 import com.glasskeep.app.nativeapp.data.network.UnlockResponse
-import com.glasskeep.app.nativeapp.isUserCancellation
+import com.glasskeep.app.nativeapp.data.refusal
 import com.glasskeep.app.nativeapp.prfOutputOf
-import com.glasskeep.app.ui.ButtonGradient
-import com.glasskeep.app.ui.Indigo
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
-import retrofit2.Response
-
-// text-red-600 / dark:text-red-400, the form's own error line.
-private val UnlockErrorLight = Color(0xFFDC2626)
-private val UnlockErrorDark = Color(0xFFF87171)
 
 // The amber scope panel: bg amber-50 / amber-900 at 30%, border amber-200 /
-// amber-800, text amber-900 / amber-200.
+// amber-800, text amber-900 / amber-200, in Tailwind v4's values.
 private val AmberBgLight = Color(0xFFFFFBEB)
-private val AmberBgDark = Color(0x4D78350F)
-private val AmberBorderLight = Color(0xFFFDE68A)
-private val AmberBorderDark = Color(0xFF92400E)
-private val AmberTextLight = Color(0xFF78350F)
-private val AmberTextDark = Color(0xFFFDE68A)
+private val AmberBgDark = Color(0x4D7B3306)
+private val AmberBorderLight = Color(0xFFFEE685)
+private val AmberBorderDark = Color(0xFF973C00)
+private val AmberTextLight = Color(0xFF7B3306)
+private val AmberTextDark = Color(0xFFFEE685)
 
 // The banner is a stronger amber than the panel: bg amber-100 /
 // amber-900 at 80%, a 2px amber-500 / amber-600 bottom rule, text
@@ -90,20 +87,6 @@ private val BannerTextLight = Color(0xFF7B3306)
 private val BannerTextDark = Color(0xFFFEF3C6)
 private val BannerCtaBg = Color(0xFFE17100)
 private val BannerDismissLight = Color(0xFF973C00)
-
-// The inactive tab: black at 5% / white at 10%, with gray-700 /
-// gray-200 text.
-private val TabIdleBgLight = Color(0x0D000000)
-private val TabIdleBgDark = Color(0x1AFFFFFF)
-private val TabIdleFgLight = Color(0xFF374151)
-private val TabIdleFgDark = Color(0xFFE5E7EB)
-
-// text-gray-600 / gray-300 for the explanation, gray-500 / gray-400 for
-// the CLI hint below the form.
-private val ExplainLight = Color(0xFF4B5563)
-private val ExplainDark = Color(0xFFD1D5DB)
-private val HintLight = Color(0xFF6B7280)
-private val HintDark = Color(0xFF9CA3AF)
 
 /** Which unlock secret the form is asking for. */
 private enum class UnlockMode { PASSPHRASE, RECOVERY, PASSKEY }
@@ -127,7 +110,7 @@ private const val RecoveryKeyPlaceholder = "GKRV-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
  *
  * The passkey path also signs the admin in, so [onUnlockedWithSession]
  * carries that session for the caller to install exactly like a password
- * login; the other two paths hand back null.
+ * login; the other two paths hand back nothing.
  */
 @Composable
 fun InstanceUnlockScreen(
@@ -138,76 +121,48 @@ fun InstanceUnlockScreen(
     onBackToOffline: (() -> Unit)? = null,
 ) {
     val dark = LocalGkDark.current
+    val context = LocalContext.current
     var mode by remember { mutableStateOf(UnlockMode.PASSPHRASE) }
     var passphrase by remember { mutableStateOf("") }
     var recoveryKey by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val activity = LocalView.current.context as Activity
 
-    val invalidPassphrase = stringResource(R.string.native_err_invalid_passphrase)
-    val invalidRecoveryKey = stringResource(R.string.native_err_invalid_recovery_key)
-    val tooManyAttempts = stringResource(R.string.native_err_too_many_unlock)
-    val plaintextHttp = stringResource(R.string.native_err_plaintext_http)
-    val encryptionOff = stringResource(R.string.native_err_encryption_not_enabled)
-    val unlockFailedTemplate = stringResource(R.string.native_unlock_failed)
-    val networkErrorTemplate = stringResource(R.string.native_login_error_network)
-    val noPrfOutput = stringResource(R.string.native_passkey_no_prf_output)
-    val passkeyCancelled = stringResource(R.string.native_passkey_unlock_cancelled)
-
-    /** The same four cases the web's serverErrors.js separates out of an
-     *  unlock rejection, keyed off the status the server actually sets
-     *  rather than off its English message. */
-    fun failureMessage(code: Int, rejected: String): String = when (code) {
-        401 -> rejected
-        429 -> tooManyAttempts
-        400 -> plaintextHttp
-        409 -> encryptionOff
-        else -> String.format(unlockFailedTemplate, code)
-    }
-
-    /** Shared tail of all three paths: the server may answer "someone else
-     *  already unlocked it", which is a success with nothing to install. */
-    fun consumeUnlocked(body: UnlockResponse) {
-        if (body.token != null && body.user != null) {
-            container.tokenStore.serverUrl = serverUrl
-            container.tokenStore.token = body.token
-            onUnlockedWithSession(body.mustChangePassword)
-        } else {
-            onUnlocked()
-        }
+    fun installSession(body: UnlockResponse) {
+        container.tokenStore.serverUrl = serverUrl
+        container.tokenStore.token = body.token
+        onUnlockedWithSession(body.mustChangePassword)
     }
 
     fun submitSecret() {
-        val secret = if (mode == UnlockMode.RECOVERY) recoveryKey.trim() else passphrase
+        val recovery = mode == UnlockMode.RECOVERY
+        val secret = if (recovery) recoveryKey else passphrase
+        // The submit button is disabled while empty, which also stops the
+        // keyboard's Go from sending the form.
         if (loading || secret.isEmpty()) return
         loading = true
-        errorMessage = null
+        error = ""
         scope.launch {
             try {
                 val api = container.api(serverUrl)
-                val response: Response<UnlockResponse> = if (mode == UnlockMode.RECOVERY) {
+                val response = if (recovery) {
                     api.unlockInstanceWithRecoveryKey(UnlockRecoveryRequest(secret))
                 } else {
                     api.unlockInstance(UnlockPassphraseRequest(secret))
                 }
-                val body = response.body()
-                if (response.isSuccessful && body != null) {
-                    NativeDebug.d("Instance unlocked (mode=$mode)")
-                    passphrase = ""
-                    recoveryKey = ""
-                    consumeUnlocked(body)
-                } else {
-                    NativeDebug.e("Unlock refused: HTTP ${response.code()} ${response.errorBody()?.string()}")
-                    errorMessage = failureMessage(
-                        response.code(),
-                        if (mode == UnlockMode.RECOVERY) invalidRecoveryKey else invalidPassphrase,
-                    )
-                }
+                if (!response.isSuccessful) throw response.refusal("POST /api/instance/unlock")
+                NativeDebug.d("Instance unlocked (mode=$mode)")
+                passphrase = ""
+                recoveryKey = ""
+                onUnlocked()
             } catch (t: Throwable) {
-                NativeDebug.e("Unlock network error", t)
-                errorMessage = String.format(networkErrorTemplate, t.message ?: t.javaClass.simpleName)
+                error = context.secretRejectionText(
+                    t,
+                    if (recovery) R.string.native_err_invalid_recovery_key else R.string.native_err_invalid_passphrase,
+                    R.string.native_unlock_failed,
+                )
             } finally {
                 loading = false
             }
@@ -222,17 +177,13 @@ fun InstanceUnlockScreen(
     fun submitPasskeyUnlock() {
         if (loading) return
         loading = true
-        errorMessage = null
+        error = ""
         scope.launch {
             try {
                 val api = container.api(serverUrl)
                 val optionsResponse = api.unlockPasskeyOptions()
                 val optionsBody = optionsResponse.body()
-                if (!optionsResponse.isSuccessful || optionsBody == null) {
-                    NativeDebug.e("Unlock passkey options failed: HTTP ${optionsResponse.code()}")
-                    errorMessage = failureMessage(optionsResponse.code(), invalidPassphrase)
-                    return@launch
-                }
+                if (!optionsResponse.isSuccessful || optionsBody == null) throw optionsResponse.refusal("POST /api/instance/unlock-passkey/options")
                 val options = optionsBody.options
                 val challengeId = optionsBody.challengeId
                 if (optionsBody.alreadyUnlocked || options == null || challengeId == null) {
@@ -245,41 +196,28 @@ fun InstanceUnlockScreen(
                         val assertion = Json.parseToJsonElement(ceremony.responseJson)
                         val prfOutput = prfOutputOf(assertion.jsonObject)
                         if (prfOutput == null) {
-                            NativeDebug.e("Passkey unlock: no PRF output in the assertion")
-                            errorMessage = noPrfOutput
+                            error = context.getString(R.string.native_passkey_no_prf_output)
                             return@launch
                         }
-                        val verifyResponse = api.unlockPasskeyVerify(
-                            UnlockPasskeyVerifyRequest(
-                                response = assertion,
-                                challengeId = challengeId,
-                                prfOutput = prfOutput,
-                            ),
+                        val verify = api.unlockPasskeyVerify(
+                            UnlockPasskeyVerifyRequest(response = assertion, challengeId = challengeId, prfOutput = prfOutput),
                         )
-                        val verifyBody = verifyResponse.body()
-                        if (verifyResponse.isSuccessful && verifyBody != null) {
-                            NativeDebug.d("Instance unlocked with a passkey")
-                            consumeUnlocked(verifyBody)
-                        } else {
-                            NativeDebug.e("Unlock passkey verify failed: HTTP ${verifyResponse.code()} ${verifyResponse.errorBody()?.string()}")
-                            errorMessage = failureMessage(verifyResponse.code(), invalidPassphrase)
+                        val session = verify.body()
+                        if (!verify.isSuccessful || session == null) throw verify.refusal("POST /api/instance/unlock-passkey/verify")
+                        when {
+                            session.alreadyUnlocked -> onUnlocked()
+                            session.token != null && session.user != null -> installSession(session)
+                            else -> error = context.localizedServerError("Verification failed", R.string.native_unlock_failed)
                         }
                     }
                     is PasskeyCeremonyResult.Failed -> {
-                        // Same split as the login screen's own: a dismissed
-                        // picker is the user's choice, not an error worth
-                        // shouting about, but the web does name it here.
-                        errorMessage = if (ceremony.isUserCancellation()) {
-                            passkeyCancelled
-                        } else {
-                            NativeDebug.e("Passkey unlock ceremony failed: ${ceremony.name} ${ceremony.message}")
-                            String.format(unlockFailedTemplate, 0)
-                        }
+                        NativeDebug.e("Passkey unlock ceremony failed: ${ceremony.name} ${ceremony.message}")
+                        error = passkeyUnlockError(context, ceremony.name, ceremony.message)
                     }
                 }
             } catch (t: Throwable) {
-                NativeDebug.e("Passkey unlock network error", t)
-                errorMessage = String.format(networkErrorTemplate, t.message ?: t.javaClass.simpleName)
+                // passkeyClient.js reads its answers with a bare fetch().
+                error = passkeyUnlockError(context, null, fetchErrorText(t))
             } finally {
                 loading = false
             }
@@ -287,17 +225,14 @@ fun InstanceUnlockScreen(
     }
 
     AuthShell(container = container, subtitle = stringResource(R.string.native_instance_locked_title)) { colors ->
-        Text(
-            stringResource(R.string.native_instance_locked_explain),
-            fontSize = 14.sp,
-            color = if (dark) ExplainDark else ExplainLight,
-        )
+        val bodyColor = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565)
+        val hintColor = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282)
+        Text(stringResource(R.string.native_instance_locked_explain), color = bodyColor, fontSize = 14.sp, lineHeight = 20.sp)
         Spacer(Modifier.height(16.dp))
-
         UnlockScopePanel(dark)
         Spacer(Modifier.height(16.dp))
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // flex gap-2: every tab stretches to the tallest, whose label may wrap.
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (tab in UnlockMode.entries) {
                 UnlockModeTab(
                     label = stringResource(
@@ -309,106 +244,94 @@ fun InstanceUnlockScreen(
                     ),
                     selected = mode == tab,
                     dark = dark,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                 ) {
                     mode = tab
-                    errorMessage = null
+                    error = ""
                 }
             }
         }
         Spacer(Modifier.height(16.dp))
 
+        val errorColor = if (dark) Color(0xFFFF6467) else Color(0xFFE7000B)
         if (mode == UnlockMode.PASSKEY) {
-            Text(
-                stringResource(R.string.native_passkey_unlock_explain),
-                fontSize = 14.sp,
-                color = if (dark) ExplainDark else ExplainLight,
-            )
+            Text(stringResource(R.string.native_passkey_unlock_explain), color = bodyColor, fontSize = 14.sp, lineHeight = 20.sp)
             Spacer(Modifier.height(12.dp))
             UnlockSubmitButton(
-                label = stringResource(
-                    if (loading) R.string.native_passkey_unlock_in_progress else R.string.native_passkey_unlock_cta,
-                ),
+                label = stringResource(if (loading) R.string.native_passkey_unlock_in_progress else R.string.native_passkey_unlock_cta),
+                themeId = colors.themeId,
                 enabled = !loading,
                 onClick = { submitPasskeyUnlock() },
             )
-            errorMessage?.let {
+            if (error.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
-                UnlockErrorLine(it, dark)
+                Text(error, color = errorColor, fontSize = 14.sp, lineHeight = 20.sp)
             }
             Spacer(Modifier.height(12.dp))
-            Text(
-                stringResource(R.string.native_passkey_unlock_fallback_hint),
-                fontSize = 12.sp,
-                color = if (dark) HintDark else HintLight,
-            )
+            Text(stringResource(R.string.native_passkey_unlock_fallback_hint), color = hintColor, fontSize = 12.sp, lineHeight = 19.5.sp)
         } else {
-            UnlockSecretField(
-                value = if (mode == UnlockMode.RECOVERY) recoveryKey else passphrase,
-                onValueChange = {
-                    if (mode == UnlockMode.RECOVERY) recoveryKey = it else passphrase = it
-                    errorMessage = null
-                },
-                placeholder = if (mode == UnlockMode.RECOVERY) {
-                    RecoveryKeyPlaceholder
-                } else {
-                    stringResource(R.string.native_instance_locked_passphrase_placeholder)
-                },
-                recovery = mode == UnlockMode.RECOVERY,
-                enabled = !loading,
-                dark = dark,
-                titleColor = colors.title,
-                borderColor = colors.border,
-            )
-            errorMessage?.let {
+            val recovery = mode == UnlockMode.RECOVERY
+            // autoFocus: each tab mounts its own field, focused on arrival.
+            val focus = remember(mode) { FocusRequester() }
+            LaunchedEffect(mode) { focus.requestFocus() }
+            key(mode) {
+                AuthTextField(
+                    value = if (recovery) recoveryKey else passphrase,
+                    onValueChange = { if (recovery) recoveryKey = it else passphrase = it },
+                    placeholder = if (recovery) RecoveryKeyPlaceholder else stringResource(R.string.native_instance_locked_passphrase_placeholder),
+                    colors = colors,
+                    password = !recovery,
+                    focusRequester = focus,
+                    keyboardOptions = if (recovery) {
+                        KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Go)
+                    } else {
+                        KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go)
+                    },
+                    keyboardActions = KeyboardActions(onGo = { submitSecret() }),
+                    // font-mono tracking-wider for the recovery key only.
+                    textStyle = if (recovery) TextStyle(fontFamily = FontFamily.Monospace, letterSpacing = 0.05.em) else TextStyle.Default,
+                    verticalPadding = 12.dp,
+                    fill = if (dark) Color(0x991E2939) else Color.White.copy(alpha = 0.7f),
+                    preflightPlaceholder = true,
+                    enabled = !loading,
+                )
+            }
+            if (error.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
-                UnlockErrorLine(it, dark)
+                Text(error, color = errorColor, fontSize = 14.sp, lineHeight = 20.sp)
             }
             Spacer(Modifier.height(12.dp))
             UnlockSubmitButton(
-                label = stringResource(
-                    if (loading) R.string.native_instance_locked_unlocking else R.string.native_instance_locked_unlock_cta,
-                ),
-                enabled = !loading && (if (mode == UnlockMode.RECOVERY) recoveryKey.isNotBlank() else passphrase.isNotEmpty()),
+                label = stringResource(if (loading) R.string.native_instance_locked_unlocking else R.string.native_instance_locked_unlock_cta),
+                themeId = colors.themeId,
+                enabled = !loading && (if (recovery) recoveryKey else passphrase).isNotEmpty(),
                 onClick = { submitSecret() },
             )
         }
 
         Spacer(Modifier.height(16.dp))
-        Text(
-            stringResource(R.string.native_instance_locked_cli_hint),
-            fontSize = 12.sp,
-            color = if (dark) HintDark else HintLight,
-        )
+        Text(stringResource(R.string.native_instance_locked_cli_hint), color = hintColor, fontSize = 12.sp, lineHeight = 16.sp)
 
         if (onBackToOffline != null) {
             Spacer(Modifier.height(16.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .border(1.dp, colors.border, RoundedCornerShape(8.dp))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Button,
-                    ) { onBackToOffline() }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ArrowLeftIcon(size = 16.dp, tint = colors.title)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.native_instance_locked_back_to_offline),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = colors.title,
-                )
-            }
+            AuthOutlineButton(
+                label = stringResource(R.string.native_instance_locked_back_to_offline),
+                colors = colors,
+                onClick = onBackToOffline,
+            ) { tint -> LongArrowLeftIcon(size = 16.dp, tint = tint) }
         }
     }
 }
+
+/** PasskeyUnlockPanel's reading of a failed ceremony: a dismissed picker is
+ *  a cancellation, anything else the message reworded, "Unlock failed."
+ *  without one. */
+private fun passkeyUnlockError(context: Context, name: String?, message: String): String =
+    if (name == "NotAllowedError" || PasskeyCancelRegex.containsMatchIn(message)) {
+        context.getString(R.string.native_passkey_unlock_cancelled)
+    } else {
+        context.localizedServerError(message, R.string.native_unlock_failed)
+    }
 
 /**
  * LockedBanner.jsx: the heads-up a signed-in user gets instead of the full
@@ -423,7 +346,14 @@ fun InstanceUnlockScreen(
 internal fun LockedBanner(dark: Boolean, onUnlock: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val textColor = if (dark) BannerTextDark else BannerTextLight
     val safeTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    Column(modifier.fillMaxWidth().background(if (dark) BannerBgDark else BannerBgLight)) {
+    // relative z-10 shadow-md: the shadow falls over the header below.
+    Column(
+        modifier
+            .zIndex(1f)
+            .fillMaxWidth()
+            .tailwindShadowMd(RectangleShape)
+            .background(if (dark) BannerBgDark else BannerBgLight),
+    ) {
         Column(
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = maxOf(safeTop, 12.dp), bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -482,40 +412,39 @@ internal fun LockedBanner(dark: Boolean, onUnlock: () -> Unit, onDismiss: () -> 
 }
 
 /** The amber "what this protects" panel, honest about its own scope in
- *  the same two bullets the web spells out. */
+ *  the same two bullets the web spells out. `list-inside`: a wrapped
+ *  bullet line runs back under its dot. */
 @Composable
 private fun UnlockScopePanel(dark: Boolean) {
     val textColor = if (dark) AmberTextDark else AmberTextLight
+    val shape = RoundedCornerShape(8.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(shape)
             .background(if (dark) AmberBgDark else AmberBgLight)
-            .border(1.dp, if (dark) AmberBorderDark else AmberBorderLight, RoundedCornerShape(8.dp))
+            .border(1.dp, if (dark) AmberBorderDark else AmberBorderLight, shape)
             .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
             stringResource(R.string.native_instance_locked_scope_title),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
             color = textColor,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            fontWeight = FontWeight.SemiBold,
         )
-        Spacer(Modifier.height(4.dp))
         for (line in listOf(
             stringResource(R.string.native_instance_locked_scope_protects),
             stringResource(R.string.native_instance_locked_scope_not_protect),
         )) {
-            Row(Modifier.padding(top = 4.dp)) {
-                Text("•", fontSize = 12.sp, color = textColor)
-                Spacer(Modifier.width(6.dp))
-                Text(line, fontSize = 12.sp, color = textColor)
-            }
+            Text("\u2022 $line", color = textColor, fontSize = 12.sp, lineHeight = 16.sp)
         }
     }
 }
 
-/** One of the three tab buttons: indigo-500 filled while selected, a faint
- *  wash otherwise. */
+/** One of the three tab buttons: indigo-500 filled while selected (a
+ *  colour the themes leave alone), a faint wash otherwise. */
 @Composable
 private fun UnlockModeTab(
     label: String,
@@ -529,9 +458,9 @@ private fun UnlockModeTab(
             .clip(RoundedCornerShape(8.dp))
             .background(
                 when {
-                    selected -> Indigo
-                    dark -> TabIdleBgDark
-                    else -> TabIdleBgLight
+                    selected -> Color(0xFF615FFF)
+                    dark -> Color(0x1AFFFFFF)
+                    else -> Color(0x0D000000)
                 },
             )
             .clickable(
@@ -545,89 +474,30 @@ private fun UnlockModeTab(
         Text(
             label,
             fontSize = 14.sp,
+            lineHeight = 20.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
             color = when {
                 selected -> Color.White
-                dark -> TabIdleFgDark
-                else -> TabIdleFgLight
+                dark -> Color(0xFFE5E7EB)
+                else -> Color(0xFF364153)
             },
         )
     }
 }
 
-/** The passphrase / recovery-key field. The recovery key is typed in the
- *  clear and monospaced with the web's own `tracking-wider`; the
- *  passphrase is masked. */
+/** `w-full px-4 py-3 rounded-lg font-semibold btn-gradient`, 48dp tall,
+ *  half transparent while disabled. */
 @Composable
-private fun UnlockSecretField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    recovery: Boolean,
-    enabled: Boolean,
-    dark: Boolean,
-    titleColor: Color,
-    borderColor: Color,
-) {
-    val textStyle = TextStyle(
-        color = titleColor,
-        fontSize = 16.sp,
-        fontFamily = if (recovery) FontFamily.Monospace else FontFamily.Default,
-        // tracking-wider, the only field on the screen the web spaces out.
-        letterSpacing = if (recovery) 0.05.em else TextUnit.Unspecified,
-    )
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
+private fun UnlockSubmitButton(label: String, themeId: String, enabled: Boolean, onClick: () -> Unit) {
+    GkGradientButton(
+        label = label,
+        themeId = themeId,
+        modifier = Modifier.fillMaxWidth(),
         enabled = enabled,
-        singleLine = true,
-        textStyle = textStyle,
-        cursorBrush = SolidColor(Indigo),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = if (recovery) KeyboardType.Ascii else KeyboardType.Password,
-        ),
-        visualTransformation = if (recovery) VisualTransformation.None else PasswordVisualTransformation(),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        decorationBox = { innerTextField ->
-            if (value.isEmpty()) {
-                Text(
-                    placeholder,
-                    style = textStyle.copy(color = if (dark) HintDark else HintLight),
-                )
-            }
-            innerTextField()
-        },
+        verticalPadding = 12.dp,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        onClick = onClick,
     )
 }
-
-/** The full-width gradient submit button the three paths share. */
-@Composable
-private fun UnlockSubmitButton(label: String, enabled: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .alpha(if (enabled) 1f else 0.5f)
-            .clip(RoundedCornerShape(8.dp))
-            .background(ButtonGradient)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                enabled = enabled,
-                role = Role.Button,
-            ) { onClick() }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-    }
-}
-
-@Composable
-private fun UnlockErrorLine(message: String, dark: Boolean) {
-    Text(message, fontSize = 14.sp, color = if (dark) UnlockErrorDark else UnlockErrorLight)
-}
-
