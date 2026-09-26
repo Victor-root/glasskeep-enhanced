@@ -164,6 +164,7 @@ import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.TypographyPresets
 import com.glasskeep.app.nativeapp.data.TypographyProfile
+import com.glasskeep.app.nativeapp.data.bodyOrRefusal
 import com.glasskeep.app.nativeapp.data.isReminderPast
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.local.SyncQueueEntity
@@ -442,7 +443,6 @@ fun NativeNotesListScreen(
     val bulkIconErrorTemplate = stringResource(R.string.native_bulk_icon_error)
     val bulkExportSuccess = stringResource(R.string.native_bulk_export_success)
     val bulkExportError = stringResource(R.string.native_bulk_export_error)
-    val lockInstanceFailed = stringResource(R.string.native_lock_instance_failed)
     val context = LocalContext.current
     val toasts = LocalGkToasts.current
 
@@ -653,16 +653,13 @@ fun NativeNotesListScreen(
     fun lockInstance() {
         scope.launch {
             try {
-                val response = container.api(serverUrl).lockInstance()
-                if (response.isSuccessful) {
-                    container.lockState.markLocked()
-                } else {
-                    NativeDebug.e("Lock instance failed: HTTP ${response.code()}")
-                    toasts.error(lockInstanceFailed)
-                }
+                container.api(serverUrl).lockInstance().bodyOrRefusal("POST /api/instance/lock")
+                container.lockState.markLocked()
+            } catch (t: CancellationException) {
+                throw t
             } catch (t: Throwable) {
-                NativeDebug.e("Lock instance network error", t)
-                toasts.error(lockInstanceFailed)
+                NativeDebug.e("Lock instance failed", t)
+                toasts.error(context.localizedServerError(context.requestErrorText(t), R.string.native_lock_instance_failed))
             }
         }
     }
