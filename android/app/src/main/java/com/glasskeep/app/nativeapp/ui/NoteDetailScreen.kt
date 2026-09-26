@@ -15,6 +15,7 @@ import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -99,6 +100,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -1372,6 +1374,17 @@ fun NoteDetailScreen(
         }
     }
 
+    // The web loads the logo library with the app and keeps it live, so its
+    // picker never opens empty; here it is read with the note and again on
+    // every opening.
+    LaunchedEffect(serverUrl) {
+        try {
+            logos = repository.fetchLogos()
+        } catch (t: Throwable) {
+            NativeDebug.e("Logo library load failed", t)
+        }
+    }
+
     fun openLogoPicker() {
         showLogoPicker = true
         scope.launch {
@@ -2399,6 +2412,7 @@ fun NoteDetailScreen(
                         // ModalFooter.jsx:297: an audio note has no image
                         // affordance, so its logo gets a button of its own.
                         showLogoButton = edit.isAudioType && !isReadOnlyAccess,
+                        noteIconSrc = currentNote.icon?.src,
                         showTagsButton = !isReadOnlyAccess,
                         // Undo/redo track the title and the body, so they
                         // are hidden for the two types whose content they
@@ -3704,6 +3718,7 @@ private fun NoteModalFooter(
     showColorButton: Boolean,
     showImageButton: Boolean,
     showLogoButton: Boolean,
+    noteIconSrc: String?,
     showTagsButton: Boolean,
     showHistoryButtons: Boolean,
     canUndo: Boolean,
@@ -3782,6 +3797,7 @@ private fun NoteModalFooter(
                 Box {
                     FooterIconButton(
                         contentDescription = stringResource(R.string.native_note_detail_add_image),
+                        badge = noteIconSrc?.let { src -> { NoteIconBadge(src) } },
                         onClick = onImageClick,
                     ) {
                         AddImageIcon(size = 20.dp, tint = imageButtonColor)
@@ -3794,7 +3810,10 @@ private fun NoteModalFooter(
             if (showLogoButton) {
                 Box {
                     FooterIconButton(
-                        contentDescription = stringResource(R.string.native_add_logo),
+                        contentDescription = stringResource(
+                            if (noteIconSrc != null) R.string.native_replace_logo else R.string.native_add_logo,
+                        ),
+                        badge = noteIconSrc?.let { src -> { NoteIconBadge(src) } },
                         onClick = onLogoClick,
                     ) {
                         LogoIcon(size = 20.dp, tint = imageButtonColor)
@@ -4185,6 +4204,23 @@ private fun FooterIconButton(
         }
         badge?.invoke(this)
     }
+}
+
+/** The note's logo as a 16px round thumbnail pinned outside the image
+ *  (or audio logo) button's top-right corner (ModalFooter.jsx:258-268). */
+@Composable
+private fun BoxScope.NoteIconBadge(src: String) {
+    val bitmap = rememberDecodedImage(src) ?: return
+    Image(
+        bitmap = bitmap,
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .offset(x = 4.dp, y = (-4).dp)
+            .size(16.dp)
+            .clip(CircleShape),
+    )
 }
 
 /** `.gk-tag-count-badge`: 16px, 10px bold, the theme gradient at 135deg. */

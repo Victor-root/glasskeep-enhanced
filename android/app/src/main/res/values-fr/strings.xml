@@ -477,11 +477,11 @@
     <string name="native_checklist_done">Terminé</string>
     <string name="native_note_detail_add_image">Ajouter des images</string>
     <string name="native_note_detail_add_image_error">Impossible d\'ajouter cette image</string>
-    <string name="native_note_detail_image_close">Fermer</string>
-    <string name="native_note_detail_image_download">Télécharger</string>
+    <string name="native_note_detail_image_close">Fermer (Esc)</string>
+    <string name="native_note_detail_image_download">Télécharger (D)</string>
     <string name="native_note_detail_image_remove">Retirer l\'image</string>
-    <string name="native_note_detail_image_previous">Précédent</string>
-    <string name="native_note_detail_image_next">Suivant</string>
+    <string name="native_note_detail_image_previous">Précédent (←)</string>
+    <string name="native_note_detail_image_next">Suivant (→)</string>
     <string name="native_richtext_format">Mise en forme</string>
     <string name="native_richtext_copy">Copier</string>
     <string name="native_richtext_copied">Copié</string>

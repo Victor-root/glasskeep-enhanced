@@ -205,6 +205,9 @@ fun FullscreenImageViewer(
         val window = (LocalView.current.parent as? DialogWindowProvider)?.window
         val density = LocalDensity.current
         SideEffect {
+            // The web mounts and unmounts the viewer at once: no window
+            // animation either way.
+            window?.setWindowAnimations(0)
             window?.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             window?.setDimAmount(0.30f)
             // backdrop-blur-md, where the platform can blur what is behind.
