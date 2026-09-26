@@ -936,9 +936,9 @@
     <string name="native_notifications_pending_user">%1$s (%2$s) is asking to create an account</string>
     <string name="native_admin_registration_approved">Registration approved</string>
     <string name="native_admin_registration_rejected">Registration rejected</string>
+    <string name="native_pending_user_already_handled">This request has already been handled by another administrator</string>
     <string name="native_notifications_title_user_deleted">User deleted</string>
     <string name="native_notifications_user_deleted">%1$s was deleted by %2$s</string>
-    <string name="native_admin_action_failed">The administrative action failed.</string>
     <string name="native_session_expired">Session expired. Please log in again.</string>
     <string name="native_login_failed">Login failed</string>
     <string name="native_login_unexpected_error">Unable to sign in. Check your connection and try again.</string>

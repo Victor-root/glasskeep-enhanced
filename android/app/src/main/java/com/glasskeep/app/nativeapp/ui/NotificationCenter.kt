@@ -74,7 +74,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -85,11 +84,13 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.NotifCategory
+import com.glasskeep.app.nativeapp.data.bodyOrRefusal
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import kotlin.math.abs
 import kotlin.math.sign
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 internal val TopSheetEasing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
@@ -131,6 +132,7 @@ fun NotificationCenter(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val toasts = LocalGkToasts.current
+    val alerts = LocalGkAlerts.current
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
 
@@ -269,7 +271,7 @@ fun NotificationCenter(
                             onApprovePending = notification.message?.toIntOrNull()?.let { pendingId ->
                                 {
                                     scope.launch {
-                                        if (decidePendingRegistration(context, api, repository, toasts, pendingId, notification.id, approve = true)) {
+                                        if (decidePendingRegistration(context, api, repository, toasts, alerts, pendingId, notification.id, approve = true)) {
                                             removeRow(notification)
                                         }
                                     }
@@ -278,7 +280,7 @@ fun NotificationCenter(
                             onRejectPending = notification.message?.toIntOrNull()?.let { pendingId ->
                                 {
                                     scope.launch {
-                                        if (decidePendingRegistration(context, api, repository, toasts, pendingId, notification.id, approve = false)) {
+                                        if (decidePendingRegistration(context, api, repository, toasts, alerts, pendingId, notification.id, approve = false)) {
                                             removeRow(notification)
                                         }
                                     }
@@ -645,19 +647,26 @@ private fun NotificationCard(
     }
 }
 
-/** Approves or rejects a pending registration from a notification (card
- *  or pill), then drops that notification. False when the call failed. */
+/** handleNotificationAction()'s approve and reject (App.jsx:5357): the
+ *  decision, then the notification dropped. A failure is the web's alert
+ *  of the reworded reason; only when it reads 404, someone having settled
+ *  the request first, is the notification dropped as well. True once the
+ *  notification is gone. */
 internal suspend fun decidePendingRegistration(
     context: Context,
     api: GlassKeepApi,
     repository: NotesRepository,
     toasts: ToastController,
+    alerts: GkAlerts,
     pendingId: Int,
     notificationId: Int,
     approve: Boolean,
 ): Boolean = try {
-    val response = if (approve) api.approvePendingUser(pendingId) else api.rejectPendingUser(pendingId)
-    if (!response.isSuccessful) error("HTTP ${response.code()}")
+    if (approve) {
+        api.approvePendingUser(pendingId).bodyOrRefusal("POST /api/admin/pending-users/$pendingId/approve")
+    } else {
+        api.rejectPendingUser(pendingId).bodyOrRefusal("POST /api/admin/pending-users/$pendingId/reject")
+    }
     repository.removeNotifications(listOf(notificationId))
     if (approve) {
         toasts.success(context.getString(R.string.native_admin_registration_approved), "user-check")
@@ -665,9 +674,23 @@ internal suspend fun decidePendingRegistration(
         toasts.show(context.getString(R.string.native_admin_registration_rejected), icon = "user-x")
     }
     true
+} catch (t: CancellationException) {
+    throw t
 } catch (t: Throwable) {
-    toasts.error(t.message ?: context.getString(R.string.native_admin_action_failed))
-    false
+    NativeDebug.e("Pending registration decision failed", t)
+    val message = context.requestErrorText(t)
+    alerts.show(
+        context.localizedServerError(
+            message,
+            if (approve) R.string.native_admin_failed_approve_user else R.string.native_admin_failed_reject_user,
+        ),
+    )
+    val settled = "404" in message
+    if (settled) {
+        toasts.show(context.getString(R.string.native_pending_user_already_handled), NotifVariant.WARNING)
+        repository.removeNotifications(listOf(notificationId))
+    }
+    settled
 }
 
 /** The card's action pills (globalCSS.js .gk-notif-card__action): a

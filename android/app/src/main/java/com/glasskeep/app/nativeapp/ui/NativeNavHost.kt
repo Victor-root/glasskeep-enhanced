@@ -353,7 +353,8 @@ fun NativeNavHost(
     // one too, and it is what replaces the platform's own Toast here.
     val toasts = rememberToastController()
     toasts.prefs = container.editorPrefs
-    val settingsActions = rememberSettingsActions(container, repository, toasts)
+    val alerts = remember { GkAlerts() }
+    val settingsActions = rememberSettingsActions(container, repository, toasts, alerts)
 
     // Shared by every login path (password, passkey, QR, secret key): same
     // reminder/theme bootstrap regardless of which screen signed the user
@@ -398,7 +399,7 @@ fun NativeNavHost(
         fun decide(approve: Boolean) {
             val id = pendingId ?: return
             scope.launch {
-                decidePendingRegistration(context, api, repository, toasts, id, notification.id, approve)
+                decidePendingRegistration(context, api, repository, toasts, alerts, id, notification.id, approve)
             }
         }
         toasts.show(
@@ -485,6 +486,7 @@ fun NativeNavHost(
 
     CompositionLocalProvider(
         LocalGkToasts provides toasts,
+        LocalGkAlerts provides alerts,
         LocalGkTooltips provides tooltips,
         LocalSignedOutReload provides signedOutReload,
     ) {
@@ -756,6 +758,7 @@ fun NativeNavHost(
             )
             GkTooltipHost(tooltips)
             SettingsActionDialogs(settingsActions, container.themeState.themeId, LocalGkDark.current)
+            GkAlertHost(alerts, container.themeState.themeId, LocalGkDark.current)
             if (qrScannerOpen) {
                 QrScannerModal(container = container, serverUrl = serverUrl, onClose = { qrScannerOpen = false })
             }

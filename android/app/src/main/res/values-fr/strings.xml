@@ -925,9 +925,9 @@
     <string name="native_notifications_pending_user">%1$s (%2$s) souhaite créer un compte</string>
     <string name="native_admin_registration_approved">Inscription approuvée</string>
     <string name="native_admin_registration_rejected">Inscription refusée</string>
+    <string name="native_pending_user_already_handled">Cette demande a déjà été traitée par un autre administrateur</string>
     <string name="native_notifications_title_user_deleted">Utilisateur supprimé</string>
     <string name="native_notifications_user_deleted">%1$s a été supprimé par %2$s</string>
-    <string name="native_admin_action_failed">L’action administrative a échoué.</string>
     <string name="native_session_expired">Session expirée. Veuillez vous reconnecter.</string>
     <string name="native_login_failed">Échec de la connexion</string>
     <string name="native_login_unexpected_error">Impossible de se connecter. Vérifiez votre réseau et réessayez.</string>

@@ -73,8 +73,8 @@ private val prettyJson = Json { prettyPrint = true; prettyPrintIndent = "  " }
  * coroutine it owned, has left the composition.
  *
  * Results and failures of the file actions are what the WebView showed
- * through the web's `alert()`, [alertMessage]; the files themselves leave
- * through the share sheet.
+ * through the web's `alert()`, raised on the app's [GkAlerts]; the files
+ * themselves leave through the share sheet.
  */
 @Stable
 internal class SettingsActions(
@@ -83,10 +83,8 @@ internal class SettingsActions(
     private val repository: NotesRepository,
     private val scope: CoroutineScope,
     private val toasts: ToastController,
+    private val alerts: GkAlerts,
 ) {
-    var alertMessage: String? by mutableStateOf(null)
-        private set
-
     var changePasswordOpen: Boolean by mutableStateOf(false)
         private set
 
@@ -114,10 +112,6 @@ internal class SettingsActions(
         glassKeepPicker = glassKeep
         googleKeepPicker = googleKeep
         markdownPicker = markdown
-    }
-
-    fun dismissAlert() {
-        alertMessage = null
     }
 
     // "*/*" as well: a .json picked from a file manager often reports as
@@ -149,10 +143,10 @@ internal class SettingsActions(
                 val shared = withContext(Dispatchers.IO) {
                     NoteExporter.exportTextFile(context, filename, pretty, "application/json")
                 }
-                if (!shared) alertMessage = context.getString(R.string.native_settings_export_failed)
+                if (!shared) alerts.show(context.getString(R.string.native_settings_export_failed))
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsActions exportAll failed", t)
-                alertMessage = context.getString(R.string.native_settings_export_failed)
+                alerts.show(context.getString(R.string.native_settings_export_failed))
             } finally {
                 transferRunning = false
             }
@@ -166,7 +160,7 @@ internal class SettingsActions(
         if (transferRunning) return
         transferRunning = true
         scope.launch {
-            alertMessage = try {
+            val message = try {
                 val key = repository.generateSecretKey()
                 val content = NoteTransfer.secretKeyFile(
                     key,
@@ -185,6 +179,7 @@ internal class SettingsActions(
             } finally {
                 transferRunning = false
             }
+            alerts.show(message)
         }
     }
 
@@ -220,7 +215,7 @@ internal class SettingsActions(
         if (transferRunning) return
         transferRunning = true
         scope.launch {
-            alertMessage = try {
+            val message = try {
                 val payload = withContext(Dispatchers.IO) { read() }
                 when {
                     payload == null -> context.getString(R.string.native_settings_import_invalid_json)
@@ -237,6 +232,7 @@ internal class SettingsActions(
             } finally {
                 transferRunning = false
             }
+            alerts.show(message)
         }
     }
 
@@ -361,10 +357,11 @@ internal fun rememberSettingsActions(
     container: NativeAppContainer,
     repository: NotesRepository,
     toasts: ToastController,
+    alerts: GkAlerts,
 ): SettingsActions {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val actions = remember(repository, toasts) { SettingsActions(context, container, repository, scope, toasts) }
+    val actions = remember(repository, toasts, alerts) { SettingsActions(context, container, repository, scope, toasts, alerts) }
     val glassKeepPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) actions.importGlassKeepExport(uri)
     }
@@ -378,22 +375,12 @@ internal fun rememberSettingsActions(
     return actions
 }
 
-/** The alert and the password dialog [SettingsActions] raise, drawn over
- *  whatever screen is showing. */
+/** The password dialog [SettingsActions] raises, drawn over whatever
+ *  screen is showing. */
 @Composable
 internal fun SettingsActionDialogs(actions: SettingsActions, themeId: String, dark: Boolean) {
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
-    actions.alertMessage?.let { message ->
-        GkAlertDialog(
-            message = message,
-            themeId = themeId,
-            dark = dark,
-            borderColor = borderColor,
-            textColor = titleColor,
-            onDismiss = actions::dismissAlert,
-        )
-    }
     if (actions.changePasswordOpen) {
         ChangePasswordDialog(actions, themeId, dark, titleColor, borderColor, forced = actions.passwordChangeForced)
     }

@@ -108,8 +108,9 @@ internal fun AdminScreen(
     val context = LocalContext.current
     val activity = LocalView.current.context as Activity
     val toasts = LocalGkToasts.current
+    val alerts = LocalGkAlerts.current
     val scope = rememberCoroutineScope()
-    val state = remember(serverUrl) { AdminPanelState(context, container, serverUrl, scope) }
+    val state = remember(serverUrl) { AdminPanelState(context, container, serverUrl, scope, alerts) }
     val power = remember(serverUrl) { ServerPower(context, state.api, toasts, activity) }
     val ai = remember(serverUrl) { AdminAiState(context, state.api, toasts) }
     val federation = remember(serverUrl) {
@@ -278,16 +279,6 @@ internal fun AdminScreen(
         )
     }
     power.progress?.let { PowerProgressDialog(it, dark, titleColor, borderColor) }
-    state.alert?.let { message ->
-        GkAlertDialog(
-            message = message,
-            themeId = themeId,
-            dark = dark,
-            borderColor = borderColor,
-            textColor = titleColor,
-            onDismiss = { state.alert = null },
-        )
-    }
 }
 
 /**
@@ -386,14 +377,15 @@ private fun PowerButton(
 
 /**
  * useAdminActions.js: the panel's settings and lists, and the requests
- * that change them. A failure the web raises as a blocking `alert()` lands
- * in [alert], which the WebView showed as its own message dialog.
+ * that change them. A failure the web raises as a blocking `alert()` goes
+ * to the app's [alerts], as the WebView showed its own message dialog.
  */
 internal class AdminPanelState(
     private val context: Context,
     private val container: NativeAppContainer,
     private val serverUrl: String,
     private val scope: CoroutineScope,
+    private val alerts: GkAlerts,
 ) {
     val api: GlassKeepApi = container.api(serverUrl)
 
@@ -404,7 +396,6 @@ internal class AdminPanelState(
         private set
     var pending by mutableStateOf<List<PendingUserDto>>(emptyList())
         private set
-    var alert by mutableStateOf<String?>(null)
 
     suspend fun loadAll() = coroutineScope {
         launch { loadSettings() }
@@ -460,7 +451,7 @@ internal class AdminPanelState(
     } catch (t: CancellationException) {
         throw t
     } catch (t: Throwable) {
-        alert = failureText(t, R.string.native_admin_failed_update_settings)
+        alerts.show(failureText(t, R.string.native_admin_failed_update_settings))
         null
     }
 
@@ -472,7 +463,7 @@ internal class AdminPanelState(
     } catch (t: CancellationException) {
         throw t
     } catch (t: Throwable) {
-        alert = failureText(t, R.string.native_admin_failed_create_user)
+        alerts.show(failureText(t, R.string.native_admin_failed_create_user))
         false
     }
 
@@ -484,7 +475,7 @@ internal class AdminPanelState(
     } catch (t: CancellationException) {
         throw t
     } catch (t: Throwable) {
-        alert = failureText(t, R.string.native_admin_failed_delete_user)
+        alerts.show(failureText(t, R.string.native_admin_failed_delete_user))
         null
     }
 
@@ -507,7 +498,7 @@ internal class AdminPanelState(
     } catch (t: CancellationException) {
         throw t
     } catch (t: Throwable) {
-        failureText(t, R.string.native_admin_failed_approve_user).also { alert = it }
+        failureText(t, R.string.native_admin_failed_approve_user).also(alerts::show)
     }
 
     /** rejectPendingUser(), answered like [approve]. */
@@ -518,7 +509,7 @@ internal class AdminPanelState(
     } catch (t: CancellationException) {
         throw t
     } catch (t: Throwable) {
-        failureText(t, R.string.native_admin_failed_reject_user).also { alert = it }
+        failureText(t, R.string.native_admin_failed_reject_user).also(alerts::show)
     }
 
     /** localizeServerError(e.message, fallback). */
