@@ -147,13 +147,13 @@
     <string name="native_bulk_restored_success">%1$d note(s) restaurée(s)</string>
     <string name="native_bulk_partial_failure">%1$d ont échoué</string>
     <string name="native_bulk_select_all">Tout sélectionner</string>
-    <string name="native_bulk_side_by_side">Côte à côte</string>
+    <string name="native_bulk_side_by_side">Ouvrir côte à côte</string>
+    <string name="native_bulk_pin">Épingler</string>
+    <string name="native_bulk_color">Couleur</string>
     <string name="native_bulk_deselect_all">Tout désélectionner</string>
     <string name="native_bulk_export_zip">Télécharger (.zip)</string>
     <string name="native_bulk_export_success">ZIP prêt à partager</string>
     <string name="native_bulk_export_error">Impossible de créer l\'export ZIP.</string>
-    <string name="native_bulk_icon_success">Icône appliquée à %1$d note(s)</string>
-    <string name="native_bulk_icon_error">Impossible d\'appliquer l\'icône à %1$d note(s)</string>
 
     <string name="native_sidebar_open">Ouvrir les tags</string>
     <string name="native_sidebar_all_images">Toutes les images</string>
@@ -401,7 +401,6 @@
     <string name="native_note_detail_deleted_for_all">Note supprimée pour tous les collaborateurs</string>
     <string name="native_note_detail_action_error">Action impossible : %1$s</string>
     <string name="native_note_detail_color">Couleur</string>
-    <string name="native_note_detail_change_color">Changer la couleur</string>
     <string name="native_note_color_default">Par défaut</string>
     <string name="native_note_color_red">Rouge</string>
     <string name="native_note_color_yellow">Jaune</string>

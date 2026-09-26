@@ -167,14 +167,12 @@ fun SecondaryNotesScreen(
     val deleteLabel = stringResource(R.string.native_note_detail_delete_permanently)
     val deleteConfirmTitle = stringResource(R.string.native_note_detail_permanent_delete_confirm_title)
     val deleteConfirmBodyText = stringResource(R.string.native_note_detail_permanent_delete_confirm_body)
-    val colorLabel = stringResource(R.string.native_note_detail_change_color)
+    val colorLabel = stringResource(R.string.native_bulk_color)
     val logoLabel = stringResource(R.string.native_add_logo)
     val exportZipLabel = stringResource(R.string.native_bulk_export_zip)
     val selectAllLabel = stringResource(R.string.native_bulk_select_all)
     val sideBySideLabel = stringResource(R.string.native_bulk_side_by_side)
     val deselectAllLabel = stringResource(R.string.native_bulk_deselect_all)
-    val bulkIconSuccessTemplate = stringResource(R.string.native_bulk_icon_success)
-    val bulkIconErrorTemplate = stringResource(R.string.native_bulk_icon_error)
     val bulkExportSuccess = stringResource(R.string.native_bulk_export_success)
     val bulkExportError = stringResource(R.string.native_bulk_export_error)
 
@@ -267,19 +265,16 @@ fun SecondaryNotesScreen(
         if (bulkActionRunning || selectedIds.isEmpty()) return
         bulkActionRunning = true
         val ids = selectedIds.toList()
+        // onBulkSetIcon applies without a word either way (App.jsx:1998).
         scope.launch {
-            var failed = 0
             for (id in ids) {
                 try {
                     repository.setNoteIcon(id, icon.copy(id = java.util.UUID.randomUUID().toString()))
                 } catch (t: Throwable) {
                     NativeDebug.e("Secondary bulk icon failed for note $id", t)
-                    failed++
                 }
             }
             bulkActionRunning = false
-            if (failed == 0) toasts.success(String.format(bulkIconSuccessTemplate, ids.size))
-            else toasts.error(String.format(bulkIconErrorTemplate, failed))
         }
     }
 
@@ -319,7 +314,6 @@ fun SecondaryNotesScreen(
                 bulkSetIcon(NoteIconDto(id = logo?.id, src = logo?.src ?: dataUrl, name = logo?.name ?: name))
             } catch (t: Throwable) {
                 NativeDebug.e("Secondary bulk logo upload failed", t)
-                toasts.error(String.format(bulkIconErrorTemplate, selectedIds.size))
             }
         }
     }
@@ -437,7 +431,6 @@ fun SecondaryNotesScreen(
                             note = note,
                             dark = dark,
                             titleColor = titleColor,
-                            subtextColor = subtextColor,
                             onClick = { onOpenNote(note.id) },
                             selectionMode = selectionMode,
                             selected = note.id in selectedIds,

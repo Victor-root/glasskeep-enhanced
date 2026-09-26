@@ -109,25 +109,25 @@ object RichDoc {
         }
     }
 
-    /** Card previews only paint their first few blocks. Stop parsing once
-     *  that visible budget is filled, just like contentToHTMLPreview() on
-     *  the web, so an unsupported node much later in the document cannot
-     *  turn the whole closed card into its raw JSON envelope. */
-    fun parsePreview(content: String?, maxBlocks: Int = 8): List<RichBlock>? {
-        if (maxBlocks <= 0) return emptyList()
+    /** Card previews only paint the document's first [maxNodes] top-level
+     *  nodes, a whole list or quote counting as one, as contentToHTMLPreview()
+     *  does on the web; the rest is not parsed, so an unsupported node much
+     *  later in the document cannot turn the whole closed card into its raw
+     *  JSON envelope. */
+    fun parsePreview(content: String?, maxNodes: Int = 8): List<RichBlock>? {
+        if (maxNodes <= 0) return emptyList()
         val doc = NoteContent.parseRichDoc(content) ?: return null
         return try {
-            parseDoc(doc, maxBlocks)
+            parseDoc(doc, maxNodes)
         } catch (_: Exception) {
             null
         }
     }
 
-    private fun parseDoc(doc: JsonObject, maxBlocks: Int = Int.MAX_VALUE): List<RichBlock>? {
+    private fun parseDoc(doc: JsonObject, maxNodes: Int = Int.MAX_VALUE): List<RichBlock>? {
         val topLevel = doc["content"] as? JsonArray ?: return null
         val blocks = mutableListOf<RichBlock>()
-        for (node in topLevel) {
-            if (blocks.size >= maxBlocks) break
+        for (node in topLevel.take(maxNodes)) {
             val obj = node as? JsonObject ?: return null
             when (nodeType(obj)) {
                 "paragraph" -> blocks.add(parseTextBlock(obj, RichBlockKind.PARAGRAPH) ?: return null)
@@ -141,7 +141,7 @@ object RichDoc {
                 else -> return null
             }
         }
-        return blocks.take(maxBlocks).ifEmpty { null }
+        return blocks.ifEmpty { null }
     }
 
     private fun nodeType(node: JsonObject): String? = (node["type"] as? JsonPrimitive)?.contentOrNull

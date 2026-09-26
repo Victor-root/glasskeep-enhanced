@@ -152,13 +152,13 @@
     <string name="native_bulk_restored_success">%1$d note(s) restored</string>
     <string name="native_bulk_partial_failure">%1$d failed</string>
     <string name="native_bulk_select_all">Select all</string>
-    <string name="native_bulk_side_by_side">Side by side</string>
+    <string name="native_bulk_side_by_side">Open side by side</string>
+    <string name="native_bulk_pin">Pin</string>
+    <string name="native_bulk_color">Color</string>
     <string name="native_bulk_deselect_all">Deselect all</string>
     <string name="native_bulk_export_zip">Download (.zip)</string>
     <string name="native_bulk_export_success">ZIP ready to share</string>
     <string name="native_bulk_export_error">Couldn\'t create the ZIP export.</string>
-    <string name="native_bulk_icon_success">Icon applied to %1$d note(s)</string>
-    <string name="native_bulk_icon_error">Couldn\'t apply the icon to %1$d note(s)</string>
 
     <string name="native_sidebar_open">Open tags</string>
     <string name="native_sidebar_all_images">All Images</string>
@@ -406,7 +406,6 @@
     <string name="native_note_detail_deleted_for_all">Note deleted for every collaborator</string>
     <string name="native_note_detail_action_error">Action failed: %1$s</string>
     <string name="native_note_detail_color">Color</string>
-    <string name="native_note_detail_change_color">Change color</string>
     <string name="native_note_color_default">Default</string>
     <string name="native_note_color_red">Red</string>
     <string name="native_note_color_yellow">Yellow</string>

@@ -159,6 +159,7 @@ import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.NoteImageData
 import com.glasskeep.app.nativeapp.data.NoteImages
+import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
@@ -432,15 +433,13 @@ fun NativeNotesListScreen(
     val partialFailureTemplate = stringResource(R.string.native_bulk_partial_failure)
     val trashLabel = stringResource(R.string.native_note_detail_move_to_trash)
     val archiveLabel = stringResource(R.string.native_note_detail_archive)
-    val pinLabel = stringResource(R.string.native_note_detail_pin)
-    val colorLabel = stringResource(R.string.native_note_detail_change_color)
+    val pinLabel = stringResource(R.string.native_bulk_pin)
+    val colorLabel = stringResource(R.string.native_bulk_color)
     val logoLabel = stringResource(R.string.native_add_logo)
     val exportZipLabel = stringResource(R.string.native_bulk_export_zip)
     val selectAllLabel = stringResource(R.string.native_bulk_select_all)
     val sideBySideLabel = stringResource(R.string.native_bulk_side_by_side)
     val deselectAllLabel = stringResource(R.string.native_bulk_deselect_all)
-    val bulkIconSuccessTemplate = stringResource(R.string.native_bulk_icon_success)
-    val bulkIconErrorTemplate = stringResource(R.string.native_bulk_icon_error)
     val bulkExportSuccess = stringResource(R.string.native_bulk_export_success)
     val bulkExportError = stringResource(R.string.native_bulk_export_error)
     val context = LocalContext.current
@@ -536,21 +535,16 @@ fun NativeNotesListScreen(
         if (bulkActionRunning || selectedIds.isEmpty()) return
         bulkActionRunning = true
         val ids = selectedIds.toList()
+        // onBulkSetIcon applies without a word either way (App.jsx:1998).
         scope.launch {
-            val succeeded = mutableListOf<String>()
-            var failed = 0
             for (id in ids) {
                 try {
                     repository.setNoteIcon(id, icon.copy(id = java.util.UUID.randomUUID().toString()))
-                    succeeded += id
                 } catch (t: Throwable) {
                     NativeDebug.e("Bulk icon failed for note $id", t)
-                    failed++
                 }
             }
             bulkActionRunning = false
-            if (failed == 0) toasts.success(String.format(bulkIconSuccessTemplate, succeeded.size))
-            else toasts.error(String.format(bulkIconErrorTemplate, failed))
         }
     }
 
@@ -591,7 +585,6 @@ fun NativeNotesListScreen(
                 bulkSetIcon(NoteIconDto(id = logo?.id, src = logo?.src ?: dataUrl, name = logo?.name ?: name))
             } catch (t: Throwable) {
                 NativeDebug.e("Bulk logo upload failed", t)
-                toasts.error(String.format(bulkIconErrorTemplate, selectedIds.size))
             }
         }
     }
@@ -860,7 +853,6 @@ fun NativeNotesListScreen(
                         loading = aiLoading,
                         dark = dark,
                         titleColor = titleColor,
-                        subtextColor = subtextColor,
                         citedNotes = notes.filter { it.id in aiCitedNoteIds },
                         typography = container.editorPrefs.typography.activeProfile,
                         taskStrike = container.editorPrefs.taskStrike,
@@ -913,7 +905,6 @@ fun NativeNotesListScreen(
                                     note = note,
                                     dark = dark,
                                     titleColor = titleColor,
-                                    subtextColor = subtextColor,
                                     onClick = { onOpenNote(note.id) },
                                     selectionMode = selectionMode,
                                     selected = note.id in selectedIds,
@@ -1800,7 +1791,6 @@ private fun AiAnswerCard(
     loading: Boolean,
     dark: Boolean,
     titleColor: Color,
-    subtextColor: Color,
     citedNotes: List<NoteEntity>,
     typography: TypographyProfile,
     taskStrike: Boolean,
@@ -1907,7 +1897,6 @@ private fun AiAnswerCard(
                         note = note,
                         dark = dark,
                         titleColor = titleColor,
-                        subtextColor = subtextColor,
                         onClick = { onOpenNote(note.id) },
                         typography = typography,
                         taskStrike = taskStrike,
@@ -2214,7 +2203,6 @@ private fun ReorderableNoteCard(
     note: NoteEntity,
     dark: Boolean,
     titleColor: Color,
-    subtextColor: Color,
     onClick: () -> Unit,
     selectionMode: Boolean,
     selected: Boolean,
@@ -2301,7 +2289,6 @@ private fun ReorderableNoteCard(
             note = note,
             dark = dark,
             titleColor = titleColor,
-            subtextColor = subtextColor,
             onClick = onClick,
             selectionMode = selectionMode,
             selected = selected,
@@ -2379,7 +2366,6 @@ internal fun NoteCard(
     note: NoteEntity,
     dark: Boolean,
     titleColor: Color,
-    subtextColor: Color,
     onClick: () -> Unit,
     selectionMode: Boolean = false,
     selected: Boolean = false,
@@ -2427,18 +2413,28 @@ internal fun NoteCard(
                     lineHeight = 20.sp,
                     modifier = Modifier.padding(end = if (!selectionMode && note.iconSrc != null) 32.dp else 0.dp),
                 )
-                Spacer(Modifier.height(8.dp))
             }
+            // The bottom margin of what was drawn last (the title's mb-2,
+            // the images' mb-3): an empty text body lets CSS collapse it
+            // into the footer's own mt-2 instead of adding both.
+            var trailingMargin = if (note.title.isNotBlank()) 8.dp else 0.dp
 
             if (images.isNotEmpty()) {
+                Spacer(Modifier.height(trailingMargin))
                 CardImageGrid(images = images, subtextColor = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282))
-                Spacer(Modifier.height(12.dp))
+                trailingMargin = 12.dp
             }
 
-            if (note.type == "checklist") {
-                ChecklistCardPreview(note = note, titleColor = titleColor, dark = dark)
-            } else if (note.type == "draw") {
-                DrawingCardPreview(
+            val textPreview = remember(note.type, note.content) {
+                if (note.type in TypedPreviews) emptyList() else cardPreviewBlocks(note.content, maxNodes = 8)
+            }
+            if (note.type in TypedPreviews || textPreview.isNotEmpty()) {
+                Spacer(Modifier.height(trailingMargin))
+                trailingMargin = 0.dp
+            }
+            when (note.type) {
+                "checklist" -> ChecklistCardPreview(note = note, titleColor = titleColor, dark = dark)
+                "draw" -> DrawingCardPreview(
                     note = note,
                     dark = dark,
                     typography = typography,
@@ -2446,20 +2442,10 @@ internal fun NoteCard(
                     titleColor = titleColor,
                     accent = WorkspaceTheme.rtAccent(themeId),
                 )
-            } else if (note.type == "audio") {
-                AudioCardPreview(note = note, dark = dark, titleColor = titleColor)
-            } else {
-                val previewBlocks = remember(note.content) {
-                    RichDoc.parsePreview(note.content, maxBlocks = 8) ?: run {
-                        val richDoc = NoteContent.parseRichDoc(note.content)
-                        val raw = richDoc?.let { NoteContent.docToPlainText(it) } ?: note.content
-                        val source = if (raw.length > 350) raw.take(350).trimEnd() + "…" else raw
-                        MarkdownDoc.toRichBlocks(source, keepBlankLines = true).take(8)
-                    }
-                }
-                if (previewBlocks.any { it.text.isNotBlank() || it.kind == com.glasskeep.app.nativeapp.data.RichBlockKind.DIVIDER }) {
+                "audio" -> AudioCardPreview(note = note, dark = dark, titleColor = titleColor)
+                else -> if (textPreview.isNotEmpty()) {
                     RichTextReader(
-                        blocks = previewBlocks,
+                        blocks = textPreview,
                         typography = typography,
                         taskStrike = taskStrike,
                         dark = dark,
@@ -2469,8 +2455,6 @@ internal fun NoteCard(
                         accent = WorkspaceTheme.rtAccent(themeId),
                         modifier = Modifier.heightIn(max = 280.dp).clipToBounds(),
                     )
-                } else if (note.type != "text") {
-                    Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
                 }
             }
 
@@ -2479,7 +2463,7 @@ internal fun NoteCard(
                 // .note-card-footer (NoteCardFooter.jsx:40): mt-2 pt-1, rows
                 // space-y-2 in the order reminder, tags.
                 Column(
-                    modifier = Modifier.padding(top = 12.dp),
+                    modifier = Modifier.padding(top = maxOf(trailingMargin, 8.dp) + 4.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     note.reminderAt?.let { reminderAt ->
@@ -2488,6 +2472,8 @@ internal fun NoteCard(
                     if (tags.isNotEmpty()) CardTagChips(tags = tags, dark = dark)
                     if (showCollaborators) CardCollaborators(collaborators = collaborators, dark = dark)
                 }
+            } else {
+                Spacer(Modifier.height(trailingMargin))
             }
         }
 
@@ -2535,10 +2521,9 @@ private fun DrawingCardPreview(
     accent: Color,
 ) {
     val drawing = remember(note.content) { DrawingContent.parse(note.content) } ?: return
-    val caption = remember(drawing.text) {
-        drawing.text?.let { RichDoc.parsePreview(it, maxBlocks = 8) }.orEmpty()
-    }
-    if (caption.any { it.text.isNotBlank() }) {
+    // The whole caption, not just its first nodes (contentToHTML).
+    val caption = remember(drawing.text) { drawing.text?.let { cardPreviewBlocks(it) }.orEmpty() }
+    if (caption.isNotEmpty()) {
         RichTextReader(
             blocks = caption,
             typography = typography,
@@ -3038,6 +3023,21 @@ private fun ChecklistSectionCardHeader(title: String, collapsed: Boolean, accent
             modifier = Modifier.weight(1f),
         )
     }
+}
+
+/** The note types whose card shows its own preview instead of text. */
+private val TypedPreviews = setOf("checklist", "draw", "audio")
+
+/** Text as NoteCard.jsx previews it: a rich document through its first
+ *  [maxNodes] top-level nodes, else Markdown cut at 350 characters with
+ *  its blank lines kept as spacer lines; nothing without any text. */
+private fun cardPreviewBlocks(content: String, maxNodes: Int = Int.MAX_VALUE): List<RichBlock> {
+    if (content.isEmpty()) return emptyList()
+    RichDoc.parsePreview(content, maxNodes)?.let { return it }
+    val raw = NoteContent.parseRichDoc(content)?.let { NoteContent.docToPlainText(it) } ?: content
+    if (raw.isBlank()) return emptyList()
+    val source = if (raw.length > 350) raw.take(350).trimEnd() + "…" else raw
+    return MarkdownDoc.toRichBlocks(source, keepBlankLines = true)
 }
 
 // internal, not private: NoteDetailScreen.kt (same package, different
