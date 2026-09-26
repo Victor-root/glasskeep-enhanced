@@ -1,6 +1,10 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.net.Uri
 import android.view.WindowManager
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
@@ -1682,13 +1686,17 @@ internal fun Modifier.tailwindShadowXl(shape: Shape): Modifier = this
     .dropShadow(shape, Shadow(radius = 25.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-5).dp, offset = DpOffset(0.dp, 20.dp)))
     .dropShadow(shape, Shadow(radius = 10.dp, color = Color.Black.copy(alpha = 0.1f), spread = (-6).dp, offset = DpOffset(0.dp, 8.dp)))
 
-/** Opens [url] in whatever app handles it, doing nothing when none does
- *  (the platform handler throws then, a web page would simply stay put). */
-internal fun UriHandler.openSafely(url: String) {
-    try {
-        openUri(url)
-    } catch (e: IllegalArgumentException) {
-        NativeDebug.e("No app opens $url", e)
+/** How the WebView shell opened a link leaving the app: a Custom Tab of
+ *  the default browser over the app, Back returning to it. Nothing
+ *  happens when no app opens it, as a web page would simply stay put.
+ *  NativeNavHost provides it to every screen. */
+internal class CustomTabUriHandler(private val context: Context) : UriHandler {
+    override fun openUri(uri: String) {
+        try {
+            CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context, Uri.parse(uri))
+        } catch (e: ActivityNotFoundException) {
+            NativeDebug.e("No app opens $uri", e)
+        }
     }
 }
 

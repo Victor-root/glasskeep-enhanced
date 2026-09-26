@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -489,6 +490,7 @@ fun NativeNavHost(
         LocalGkAlerts provides alerts,
         LocalGkTooltips provides tooltips,
         LocalSignedOutReload provides signedOutReload,
+        LocalUriHandler provides remember(context) { CustomTabUriHandler(context) },
     ) {
         Box(Modifier.fillMaxSize().then(safeLeft)) {
             if (showUnlockScreen) {

@@ -914,7 +914,7 @@ private fun ReaderText(
 ) {
     val uriHandler = LocalUriHandler.current
     val openLink = remember(uriHandler) {
-        LinkInteractionListener { link -> (link as? LinkAnnotation.Url)?.let { uriHandler.openSafely(it.url) } }
+        LinkInteractionListener { link -> (link as? LinkAnnotation.Url)?.let { uriHandler.openUri(it.url) } }
     }
     val annotated = remember(block, style, dark, surface) { annotatedTextFor(block, style, dark, surface, openLink) }
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
@@ -1124,7 +1124,7 @@ private fun RichTextBlockField(
                         dark = dark,
                         onOpen = {
                             tappedLink = null
-                            uriHandler.openSafely(RichDoc.ensureSchemeUrl(link.value.orEmpty()))
+                            uriHandler.openUri(RichDoc.ensureSchemeUrl(link.value.orEmpty()))
                         },
                         onEdit = {
                             tappedLink = null

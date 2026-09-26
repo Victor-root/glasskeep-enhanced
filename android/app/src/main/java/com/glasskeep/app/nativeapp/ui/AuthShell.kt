@@ -62,7 +62,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -419,15 +418,14 @@ private fun ThemeToggle(dark: Boolean, pill: Boolean, border: Color, onClick: ()
  *  translucent pill. */
 @Composable
 private fun AuthCredits(dark: Boolean, pill: Boolean) {
-    val uriHandler = LocalUriHandler.current
     val linkStyles = TextLinkStyles(SpanStyle(textDecoration = TextDecoration.Underline))
     val credits = buildAnnotatedString {
         append("Open source project · Originally by ")
-        withLink(LinkAnnotation.Url(CreditsAuthorUrl, linkStyles) { uriHandler.openSafely(CreditsAuthorUrl) }) {
+        withLink(LinkAnnotation.Url(CreditsAuthorUrl, linkStyles)) {
             append("nikunjsingh93")
         }
         append(" · maintained and expanded by ")
-        withLink(LinkAnnotation.Url(CreditsMaintainerUrl, linkStyles) { uriHandler.openSafely(CreditsMaintainerUrl) }) {
+        withLink(LinkAnnotation.Url(CreditsMaintainerUrl, linkStyles)) {
             append("Victor-root")
         }
     }

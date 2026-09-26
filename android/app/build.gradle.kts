@@ -153,6 +153,11 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.appcompat:appcompat:1.6.1")
 
+    // Custom Tabs: a link leaving the app opens as the default browser's
+    // overlay on top of it, Back returning to the app, as the WebView
+    // shell did. Called directly, so R8 needs no rule for it.
+    implementation("androidx.browser:browser:1.8.0")
+
     // Credential Manager: Android's unified API for passkeys, passwords
     // and federated sign-in. NativePasskeys calls it directly to open the
     // OS-level passkey UI (Google Password Manager / 1Password / Bitwarden).

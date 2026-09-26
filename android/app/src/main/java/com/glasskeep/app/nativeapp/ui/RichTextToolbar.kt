@@ -1818,7 +1818,7 @@ private fun RichLinkPopover(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                                 role = Role.Button,
-                            ) { uriHandler.openSafely(RichDoc.ensureSchemeUrl(href.ifBlank { existingHref.orEmpty() })) },
+                            ) { uriHandler.openUri(RichDoc.ensureSchemeUrl(href.ifBlank { existingHref.orEmpty() })) },
                         contentAlignment = Alignment.Center,
                     ) {
                         ExternalLinkIcon(size = 16.dp, tint = titleColor)
