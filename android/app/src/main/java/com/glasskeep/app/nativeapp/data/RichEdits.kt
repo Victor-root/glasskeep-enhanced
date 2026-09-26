@@ -344,10 +344,10 @@ object RichEdits {
 
     private val RichBlockKind.isOrderedOrBullet: Boolean
         get() = this == RichBlockKind.BULLET_ITEM || this == RichBlockKind.NUMBERED_ITEM
-
-    private fun List<RichBlock>.replaceAt(index: Int, replacement: List<RichBlock>): List<RichBlock> =
-        replaceRange(index, index + 1, replacement)
-
-    private fun List<RichBlock>.replaceRange(from: Int, to: Int, replacement: List<RichBlock>): List<RichBlock> =
-        subList(0, from) + replacement + subList(to, size)
 }
+
+internal fun List<RichBlock>.replaceAt(index: Int, replacement: List<RichBlock>): List<RichBlock> =
+    replaceRange(index, index + 1, replacement)
+
+internal fun List<RichBlock>.replaceRange(from: Int, to: Int, replacement: List<RichBlock>): List<RichBlock> =
+    subList(0, from) + replacement + subList(to, size)

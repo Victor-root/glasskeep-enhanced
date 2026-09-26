@@ -332,7 +332,7 @@ object RichDoc {
             "code" -> listOf(RichMark(start, end, RichMarkType.CODE))
             "subscript" -> listOf(RichMark(start, end, RichMarkType.SUBSCRIPT))
             "superscript" -> listOf(RichMark(start, end, RichMarkType.SUPERSCRIPT))
-            "highlight" -> listOf(RichMark(start, end, RichMarkType.HIGHLIGHT, value = attr("color") ?: DefaultHighlight))
+            "highlight" -> listOf(RichMark(start, end, RichMarkType.HIGHLIGHT, value = attr("color")))
             "underline" -> listOf(
                 RichMark(start, end, RichMarkType.UNDERLINE, value = attr("style"), color = attr("color")),
             )
@@ -375,8 +375,8 @@ object RichDoc {
     private val TEXT_STYLE_KEYS = setOf("color", "fontFamily", "fontSize")
     private val KNOWN_ATTR_KEYS = setOf("indent", "textAlign")
 
-    /** The default highlight when a `highlight` mark carries no colour of
-     *  its own: slot 1 of the palette (see RichPalettes.kt). */
+    /** The highlight button's swatch while nothing is highlighted
+     *  (DEFAULT_HIGHLIGHT_SWATCH): slot 1 of the palette. */
     const val DefaultHighlight = "var(--rt-hl-1)"
 
     /** True when every attrs key is one this vocabulary knows about. A key
@@ -653,7 +653,7 @@ object RichDoc {
                     put("type", type)
                     when (m.type) {
                         RichMarkType.LINK -> put("attrs", buildJsonObject { put("href", m.value.orEmpty()) })
-                        RichMarkType.HIGHLIGHT -> put("attrs", buildJsonObject { put("color", m.value ?: DefaultHighlight) })
+                        RichMarkType.HIGHLIGHT -> put("attrs", buildJsonObject { put("color", m.value) })
                         RichMarkType.UNDERLINE -> if (m.value != null || m.color != null) {
                             put(
                                 "attrs",
@@ -863,7 +863,7 @@ object RichDoc {
 
     /** JavaScript's `\s`, which also matches the no-break and typographic
      *  spaces a French phone number is often written with. */
-    private const val JsSpace = "\\s\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff"
+    internal const val JsSpace = "\\s\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff"
     private val JsWhitespaceRegex = Regex("[$JsSpace]")
     private const val PhoneSeparators = ".()-"
     private val UrlSchemeRegex = Regex("^(https?|mailto|tel):", RegexOption.IGNORE_CASE)

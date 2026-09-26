@@ -232,6 +232,7 @@ fun RichTextEditor(
     onTextEdited: (id: String, newText: String, newMarks: List<RichMark>) -> Unit,
     onEnter: (id: String, atPosition: Int) -> Unit,
     onInsertLines: (id: String, newText: String, newMarks: List<RichMark>, start: Int, end: Int) -> Unit,
+    onTyped: (id: String, newText: String, newMarks: List<RichMark>, caret: Int, inserted: String) -> Boolean,
     onToggleChecked: (id: String) -> Unit,
     onMergeWithPrevious: (id: String) -> Unit,
     onTapBlank: (lastTextBlockId: String) -> Unit,
@@ -292,6 +293,7 @@ fun RichTextEditor(
                             state.clearAllPending()
                         }
                     },
+                    onSelectionPlaced = { selection -> if (state.activeId == block.id) state.selection = selection },
                     onTextEdited = { newText, newMarks, newSelection ->
                         onTextEdited(block.id, newText, newMarks)
                         if (state.activeId == block.id) state.selection = newSelection
@@ -299,6 +301,11 @@ fun RichTextEditor(
                     onEnter = if (splits) { position -> onEnter(block.id, position) } else null,
                     onInsertLines = if (splits) {
                         { newText, newMarks, start, end -> onInsertLines(block.id, newText, newMarks, start, end) }
+                    } else {
+                        null
+                    },
+                    onTyped = if (splits) {
+                        { newText, newMarks, caret, inserted -> onTyped(block.id, newText, newMarks, caret, inserted) }
                     } else {
                         null
                     },
@@ -953,7 +960,9 @@ private fun ReaderText(
  *  style, the caret in the text colour. Enter splits the block and a
  *  multi-line insertion becomes several blocks ([onEnter],
  *  [onInsertLines], null inside a code block, where both are plain
- *  newlines); Backspace at its start joins it backward ([onMerge]). */
+ *  newlines); Backspace at its start joins it backward ([onMerge]). What
+ *  is typed outside an IME composition, or a composition that ends, goes
+ *  through the input rules first ([onTyped], true when one applied). */
 @Composable
 private fun RichTextBlockField(
     block: RichBlock,
@@ -966,9 +975,11 @@ private fun RichTextBlockField(
     onConsumePending: () -> Unit,
     onFocusGained: (TextRange) -> Unit,
     onSelectionChanged: (TextRange) -> Unit,
+    onSelectionPlaced: (TextRange) -> Unit,
     onTextEdited: (newText: String, newMarks: List<RichMark>, newSelection: TextRange) -> Unit,
     onEnter: ((position: Int) -> Unit)?,
     onInsertLines: ((newText: String, newMarks: List<RichMark>, start: Int, end: Int) -> Unit)?,
+    onTyped: ((newText: String, newMarks: List<RichMark>, caret: Int, inserted: String) -> Boolean)?,
     onMerge: () -> Unit,
     pendingSelection: TextRange?,
     onPendingSelectionConsumed: () -> Unit,
@@ -988,10 +999,9 @@ private fun RichTextBlockField(
         val rebuilt = annotatedTextFor(block, style, dark, surface)
         val pending = pendingSelection
         if (pending != null) {
-            fieldValue = TextFieldValue(
-                rebuilt,
-                TextRange(pending.start.coerceIn(0, rebuilt.length), pending.end.coerceIn(0, rebuilt.length)),
-            )
+            val placed = TextRange(pending.start.coerceIn(0, rebuilt.length), pending.end.coerceIn(0, rebuilt.length))
+            fieldValue = TextFieldValue(rebuilt, placed)
+            onSelectionPlaced(placed)
             onPendingSelectionConsumed()
         } else if (fieldValue.annotatedString.text != rebuilt.text || fieldValue.annotatedString.spanStyles != rebuilt.spanStyles) {
             fieldValue = TextFieldValue(
@@ -1008,8 +1018,11 @@ private fun RichTextBlockField(
         value = fieldValue,
         onValueChange = { new ->
             if (new.text == fieldValue.text) {
+                val moved = new.selection != fieldValue.selection
+                val compositionEnded = fieldValue.composition != null && new.composition == null
                 fieldValue = new
-                onSelectionChanged(new.selection)
+                if (moved) onSelectionChanged(new.selection)
+                if (compositionEnded && new.selection.collapsed) onTyped?.invoke(new.text, block.marks, new.selection.end, "")
                 return@BasicTextField
             }
             val span = RichDoc.diffEdit(fieldValue.text, new.text)
@@ -1030,9 +1043,19 @@ private fun RichTextBlockField(
                 newline && onEnter != null && span.newEnd == span.start + 1 -> onEnter(span.start)
                 newline && onInsertLines != null -> onInsertLines(new.text, newMarks, span.start, span.newEnd)
                 else -> {
-                    val updated = block.copy(text = new.text, marks = newMarks)
-                    fieldValue = TextFieldValue(annotatedTextFor(updated, style, dark, surface), new.selection)
-                    onTextEdited(new.text, newMarks, new.selection)
+                    val typed = span.newEnd > span.start && new.composition == null &&
+                        new.selection.collapsed && new.selection.end == span.newEnd
+                    val ruled = typed && onTyped?.invoke(
+                        new.text,
+                        newMarks,
+                        span.newEnd,
+                        new.text.substring(span.start, span.newEnd),
+                    ) == true
+                    if (!ruled) {
+                        val updated = block.copy(text = new.text, marks = newMarks)
+                        fieldValue = TextFieldValue(annotatedTextFor(updated, style, dark, surface), new.selection)
+                        onTextEdited(new.text, newMarks, new.selection)
+                    }
                 }
             }
         },
@@ -1178,6 +1201,7 @@ private fun annotatedTextFor(
         var sizeSet = false
         var baseline: BaselineShift? = null
         var mono = false
+        var plainMark = false
         val decorations = mutableListOf<TextDecoration>()
 
         for (m in active) when (m.type) {
@@ -1195,7 +1219,7 @@ private fun annotatedTextFor(
             RichMarkType.SUBSCRIPT -> baseline = BaselineShift(-0.27f)
             RichMarkType.SUPERSCRIPT -> baseline = BaselineShift(0.54f)
             RichMarkType.TEXT_COLOR -> color = richColorOf(m.value, dark)
-            RichMarkType.HIGHLIGHT -> Unit
+            RichMarkType.HIGHLIGHT -> if (m.value == null) plainMark = true
             RichMarkType.FONT_FAMILY -> fontFamily = richFontFor(m.value)?.family
             RichMarkType.FONT_SIZE -> richFontSizeOf(m.value)?.let {
                 fontSize = it
@@ -1207,7 +1231,11 @@ private fun annotatedTextFor(
 
         addStyle(
             SpanStyle(
-                color = if (link != null) linkColor else (color ?: Color.Unspecified),
+                color = when {
+                    plainMark -> Color.Black
+                    link != null -> linkColor
+                    else -> color ?: Color.Unspecified
+                },
                 fontWeight = if (bold) bolderThan(style.fontWeight) else null,
                 fontStyle = if (italic) FontStyle.Italic else null,
                 fontFamily = fontFamily ?: if (mono) FontFamily.Monospace else null,
@@ -1229,6 +1257,10 @@ private fun annotatedTextFor(
         }
     }
 }
+
+/** Chrome's own `mark` style, which a highlight with no colour of its own
+ *  (typed as `==text==`) gets: yellow, under black text. */
+private val PlainMarkBackground = Color(0xFFFFFF00)
 
 /** An underline Compose can draw itself: no line style, no colour. */
 private fun plainUnderline(mark: RichMark): Boolean =
@@ -1281,7 +1313,7 @@ private fun DrawScope.drawRichDecorations(layout: TextLayoutResult, block: RichB
                 }
             }
             RichMarkType.HIGHLIGHT -> {
-                val color = richColorOf(mark.value, dark) ?: continue
+                val color = if (mark.value == null) PlainMarkBackground else richColorOf(mark.value, dark) ?: continue
                 val em = markFontSize(block, style, start).toPx()
                 val padX = if (editor) 2.dp.toPx() else 0f
                 val radius = if (editor) 2.dp.toPx() else 0f

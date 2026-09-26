@@ -791,7 +791,7 @@ private fun CandidateList(
         when {
             loading -> CandidatePlaceholder(stringResource(R.string.native_collaborators_searching), mutedColor)
             !hasAny -> CandidatePlaceholder(stringResource(R.string.native_collaborators_none_available), mutedColor)
-            visible.isEmpty() -> CandidatePlaceholder("—", if (dark) Color(0xFF6A7282) else Color(0xFF99A1AF))
+            visible.isEmpty() -> CandidatePlaceholder("\u2014", if (dark) Color(0xFF6A7282) else Color(0xFF99A1AF))
             else -> for (user in visible) {
                 key(user.key) {
                     CandidateRow(

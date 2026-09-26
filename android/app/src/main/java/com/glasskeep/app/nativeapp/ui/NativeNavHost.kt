@@ -551,7 +551,7 @@ fun NativeNavHost(
                             container = container,
                             serverUrl = serverUrl,
                             onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
-                            onOpenNewDrawing = { noteId -> navController.navigate("notes/$noteId?draw=true") },
+                            onOpenNewNote = { noteId -> navController.navigate("notes/$noteId?new=true") },
                             onOpenArchived = { navController.navigate("archived") },
                             onOpenTrash = { navController.navigate("trash") },
                             onOpenSettings = { navController.navigate("settings") },
@@ -620,7 +620,7 @@ fun NativeNavHost(
                 // rise, 200ms ease-out in, 180ms ease-in out.
                 composable(
                     route = NoteRoute,
-                    arguments = listOf(navArgument("draw") { type = NavType.BoolType; defaultValue = false }),
+                    arguments = listOf(navArgument("new") { type = NavType.BoolType; defaultValue = false }),
                     enterTransition = {
                         if (initialState.destination.route == "notes") {
                             fadeIn(tween(200, easing = EaseOut)) +
@@ -644,7 +644,7 @@ fun NativeNavHost(
                         serverUrl = serverUrl,
                         noteId = noteId,
                         onBack = { navController.popBackStack() },
-                        startInDrawMode = backStackEntry.arguments?.getBoolean("draw") == true,
+                        isNew = backStackEntry.arguments?.getBoolean("new") == true,
                     )
                 }
                 composable("compare/{firstId}/{secondId}") { backStackEntry ->
@@ -730,9 +730,9 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     }
 }
 
-/** `draw`: a drawing just created from the FAB opens straight on its
- *  canvas. */
-private const val NoteRoute = "notes/{noteId}?draw={draw}"
+/** `new`: a note just created opens the way the web's
+ *  createAndOpenBlankNote opens it (see NoteDetailScreen's isNew). */
+private const val NoteRoute = "notes/{noteId}?new={new}"
 private val NoteRise = 14.dp
 
 /** Overlays the notes list stays in place under, rather than fading. */

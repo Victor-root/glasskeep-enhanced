@@ -158,6 +158,7 @@ import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.RichEdit
 import com.glasskeep.app.nativeapp.data.RichEdits
+import com.glasskeep.app.nativeapp.data.RichInputRules
 import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
@@ -279,7 +280,9 @@ fun NoteDetailScreen(
     serverUrl: String,
     noteId: String,
     onBack: () -> Unit,
-    startInDrawMode: Boolean = false,
+    /** Just created: it opens the way the web's createAndOpenBlankNote
+     *  opens it, out of read mode, and a drawing on its canvas. */
+    isNew: Boolean = false,
 ) {
     val dark = LocalGkDark.current
     val context = LocalContext.current
@@ -363,9 +366,10 @@ fun NoteDetailScreen(
     // safety-net LaunchedEffect and removed.
     val pendingRichSelections = remember { mutableStateMapOf<String, TextRange>() }
     var showConvertConfirm by remember { mutableStateOf(false) }
-    // readModeEnabled decides which face a text note opens on; the
-    // footer toggle flips it for this note only (ModalFooter.jsx:860).
-    var viewMode by remember { mutableStateOf(container.editorPrefs.readModeEnabled) }
+    // readModeEnabled decides which face a text note opens on, unless it
+    // was just created; the footer toggle flips it for this note only
+    // (ModalFooter.jsx:860).
+    var viewMode by remember { mutableStateOf(!isNew && container.editorPrefs.readModeEnabled) }
     var converting by remember { mutableStateOf(false) }
     // The note's own AI conversation. Thrown away when the note closes
     // unless the panel's save button kept it, exactly like the web's own
@@ -993,8 +997,23 @@ fun NoteDetailScreen(
         closeLinkDialog()
     }
 
+    /** Enter: an input rule the line break completes, else the split,
+     *  with the word before it linked when it is an address. */
     fun splitRichBlock(id: String, position: Int) {
-        applyRichEdit(RichEdits.split(richBlocks ?: return, id, position))
+        val blocks = richBlocks ?: return
+        applyRichEdit(
+            RichInputRules.enter(blocks, id, position)
+                ?: RichEdits.split(RichInputRules.linkBeforeBreak(blocks, id, position), id, position),
+        )
+    }
+
+    /** What was typed into block [id], through the input rules: true when
+     *  one applied. */
+    fun typeRichText(id: String, text: String, marks: List<RichMark>, caret: Int, inserted: String): Boolean {
+        val result = RichInputRules.typed(richBlocks ?: return false, id, text, marks, caret, inserted) ?: return false
+        applyRichEdit(result.edit)
+        result.disarm?.let { richEditorState.clearPending(it, activeAtCaret = true) }
+        return true
     }
 
     fun mergeRichBlockWithPrevious(id: String) {
@@ -1476,7 +1495,13 @@ fun NoteDetailScreen(
             images = NoteImages.parse(fetched.images)
             editability = when (fetched.type) {
                 "text" -> {
-                    val parsedRichBlocks = RichDoc.parse(fetched.content)
+                    // A blank body is the web's emptyRichDoc(): one empty
+                    // paragraph, in the rich editor like any other.
+                    val parsedRichBlocks = if (fetched.content.isBlank()) {
+                        listOf(RichDoc.newBlock())
+                    } else {
+                        RichDoc.parse(fetched.content)
+                    }
                     if (parsedRichBlocks != null) {
                         Editability(
                             isTextType = true,
@@ -1553,15 +1578,11 @@ fun NoteDetailScreen(
             drawingPaths = editability?.originalDrawingPaths.orEmpty()
             drawingDimensions = editability?.originalDrawingDimensions
             drawingCaptionText = editability?.originalDrawingCaptionText
-            if (editability?.isDrawType == true) {
-                richBlocks = editability?.originalRichBlocks
-                // Once, on the first render: a drawing opens on its read face,
-                // or on its canvas when it was just created.
-                if (!drawingFaceSet) {
-                    drawingFaceSet = true
-                    drawingCanvasMode = startInDrawMode
-                    viewMode = !startInDrawMode && container.editorPrefs.readModeEnabled
-                }
+            // Once, on the first render: a drawing just created opens on its
+            // canvas.
+            if (editability?.isDrawType == true && !drawingFaceSet) {
+                drawingFaceSet = true
+                drawingCanvasMode = isNew
             }
             audioClips = editability?.originalAudioClips.orEmpty()
             audioCaptionText = editability?.originalAudioCaptionText
@@ -2190,6 +2211,7 @@ fun NoteDetailScreen(
                     onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
                     onEnter = { id, position -> splitRichBlock(id, position) },
                     onInsertLines = { id, newText, newMarks, start, end -> insertRichLines(id, newText, newMarks, start, end) },
+                    onTyped = { id, newText, newMarks, caret, inserted -> typeRichText(id, newText, newMarks, caret, inserted) },
                     onToggleChecked = { id -> toggleRichChecked(id) },
                     onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
                     onTapBlank = { id -> focusRichBlockEnd(id) },
