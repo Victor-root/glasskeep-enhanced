@@ -4,7 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,11 +21,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.isOutOfBounds
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -94,9 +98,9 @@ internal fun rememberTooltipController(): GkTooltipController = remember { GkToo
  *
  * Observes on the Initial pass and never consumes, so the control's own
  * tap, long-press or drag behaves exactly as it did without this. A
- * gesture that ends, or is taken over by a scrolling parent, before the
- * second is up shows nothing, and one taken over after it hides the pill
- * straight away, which is what the web's own touchmove handler does.
+ * finger that lifts before the second is up shows nothing, and one that
+ * lifts after it leaves the pill up. One that moves, as the web's own
+ * touchmove handler sees it, cancels the pill, pending or shown.
  *
  * Phone-only by construction, and that is the whole of the web's mobile
  * half too: its other branch is a 600ms mouse hover, and there is no
@@ -108,27 +112,42 @@ internal fun Modifier.gkTooltip(label: String): Modifier {
     // Written from the layout pass, read from the gesture coroutine. Not
     // Compose state: nothing recomposes on it, and making it state would
     // schedule a recomposition on every scroll frame.
-    val anchor = remember { AnchorBounds() }
+    val anchor = remember { CoordinatesHolder() }
     return this
-        .onGloballyPositioned { anchor.value = it.boundsInWindow() }
+        .onGloballyPositioned { anchor.value = it }
         .pointerInput(label, controller) {
             awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                val origin = anchor.toRoot(down.position)
                 try {
-                    withTimeout(TooltipHoldMs) {
-                        waitForUpOrCancellation(PointerEventPass.Initial)
-                    }
+                    withTimeout(TooltipHoldMs) { awaitLiftInPlace(down, origin, anchor) }
                 } catch (_: PointerEventTimeoutCancellationException) {
-                    anchor.value?.let { controller.show(label, it) }
-                    if (waitForUpOrCancellation(PointerEventPass.Initial) == null) controller.hide()
+                    anchor.value?.takeIf { it.isAttached }?.let { controller.show(label, it.boundsInWindow()) }
+                    if (!awaitLiftInPlace(down, origin, anchor)) controller.hide()
                 }
             }
         }
 }
 
-/** See [gkTooltip]: a plain holder, deliberately not Compose state. */
-private class AnchorBounds {
-    var value: Rect? = null
+/**
+ * Follows [down] until it lifts in place (true), or until it would have
+ * fired the web's touchmove (false): gone past the touch slop, off the
+ * control, or taken over by a scrolling parent. The distance is the
+ * finger's own, in root coordinates, so a control carried along with it,
+ * a lifted checklist section's handle, still sees it move.
+ */
+private suspend fun AwaitPointerEventScope.awaitLiftInPlace(
+    down: PointerInputChange,
+    origin: Offset?,
+    anchor: CoordinatesHolder,
+): Boolean {
+    while (true) {
+        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: return false
+        if (change.changedToUp()) return true
+        if (change.isConsumed || !change.pressed || change.isOutOfBounds(size, extendedTouchPadding)) return false
+        val point = anchor.toRoot(change.position) ?: continue
+        if (origin != null && (point - origin).getDistance() > viewConfiguration.touchSlop) return false
+    }
 }
 
 /**

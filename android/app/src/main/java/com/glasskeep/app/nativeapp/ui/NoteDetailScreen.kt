@@ -104,6 +104,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -310,6 +312,11 @@ fun NoteDetailScreen(
     var showReminderPicker by remember { mutableStateOf(false) }
     var showFormatSheet by remember { mutableStateOf(false) }
     val contentScroll = rememberScrollState()
+    // A checklist drag scrolls the note near the edges of the web's scroll
+    // area, which holds the sticky bar too: from the bar's top to the
+    // content's bottom. Read by that drag only.
+    val stickyBarCoordinates = remember { CoordinatesHolder() }
+    val contentCoordinates = remember { CoordinatesHolder() }
     // How far down the note was, as a share of its scroll range, when the
     // read/edit toggle was hit: the other face lands at the same share.
     var modeSwitchScrollRatio by remember { mutableStateOf<Float?>(null) }
@@ -2019,6 +2026,7 @@ fun NoteDetailScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .onGloballyPositioned { stickyBarCoordinates.value = it }
                     .background(modalBg)
                     .then(
                         // ModalHeader.jsx's draw-edit bar: 4px all round and a
@@ -2128,6 +2136,7 @@ fun NoteDetailScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .onGloballyPositioned { contentCoordinates.value = it }
                                 .verticalScroll(contentScroll),
                         ) {
                             // Outside the sticky bar on purpose: the title
@@ -2243,6 +2252,13 @@ fun NoteDetailScreen(
                                         onEntriesChange = { updated, persist -> updateChecklistEntries(updated, persist) },
                                         onFocusItem = { id -> pendingChecklistFocus = id },
                                         onDoneCollapsedChange = { collapsed -> setDoneSectionCollapsed(collapsed) },
+                                        noteBackground = panelBg,
+                                        scrollState = contentScroll,
+                                        scrollViewport = {
+                                            val content = contentCoordinates.value?.takeIf { it.isAttached }?.boundsInRoot()
+                                            val bar = stickyBarCoordinates.value?.takeIf { it.isAttached }?.boundsInRoot()
+                                            if (content != null && bar != null) content.copy(top = bar.top) else content
+                                        },
                                         readOnly = isNoteReadOnly,
                                     )
                                 } else if (edit.isDrawType) {

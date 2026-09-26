@@ -282,6 +282,50 @@ object ChecklistItems {
         return rest.subList(0, insertAt) + orphans + rest.subList(insertAt, rest.size)
     }
 
+    /**
+     * The end of a row's drag (useChecklistDrag.js:392-436): the row leaves
+     * its place and lands before the [position]-th unchecked row of the
+     * block [sectionId] names (null: the default one), or at the end of
+     * that block when it has fewer. A section gone meanwhile sends it to
+     * the very end; a row gone meanwhile moves nothing (null).
+     */
+    fun moveItemIntoSection(
+        entries: List<ChecklistEntry>,
+        itemId: String,
+        sectionId: String?,
+        position: Int,
+    ): List<ChecklistEntry>? {
+        val from = entries.indexOfFirst { it.id == itemId }
+        if (from < 0) return null
+        val rest = entries.toMutableList()
+        val moved = rest.removeAt(from)
+        val start: Int
+        val end: Int
+        if (sectionId == null) {
+            start = 0
+            end = rest.indexOfFirst { it is ChecklistSectionData }.takeIf { it >= 0 } ?: rest.size
+        } else {
+            val marker = rest.indexOfFirst { it is ChecklistSectionData && it.id == sectionId }
+            if (marker < 0) return rest + moved
+            start = marker + 1
+            end = sectionEnd(rest, marker)
+        }
+        var seen = 0
+        var insertAt = end
+        for (i in start until end) {
+            val entry = rest[i]
+            if (entry is ChecklistItemData && !entry.done) {
+                if (seen == position) {
+                    insertAt = i
+                    break
+                }
+                seen++
+            }
+        }
+        rest.add(insertAt, moved)
+        return rest
+    }
+
     /** One past the last entry the marker at [start] owns: the next
      *  marker's index, or the end of the list. */
     private fun sectionEnd(entries: List<ChecklistEntry>, start: Int): Int {

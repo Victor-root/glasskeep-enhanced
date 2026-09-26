@@ -82,6 +82,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -1485,6 +1486,15 @@ internal fun Modifier.dismissOnOutsideTouch(onDismiss: () -> Unit): Modifier = p
  *  web's `fixed inset-0` overlays): every touch landing on it stops here,
  *  even where nothing on the layer answers it. */
 internal fun Modifier.blockTouchesBelow(): Modifier = pointerInput(Unit) {}
+
+/** Holds a layout's coordinates without making them state: they change on
+ *  every scroll, and only a gesture reads them. */
+internal class CoordinatesHolder {
+    var value: LayoutCoordinates? = null
+
+    /** [local] in the root's coordinates, while the layout is attached. */
+    fun toRoot(local: Offset): Offset? = value?.takeIf { it.isAttached }?.localToRoot(local)
+}
 
 /** Lets a block spill past its parent's horizontal padding, the way the
  *  checklist deliberately does on a phone (`max-sm:-mx-4`). */

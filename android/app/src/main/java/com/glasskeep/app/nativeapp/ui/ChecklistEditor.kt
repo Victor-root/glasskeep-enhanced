@@ -1,15 +1,14 @@
 package com.glasskeep.app.nativeapp.ui
 
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +25,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -34,11 +34,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +51,8 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
@@ -62,10 +66,12 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
@@ -89,6 +95,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -110,14 +117,17 @@ import com.glasskeep.app.nativeapp.data.ContactLink
 import com.glasskeep.app.nativeapp.data.ContactLinks
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.LightBorderColor
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** INDENT_STEP_PX (checklist.js:47): the one value shared by the row's
  *  own margin and the horizontal distance that commits an indent. */
 private val IndentStep = 28.dp
-private const val AxisLockPx = 8f
-private val DragEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+
+/** AXIS_LOCK_PX (useChecklistDrag.js:11). */
+private val AxisLock = 8.dp
 
 /** SECTION_COLORS (SectionHeader.jsx:15-25), in order. */
 internal val ChecklistSectionColors: List<Pair<String, Color>> = listOf(
@@ -171,44 +181,24 @@ fun ChecklistEditorBody(
     onEntriesChange: (List<ChecklistEntry>, persist: Boolean) -> Unit,
     onFocusItem: (id: String) -> Unit,
     onDoneCollapsedChange: (Boolean) -> Unit,
+    noteBackground: Color,
+    scrollState: ScrollState,
+    scrollViewport: () -> Rect?,
     readOnly: Boolean = false,
 ) {
     val blocks = remember(entries) { ChecklistItems.blocks(entries) }
     val hasChecked = remember(entries) { entries.any { it is ChecklistItemData && it.done } }
 
-    // Everything the drag gesture needs: which row is moving, on which
-    // axis the gesture locked, and how tall each visible row is.
-    var draggingId by remember { mutableStateOf<String?>(null) }
-    var dragVertical by remember { mutableStateOf(false) }
-    var dragOffsetY by remember { mutableStateOf(0f) }
-    val rowHeights = remember { mutableStateMapOf<String, Int>() }
-
-    // The same gesture one level up: dragging a section's own handle moves
-    // the whole block, header and rows together (useChecklistDrag.js's
-    // handleSectionPointerDown). Blocks have wildly different heights, so
-    // the drop target is computed from their measured ones rather than a
-    // single row height.
-    var draggingSectionId by remember { mutableStateOf<String?>(null) }
-    var sectionDragOffsetY by remember { mutableStateOf(0f) }
-    val blockHeights = remember { mutableStateMapOf<String, Int>() }
-
-    val visibleIds = remember(blocks) {
-        blocks.flatMap { block -> block.items.filterNot { it.done }.map { it.id } }
+    // The web lets the list scroll by itself within 60px of the note's
+    // edges, by up to 12px a frame.
+    val density = LocalDensity.current
+    val dragScope = rememberCoroutineScope()
+    val drag = remember(density) {
+        ChecklistDragController(dragScope, with(density) { 60.dp.toPx() }, with(density) { 12.dp.toPx() })
     }
-    val draggedIndex = visibleIds.indexOf(draggingId)
-    val dropIndex = remember(draggingId, dragOffsetY, visibleIds, rowHeights.toMap()) {
-        if (draggedIndex < 0) -1 else dropTargetIndex(visibleIds, rowHeights, draggedIndex, dragOffsetY)
-    }
-
-    val blockGapPx = with(LocalDensity.current) { BlockGap.toPx() }
-    val blockKeys = remember(blocks) { blocks.map { it.section?.id ?: DefaultBlockKey } }
-    val draggedBlockIndex = blockKeys.indexOf(draggingSectionId)
-    val blockDropIndex = remember(draggingSectionId, sectionDragOffsetY, blockKeys, blockHeights.toMap()) {
-        if (draggedBlockIndex < 0) {
-            -1
-        } else {
-            blockDropTargetIndex(blockKeys, blockHeights, draggedBlockIndex, sectionDragOffsetY, blockGapPx)
-        }
+    SideEffect {
+        drag.scrollState = scrollState
+        drag.viewport = scrollViewport
     }
 
     fun commitEntries(updated: List<ChecklistEntry>, persist: Boolean = true) {
@@ -259,6 +249,47 @@ fun ChecklistEditorBody(
         }
     }
 
+    /** Every row a dragged item can land among, in the order drawn. */
+    fun dragSlots(): List<ChecklistDragSlot> = buildList {
+        for (block in blocks) {
+            val section = block.section
+            val blockKey = section?.id ?: DefaultBlockKey
+            val rows = block.items.filterNot { it.done }.map { ChecklistDragSlot(it.id, it.id, false, blockKey) }
+            if (section == null) {
+                if (insertPosition == "top") add(ChecklistDragSlot(AddRowSlot, null, false, blockKey))
+                addAll(rows)
+                if (insertPosition != "top") add(ChecklistDragSlot(AddRowSlot, null, false, blockKey))
+            } else {
+                add(ChecklistDragSlot(headerSlot(section.id), null, true, blockKey))
+                if (!section.collapsed) {
+                    addAll(rows)
+                    add(ChecklistDragSlot(addToSectionSlot(section.id), null, false, blockKey))
+                }
+            }
+        }
+    }
+
+    /** The dropped item joins the block its new neighbours say, a header
+     *  right after it meaning the block before, at the place among that
+     *  block's unchecked rows the rows before it give. */
+    fun commitItemMove(slots: List<ChecklistDragSlot>, from: Int, to: Int) {
+        if (from == to) return
+        val itemId = slots[from].itemId ?: return
+        val order = slots.toMutableList().apply { add(to, removeAt(from)) }
+        val previous = order.getOrNull(to - 1)
+        val next = order.getOrNull(to + 1)
+        val target = if (next != null && !next.isHeader) next.blockKey else previous?.blockKey ?: DefaultBlockKey
+        val position = (0 until to).count { order[it].itemId != null && order[it].blockKey == target }
+        ChecklistItems.moveItemIntoSection(entries, itemId, target.takeUnless { it == DefaultBlockKey }, position)
+            ?.let { commitEntries(it) }
+    }
+
+    fun commitBlockMove(keys: List<String>, from: Int, to: Int) {
+        if (from == to) return
+        val order = keys.toMutableList().apply { add(to, removeAt(from)) }
+        commitEntries(ChecklistItems.reorderSections(entries, order.filterNot { it == DefaultBlockKey }))
+    }
+
     // A dismissed keyboard ends the typing, as the web blurs its field.
     val imeVisible = WindowInsets.isImeVisible
     val focusManager = LocalFocusManager.current
@@ -292,10 +323,11 @@ fun ChecklistEditorBody(
     }
 
     // max-sm:-mx-4: the list reaches 16dp past the note's text gutter.
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .bleedHorizontally(16.dp)
+            .onGloballyPositioned { drag.attachRoot(it) }
             .onFocusChanged { editingInside = it.hasFocus },
     ) {
         if (entries.isEmpty()) {
@@ -316,7 +348,7 @@ fun ChecklistEditorBody(
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                blocks.forEachIndexed { blockIndex, block ->
+                blocks.forEach { block ->
                     val blockKey = block.section?.id ?: DefaultBlockKey
                     ChecklistSectionBlock(
                         block = block,
@@ -324,62 +356,20 @@ fun ChecklistEditorBody(
                         readOnly = readOnly,
                         insertPosition = insertPosition,
                         onAddAtEdge = { addItemAtEdge() },
-                        blockDragging = draggingSectionId == blockKey,
-                        blockDragOffsetY = if (draggingSectionId == blockKey) sectionDragOffsetY else 0f,
-                        blockShift = blockNeighbourShift(
-                            blockIndex,
-                            draggedBlockIndex,
-                            blockDropIndex,
-                            blockKeys,
-                            blockHeights,
-                            blockGapPx,
-                        ),
-                        onBlockHeight = { height -> blockHeights[blockKey] = height },
-                        onSectionDragStart = {
-                            draggingSectionId = blockKey
-                            sectionDragOffsetY = 0f
+                        drag = drag,
+                        noteBackground = noteBackground,
+                        onLiftItem = { id, fingerRootY -> drag.liftItem(id, dragSlots(), fingerRootY) },
+                        onDropItem = { drag.dropItem { slots, from, to -> commitItemMove(slots, from, to) } },
+                        onLiftBlock = { fingerRootY ->
+                            drag.liftBlock(blockKey, blocks.map { it.section?.id ?: DefaultBlockKey }, fingerRootY)
                         },
-                        onSectionDragDelta = { dy -> sectionDragOffsetY += dy },
-                        onSectionDragEnd = {
-                            val from = draggedBlockIndex
-                            val to = blockDropIndex
-                            draggingSectionId = null
-                            sectionDragOffsetY = 0f
-                            if (from >= 0 && to >= 0 && to != from) {
-                                val reordered = blockKeys.toMutableList().apply { add(to, removeAt(from)) }
-                                commitEntries(
-                                    ChecklistItems.reorderSections(entries, reordered.filterNot { it == DefaultBlockKey }),
-                                )
-                            }
-                        },
-                        onSectionDragCancel = { draggingSectionId = null; sectionDragOffsetY = 0f },
+                        onDropBlock = { drag.dropBlock { keys, from, to -> commitBlockMove(keys, from, to) } },
                         dark = dark,
                         titleColor = titleColor,
                         borderColor = borderColor,
-                        visibleIds = visibleIds,
-                        draggingId = draggingId,
-                        dragVertical = dragVertical,
-                        dragOffsetY = dragOffsetY,
-                        draggedIndex = draggedIndex,
-                        dropIndex = dropIndex,
-                        rowHeights = rowHeights,
                         focusRequesterFor = focusRequesterFor,
                         caretToEndId = caretToEndId,
                         onCaretPlaced = { caretToEndId = null },
-                        onRowHeight = { id, height -> rowHeights[id] = height },
-                        onDragStart = { id, vertical -> draggingId = id; dragVertical = vertical; dragOffsetY = 0f },
-                        onDragDelta = { dy -> dragOffsetY += dy },
-                        onDragEnd = {
-                            val id = draggingId
-                            val from = draggedIndex
-                            val to = dropIndex
-                            draggingId = null
-                            dragOffsetY = 0f
-                            if (id != null && from >= 0 && to >= 0 && to != from) {
-                                commitEntries(moveItem(entries, id, visibleIds, to))
-                            }
-                        },
-                        onDragCancel = { draggingId = null; dragOffsetY = 0f },
                         onIndentChange = { id, indent ->
                             commitEntries(entries.map { if (it.id == id && it is ChecklistItemData) it.copy(indent = indent) else it })
                         },
@@ -452,62 +442,13 @@ fun ChecklistEditorBody(
                 }
             }
         }
-    }
-}
-
-/** Where the dragged row would land: the last visible row whose middle
- *  the dragged one's own middle has passed (useChecklistDrag.js:64-71). */
-private fun dropTargetIndex(
-    visibleIds: List<String>,
-    heights: Map<String, Int>,
-    draggedIndex: Int,
-    offsetY: Float,
-): Int {
-    if (visibleIds.isEmpty()) return -1
-    val gap = 0
-    var target = draggedIndex
-    var travelled = 0f
-    if (offsetY > 0) {
-        for (i in draggedIndex + 1 until visibleIds.size) {
-            val h = (heights[visibleIds[i]] ?: 0) + gap
-            travelled += h / 2f
-            if (offsetY < travelled) break
-            target = i
-            travelled += h / 2f
-        }
-    } else if (offsetY < 0) {
-        for (i in draggedIndex - 1 downTo 0) {
-            val h = (heights[visibleIds[i]] ?: 0) + gap
-            travelled += h / 2f
-            if (-offsetY < travelled) break
-            target = i
-            travelled += h / 2f
+        // The carried item's own floating copy, over everything.
+        drag.liftedItemId?.let { id ->
+            (entries.firstOrNull { it.id == id } as? ChecklistItemData)?.let { item ->
+                ChecklistLiftedRow(item = item, drag = drag, background = noteBackground, dark = dark, textColor = titleColor)
+            }
         }
     }
-    return target
-}
-
-/** Moves the dragged row so it sits at [targetVisibleIndex] among the
- *  visible rows, keeping every other entry (section markers included) in
- *  place. The section it ends up in is decided by its new neighbours,
- *  same as the web's own commit step. */
-private fun moveItem(
-    entries: List<ChecklistEntry>,
-    draggedId: String,
-    visibleIds: List<String>,
-    targetVisibleIndex: Int,
-): List<ChecklistEntry> {
-    val dragged = entries.firstOrNull { it.id == draggedId } as? ChecklistItemData ?: return entries
-    val without = entries.filterNot { it.id == draggedId }
-    val remainingVisible = visibleIds.filterNot { it == draggedId }
-    val anchorId = remainingVisible.getOrNull(targetVisibleIndex)
-    val updated = without.toMutableList()
-    val insertAt = when {
-        anchorId == null -> updated.size
-        else -> updated.indexOfFirst { it.id == anchorId }.let { if (it < 0) updated.size else it }
-    }
-    updated.add(insertAt, dragged)
-    return updated
 }
 
 /** One block of the list: the unsectioned rows with the global add row,
@@ -519,32 +460,18 @@ private fun ChecklistSectionBlock(
     readOnly: Boolean,
     insertPosition: String,
     onAddAtEdge: () -> Unit,
-    blockDragging: Boolean,
-    blockDragOffsetY: Float,
-    blockShift: Float,
-    onBlockHeight: (Int) -> Unit,
-    onSectionDragStart: () -> Unit,
-    onSectionDragDelta: (Float) -> Unit,
-    onSectionDragEnd: () -> Unit,
-    onSectionDragCancel: () -> Unit,
+    drag: ChecklistDragController,
+    noteBackground: Color,
+    onLiftItem: (id: String, fingerRootY: Float) -> Boolean,
+    onDropItem: () -> Unit,
+    onLiftBlock: (fingerRootY: Float) -> Boolean,
+    onDropBlock: () -> Unit,
     dark: Boolean,
     titleColor: Color,
     borderColor: Color,
-    visibleIds: List<String>,
-    draggingId: String?,
-    dragVertical: Boolean,
-    dragOffsetY: Float,
-    draggedIndex: Int,
-    dropIndex: Int,
-    rowHeights: Map<String, Int>,
     focusRequesterFor: (id: String) -> FocusRequester,
     caretToEndId: String?,
     onCaretPlaced: () -> Unit,
-    onRowHeight: (String, Int) -> Unit,
-    onDragStart: (String, Boolean) -> Unit,
-    onDragDelta: (Float) -> Unit,
-    onDragEnd: () -> Unit,
-    onDragCancel: () -> Unit,
     onIndentChange: (String, Int) -> Unit,
     onToggle: (String, Boolean) -> Unit,
     onTextChange: (String, String) -> Unit,
@@ -558,6 +485,7 @@ private fun ChecklistSectionBlock(
     onSectionRemove: (String) -> Unit,
 ) {
     val section = block.section
+    val blockKey = section?.id ?: DefaultBlockKey
     val accent = sectionColorOf(section?.color)
     val unchecked = block.items.filterNot { it.done }
     val collapsed = section?.collapsed == true
@@ -565,8 +493,6 @@ private fun ChecklistSectionBlock(
     @Composable
     fun Rows() {
         for (item in unchecked) key(item.id) {
-            val visibleIndex = visibleIds.indexOf(item.id)
-            val shift = neighbourShift(visibleIndex, draggedIndex, dropIndex, draggingId, rowHeights, visibleIds)
             ChecklistRowView(
                 item = item,
                 readOnly = readOnly,
@@ -576,16 +502,10 @@ private fun ChecklistSectionBlock(
                 focusRequester = focusRequesterFor(item.id),
                 caretToEnd = caretToEndId == item.id,
                 onCaretPlaced = onCaretPlaced,
-                dragging = draggingId == item.id,
-                draggingVertically = draggingId == item.id && dragVertical,
-                dragOffsetY = if (draggingId == item.id) dragOffsetY else 0f,
-                neighbourShift = shift,
+                drag = drag,
                 canIndent = ChecklistItems.canIndent(entries, item.id),
-                onHeight = { height -> onRowHeight(item.id, height) },
-                onDragStart = { vertical -> onDragStart(item.id, vertical) },
-                onDragDelta = onDragDelta,
-                onDragEnd = onDragEnd,
-                onDragCancel = onDragCancel,
+                onLift = { fingerRootY -> onLiftItem(item.id, fingerRootY) },
+                onDrop = onDropItem,
                 onIndentChange = { indent -> onIndentChange(item.id, indent) },
                 onToggle = { checked -> onToggle(item.id, checked) },
                 onTextChange = { text -> onTextChange(item.id, text) },
@@ -597,30 +517,47 @@ private fun ChecklistSectionBlock(
         }
     }
 
+    // A lifted section is the block itself, raised in its own place while
+    // the others slide around it. The web's floating copy keeps the
+    // block's max-sm:-ml-2, so it rides 8dp left of the block.
+    val lifted = drag.liftedBlockKey == blockKey
+    val liftShape = RoundedCornerShape(8.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .onGloballyPositioned { onBlockHeight(it.size.height) }
-            .zIndex(if (blockDragging) 1f else 0f)
+            // max-sm:-mx-2: a section reaches the panel's own edges.
+            .then(if (section != null) Modifier.bleedHorizontally(8.dp) else Modifier)
+            .onGloballyPositioned { drag.placeBlock(blockKey, it) }
+            .zIndex(if (lifted) 1f else 0f)
             .graphicsLayer {
-                translationY = if (blockDragging) blockDragOffsetY else blockShift
-                if (blockDragging) {
-                    scaleX = 1.02f
-                    scaleY = 1.02f
-                    shadowElevation = 12.dp.toPx()
-                    shape = RoundedCornerShape(8.dp)
-                    clip = false
+                translationY = if (lifted) drag.blockOffset else drag.blockShiftOf(blockKey)
+                if (lifted) {
+                    translationX = -8.dp.toPx()
+                    scaleX = 1.02f - 0.02f * drag.settle
+                    scaleY = scaleX
                 }
             }
-            // max-sm:-mx-2: a section reaches the panel's own edges.
-            .then(if (section != null) Modifier.bleedHorizontally(8.dp) else Modifier),
+            .then(
+                if (lifted) {
+                    Modifier
+                        .dropShadow(liftShape, checklistLiftShadow(drag.settle))
+                        .background(noteBackground, liftShape)
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         if (section == null) {
             // space-y-3 around the rows. An empty row list still carries its
             // 12dp margin: under the "bottom" add row it collapses above the
             // block, over the "top" one into the 24dp gap that follows.
             if (!readOnly && insertPosition == "top") {
-                ChecklistAddRow(borderColor = borderColor, dark = dark, onClick = onAddAtEdge)
+                ChecklistAddRow(
+                    borderColor = borderColor,
+                    dark = dark,
+                    modifier = Modifier.checklistDragSlot(AddRowSlot, drag),
+                    onClick = onAddAtEdge,
+                )
                 if (unchecked.isNotEmpty()) Spacer(Modifier.height(12.dp))
             } else if (!readOnly && unchecked.isEmpty()) {
                 Spacer(Modifier.height(12.dp))
@@ -628,7 +565,12 @@ private fun ChecklistSectionBlock(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { Rows() }
             if (!readOnly && insertPosition != "top") {
                 if (unchecked.isNotEmpty()) Spacer(Modifier.height(12.dp))
-                ChecklistAddRow(borderColor = borderColor, dark = dark, onClick = onAddAtEdge)
+                ChecklistAddRow(
+                    borderColor = borderColor,
+                    dark = dark,
+                    modifier = Modifier.checklistDragSlot(AddRowSlot, drag),
+                    onClick = onAddAtEdge,
+                )
             }
         } else {
             // The 3px accent is a left border on header and rows together,
@@ -645,13 +587,13 @@ private fun ChecklistSectionBlock(
                     uncheckedCount = unchecked.size,
                     dark = dark,
                     borderColor = borderColor,
-                    onDragStart = onSectionDragStart,
-                    onDragDelta = onSectionDragDelta,
-                    onDragEnd = onSectionDragEnd,
-                    onDragCancel = onSectionDragCancel,
+                    drag = drag,
+                    onLift = onLiftBlock,
+                    onDrop = onDropBlock,
                     onChange = onSectionChange,
                     onEnter = { title -> onSectionEnter(section.id, title) },
                     onRemove = { onSectionRemove(section.id) },
+                    modifier = Modifier.checklistDragSlot(headerSlot(section.id), drag),
                 )
                 if (!collapsed) {
                     Column(
@@ -665,7 +607,13 @@ private fun ChecklistSectionBlock(
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) { Rows() }
                         }
-                        if (!readOnly) ChecklistAddToSectionRow(dark = dark, onClick = onAddToSection)
+                        if (!readOnly) {
+                            ChecklistAddToSectionRow(
+                                dark = dark,
+                                modifier = Modifier.checklistDragSlot(addToSectionSlot(section.id), drag),
+                                onClick = onAddToSection,
+                            )
+                        }
                     }
                 }
             }
@@ -679,74 +627,38 @@ private fun ChecklistSectionBlock(
  *  (useChecklistDrag.js:520-524). */
 private const val DefaultBlockKey = "__default__"
 
-/** The 24dp gap the blocks column puts between two section blocks, in the
- *  same units their measured heights come back in. */
-private val BlockGap = 24.dp
+/** Drag slot names of the rows that are not items. */
+private const val AddRowSlot = "add"
 
-/** Where a dragged section block would land: the last block whose middle
- *  the dragged one's own middle has passed. Unlike rows, blocks have
- *  heterogeneous heights, so the tops are summed rather than multiplied
- *  (updateSectionDragPosition, useChecklistDrag.js:472-487). */
-private fun blockDropTargetIndex(
-    blockKeys: List<String>,
-    heights: Map<String, Int>,
-    draggedIndex: Int,
-    offsetY: Float,
-    gap: Float,
-): Int {
-    var top = 0f
-    val tops = FloatArray(blockKeys.size)
-    for (i in blockKeys.indices) {
-        tops[i] = top
-        top += (heights[blockKeys[i]] ?: 0) + gap
-    }
-    val draggedHeight = (heights[blockKeys[draggedIndex]] ?: 0).toFloat()
-    val draggedCenter = tops[draggedIndex] + offsetY + draggedHeight / 2f
-    var target = draggedIndex
-    for (i in blockKeys.indices) {
-        val middle = tops[i] + (heights[blockKeys[i]] ?: 0) / 2f
-        if (draggedCenter > middle) target = i
-    }
-    return target.coerceIn(0, blockKeys.lastIndex)
-}
+private fun headerSlot(sectionId: String) = "header:$sectionId"
 
-/** How far a block slides to make room, the dragged block's own height
- *  plus the gap, exactly as the web shifts them. */
-private fun blockNeighbourShift(
-    index: Int,
-    draggedIndex: Int,
-    dropIndex: Int,
-    blockKeys: List<String>,
-    heights: Map<String, Int>,
-    gap: Float,
-): Float {
-    if (draggedIndex < 0 || dropIndex < 0 || index == draggedIndex) return 0f
-    val shift = (heights[blockKeys.getOrNull(draggedIndex)] ?: 0) + gap
-    return when {
-        draggedIndex < dropIndex && index > draggedIndex && index <= dropIndex -> -shift
-        draggedIndex > dropIndex && index >= dropIndex && index < draggedIndex -> shift
-        else -> 0f
-    }
-}
+private fun addToSectionSlot(sectionId: String) = "addto:$sectionId"
 
-/** How far a row slides out of the way while another is dragged over it:
- *  always the dragged row's own height, the web's single shift distance
- *  (useChecklistDrag.js:78-97). */
-private fun neighbourShift(
-    visibleIndex: Int,
-    draggedIndex: Int,
-    dropIndex: Int,
-    draggingId: String?,
-    rowHeights: Map<String, Int>,
-    visibleIds: List<String>,
-): Int {
-    if (draggingId == null || draggedIndex < 0 || dropIndex < 0 || visibleIndex < 0) return 0
-    if (visibleIndex == draggedIndex) return 0
-    val draggedHeight = rowHeights[visibleIds.getOrNull(draggedIndex)] ?: 0
-    return when {
-        dropIndex > draggedIndex && visibleIndex in (draggedIndex + 1)..dropIndex -> -draggedHeight
-        dropIndex < draggedIndex && visibleIndex in dropIndex until draggedIndex -> draggedHeight
-        else -> 0
+/** How a gesture on a row's handle turned out once it cleared the 8dp
+ *  axis lock: a carried row, an indent slide, or neither when the row
+ *  could not be lifted. */
+private enum class HandleGesture { Pending, Vertical, Horizontal, Ignored }
+
+/**
+ * Follows the finger that went down on a drag handle until it lifts
+ * (true) or the gesture is cancelled (false). Every change is consumed,
+ * as the web's `touch-action: none` handles keep the note from
+ * scrolling; [onMove] gets each position in the root's coordinates.
+ */
+private suspend fun AwaitPointerEventScope.trackHandle(
+    down: PointerInputChange,
+    handle: CoordinatesHolder,
+    onMove: (Offset) -> Unit,
+): Boolean {
+    while (true) {
+        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: return false
+        if (!change.pressed) {
+            val lifted = change.changedToUp()
+            change.consume()
+            return lifted
+        }
+        change.consume()
+        handle.toRoot(change.position)?.let(onMove)
     }
 }
 
@@ -760,16 +672,10 @@ private fun ChecklistRowView(
     focusRequester: FocusRequester,
     caretToEnd: Boolean,
     onCaretPlaced: () -> Unit,
-    dragging: Boolean,
-    draggingVertically: Boolean,
-    dragOffsetY: Float,
-    neighbourShift: Int,
+    drag: ChecklistDragController,
     canIndent: Boolean,
-    onHeight: (Int) -> Unit,
-    onDragStart: (vertical: Boolean) -> Unit,
-    onDragDelta: (Float) -> Unit,
-    onDragEnd: () -> Unit,
-    onDragCancel: () -> Unit,
+    onLift: (fingerRootY: Float) -> Boolean,
+    onDrop: () -> Unit,
     onIndentChange: (Int) -> Unit,
     onToggle: (Boolean) -> Unit,
     onTextChange: (String) -> Unit,
@@ -778,33 +684,26 @@ private fun ChecklistRowView(
     onBackspaceEmpty: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    val density = LocalDensity.current
-    var slideX by remember(item.id) { mutableStateOf(0f) }
-    val shiftDp by animateDpAsState(
-        targetValue = with(density) { neighbourShift.toDp() },
-        animationSpec = tween(durationMillis = 200, easing = DragEasing),
-        label = "checklistNeighbourShift",
-    )
-    val removeLabel = stringResource(R.string.native_checklist_remove_item)
+    val slide = remember(item.id) { Animatable(0f) }
+    val slideScope = rememberCoroutineScope()
+    val handle = remember { CoordinatesHolder() }
+    val currentCanIndent by rememberUpdatedState(canIndent)
+    val currentIndent by rememberUpdatedState(item.indent)
+    val currentOnLift by rememberUpdatedState(onLift)
+    val currentOnDrop by rememberUpdatedState(onDrop)
+    val currentOnIndentChange by rememberUpdatedState(onIndentChange)
     val moveLabel = stringResource(R.string.native_checklist_move_item)
+
+    fun slideTo(x: Float) {
+        slideScope.launch(start = CoroutineStart.UNDISPATCHED) { slide.snapTo(x) }
+    }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = if (item.indent == 1) IndentStep else 0.dp)
-            .onSizeChanged { onHeight(it.height) }
-            .zIndex(if (dragging) 1f else 0f)
-            .graphicsLayer {
-                translationY = if (draggingVertically) dragOffsetY else with(density) { shiftDp.toPx() }
-                if (draggingVertically) {
-                    scaleX = 1.03f
-                    scaleY = 1.03f
-                    shadowElevation = with(density) { 12.dp.toPx() }
-                    shape = RoundedCornerShape(8.dp)
-                    clip = false
-                }
-            },
+            .checklistDragSlot(item.id, drag),
     ) {
         // [data-checklist-slide]: the handle, the box and the text slide
         // together while indenting; the delete button stays put.
@@ -812,63 +711,81 @@ private fun ChecklistRowView(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .weight(1f)
-                .offset { IntOffset(slideX.roundToInt(), 0) },
+                .offset { IntOffset(slide.value.roundToInt(), 0) },
         ) {
             if (!readOnly) {
                 Box(
                     modifier = Modifier
                         .semantics { contentDescription = moveLabel }
                         .padding(horizontal = 4.dp)
-                        .pointerInput(item.id, canIndent, item.indent) {
-                            var locked = false
-                            var vertical = false
-                            var totalX = 0f
-                            var totalY = 0f
-                            detectDragGestures(
-                                onDragStart = {
-                                    locked = false
-                                    vertical = false
-                                    totalX = 0f
-                                    totalY = 0f
-                                },
-                                onDrag = { change, delta ->
-                                    change.consume()
-                                    totalX += delta.x
-                                    totalY += delta.y
-                                    if (!locked) {
-                                        // 8px axis lock: whichever axis wins
-                                        // first owns the whole gesture.
-                                        if (abs(totalX) < AxisLockPx && abs(totalY) < AxisLockPx) return@detectDragGestures
-                                        locked = true
-                                        vertical = abs(totalX) <= abs(totalY)
-                                        onDragStart(vertical)
-                                    }
-                                    if (vertical) {
-                                        onDragDelta(delta.y)
-                                    } else {
-                                        val step = with(density) { IndentStep.toPx() }
-                                        val allowed = if (totalX > 0) canIndent else item.indent == 1
-                                        slideX = if (!allowed) 0f else totalX.coerceIn(-step, step)
-                                    }
-                                },
-                                onDragEnd = {
-                                    if (locked && vertical) {
-                                        onDragEnd()
-                                    } else if (locked) {
-                                        val step = with(density) { IndentStep.toPx() }
-                                        if (abs(slideX) >= step) {
-                                            onIndentChange(if (slideX > 0) 1 else 0)
+                        .onGloballyPositioned { handle.value = it }
+                        .pointerInput(item.id) {
+                            val axisLock = AxisLock.toPx()
+                            val step = IndentStep.toPx()
+                            awaitEachGesture {
+                                val down = awaitFirstDown()
+                                down.consume()
+                                val origin = handle.toRoot(down.position) ?: return@awaitEachGesture
+                                // Fixed for the whole gesture, as the web
+                                // reads them once on pointerdown.
+                                val canIndentNow = currentCanIndent
+                                val canOutdentNow = currentIndent == 1
+                                var mode = HandleGesture.Pending
+                                var deltaX = 0f
+                                var released = false
+                                try {
+                                    released = trackHandle(down, handle) { point ->
+                                        deltaX = point.x - origin.x
+                                        val deltaY = point.y - origin.y
+                                        if (mode == HandleGesture.Pending) {
+                                            // Whichever axis clears 8dp first owns
+                                            // the whole gesture, a tie going to
+                                            // the vertical carry.
+                                            if (abs(deltaX) < axisLock && abs(deltaY) < axisLock) return@trackHandle
+                                            mode = when {
+                                                abs(deltaX) > abs(deltaY) -> HandleGesture.Horizontal
+                                                currentOnLift(origin.y) -> HandleGesture.Vertical
+                                                else -> HandleGesture.Ignored
+                                            }
                                         }
-                                        slideX = 0f
+                                        when (mode) {
+                                            HandleGesture.Vertical -> drag.dragItemTo(point.y)
+                                            HandleGesture.Horizontal -> {
+                                                val allowed = (deltaX > 0 && canIndentNow) || (deltaX < 0 && canOutdentNow)
+                                                slideTo(if (allowed) deltaX.coerceIn(-step, step) else 0f)
+                                            }
+                                            else -> Unit
+                                        }
                                     }
-                                    locked = false
-                                },
-                                onDragCancel = {
-                                    if (locked && vertical) onDragCancel()
-                                    slideX = 0f
-                                    locked = false
-                                },
-                            )
+                                } finally {
+                                    if (!released) {
+                                        when (mode) {
+                                            HandleGesture.Vertical -> drag.cancel()
+                                            HandleGesture.Horizontal -> slideTo(0f)
+                                            else -> Unit
+                                        }
+                                    }
+                                }
+                                if (!released) return@awaitEachGesture
+                                when (mode) {
+                                    HandleGesture.Vertical -> currentOnDrop()
+                                    HandleGesture.Horizontal -> {
+                                        // A slide of a full step commits; the
+                                        // row already sits where its new
+                                        // margin puts it. A shorter one
+                                        // springs back.
+                                        val indent = canIndentNow && deltaX >= step
+                                        val outdent = canOutdentNow && deltaX <= -step
+                                        if (indent || outdent) {
+                                            currentOnIndentChange(if (indent) 1 else 0)
+                                            slideTo(0f)
+                                        } else {
+                                            slideScope.launch { slide.animateTo(0f, tween(durationMillis = 150, easing = ChecklistDragEasing)) }
+                                        }
+                                    }
+                                    else -> Unit
+                                }
+                            }
                         },
                 ) {
                     ChecklistDragHandle(dark = dark)
@@ -896,32 +813,96 @@ private fun ChecklistRowView(
                 modifier = Modifier.weight(1f),
             )
         }
-        if (!readOnly) {
-            // The row's 8dp gap plus the button's own ml-1.5, then -translate-x-2.
-            Box(
-                modifier = Modifier
-                    .padding(start = 14.dp)
-                    .offset(x = (-8).dp)
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .alpha(0.8f)
-                    .semantics { contentDescription = removeLabel }
-                    .gkTooltip(removeLabel)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Button,
-                    ) { onRemove() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "✕",
-                    color = if (dark) HandleDotDark else CheckedTextLight,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
+        // The row's 8dp gap plus the button's own ml-1.5.
+        if (!readOnly) ChecklistRemoveButton(dark = dark, gap = 14.dp, onRemove = onRemove)
+    }
+}
+
+/**
+ * The carried row's floating copy (useChecklistDrag.js:125-141): the row
+ * as it reads at rest, as wide as its content up to the row's own width,
+ * padded 4/12/4/4 on the note's background with the lift shadow, 3%
+ * larger until it settles. The web's copy keeps the row's inline indent
+ * margin on top of the row's own position, so an indented row floats one
+ * step further right.
+ */
+@Composable
+private fun ChecklistLiftedRow(
+    item: ChecklistItemData,
+    drag: ChecklistDragController,
+    background: Color,
+    dark: Boolean,
+    textColor: Color,
+) {
+    val density = LocalDensity.current
+    val shape = RoundedCornerShape(8.dp)
+    val links = remember(item.text) { ContactLinks.find(item.text) }
+    val placeholder = stringResource(R.string.native_checklist_item_placeholder)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .offset {
+                val indent = if (item.indent == 1) IndentStep.roundToPx() else 0
+                IntOffset(drag.liftedLeft.roundToInt() + indent, drag.liftedTop.roundToInt())
             }
-        }
+            .widthIn(max = with(density) { drag.liftedWidth.toDp() })
+            .graphicsLayer {
+                scaleX = 1.03f - 0.03f * drag.settle
+                scaleY = scaleX
+            }
+            .dropShadow(shape, checklistLiftShadow(drag.settle))
+            .background(background, shape)
+            .padding(start = 4.dp, top = 4.dp, end = 12.dp, bottom = 4.dp),
+    ) {
+        Box(Modifier.padding(horizontal = 4.dp)) { ChecklistDragHandle(dark = dark) }
+        Spacer(Modifier.width(8.dp))
+        GkCheckbox(checked = false, onCheckedChange = null)
+        Spacer(Modifier.width(6.dp))
+        Text(
+            if (item.text.isEmpty()) {
+                AnnotatedString(placeholder, SpanStyle(color = if (dark) PlaceholderDark else PlaceholderLight))
+            } else {
+                checklistRestText(item.text, links, checklistLinkStyle(dark, done = false))
+            },
+            color = textColor,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            modifier = Modifier.weight(1f, fill = false).padding(bottom = 3.dp),
+        )
+        ChecklistRemoveButton(dark = dark, gap = 14.dp, onRemove = null)
+    }
+}
+
+/** A row's "✕" (text-lg, semibold, at 80%), [gap] after the text and
+ *  pulled 8dp back by its -translate-x-2; without [onRemove], the lifted
+ *  copy's lookalike. */
+@Composable
+private fun ChecklistRemoveButton(dark: Boolean, gap: Dp, onRemove: (() -> Unit)?) {
+    val removeLabel = stringResource(R.string.native_checklist_remove_item)
+    Box(
+        modifier = Modifier
+            .padding(start = gap)
+            .offset(x = (-8).dp)
+            .size(24.dp)
+            .clip(CircleShape)
+            .alpha(0.8f)
+            .then(
+                if (onRemove != null) {
+                    Modifier
+                        .semantics { contentDescription = removeLabel }
+                        .gkTooltip(removeLabel)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onRemove() }
+                } else {
+                    Modifier
+                },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("✕", color = if (dark) HandleDotDark else CheckedTextLight, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -961,16 +942,7 @@ private fun ChecklistRowText(
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val uriHandler = LocalUriHandler.current
     val links = remember(text) { ContactLinks.find(text) }
-    // underline text-blue-600 / dark:text-blue-400, struck through too in
-    // the Done area.
-    val linkStyle = SpanStyle(
-        color = if (dark) Color(0xFF51A2FF) else Color(0xFF155DFC),
-        textDecoration = if (done) {
-            TextDecoration.combine(listOf(TextDecoration.Underline, TextDecoration.LineThrough))
-        } else {
-            TextDecoration.Underline
-        },
-    )
+    val linkStyle = checklistLinkStyle(dark, done)
     val atRest = remember(links, linkStyle) { ChecklistAtRestTransformation(links, linkStyle) }
 
     if (readOnly) {
@@ -1099,25 +1071,39 @@ private fun ChecklistRowText(
     )
 }
 
-/** A row at rest: its line breaks read as spaces and its contacts as
- *  links, the text itself untouched, character for character. */
+/** underline text-blue-600 / dark:text-blue-400, struck through too in
+ *  the Done area. */
+private fun checklistLinkStyle(dark: Boolean, done: Boolean) = SpanStyle(
+    color = if (dark) Color(0xFF51A2FF) else Color(0xFF155DFC),
+    textDecoration = if (done) {
+        TextDecoration.combine(listOf(TextDecoration.Underline, TextDecoration.LineThrough))
+    } else {
+        TextDecoration.Underline
+    },
+)
+
+/** A row's text as it reads at rest: its line breaks as spaces and its
+ *  contacts in [linkStyle], character for character. */
+private fun checklistRestText(text: String, links: List<ContactLink>, linkStyle: SpanStyle): AnnotatedString =
+    buildAnnotatedString {
+        append(text.replace('\n', ' '))
+        links.forEach { addStyle(linkStyle, it.start, it.end) }
+    }
+
+/** A row at rest, the text itself untouched. */
 private class ChecklistAtRestTransformation(
     private val links: List<ContactLink>,
     private val linkStyle: SpanStyle,
 ) : VisualTransformation {
-    override fun filter(text: AnnotatedString): TransformedText {
-        val shown = buildAnnotatedString {
-            append(text.text.replace('\n', ' '))
-            links.forEach { addStyle(linkStyle, it.start, it.end) }
-        }
-        return TransformedText(shown, OffsetMapping.Identity)
-    }
+    override fun filter(text: AnnotatedString): TransformedText =
+        TransformedText(checklistRestText(text.text, links, linkStyle), OffsetMapping.Identity)
 }
 
 /**
  * SectionHeader.jsx:212-342: handle, colour dot, collapse chevron, the
  * inline-editable title, the unchecked count and a delete button that
- * asks twice.
+ * asks twice. The handle lifts the whole section the moment it is
+ * touched, with no axis lock (handleSectionPointerDown).
  */
 @Composable
 private fun ChecklistSectionHeader(
@@ -1127,13 +1113,13 @@ private fun ChecklistSectionHeader(
     uncheckedCount: Int,
     dark: Boolean,
     borderColor: Color,
-    onDragStart: () -> Unit,
-    onDragDelta: (Float) -> Unit,
-    onDragEnd: () -> Unit,
-    onDragCancel: () -> Unit,
+    drag: ChecklistDragController,
+    onLift: (fingerRootY: Float) -> Boolean,
+    onDrop: () -> Unit,
     onChange: (ChecklistSectionData) -> Unit,
     onEnter: (title: String) -> Unit,
     onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     // text-gray-700 / dark:text-gray-200.
     val titleColor = if (dark) Color(0xFFE5E7EB) else Color(0xFF364153)
@@ -1158,6 +1144,9 @@ private fun ChecklistSectionHeader(
         if (confirmingRemove) R.string.native_checklist_confirm_remove_section else R.string.native_checklist_remove_section,
     )
     val moveLabel = stringResource(R.string.native_checklist_move_section)
+    val handle = remember { CoordinatesHolder() }
+    val currentOnLift by rememberUpdatedState(onLift)
+    val currentOnDrop by rememberUpdatedState(onDrop)
 
     // The confirmation falls back to a plain delete button after three
     // seconds, same as the web (SectionHeader.jsx:179-185).
@@ -1171,7 +1160,7 @@ private fun ChecklistSectionHeader(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .then(if (accent != null) Modifier.background(accent.copy(alpha = if (dark) 0.22f else 0.12f)) else Modifier)
             // A coloured header's bottom border adds its own 1dp.
@@ -1184,16 +1173,21 @@ private fun ChecklistSectionHeader(
                 modifier = Modifier
                     .semantics { contentDescription = moveLabel }
                     .gkTooltip(moveLabel)
+                    .onGloballyPositioned { handle.value = it }
                     .pointerInput(section.id) {
-                        detectDragGestures(
-                            onDragStart = { onDragStart() },
-                            onDrag = { change, delta ->
-                                change.consume()
-                                onDragDelta(delta.y)
-                            },
-                            onDragEnd = { onDragEnd() },
-                            onDragCancel = { onDragCancel() },
-                        )
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            down.consume()
+                            val start = handle.toRoot(down.position)
+                            val lifted = start != null && currentOnLift(start.y)
+                            var released = false
+                            try {
+                                released = trackHandle(down, handle) { point -> if (lifted) drag.dragBlockTo(point.y) }
+                            } finally {
+                                if (lifted && !released) drag.cancel()
+                            }
+                            if (lifted && released) currentOnDrop()
+                        }
                     },
             ) {
                 ChecklistDragHandle(dark = dark, small = true)
@@ -1477,8 +1471,8 @@ private fun ChecklistDragHandle(dark: Boolean, small: Boolean = false) {
 }
 
 @Composable
-private fun ChecklistAddRow(borderColor: Color, dark: Boolean, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
+private fun ChecklistAddRow(borderColor: Color, dark: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -1501,11 +1495,11 @@ private fun ChecklistAddRow(borderColor: Color, dark: Boolean, onClick: () -> Un
 
 /** `pl-4 py-1.5 text-xs`, as wide as its label only. */
 @Composable
-private fun ChecklistAddToSectionRow(dark: Boolean, onClick: () -> Unit) {
+private fun ChecklistAddToSectionRow(dark: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val tint = if (dark) CheckedTextDark else CheckedTextLight
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+        modifier = modifier
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -1658,7 +1652,6 @@ private fun ChecklistDoneRow(
     onBlur: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    val removeLabel = stringResource(R.string.native_checklist_remove_item)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(start = if (item.indent == 1) IndentStep else 0.dp),
@@ -1679,25 +1672,6 @@ private fun ChecklistDoneRow(
             onBlur = onBlur,
             modifier = Modifier.weight(1f),
         )
-        if (!readOnly) {
-            Box(
-                modifier = Modifier
-                    .padding(start = 6.dp)
-                    .offset(x = (-8).dp)
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .alpha(0.8f)
-                    .semantics { contentDescription = removeLabel }
-                    .gkTooltip(removeLabel)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Button,
-                    ) { onRemove() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("✕", color = if (dark) HandleDotDark else CheckedTextLight, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
+        if (!readOnly) ChecklistRemoveButton(dark = dark, gap = 6.dp, onRemove = onRemove)
     }
 }
