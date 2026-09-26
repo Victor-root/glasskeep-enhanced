@@ -7,15 +7,21 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,19 +53,39 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
@@ -78,6 +105,8 @@ import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.ChecklistPreview
 import com.glasskeep.app.nativeapp.data.ChecklistSectionData
+import com.glasskeep.app.nativeapp.data.ContactLink
+import com.glasskeep.app.nativeapp.data.ContactLinks
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.LightBorderColor
 import kotlinx.serialization.json.JsonArray
@@ -123,18 +152,9 @@ private val PlaceholderDark = Color(0xFF6A7282)
  *
  * Structural changes (reorder, indent, add, remove, section edits) hand
  * a whole new entry list back through [onEntriesChange]; typing does the
- * same with `persist = false`, since the web only saves a row's text
- * when it loses focus.
- *
- * Two web behaviours are deliberately not ported, both disclosed rather
- * than silently dropped: Enter with the caret at the very start of a row
- * inserting above it (knowing where the caret sits would mean tracking a
- * TextFieldValue per row for a minor convenience), and
- * Backspace-on-an-empty-row deleting it and focusing the previous one (a
- * soft keyboard's backspace on an already-empty field isn't reliably
- * delivered as a key event by every IME). Removing a row still works
- * through its own button.
+ * same with `persist = false`, and the row saves once it loses the focus.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChecklistEditorBody(
     entries: List<ChecklistEntry>,
@@ -210,12 +230,39 @@ fun ChecklistEditorBody(
         return (markerIndex + 1 until base.size).firstOrNull { base[it] is ChecklistSectionData } ?: base.size
     }
 
-    /** Enter inside a row: the new row lands above or below it depending
-     *  on the user's own insert-position preference. */
-    fun addItemAdjacent(anchorId: String) {
+    /** Enter inside a row: the new row lands above it with the caret at
+     *  the very start of the text or the "top" preference, below it
+     *  otherwise. */
+    fun addItemAdjacent(anchorId: String, atStart: Boolean) {
         val index = entries.indexOfFirst { it.id == anchorId }
         if (index < 0) return
-        insertItemAt(if (insertPosition == "top") index else index + 1)
+        insertItemAt(if (atStart || insertPosition == "top") index else index + 1)
+    }
+
+    // Set for the row that must take the focus with its caret at the end.
+    var caretToEndId by remember { mutableStateOf<String?>(null) }
+
+    /** Backspace in an empty row: it goes, and the caret moves to the end
+     *  of the row before it in the list (findPrevItemId). */
+    fun removeAndFocusPrevious(id: String) {
+        val index = entries.indexOfFirst { it.id == id }
+        if (index < 0) return
+        val previous = entries.subList(0, index).lastOrNull { it is ChecklistItemData }
+        commitEntries(entries.filterNot { it.id == id })
+        if (previous != null) {
+            caretToEndId = previous.id
+            onFocusItem(previous.id)
+        }
+    }
+
+    // A dismissed keyboard ends the typing, as the web blurs its field.
+    val imeVisible = WindowInsets.isImeVisible
+    val focusManager = LocalFocusManager.current
+    var editingInside by remember { mutableStateOf(false) }
+    var imeWasVisible by remember { mutableStateOf(imeVisible) }
+    LaunchedEffect(imeVisible) {
+        if (imeWasVisible && !imeVisible && editingInside) focusManager.clearFocus()
+        imeWasVisible = imeVisible
     }
 
     /** The global add row always adds outside every section: at the very
@@ -241,7 +288,12 @@ fun ChecklistEditorBody(
     }
 
     // max-sm:-mx-4: the list reaches 16dp past the note's text gutter.
-    Column(modifier = Modifier.fillMaxWidth().bleedHorizontally(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .bleedHorizontally(16.dp)
+            .onFocusChanged { editingInside = it.hasFocus },
+    ) {
         if (entries.isEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (insertPosition == "top") ChecklistAddRow(borderColor = borderColor, dark = dark) { addItemAtEdge() }
@@ -305,6 +357,8 @@ fun ChecklistEditorBody(
                         dropIndex = dropIndex,
                         rowHeights = rowHeights,
                         focusRequesterFor = focusRequesterFor,
+                        caretToEndId = caretToEndId,
+                        onCaretPlaced = { caretToEndId = null },
                         onRowHeight = { id, height -> rowHeights[id] = height },
                         onDragStart = { id, vertical -> draggingId = id; dragVertical = vertical; dragOffsetY = 0f },
                         onDragDelta = { dy -> dragOffsetY += dy },
@@ -334,7 +388,8 @@ fun ChecklistEditorBody(
                         // An emptied row stays, showing its placeholder: the web
                         // only drops an emptied row of the Done area.
                         onBlur = { commitEntries(entries) },
-                        onEnter = { id -> addItemAdjacent(id) },
+                        onEnter = { id, atStart -> addItemAdjacent(id, atStart) },
+                        onBackspaceEmpty = { id -> removeAndFocusPrevious(id) },
                         onRemove = { id -> commitEntries(entries.filterNot { it.id == id }) },
                         onAddToSection = { block.section?.let { insertItemAt(sectionInsertIndex(entries, it.id)) } },
                         onSectionEnter = { sectionId, title -> renameSectionAndAddItem(sectionId, title) },
@@ -373,6 +428,14 @@ fun ChecklistEditorBody(
                         onToggle = { id, checked ->
                             val ids = (listOf(id) + ChecklistItems.indentedChildren(entries, id).map { it.id }).toSet()
                             commitEntries(entries.map { if (it.id in ids && it is ChecklistItemData) it.copy(done = checked) else it })
+                        },
+                        onTextChange = { id, text ->
+                            commitEntries(entries.map { if (it.id == id && it is ChecklistItemData) it.copy(text = text) else it }, persist = false)
+                        },
+                        // Only a Done row emptied and left goes away.
+                        onBlur = { id ->
+                            val item = entries.firstOrNull { it.id == id } as? ChecklistItemData
+                            commitEntries(if (item != null && item.text.isBlank()) entries.filterNot { it.id == id } else entries)
                         },
                         onRemove = { id -> commitEntries(entries.filterNot { it.id == id }) },
                     )
@@ -464,6 +527,8 @@ private fun ChecklistSectionBlock(
     dropIndex: Int,
     rowHeights: Map<String, Int>,
     focusRequesterFor: (id: String) -> FocusRequester,
+    caretToEndId: String?,
+    onCaretPlaced: () -> Unit,
     onRowHeight: (String, Int) -> Unit,
     onDragStart: (String, Boolean) -> Unit,
     onDragDelta: (Float) -> Unit,
@@ -473,7 +538,8 @@ private fun ChecklistSectionBlock(
     onToggle: (String, Boolean) -> Unit,
     onTextChange: (String, String) -> Unit,
     onBlur: (String) -> Unit,
-    onEnter: (String) -> Unit,
+    onEnter: (id: String, atStart: Boolean) -> Unit,
+    onBackspaceEmpty: (String) -> Unit,
     onRemove: (String) -> Unit,
     onAddToSection: () -> Unit,
     onSectionChange: (ChecklistSectionData) -> Unit,
@@ -487,7 +553,7 @@ private fun ChecklistSectionBlock(
 
     @Composable
     fun Rows() {
-        for (item in unchecked) {
+        for (item in unchecked) key(item.id) {
             val visibleIndex = visibleIds.indexOf(item.id)
             val shift = neighbourShift(visibleIndex, draggedIndex, dropIndex, draggingId, rowHeights, visibleIds)
             ChecklistRowView(
@@ -496,6 +562,8 @@ private fun ChecklistSectionBlock(
                 titleColor = titleColor,
                 borderColor = borderColor,
                 focusRequester = focusRequesterFor(item.id),
+                caretToEnd = caretToEndId == item.id,
+                onCaretPlaced = onCaretPlaced,
                 dragging = draggingId == item.id,
                 draggingVertically = draggingId == item.id && dragVertical,
                 dragOffsetY = if (draggingId == item.id) dragOffsetY else 0f,
@@ -510,7 +578,8 @@ private fun ChecklistSectionBlock(
                 onToggle = { checked -> onToggle(item.id, checked) },
                 onTextChange = { text -> onTextChange(item.id, text) },
                 onBlur = { onBlur(item.id) },
-                onEnter = { onEnter(item.id) },
+                onEnter = { atStart -> onEnter(item.id, atStart) },
+                onBackspaceEmpty = { onBackspaceEmpty(item.id) },
                 onRemove = { onRemove(item.id) },
             )
         }
@@ -675,6 +744,8 @@ private fun ChecklistRowView(
     titleColor: Color,
     borderColor: Color,
     focusRequester: FocusRequester,
+    caretToEnd: Boolean,
+    onCaretPlaced: () -> Unit,
     dragging: Boolean,
     draggingVertically: Boolean,
     dragOffsetY: Float,
@@ -689,7 +760,8 @@ private fun ChecklistRowView(
     onToggle: (Boolean) -> Unit,
     onTextChange: (String) -> Unit,
     onBlur: () -> Unit,
-    onEnter: () -> Unit,
+    onEnter: (atStart: Boolean) -> Unit,
+    onBackspaceEmpty: () -> Unit,
     onRemove: () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -701,7 +773,6 @@ private fun ChecklistRowView(
     )
     val removeLabel = stringResource(R.string.native_checklist_remove_item)
     val moveLabel = stringResource(R.string.native_checklist_move_item)
-    val placeholder = stringResource(R.string.native_checklist_item_placeholder)
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -790,34 +861,22 @@ private fun ChecklistRowView(
             Spacer(Modifier.width(8.dp))
             GkCheckbox(checked = item.done, onCheckedChange = onToggle)
             Spacer(Modifier.width(6.dp))
-            BasicTextField(
-                value = item.text,
-                onValueChange = onTextChange,
-                textStyle = TextStyle(
-                    color = if (item.done) (if (dark) CheckedTextDark else CheckedTextLight) else titleColor,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    textDecoration = if (item.done) TextDecoration.LineThrough else TextDecoration.None,
-                ),
-                cursorBrush = SolidColor(titleColor),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                keyboardActions = KeyboardActions(onNext = { onEnter() }),
-                modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(focusRequester)
-                    .onFocusChanged { state -> if (!state.isFocused) onBlur() }
-                    // pb-0.5 and a 1px bottom border under the 20dp line.
-                    .padding(bottom = 3.dp),
-                decorationBox = { innerTextField ->
-                    if (item.text.isEmpty()) {
-                        Text(
-                            placeholder,
-                            color = if (dark) PlaceholderDark else PlaceholderLight,
-                            fontSize = 14.sp,
-                        )
-                    }
-                    innerTextField()
-                },
+            ChecklistRowText(
+                text = item.text,
+                done = false,
+                textColor = titleColor,
+                dark = dark,
+                borderColor = borderColor,
+                focusRequester = focusRequester,
+                caretToEnd = caretToEnd,
+                onCaretPlaced = onCaretPlaced,
+                onTextChange = onTextChange,
+                onBlur = onBlur,
+                onEnter = onEnter,
+                onBackspaceEmpty = onBackspaceEmpty,
+                onIndent = { if (canIndent) onIndentChange(1) },
+                onOutdent = { if (item.indent == 1) onIndentChange(0) },
+                modifier = Modifier.weight(1f),
             )
         }
         // The row's 8dp gap plus the button's own ml-1.5, then -translate-x-2.
@@ -844,6 +903,174 @@ private fun ChecklistRowView(
                 fontWeight = FontWeight.SemiBold,
             )
         }
+    }
+}
+
+/**
+ * ChecklistRow.jsx's text: 14/20 over a 2dp foot and a 1dp line that only
+ * shows while typing. At rest it reads like the web's span: line breaks as
+ * spaces, phone numbers and e-mail addresses as links a tap opens, and a
+ * grey "List item" when empty; tapped anywhere else it edits from there,
+ * its placeholder then at half the text's own strength. Enter makes a new
+ * row (above when the caret is at the very start), Backspace in an empty
+ * row removes it, Ctrl+] / Ctrl+[ indent and outdent; without [onEnter]
+ * (a Done row), Enter is a line break.
+ */
+@Composable
+private fun ChecklistRowText(
+    text: String,
+    done: Boolean,
+    textColor: Color,
+    dark: Boolean,
+    borderColor: Color,
+    focusRequester: FocusRequester,
+    caretToEnd: Boolean,
+    onCaretPlaced: () -> Unit,
+    onTextChange: (String) -> Unit,
+    onBlur: () -> Unit,
+    modifier: Modifier = Modifier,
+    onEnter: ((atStart: Boolean) -> Unit)? = null,
+    onBackspaceEmpty: (() -> Unit)? = null,
+    onIndent: (() -> Unit)? = null,
+    onOutdent: (() -> Unit)? = null,
+) {
+    var selection by remember { mutableStateOf(TextRange(text.length)) }
+    var composition by remember { mutableStateOf<TextRange?>(null) }
+    var focused by remember { mutableStateOf(false) }
+    var shiftEnter by remember { mutableStateOf(false) }
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val uriHandler = LocalUriHandler.current
+    val links = remember(text) { ContactLinks.find(text) }
+    // underline text-blue-600 / dark:text-blue-400, struck through too in
+    // the Done area.
+    val linkStyle = SpanStyle(
+        color = if (dark) Color(0xFF51A2FF) else Color(0xFF155DFC),
+        textDecoration = if (done) {
+            TextDecoration.combine(listOf(TextDecoration.Underline, TextDecoration.LineThrough))
+        } else {
+            TextDecoration.Underline
+        },
+    )
+    val atRest = remember(links, linkStyle) { ChecklistAtRestTransformation(links, linkStyle) }
+
+    LaunchedEffect(caretToEnd) {
+        if (caretToEnd) {
+            selection = TextRange(text.length)
+            onCaretPlaced()
+        }
+    }
+
+    val value = TextFieldValue(
+        text = text,
+        selection = TextRange(selection.start.coerceIn(0, text.length), selection.end.coerceIn(0, text.length)),
+        composition = composition?.takeIf { it.max <= text.length },
+    )
+    BasicTextField(
+        value = value,
+        onValueChange = { next ->
+            val newline = next.text == text.replaceRange(value.selection.min, value.selection.max, "\n")
+            if (newline && onEnter != null && !shiftEnter) {
+                onEnter(value.selection == TextRange.Zero)
+                return@BasicTextField
+            }
+            shiftEnter = false
+            selection = next.selection
+            composition = next.composition
+            if (next.text != text) onTextChange(next.text)
+        },
+        textStyle = TextStyle(
+            color = textColor,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None,
+        ),
+        cursorBrush = SolidColor(textColor),
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+        visualTransformation = if (focused) VisualTransformation.None else atRest,
+        onTextLayout = { layout = it },
+        modifier = modifier
+            .focusRequester(focusRequester)
+            .onFocusChanged { state ->
+                if (focused && !state.isFocused) onBlur()
+                focused = state.isFocused
+            }
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                val command = event.isCtrlPressed || event.isMetaPressed
+                when {
+                    event.key == Key.Enter && event.isShiftPressed -> {
+                        shiftEnter = true
+                        false
+                    }
+                    event.key == Key.Enter && onEnter != null && !command && !event.isAltPressed -> {
+                        onEnter(value.selection == TextRange.Zero)
+                        true
+                    }
+                    event.key == Key.Backspace && onBackspaceEmpty != null && text.isEmpty() &&
+                        !command && !event.isShiftPressed && !event.isAltPressed -> {
+                        onBackspaceEmpty()
+                        true
+                    }
+                    command && !event.isShiftPressed && !event.isAltPressed && event.key == Key.RightBracket && onIndent != null -> {
+                        onIndent()
+                        true
+                    }
+                    command && !event.isShiftPressed && !event.isAltPressed && event.key == Key.LeftBracket && onOutdent != null -> {
+                        onOutdent()
+                        true
+                    }
+                    else -> false
+                }
+            }
+            // At rest, a tap on a link opens it instead of editing.
+            .pointerInput(links, focused) {
+                if (focused || links.isEmpty()) return@pointerInput
+                awaitEachGesture {
+                    val down = awaitFirstDown(pass = PointerEventPass.Initial)
+                    val shown = layout ?: return@awaitEachGesture
+                    val link = links.firstOrNull { link ->
+                        (link.start until link.end).any { shown.getBoundingBox(it).contains(down.position) }
+                    } ?: return@awaitEachGesture
+                    down.consume()
+                    val up = waitForUpOrCancellation(pass = PointerEventPass.Initial) ?: return@awaitEachGesture
+                    up.consume()
+                    uriHandler.openUri(link.uri)
+                }
+            }
+            // pb-0.5, then the 1px bottom border, drawn only while typing.
+            .bottomHairline(if (focused) borderColor else null)
+            .padding(bottom = 3.dp),
+        decorationBox = { innerTextField ->
+            if (text.isEmpty()) {
+                Text(
+                    stringResource(R.string.native_checklist_item_placeholder),
+                    color = when {
+                        focused -> textColor.copy(alpha = 0.5f)
+                        dark -> PlaceholderDark
+                        else -> PlaceholderLight
+                    },
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None,
+                )
+            }
+            innerTextField()
+        },
+    )
+}
+
+/** A row at rest: its line breaks read as spaces and its contacts as
+ *  links, the text itself untouched, character for character. */
+private class ChecklistAtRestTransformation(
+    private val links: List<ContactLink>,
+    private val linkStyle: SpanStyle,
+) : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val shown = buildAnnotatedString {
+            append(text.text.replace('\n', ' '))
+            links.forEach { addStyle(linkStyle, it.start, it.end) }
+        }
+        return TransformedText(shown, OffsetMapping.Identity)
     }
 }
 
@@ -980,7 +1207,7 @@ private fun ChecklistSectionHeader(
                 singleLine = true,
                 textStyle = TextStyle(color = titleColor, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
                 cursorBrush = SolidColor(titleColor),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(
                     onDone = {
                         enterPressed = true
@@ -1286,6 +1513,8 @@ private fun ChecklistDoneArea(
     borderColor: Color,
     onToggleCollapsed: () -> Unit,
     onToggle: (String, Boolean) -> Unit,
+    onTextChange: (String, String) -> Unit,
+    onBlur: (String) -> Unit,
     onRemove: (String) -> Unit,
 ) {
     val checkedCount = blocks.sumOf { block -> block.items.count { it.done } }
@@ -1350,12 +1579,17 @@ private fun ChecklistDoneArea(
                         )
                     }
                     checked.forEach { item ->
-                        ChecklistDoneRow(
-                            item = item,
-                            dark = dark,
-                            onToggle = { value -> onToggle(item.id, value) },
-                            onRemove = { onRemove(item.id) },
-                        )
+                        key(item.id) {
+                            ChecklistDoneRow(
+                                item = item,
+                                dark = dark,
+                                borderColor = borderColor,
+                                onToggle = { value -> onToggle(item.id, value) },
+                                onTextChange = { text -> onTextChange(item.id, text) },
+                                onBlur = { onBlur(item.id) },
+                                onRemove = { onRemove(item.id) },
+                            )
+                        }
                     }
                 }
             }
@@ -1363,13 +1597,16 @@ private fun ChecklistDoneArea(
     }
 }
 
-/** A checked row: box, struck-through text and its own "✕", pulled 8dp
- *  left like the web's. */
+/** A checked row: box, struck-through text, still editable, and its own
+ *  "✕", pulled 8dp left like the web's. */
 @Composable
 private fun ChecklistDoneRow(
     item: ChecklistItemData,
     dark: Boolean,
+    borderColor: Color,
     onToggle: (Boolean) -> Unit,
+    onTextChange: (String) -> Unit,
+    onBlur: () -> Unit,
     onRemove: () -> Unit,
 ) {
     val removeLabel = stringResource(R.string.native_checklist_remove_item)
@@ -1379,13 +1616,18 @@ private fun ChecklistDoneRow(
     ) {
         GkCheckbox(checked = true, onCheckedChange = onToggle)
         Spacer(Modifier.width(6.dp))
-        Text(
-            item.text,
-            color = if (dark) CheckedTextDark else CheckedTextLight,
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            textDecoration = TextDecoration.LineThrough,
-            modifier = Modifier.weight(1f).padding(bottom = 3.dp),
+        ChecklistRowText(
+            text = item.text,
+            done = true,
+            textColor = if (dark) CheckedTextDark else CheckedTextLight,
+            dark = dark,
+            borderColor = borderColor,
+            focusRequester = remember { FocusRequester() },
+            caretToEnd = false,
+            onCaretPlaced = {},
+            onTextChange = onTextChange,
+            onBlur = onBlur,
+            modifier = Modifier.weight(1f),
         )
         Box(
             modifier = Modifier
