@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp.ui
 
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -93,7 +94,7 @@ private fun sectionColorOf(key: String?): Color? =
 
 private val HandleDotLight = Color(0xFF99A1AF)
 private val HandleDotDark = Color(0xFFD1D5DC)
-private val DoneCountBg = Color(0x24647488)
+private val DoneCountBg = Color(0x2464748B)
 private val DoneCountFg = Color(0xFF64748B)
 private val CheckedTextLight = Color(0xFF6A7282)
 private val CheckedTextDark = Color(0xFF99A1AF)
@@ -127,7 +128,6 @@ fun ChecklistEditorBody(
     removeSectionBehavior: String,
     dark: Boolean,
     titleColor: Color,
-    subtextColor: Color,
     borderColor: Color,
     doneCollapsed: Boolean,
     focusRequesterFor: (id: String) -> FocusRequester,
@@ -193,20 +193,24 @@ fun ChecklistEditorBody(
         insertItemAt(if (insertPosition == "top") index else index + 1)
     }
 
-    /** The global add row: the very top or the very bottom of the list. */
+    /** The global add row always adds outside every section: at the very
+     *  top, or at the end of the unsectioned rows, just before the first
+     *  section (insertAtTop / insertAtBottom). */
     fun addItemAtEdge() {
-        insertItemAt(if (insertPosition == "top") 0 else entries.size)
+        val firstMarker = entries.indexOfFirst { it is ChecklistSectionData }
+        insertItemAt(if (insertPosition == "top") 0 else if (firstMarker < 0) entries.size else firstMarker)
     }
 
-    /** "Add to section…": right after that section's last row, or right
-     *  after its marker when it has none yet. */
-    fun addItemInSection(sectionId: String?) {
-        if (sectionId == null) {
-            addItemAtEdge()
-            return
-        }
+    /** "Add to section…": right under its header with the "top"
+     *  preference, after its last row otherwise (insertAtSectionStart /
+     *  insertAtSectionEnd). */
+    fun addItemInSection(sectionId: String) {
         val markerIndex = entries.indexOfFirst { it.id == sectionId }
         if (markerIndex < 0) return
+        if (insertPosition == "top") {
+            insertItemAt(markerIndex + 1)
+            return
+        }
         var last = markerIndex
         for (i in markerIndex + 1 until entries.size) {
             if (entries[i] is ChecklistSectionData) break
@@ -215,159 +219,151 @@ fun ChecklistEditorBody(
         insertItemAt(last + 1)
     }
 
-    Column(
-        modifier = Modifier.fillMaxWidth().bleedHorizontally(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        if (insertPosition == "top") {
-            ChecklistAddRow(borderColor = borderColor, dark = dark) { addItemAtEdge() }
-        }
+    fun addSection() {
+        // The marker comes with one empty row under it, so the new
+        // section is never born empty (ChecklistEditor.jsx:198-208).
+        val newSection = ChecklistItems.newSection()
+        val newItem = ChecklistItems.newItem()
+        commitEntries(entries + newSection + newItem)
+        onFocusItem(newItem.id)
+    }
 
-        if (entries.none { it is ChecklistItemData }) {
-            Text(
-                stringResource(R.string.native_checklist_empty),
-                color = subtextColor,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            blocks.forEachIndexed { blockIndex, block ->
-                val unchecked = block.items.filterNot { it.done }
-                if (block.section == null && unchecked.isEmpty() && blocks.size > 1) return@forEachIndexed
-                val blockKey = block.section?.id ?: DefaultBlockKey
-                ChecklistSectionBlock(
-                    block = block,
-                    entries = entries,
-                    blockDragging = draggingSectionId == blockKey,
-                    blockDragOffsetY = if (draggingSectionId == blockKey) sectionDragOffsetY else 0f,
-                    blockShift = blockNeighbourShift(
-                        blockIndex,
-                        draggedBlockIndex,
-                        blockDropIndex,
-                        blockKeys,
-                        blockHeights,
-                        blockGapPx,
-                    ),
-                    onBlockHeight = { height -> blockHeights[blockKey] = height },
-                    onSectionDragStart = {
-                        draggingSectionId = blockKey
-                        sectionDragOffsetY = 0f
-                    },
-                    onSectionDragDelta = { dy -> sectionDragOffsetY += dy },
-                    onSectionDragEnd = {
-                        val from = draggedBlockIndex
-                        val to = blockDropIndex
-                        draggingSectionId = null
-                        sectionDragOffsetY = 0f
-                        if (from >= 0 && to >= 0 && to != from) {
-                            val reordered = blockKeys.toMutableList().apply { add(to, removeAt(from)) }
-                            commitEntries(
-                                ChecklistItems.reorderSections(entries, reordered.filterNot { it == DefaultBlockKey }),
-                            )
-                        }
-                    },
-                    onSectionDragCancel = { draggingSectionId = null; sectionDragOffsetY = 0f },
-                    dark = dark,
-                    titleColor = titleColor,
-                    subtextColor = subtextColor,
-                    borderColor = borderColor,
-                    visibleIds = visibleIds,
-                    draggingId = draggingId,
-                    dragVertical = dragVertical,
-                    dragOffsetY = dragOffsetY,
-                    draggedIndex = draggedIndex,
-                    dropIndex = dropIndex,
-                    rowHeights = rowHeights,
-                    focusRequesterFor = focusRequesterFor,
-                    onRowHeight = { id, height -> rowHeights[id] = height },
-                    onDragStart = { id, vertical -> draggingId = id; dragVertical = vertical; dragOffsetY = 0f },
-                    onDragDelta = { dy -> dragOffsetY += dy },
-                    onDragEnd = {
-                        val id = draggingId
-                        val from = draggedIndex
-                        val to = dropIndex
-                        draggingId = null
-                        dragOffsetY = 0f
-                        if (id != null && from >= 0 && to >= 0 && to != from) {
-                            commitEntries(moveItem(entries, id, visibleIds, to))
-                        }
-                    },
-                    onDragCancel = { draggingId = null; dragOffsetY = 0f },
-                    onIndentChange = { id, indent ->
-                        commitEntries(entries.map { if (it.id == id && it is ChecklistItemData) it.copy(indent = indent) else it })
-                    },
-                    onToggle = { id, checked ->
-                        // A parent carries its own indented children with
-                        // it, Google Keep style (ChecklistEditor.jsx:104).
-                        val ids = (listOf(id) + ChecklistItems.indentedChildren(entries, id).map { it.id }).toSet()
-                        commitEntries(entries.map { if (it.id in ids && it is ChecklistItemData) it.copy(done = checked) else it })
-                    },
-                    onTextChange = { id, text ->
-                        commitEntries(entries.map { if (it.id == id && it is ChecklistItemData) it.copy(text = text) else it }, persist = false)
-                    },
-                    onBlur = { id ->
-                        val item = entries.firstOrNull { it.id == id } as? ChecklistItemData
-                        if (item != null && item.text.isBlank()) {
-                            commitEntries(entries.filterNot { it.id == id })
-                        } else {
-                            commitEntries(entries)
-                        }
-                    },
-                    onEnter = { id -> addItemAdjacent(id) },
-                    onRemove = { id -> commitEntries(entries.filterNot { it.id == id }) },
-                    onAddToSection = { addItemInSection(block.section?.id) },
-                    onSectionChange = { updatedSection ->
-                        commitEntries(entries.map { if (it.id == updatedSection.id) updatedSection else it })
-                    },
-                    onSectionRemove = { sectionId ->
-                        // Two behaviours, the user's own choice
-                        // (ChecklistEditor.jsx:220-230): "cascade" takes
-                        // the section's rows with it, "keep" moves them
-                        // back into the block at the top.
-                        commitEntries(
-                            if (removeSectionBehavior == "keep") {
-                                ChecklistItems.removeSectionKeepItems(entries, sectionId)
-                            } else {
-                                ChecklistItems.removeSectionWithItems(entries, sectionId)
-                            },
-                        )
-                    },
-                    isFirstBlock = blockIndex == 0,
+    // max-sm:-mx-4: the list reaches 16dp past the note's text gutter.
+    Column(modifier = Modifier.fillMaxWidth().bleedHorizontally(16.dp)) {
+        if (entries.isEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (insertPosition == "top") ChecklistAddRow(borderColor = borderColor, dark = dark) { addItemAtEdge() }
+                Text(
+                    stringResource(R.string.native_checklist_empty),
+                    color = CheckedTextLight,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
                 )
+                if (insertPosition != "top") ChecklistAddRow(borderColor = borderColor, dark = dark) { addItemAtEdge() }
+                ChecklistAddSectionButton(borderColor = borderColor, dark = dark, modifier = Modifier.padding(top = 8.dp)) {
+                    addSection()
+                }
             }
-        }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                blocks.forEachIndexed { blockIndex, block ->
+                    val blockKey = block.section?.id ?: DefaultBlockKey
+                    ChecklistSectionBlock(
+                        block = block,
+                        entries = entries,
+                        insertPosition = insertPosition,
+                        onAddAtEdge = { addItemAtEdge() },
+                        blockDragging = draggingSectionId == blockKey,
+                        blockDragOffsetY = if (draggingSectionId == blockKey) sectionDragOffsetY else 0f,
+                        blockShift = blockNeighbourShift(
+                            blockIndex,
+                            draggedBlockIndex,
+                            blockDropIndex,
+                            blockKeys,
+                            blockHeights,
+                            blockGapPx,
+                        ),
+                        onBlockHeight = { height -> blockHeights[blockKey] = height },
+                        onSectionDragStart = {
+                            draggingSectionId = blockKey
+                            sectionDragOffsetY = 0f
+                        },
+                        onSectionDragDelta = { dy -> sectionDragOffsetY += dy },
+                        onSectionDragEnd = {
+                            val from = draggedBlockIndex
+                            val to = blockDropIndex
+                            draggingSectionId = null
+                            sectionDragOffsetY = 0f
+                            if (from >= 0 && to >= 0 && to != from) {
+                                val reordered = blockKeys.toMutableList().apply { add(to, removeAt(from)) }
+                                commitEntries(
+                                    ChecklistItems.reorderSections(entries, reordered.filterNot { it == DefaultBlockKey }),
+                                )
+                            }
+                        },
+                        onSectionDragCancel = { draggingSectionId = null; sectionDragOffsetY = 0f },
+                        dark = dark,
+                        titleColor = titleColor,
+                        borderColor = borderColor,
+                        visibleIds = visibleIds,
+                        draggingId = draggingId,
+                        dragVertical = dragVertical,
+                        dragOffsetY = dragOffsetY,
+                        draggedIndex = draggedIndex,
+                        dropIndex = dropIndex,
+                        rowHeights = rowHeights,
+                        focusRequesterFor = focusRequesterFor,
+                        onRowHeight = { id, height -> rowHeights[id] = height },
+                        onDragStart = { id, vertical -> draggingId = id; dragVertical = vertical; dragOffsetY = 0f },
+                        onDragDelta = { dy -> dragOffsetY += dy },
+                        onDragEnd = {
+                            val id = draggingId
+                            val from = draggedIndex
+                            val to = dropIndex
+                            draggingId = null
+                            dragOffsetY = 0f
+                            if (id != null && from >= 0 && to >= 0 && to != from) {
+                                commitEntries(moveItem(entries, id, visibleIds, to))
+                            }
+                        },
+                        onDragCancel = { draggingId = null; dragOffsetY = 0f },
+                        onIndentChange = { id, indent ->
+                            commitEntries(entries.map { if (it.id == id && it is ChecklistItemData) it.copy(indent = indent) else it })
+                        },
+                        onToggle = { id, checked ->
+                            // A parent carries its own indented children with
+                            // it, Google Keep style (ChecklistEditor.jsx:104).
+                            val ids = (listOf(id) + ChecklistItems.indentedChildren(entries, id).map { it.id }).toSet()
+                            commitEntries(entries.map { if (it.id in ids && it is ChecklistItemData) it.copy(done = checked) else it })
+                        },
+                        onTextChange = { id, text ->
+                            commitEntries(entries.map { if (it.id == id && it is ChecklistItemData) it.copy(text = text) else it }, persist = false)
+                        },
+                        // An emptied row stays, showing its placeholder: the web
+                        // only drops an emptied row of the Done area.
+                        onBlur = { commitEntries(entries) },
+                        onEnter = { id -> addItemAdjacent(id) },
+                        onRemove = { id -> commitEntries(entries.filterNot { it.id == id }) },
+                        onAddToSection = { block.section?.let { addItemInSection(it.id) } },
+                        onSectionChange = { updatedSection ->
+                            commitEntries(entries.map { if (it.id == updatedSection.id) updatedSection else it })
+                        },
+                        onSectionRemove = { sectionId ->
+                            // Two behaviours, the user's own choice
+                            // (ChecklistEditor.jsx:220-230): "cascade" takes
+                            // the section's rows with it, "keep" moves them
+                            // back into the block at the top.
+                            commitEntries(
+                                if (removeSectionBehavior == "keep") {
+                                    ChecklistItems.removeSectionKeepItems(entries, sectionId)
+                                } else {
+                                    ChecklistItems.removeSectionWithItems(entries, sectionId)
+                                },
+                            )
+                        },
+                    )
+                }
 
-        if (insertPosition != "top") {
-            ChecklistAddRow(borderColor = borderColor, dark = dark) { addItemAtEdge() }
-        }
+                ChecklistAddSectionButton(borderColor = borderColor, dark = dark, modifier = Modifier.padding(top = 4.dp)) {
+                    addSection()
+                }
 
-        if (hasChecked) {
-            ChecklistDoneArea(
-                blocks = blocks,
-                collapsed = doneCollapsed,
-                dark = dark,
-                titleColor = titleColor,
-                subtextColor = subtextColor,
-                borderColor = borderColor,
-                onToggleCollapsed = { onDoneCollapsedChange(!doneCollapsed) },
-                onToggle = { id, checked ->
-                    val ids = (listOf(id) + ChecklistItems.indentedChildren(entries, id).map { it.id }).toSet()
-                    commitEntries(entries.map { if (it.id in ids && it is ChecklistItemData) it.copy(done = checked) else it })
-                },
-                onRemove = { id -> commitEntries(entries.filterNot { it.id == id }) },
-            )
-        }
-
-        // "+ Add section" adds the marker and one empty row under it, so
-        // the new section is never born empty (ChecklistEditor.jsx:187).
-        Box(Modifier.padding(horizontal = 16.dp)) {
-            ChecklistAddSectionButton(borderColor = borderColor, subtextColor = subtextColor) {
-                val newSection = ChecklistItems.newSection()
-                val newItem = ChecklistItems.newItem()
-                commitEntries(entries + newSection + newItem)
-                onFocusItem(newItem.id)
+                // Its own 16dp top margin folds into the 24dp above it.
+                if (hasChecked) {
+                    ChecklistDoneArea(
+                        blocks = blocks,
+                        showSectionLabels = blocks.size > 1,
+                        collapsed = doneCollapsed,
+                        dark = dark,
+                        borderColor = borderColor,
+                        onToggleCollapsed = { onDoneCollapsedChange(!doneCollapsed) },
+                        onToggle = { id, checked ->
+                            val ids = (listOf(id) + ChecklistItems.indentedChildren(entries, id).map { it.id }).toSet()
+                            commitEntries(entries.map { if (it.id in ids && it is ChecklistItemData) it.copy(done = checked) else it })
+                        },
+                        onRemove = { id -> commitEntries(entries.filterNot { it.id == id }) },
+                    )
+                }
             }
         }
     }
@@ -428,10 +424,14 @@ private fun moveItem(
     return updated
 }
 
+/** One block of the list: the unsectioned rows with the global add row,
+ *  or a section with its header, tinted rows and "Add to section…". */
 @Composable
 private fun ChecklistSectionBlock(
     block: ChecklistBlock,
     entries: List<ChecklistEntry>,
+    insertPosition: String,
+    onAddAtEdge: () -> Unit,
     blockDragging: Boolean,
     blockDragOffsetY: Float,
     blockShift: Float,
@@ -442,7 +442,6 @@ private fun ChecklistSectionBlock(
     onSectionDragCancel: () -> Unit,
     dark: Boolean,
     titleColor: Color,
-    subtextColor: Color,
     borderColor: Color,
     visibleIds: List<String>,
     draggingId: String?,
@@ -466,12 +465,42 @@ private fun ChecklistSectionBlock(
     onAddToSection: () -> Unit,
     onSectionChange: (ChecklistSectionData) -> Unit,
     onSectionRemove: (String) -> Unit,
-    isFirstBlock: Boolean,
 ) {
     val section = block.section
     val accent = sectionColorOf(section?.color)
     val unchecked = block.items.filterNot { it.done }
     val collapsed = section?.collapsed == true
+
+    @Composable
+    fun Rows() {
+        for (item in unchecked) {
+            val visibleIndex = visibleIds.indexOf(item.id)
+            val shift = neighbourShift(visibleIndex, draggedIndex, dropIndex, draggingId, rowHeights, visibleIds)
+            ChecklistRowView(
+                item = item,
+                dark = dark,
+                titleColor = titleColor,
+                borderColor = borderColor,
+                focusRequester = focusRequesterFor(item.id),
+                dragging = draggingId == item.id,
+                draggingVertically = draggingId == item.id && dragVertical,
+                dragOffsetY = if (draggingId == item.id) dragOffsetY else 0f,
+                neighbourShift = shift,
+                canIndent = ChecklistItems.canIndent(entries, item.id),
+                onHeight = { height -> onRowHeight(item.id, height) },
+                onDragStart = { vertical -> onDragStart(item.id, vertical) },
+                onDragDelta = onDragDelta,
+                onDragEnd = onDragEnd,
+                onDragCancel = onDragCancel,
+                onIndentChange = { indent -> onIndentChange(item.id, indent) },
+                onToggle = { checked -> onToggle(item.id, checked) },
+                onTextChange = { text -> onTextChange(item.id, text) },
+                onBlur = { onBlur(item.id) },
+                onEnter = { onEnter(item.id) },
+                onRemove = { onRemove(item.id) },
+            )
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -488,75 +517,58 @@ private fun ChecklistSectionBlock(
                     clip = false
                 }
             }
-            .padding(horizontal = if (section == null) 16.dp else 8.dp),
+            // max-sm:-mx-2: a section reaches the panel's own edges.
+            .then(if (section != null) Modifier.bleedHorizontally(8.dp) else Modifier),
     ) {
-        if (section != null) {
-            ChecklistSectionHeader(
-                section = section,
-                accent = accent,
-                uncheckedCount = unchecked.size,
-                dark = dark,
-                titleColor = titleColor,
-                subtextColor = subtextColor,
-                onDragStart = onSectionDragStart,
-                onDragDelta = onSectionDragDelta,
-                onDragEnd = onSectionDragEnd,
-                onDragCancel = onSectionDragCancel,
-                onChange = onSectionChange,
-                onRemove = { onSectionRemove(section.id) },
-            )
-        }
-        if (!collapsed) {
+        if (section == null) {
+            // space-y-3 around the rows. An empty row list still carries its
+            // 12dp margin: under the "bottom" add row it collapses above the
+            // block, over the "top" one into the 24dp gap that follows.
+            if (insertPosition == "top") {
+                ChecklistAddRow(borderColor = borderColor, dark = dark, onClick = onAddAtEdge)
+                if (unchecked.isNotEmpty()) Spacer(Modifier.height(12.dp))
+            } else if (unchecked.isEmpty()) {
+                Spacer(Modifier.height(12.dp))
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { Rows() }
+            if (insertPosition != "top") {
+                if (unchecked.isNotEmpty()) Spacer(Modifier.height(12.dp))
+                ChecklistAddRow(borderColor = borderColor, dark = dark, onClick = onAddAtEdge)
+            }
+        } else {
+            // The 3px accent is a left border on header and rows together,
+            // so it survives a collapse and pushes the header in too.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(
-                        if (accent != null) {
-                            Modifier.background(accent.copy(alpha = if (dark) 0.09f else 0.04f))
-                        } else {
-                            Modifier
-                        },
-                    )
-                    .then(
-                        if (accent != null) {
-                            Modifier.drawSectionAccent(accent, dark).padding(start = 3.dp)
-                        } else {
-                            Modifier
-                        },
-                    )
-                    .padding(start = if (section != null) 12.dp else 0.dp, top = if (section != null) 4.dp else 0.dp, bottom = if (section != null) 4.dp else 0.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .then(if (accent != null) Modifier.drawSectionAccent(accent, dark).padding(start = 3.dp) else Modifier),
             ) {
-                for (item in unchecked) {
-                    val visibleIndex = visibleIds.indexOf(item.id)
-                    val shift = neighbourShift(visibleIndex, draggedIndex, dropIndex, draggingId, rowHeights, visibleIds)
-                    ChecklistRowView(
-                        item = item,
-                        dark = dark,
-                        titleColor = titleColor,
-                        subtextColor = subtextColor,
-                        borderColor = borderColor,
-                        focusRequester = focusRequesterFor(item.id),
-                        dragging = draggingId == item.id,
-                        draggingVertically = draggingId == item.id && dragVertical,
-                        dragOffsetY = if (draggingId == item.id) dragOffsetY else 0f,
-                        neighbourShift = shift,
-                        canIndent = ChecklistItems.canIndent(entries, item.id),
-                        onHeight = { height -> onRowHeight(item.id, height) },
-                        onDragStart = { vertical -> onDragStart(item.id, vertical) },
-                        onDragDelta = onDragDelta,
-                        onDragEnd = onDragEnd,
-                        onDragCancel = onDragCancel,
-                        onIndentChange = { indent -> onIndentChange(item.id, indent) },
-                        onToggle = { checked -> onToggle(item.id, checked) },
-                        onTextChange = { text -> onTextChange(item.id, text) },
-                        onBlur = { onBlur(item.id) },
-                        onEnter = { onEnter(item.id) },
-                        onRemove = { onRemove(item.id) },
-                    )
-                }
-                if (section != null) {
-                    ChecklistAddToSectionRow(subtextColor = subtextColor, onClick = onAddToSection)
+                ChecklistSectionHeader(
+                    section = section,
+                    accent = accent,
+                    uncheckedCount = unchecked.size,
+                    dark = dark,
+                    onDragStart = onSectionDragStart,
+                    onDragDelta = onSectionDragDelta,
+                    onDragEnd = onSectionDragEnd,
+                    onDragCancel = onSectionDragCancel,
+                    onChange = onSectionChange,
+                    onRemove = { onSectionRemove(section.id) },
+                )
+                if (!collapsed) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (accent != null) Modifier.background(accent.copy(alpha = if (dark) 0.09f else 0.04f)) else Modifier),
+                    ) {
+                        if (unchecked.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) { Rows() }
+                        }
+                        ChecklistAddToSectionRow(dark = dark, onClick = onAddToSection)
+                    }
                 }
             }
         }
@@ -645,7 +657,6 @@ private fun ChecklistRowView(
     item: ChecklistItemData,
     dark: Boolean,
     titleColor: Color,
-    subtextColor: Color,
     borderColor: Color,
     focusRequester: FocusRequester,
     dragging: Boolean,
@@ -778,7 +789,9 @@ private fun ChecklistRowView(
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(focusRequester)
-                    .onFocusChanged { state -> if (!state.isFocused) onBlur() },
+                    .onFocusChanged { state -> if (!state.isFocused) onBlur() }
+                    // pb-0.5 and a 1px bottom border under the 20dp line.
+                    .padding(bottom = 3.dp),
                 decorationBox = { innerTextField ->
                     if (item.text.isEmpty()) {
                         Text(
@@ -791,9 +804,10 @@ private fun ChecklistRowView(
                 },
             )
         }
+        // The row's 8dp gap plus the button's own ml-1.5, then -translate-x-2.
         Box(
             modifier = Modifier
-                .padding(start = 6.dp)
+                .padding(start = 14.dp)
                 .offset(x = (-8).dp)
                 .size(24.dp)
                 .clip(CircleShape)
@@ -828,8 +842,6 @@ private fun ChecklistSectionHeader(
     accent: Color?,
     uncheckedCount: Int,
     dark: Boolean,
-    titleColor: Color,
-    subtextColor: Color,
     onDragStart: () -> Unit,
     onDragDelta: (Float) -> Unit,
     onDragEnd: () -> Unit,
@@ -837,6 +849,8 @@ private fun ChecklistSectionHeader(
     onChange: (ChecklistSectionData) -> Unit,
     onRemove: () -> Unit,
 ) {
+    // text-gray-700 / dark:text-gray-200.
+    val titleColor = if (dark) Color(0xFFE5E7EB) else Color(0xFF364153)
     var editingTitle by remember(section.id) { mutableStateOf(section.title.isBlank()) }
     var pickerOpen by remember(section.id) { mutableStateOf(false) }
     var confirmingRemove by remember(section.id) { mutableStateOf(false) }
@@ -864,7 +878,9 @@ private fun ChecklistSectionHeader(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (accent != null) Modifier.background(accent.copy(alpha = if (dark) 0.22f else 0.12f)) else Modifier)
+            // A coloured header's bottom border adds its own 1dp.
             .bottomHairline(accent?.copy(alpha = if (dark) 0.35f else 0.20f))
+            .padding(bottom = if (accent != null) 1.dp else 0.dp)
             .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
         Box(
@@ -894,7 +910,8 @@ private fun ChecklistSectionHeader(
                         if (accent != null) {
                             Modifier.background(accent)
                         } else {
-                            Modifier.border(2.dp, if (dark) PlaceholderDark else HandleDotLight, CircleShape)
+                            // border-gray-300 / dark:border-gray-500.
+                            Modifier.border(2.dp, if (dark) Color(0xFF6A7282) else Color(0xFFD1D5DC), CircleShape)
                         },
                     )
                     .semantics { contentDescription = colorLabel }
@@ -925,18 +942,14 @@ private fun ChecklistSectionHeader(
                 ) { onChange(section.copy(collapsed = !section.collapsed)) },
             contentAlignment = Alignment.Center,
         ) {
-            ChevronDownIcon(
-                modifier = Modifier.rotate(if (section.collapsed) -90f else 0f),
-                size = 14.dp,
-                tint = if (dark) PlaceholderDark else HandleDotLight,
-            )
+            ChecklistChevron(collapsed = section.collapsed, dark = dark)
         }
         if (editingTitle) {
             BasicTextField(
                 value = section.title,
                 onValueChange = { onChange(section.copy(title = it)) },
                 singleLine = true,
-                textStyle = TextStyle(color = titleColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+                textStyle = TextStyle(color = titleColor, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
                 cursorBrush = SolidColor(titleColor),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { editingTitle = false }),
@@ -949,6 +962,7 @@ private fun ChecklistSectionHeader(
                             stringResource(R.string.native_checklist_section_title_placeholder),
                             color = if (dark) PlaceholderDark else PlaceholderLight,
                             fontSize = 14.sp,
+                            lineHeight = 20.sp,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
@@ -960,6 +974,7 @@ private fun ChecklistSectionHeader(
                 section.title,
                 color = titleColor,
                 fontSize = 14.sp,
+                lineHeight = 20.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .weight(1f)
@@ -980,6 +995,7 @@ private fun ChecklistSectionHeader(
                 uncheckedCount.toString(),
                 color = accent ?: Color.Black.copy(alpha = 0.5f),
                 fontSize = 12.sp,
+                lineHeight = 16.sp,
                 fontWeight = FontWeight.Medium,
             )
         }
@@ -999,9 +1015,9 @@ private fun ChecklistSectionHeader(
             contentAlignment = Alignment.Center,
         ) {
             if (confirmingRemove) {
-                CheckmarkIcon(size = 16.dp, tint = SectionDeleteRed)
+                SaveCheckIcon(size = 16.dp, tint = SectionDeleteRed, strokeWidth = 2.5f)
             } else {
-                CloseIcon(size = 16.dp, tint = SectionDeleteRed)
+                CloseIcon(size = 16.dp, tint = SectionDeleteRed, strokeWidth = 2.5f)
             }
         }
     }
@@ -1074,7 +1090,25 @@ private fun ChecklistSectionColorPicker(
     }
 }
 
-private val SectionDeleteRed = Color(0xFFEF4444)
+/** red-500. */
+private val SectionDeleteRed = Color(0xFFFB2C36)
+
+/** The list's own chevron (`M19 9l-7 7-7-7`, stroke 2.5), turning a
+ *  quarter left over 200ms when its part folds. */
+@Composable
+private fun ChecklistChevron(collapsed: Boolean, dark: Boolean) {
+    val rotation by animateFloatAsState(
+        targetValue = if (collapsed) -90f else 0f,
+        animationSpec = tween(durationMillis = 200, easing = CssEase),
+        label = "checklistChevron",
+    )
+    DownChevronIcon(
+        modifier = Modifier.rotate(rotation),
+        size = 14.dp,
+        tint = if (dark) PlaceholderDark else HandleDotLight,
+        strokeWidth = 2.5f,
+    )
+}
 
 /** Six 4px dots in two columns, always visible on touch at 40% opacity
  *  (ChecklistEditor.jsx:255-273). */
@@ -1097,7 +1131,7 @@ private fun ChecklistDragHandle(dark: Boolean, small: Boolean = false) {
 
 @Composable
 private fun ChecklistAddRow(borderColor: Color, dark: Boolean, onClick: () -> Unit) {
-    Column {
+    Column(Modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -1111,19 +1145,20 @@ private fun ChecklistAddRow(borderColor: Color, dark: Boolean, onClick: () -> Un
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val tint = if (dark) HandleDotDark else HandleDotLight
-            Text("+", color = tint, fontSize = 18.sp)
-            Text(stringResource(R.string.native_checklist_add_item), color = tint, fontSize = 14.sp)
+            Text("+", color = tint, fontSize = 18.sp, lineHeight = 18.sp)
+            Text(stringResource(R.string.native_checklist_add_item), color = tint, fontSize = 14.sp, lineHeight = 20.sp)
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
     }
 }
 
+/** `pl-4 py-1.5 text-xs`, as wide as its label only. */
 @Composable
-private fun ChecklistAddToSectionRow(subtextColor: Color, onClick: () -> Unit) {
+private fun ChecklistAddToSectionRow(dark: Boolean, onClick: () -> Unit) {
+    val tint = if (dark) CheckedTextDark else CheckedTextLight
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .fillMaxWidth()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -1132,51 +1167,64 @@ private fun ChecklistAddToSectionRow(subtextColor: Color, onClick: () -> Unit) {
             .padding(start = 16.dp, top = 6.dp, bottom = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("+", color = subtextColor, fontSize = 12.sp)
-        Text(stringResource(R.string.native_checklist_add_to_section), color = subtextColor, fontSize = 12.sp)
+        Text("+", color = tint, fontSize = 12.sp, lineHeight = 12.sp)
+        Text(stringResource(R.string.native_checklist_add_to_section), color = tint, fontSize = 12.sp, lineHeight = 16.sp)
     }
 }
 
+/** The dashed `rounded px-2 py-1 text-xs` button, in Chromium's 3px-dash,
+ *  2px-gap pattern. */
 @Composable
-private fun ChecklistAddSectionButton(borderColor: Color, subtextColor: Color, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .dashedBorder(borderColor, RoundedCornerShape(4.dp))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Button,
-            ) { onClick() }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        Text("+ " + stringResource(R.string.native_checklist_add_section), color = subtextColor, fontSize = 12.sp)
+private fun ChecklistAddSectionButton(borderColor: Color, dark: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(modifier) {
+        Box(
+            modifier = Modifier
+                .dashedBorder(borderColor, RoundedCornerShape(4.dp), dash = 3.dp, gap = 2.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    role = Role.Button,
+                ) { onClick() }
+                .padding(horizontal = 9.dp, vertical = 5.dp),
+        ) {
+            Text(
+                "+ " + stringResource(R.string.native_checklist_add_section),
+                color = if (dark) CheckedTextDark else CheckedTextLight,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+            )
+        }
     }
 }
 
 /** The "Done" area (ChecklistEditor.jsx:439-513): a hairline, a
  *  collapsible header with its own slate pill, then the checked rows
- *  grouped by section without ever moving them in the data. */
+ *  grouped by section without ever moving them in the data. Rows touch;
+ *  once the list has sections, each group ends 12dp lower and carries its
+ *  section's name, when it has one. */
 @Composable
 private fun ChecklistDoneArea(
     blocks: List<ChecklistBlock>,
+    showSectionLabels: Boolean,
     collapsed: Boolean,
     dark: Boolean,
-    titleColor: Color,
-    subtextColor: Color,
     borderColor: Color,
     onToggleCollapsed: () -> Unit,
     onToggle: (String, Boolean) -> Unit,
     onRemove: (String) -> Unit,
 ) {
     val checkedCount = blocks.sumOf { block -> block.items.count { it.done } }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
         Spacer(Modifier.height(16.dp))
+        // w-full -mx-2 px-2: the same width moved 8dp left, so the chevron
+        // lines up with the rows.
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
+                .offset(x = (-8).dp)
                 .clip(RoundedCornerShape(2.dp))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
@@ -1186,46 +1234,51 @@ private fun ChecklistDoneArea(
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            ChevronDownIcon(
-                modifier = Modifier.rotate(if (collapsed) -90f else 0f),
-                size = 14.dp,
-                tint = if (dark) PlaceholderDark else HandleDotLight,
-            )
+            ChecklistChevron(collapsed = collapsed, dark = dark)
             Text(
                 stringResource(R.string.native_checklist_done),
                 color = if (dark) CheckedTextDark else CheckedTextLight,
                 fontSize = 14.sp,
+                lineHeight = 20.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             Box(
                 modifier = Modifier
+                    .padding(start = 2.dp)
                     .clip(RoundedCornerShape(999.dp))
                     .background(DoneCountBg)
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             ) {
-                Text(checkedCount.toString(), color = DoneCountFg, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    checkedCount.toString(),
+                    color = DoneCountFg,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                )
             }
         }
         if (!collapsed) {
             Spacer(Modifier.height(12.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                blocks.forEach { block ->
-                    val checked = ChecklistItems.orderCheckedForDisplay(block.items)
-                    if (checked.isEmpty()) return@forEach
-                    block.section?.let { section ->
+            blocks.forEach { block ->
+                val checked = ChecklistItems.orderCheckedForDisplay(block.items)
+                if (checked.isEmpty()) return@forEach
+                Column(Modifier.padding(bottom = if (showSectionLabels) 12.dp else 0.dp)) {
+                    block.section?.title?.takeIf { it.isNotEmpty() }?.let { title ->
                         Text(
-                            section.title,
+                            title,
                             color = if (dark) PlaceholderDark else HandleDotLight,
                             fontSize = 12.sp,
+                            lineHeight = 16.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 0.3.sp,
+                            modifier = Modifier.padding(bottom = 4.dp),
                         )
                     }
                     checked.forEach { item ->
                         ChecklistDoneRow(
                             item = item,
                             dark = dark,
-                            subtextColor = subtextColor,
                             onToggle = { value -> onToggle(item.id, value) },
                             onRemove = { onRemove(item.id) },
                         )
@@ -1236,11 +1289,12 @@ private fun ChecklistDoneArea(
     }
 }
 
+/** A checked row: box, struck-through text and its own "✕", pulled 8dp
+ *  left like the web's. */
 @Composable
 private fun ChecklistDoneRow(
     item: ChecklistItemData,
     dark: Boolean,
-    subtextColor: Color,
     onToggle: (Boolean) -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -1257,10 +1311,12 @@ private fun ChecklistDoneRow(
             fontSize = 14.sp,
             lineHeight = 20.sp,
             textDecoration = TextDecoration.LineThrough,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).padding(bottom = 3.dp),
         )
         Box(
             modifier = Modifier
+                .padding(start = 6.dp)
+                .offset(x = (-8).dp)
                 .size(24.dp)
                 .clip(CircleShape)
                 .alpha(0.8f)
@@ -1273,7 +1329,7 @@ private fun ChecklistDoneRow(
                 ) { onRemove() },
             contentAlignment = Alignment.Center,
         ) {
-            Text("✕", color = subtextColor, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text("✕", color = if (dark) HandleDotDark else CheckedTextLight, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

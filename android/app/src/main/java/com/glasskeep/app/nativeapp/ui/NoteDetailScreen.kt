@@ -2245,7 +2245,6 @@ fun NoteDetailScreen(
                                             removeSectionBehavior = container.editorPrefs.checklistRemoveSectionBehavior,
                                             dark = dark,
                                             titleColor = titleColor,
-                                            subtextColor = subtextColor,
                                             borderColor = borderColor,
                                             doneCollapsed = doneSectionCollapsed,
                                             focusRequesterFor = { id -> checklistFocusRequesters.getOrPut(id) { FocusRequester() } },

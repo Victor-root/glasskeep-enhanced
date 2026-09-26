@@ -1540,11 +1540,11 @@ internal fun Modifier.dashedUnderline(color: Color): Modifier = drawBehind {
 
 /** A CSS `border-style: dashed`, drawn inside the box like any CSS
  *  border. */
-internal fun Modifier.dashedBorder(color: Color, shape: Shape, width: Dp = 1.dp, dash: Dp = 4.dp): Modifier = drawBehind {
+internal fun Modifier.dashedBorder(color: Color, shape: Shape, width: Dp = 1.dp, dash: Dp = 4.dp, gap: Dp = dash): Modifier = drawBehind {
     val strokeWidth = width.toPx()
     val stroke = Stroke(
         width = strokeWidth,
-        pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash.toPx(), dash.toPx())),
+        pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash.toPx(), gap.toPx())),
     )
     val inset = strokeWidth / 2f
     val outline = shape.createOutline(Size(size.width - strokeWidth, size.height - strokeWidth), layoutDirection, this)

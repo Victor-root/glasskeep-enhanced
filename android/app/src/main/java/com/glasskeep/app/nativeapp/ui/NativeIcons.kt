@@ -786,16 +786,17 @@ fun ArrowLeftIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color =
 }
 
 @Composable
-fun SaveCheckIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+fun SaveCheckIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, strokeWidth: Float = 3f) {
     // ModalHeader.jsx's save button glyph: viewBox 24x24, strokeWidth 3,
-    // round caps/joins. Thicker than the small CheckmarkIcon above.
+    // round caps/joins. Thicker than the small CheckmarkIcon above. A
+    // checklist section's delete confirmation draws it at 2.5.
     val path = remember {
         PathParser().parsePathString("M5 13l4 4L19 7").toPath()
     }
     Canvas(modifier.size(size)) {
         val scale = this.size.minDimension / 24f
         scale(scale, scale, pivot = Offset.Zero) {
-            drawPath(path, color = tint, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawPath(path, color = tint, style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
     }
 }
@@ -1178,6 +1179,14 @@ fun WorldIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Col
 @Composable
 fun ChevronDownIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, strokeWidth: Float = 1.75f) = TablerIcon(
     "M6 9l6 6l6 -6",
+    modifier, size, tint, strokeWidth,
+)
+
+/** The heroicons chevron the web draws inline (`M19 9l-7 7-7-7`): wider
+ *  and lower than Tabler's. */
+@Composable
+fun DownChevronIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black, strokeWidth: Float = 2f) = TablerIcon(
+    "M19 9l-7 7l-7 -7",
     modifier, size, tint, strokeWidth,
 )
 
