@@ -90,15 +90,10 @@ fun NativeNavHost(
 ) {
     val navController: NavHostController = rememberNavController()
     // Set when the unlock screen signs an admin in (its passkey path does)
-    // on a cold start, i.e. before the NavHost has ever composed and so
-    // before there is a graph to navigate: the start destination below is
-    // what carries the must-change-password detour in that one case.
+    // on a cold start, i.e. before the NavHost has ever composed: the
+    // forced password change that sign-in carries opens once it has.
     var unlockedIntoForcedPasswordChange by remember { mutableStateOf(false) }
-    val startDestination = when {
-        unlockedIntoForcedPasswordChange -> "force-change-password"
-        container.tokenStore.token != null -> "notes"
-        else -> "login"
-    }
+    val startDestination = if (container.tokenStore.token != null) "notes" else "login"
     val context = LocalContext.current
 
     // Existing installs skip onboarding, so the first native reconciliation
@@ -334,13 +329,18 @@ fun NativeNavHost(
 
     val scope = rememberCoroutineScope()
 
-    // Shared by every login path (password, passkey, secret key): same
+    // One pill for the whole app, over every screen: the web has exactly
+    // one too, and it is what replaces the platform's own Toast here.
+    val toasts = rememberToastController()
+    toasts.prefs = container.editorPrefs
+    val settingsActions = rememberSettingsActions(container, repository, toasts)
+
+    // Shared by every login path (password, passkey, QR, secret key): same
     // reminder/theme bootstrap regardless of which screen signed the user
-    // in, and the same must_change_password branch (see
-    // ForceChangePasswordScreen.kt) instead of ever landing on "notes"
-    // with a temporary password still active. popUpTo("login") clears
-    // whichever of "login"/"login-secret" is on the back stack either way,
-    // since popUpTo removes everything up to and including its target.
+    // in. A temporary password lands on the notes like any other sign-in,
+    // under the change-password dialog it cannot leave (App.jsx:7951).
+    // popUpTo("login") clears whichever signed-out screens are on the back
+    // stack, since popUpTo removes everything up to and including its target.
     fun handleLoggedIn(mustChangePassword: Boolean) {
         ReminderSyncWorker.schedulePeriodic(context)
         ReminderSyncWorker.syncNow(context)
@@ -348,27 +348,23 @@ fun NativeNavHost(
         SyncQueueWorker.triggerNow(context)
         realtimeClient.start()
         scope.launch { applyWorkspacePreferences(container, repository) }
-        if (mustChangePassword) {
-            navController.navigate("force-change-password") {
-                popUpTo("login") { inclusive = true }
-            }
-        } else {
-            navController.navigate("notes") {
-                popUpTo("login") { inclusive = true }
-            }
-            pendingOpenNoteId?.let {
-                navController.navigate("notes/$it")
-                onPendingOpenNoteIdConsumed()
-            }
+        navController.navigate("notes") {
+            popUpTo("login") { inclusive = true }
+        }
+        if (mustChangePassword) settingsActions.openForcedPasswordChange()
+        pendingOpenNoteId?.let {
+            navController.navigate("notes/$it")
+            onPendingOpenNoteIdConsumed()
+        }
+    }
+    LaunchedEffect(unlockedIntoForcedPasswordChange) {
+        if (unlockedIntoForcedPasswordChange) {
+            settingsActions.openForcedPasswordChange()
+            unlockedIntoForcedPasswordChange = false
         }
     }
 
-    // One pill for the whole app, over every screen: the web has exactly
-    // one too, and it is what replaces the platform's own Toast here.
     val density = LocalDensity.current
-    val toasts = rememberToastController()
-    toasts.prefs = container.editorPrefs
-    val settingsActions = rememberSettingsActions(container, repository, toasts)
 
     toasts.removeServerRow = { id -> scope.launch { repository.removeNotifications(listOf(id)) } }
 
@@ -528,21 +524,6 @@ fun NativeNavHost(
                         serverUrl = serverUrl,
                         onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
                         onBack = { navController.popBackStack() },
-                    )
-                }
-                composable("force-change-password") {
-                    ForceChangePasswordScreen(
-                        container = container,
-                        serverUrl = serverUrl,
-                        onChanged = {
-                            navController.navigate("notes") {
-                                popUpTo("force-change-password") { inclusive = true }
-                            }
-                            pendingOpenNoteId?.let {
-                                navController.navigate("notes/$it")
-                                onPendingOpenNoteIdConsumed()
-                            }
-                        },
                     )
                 }
                 // Under the settings panel the notes list neither fades nor

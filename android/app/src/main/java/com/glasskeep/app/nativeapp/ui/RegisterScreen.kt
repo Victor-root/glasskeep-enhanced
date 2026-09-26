@@ -54,8 +54,8 @@ fun RegisterScreen(
         // The fields the web marks `required` never reach its handler empty.
         if (loading || email.isEmpty() || password.isEmpty() || confirmation.isEmpty()) return
         when {
-            password.length < 6 -> error = context.getString(R.string.native_register_password_short)
-            password != confirmation -> error = context.getString(R.string.native_register_password_mismatch)
+            password.length < 6 -> error = context.getString(R.string.native_settings_password_too_short)
+            password != confirmation -> error = context.getString(R.string.native_settings_password_mismatch)
             else -> {
                 loading = true
                 scope.launch {

@@ -205,7 +205,6 @@
     <string name="native_settings_password_confirm_placeholder">Confirmer le mot de passe</string>
     <string name="native_settings_password_mismatch">Les mots de passe ne correspondent pas.</string>
     <string name="native_settings_password_too_short">Le mot de passe doit contenir au moins 6 caractères.</string>
-    <string name="native_settings_password_error">Impossible de changer le mot de passe (code %1$d). Vérifiez votre mot de passe actuel.</string>
     <string name="native_settings_password_saving">Enregistrement...</string>
     <string name="native_settings_password_success">Mot de passe modifié avec succès</string>
     <string name="native_settings_qr_signin">Connecter un autre appareil</string>
@@ -236,7 +235,6 @@
     <string name="native_secret_login_back">Connexion avec e-mail et mot de passe</string>
     <string name="native_force_password_title">Changement de mot de passe requis</string>
     <string name="native_force_password_desc">Votre compte a un mot de passe temporaire. Veuillez choisir un nouveau mot de passe pour continuer.</string>
-    <string name="native_force_password_error">Impossible de changer le mot de passe (code %1$d).</string>
     <string name="native_settings_export_all">Exporter toutes les notes (.json)</string>
     <string name="native_settings_export_all_desc">Télécharger toutes les notes en fichier JSON</string>
     <string name="native_settings_import_json">Importer des notes (.json)</string>
@@ -896,8 +894,6 @@
     <string name="native_no_logos_yet">Aucun logo, cliquez sur + pour en importer un</string>
     <string name="native_note_icon_error">Impossible de changer l\'ic\u00f4ne de la note.</string>
     <!-- Inscription native et administration complète de l’instance. -->
-    <string name="native_register_password_short">Le mot de passe doit contenir au moins 6 caractères.</string>
-    <string name="native_register_password_mismatch">Les mots de passe ne correspondent pas.</string>
     <string name="native_register_failed">Échec de l\'inscription.</string>
     <string name="native_register_pending_title">Inscription en attente d\'approbation</string>
     <string name="native_register_pending_body">Votre compte a été soumis. Un administrateur va l\'examiner rapidement et vous pourrez vous connecter une fois approuvé.</string>
@@ -1049,4 +1045,5 @@
     <string name="native_err_email_in_use_by_another">Cet e-mail est déjà utilisé par un autre utilisateur.</string>
     <string name="native_err_registration_pending">Une demande d\'inscription pour cet e-mail est déjà en attente.</string>
     <string name="native_err_user_already_exists">Un utilisateur avec cet e-mail existe déjà.</string>
+    <string name="native_something_went_wrong">Une erreur est survenue</string>
 </resources>

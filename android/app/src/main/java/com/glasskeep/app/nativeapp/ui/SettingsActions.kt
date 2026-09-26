@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,7 +38,6 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NoteExporter
-import com.glasskeep.app.nativeapp.data.ChangePasswordResult
 import com.glasskeep.app.nativeapp.data.NoteTransfer
 import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
@@ -88,6 +88,11 @@ internal class SettingsActions(
         private set
 
     var changePasswordOpen: Boolean by mutableStateOf(false)
+        private set
+
+    /** ChangePasswordModal's `forced` mode: a temporary password, no
+     *  current-password field and no way out but a new password. */
+    var passwordChangeForced: Boolean by mutableStateOf(false)
         private set
 
     var passwordSaving: Boolean by mutableStateOf(false)
@@ -304,8 +309,13 @@ internal class SettingsActions(
         changePasswordOpen = true
     }
 
+    fun openForcedPasswordChange() {
+        passwordChangeForced = true
+        openChangePassword()
+    }
+
     fun closeChangePassword() {
-        changePasswordOpen = false
+        if (!passwordChangeForced) changePasswordOpen = false
     }
 
     fun clearPasswordError() {
@@ -317,7 +327,8 @@ internal class SettingsActions(
      *  session out on success, so the fresh token must be stored even when
      *  the dialog was closed while the request was still out. */
     fun changePassword(current: String, new: String, confirm: String) {
-        if (passwordSaving) return
+        // The fields the web marks `required` never reach its handler empty.
+        if (passwordSaving || (!passwordChangeForced && current.isEmpty()) || new.isEmpty() || confirm.isEmpty()) return
         passwordError = null
         if (new.length < 6) {
             passwordError = context.getString(R.string.native_settings_password_too_short)
@@ -330,19 +341,14 @@ internal class SettingsActions(
         passwordSaving = true
         scope.launch {
             try {
-                when (val result = repository.changePassword(current.ifBlank { null }, new)) {
-                    is ChangePasswordResult.Saved -> {
-                        container.tokenStore.token = result.token
-                        changePasswordOpen = false
-                        toasts.success(context.getString(R.string.native_settings_password_success), "key")
-                    }
-                    is ChangePasswordResult.Rejected -> {
-                        passwordError = context.getString(R.string.native_settings_password_error, result.httpCode)
-                    }
-                }
+                container.tokenStore.token = repository.changePassword(current.takeUnless { passwordChangeForced }, new)
+                changePasswordOpen = false
+                passwordChangeForced = false
+                toasts.success(context.getString(R.string.native_settings_password_success), "key")
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsActions changePassword failed", t)
-                passwordError = context.getString(R.string.native_settings_action_error, t.message ?: t.javaClass.simpleName)
+                // The web shows the server's own words, untranslated.
+                passwordError = context.requestErrorText(t).ifEmpty { context.getString(R.string.native_something_went_wrong) }
             } finally {
                 passwordSaving = false
             }
@@ -389,13 +395,15 @@ internal fun SettingsActionDialogs(actions: SettingsActions, themeId: String, da
         )
     }
     if (actions.changePasswordOpen) {
-        ChangePasswordDialog(actions, themeId, dark, titleColor, borderColor)
+        ChangePasswordDialog(actions, themeId, dark, titleColor, borderColor, forced = actions.passwordChangeForced)
     }
 }
 
 /** ChangePasswordModal.jsx: three labelled fields, the new one focused on
  *  open, the inline error, then Cancel and the gradient submit, which
- *  reads "Saving..." while the request is out. */
+ *  reads "Saving..." while the request is out. [forced] is the first
+ *  sign-in with a temporary password: its own title and explanation, no
+ *  current password and no Cancel. */
 @Composable
 private fun ChangePasswordDialog(
     actions: SettingsActions,
@@ -403,6 +411,7 @@ private fun ChangePasswordDialog(
     dark: Boolean,
     titleColor: Color,
     borderColor: Color,
+    forced: Boolean,
 ) {
     var current by remember { mutableStateOf("") }
     var new by remember { mutableStateOf("") }
@@ -418,27 +427,42 @@ private fun ChangePasswordDialog(
         dismissOnClickOutside = false,
     ) {
         Text(
-            stringResource(R.string.native_settings_change_password),
+            stringResource(if (forced) R.string.native_force_password_title else R.string.native_settings_change_password),
             color = titleColor,
             fontSize = 18.sp,
             lineHeight = 28.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        Spacer(Modifier.height(16.dp))
-        GkTextField(
-            value = current,
-            onValueChange = { current = it; actions.clearPasswordError() },
-            label = stringResource(R.string.native_settings_password_current),
-            placeholder = stringResource(R.string.native_settings_password_current),
-            themeId = themeId,
-            dark = dark,
-            titleColor = titleColor,
-            borderColor = borderColor,
-            focusRingColor = focusRing,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
-            visualTransformation = PasswordVisualTransformation(),
-        )
-        Spacer(Modifier.height(16.dp))
+        // The title's mb-1 and the form's mt-3 collapse into 12px; the
+        // explanation's mb-4 wins over that mt-3.
+        if (forced) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.native_force_password_desc),
+                color = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282),
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+            )
+            Spacer(Modifier.height(16.dp))
+        } else {
+            Spacer(Modifier.height(12.dp))
+        }
+        if (!forced) {
+            GkTextField(
+                value = current,
+                onValueChange = { current = it; actions.clearPasswordError() },
+                label = stringResource(R.string.native_settings_password_current),
+                placeholder = stringResource(R.string.native_settings_password_current),
+                themeId = themeId,
+                dark = dark,
+                titleColor = titleColor,
+                borderColor = borderColor,
+                focusRingColor = focusRing,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
+                visualTransformation = PasswordVisualTransformation(),
+            )
+            Spacer(Modifier.height(16.dp))
+        }
         GkTextField(
             value = new,
             onValueChange = { new = it; actions.clearPasswordError() },
@@ -464,7 +488,8 @@ private fun ChangePasswordDialog(
             titleColor = titleColor,
             borderColor = borderColor,
             focusRingColor = focusRing,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { actions.changePassword(current, new, confirm) }),
             visualTransformation = PasswordVisualTransformation(),
         )
         actions.passwordError?.let {
@@ -478,15 +503,17 @@ private fun ChangePasswordDialog(
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            GkSecondaryButton(
-                label = stringResource(R.string.native_dialog_cancel),
-                borderColor = borderColor,
-                textColor = titleColor,
-                fontSize = 16.sp,
-                lineHeight = 24.sp,
-                fontWeight = FontWeight.Normal,
-                onClick = actions::closeChangePassword,
-            )
+            if (!forced) {
+                GkSecondaryButton(
+                    label = stringResource(R.string.native_dialog_cancel),
+                    borderColor = borderColor,
+                    textColor = titleColor,
+                    fontSize = 16.sp,
+                    lineHeight = 24.sp,
+                    fontWeight = FontWeight.Normal,
+                    onClick = actions::closeChangePassword,
+                )
+            }
             GkGradientButton(
                 label = stringResource(
                     if (actions.passwordSaving) R.string.native_settings_password_saving else R.string.native_settings_change_password,

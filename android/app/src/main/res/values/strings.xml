@@ -210,7 +210,6 @@
     <string name="native_settings_password_confirm_placeholder">Confirm password</string>
     <string name="native_settings_password_mismatch">Passwords do not match.</string>
     <string name="native_settings_password_too_short">Password must be at least 6 characters.</string>
-    <string name="native_settings_password_error">Couldn\'t change password (code %1$d). Check your current password.</string>
     <string name="native_settings_password_saving">Saving...</string>
     <string name="native_settings_password_success">Password changed successfully</string>
     <string name="native_settings_qr_signin">Sign in another device</string>
@@ -241,7 +240,6 @@
     <string name="native_secret_login_back">Sign in with email &amp; password</string>
     <string name="native_force_password_title">Password change required</string>
     <string name="native_force_password_desc">Your account has a temporary password. Please choose a new password to continue.</string>
-    <string name="native_force_password_error">Couldn\'t change password (code %1$d).</string>
     <string name="native_settings_export_all">Export ALL notes (.json)</string>
     <string name="native_settings_export_all_desc">Download all notes as JSON file</string>
     <string name="native_settings_import_json">Import notes (.json)</string>
@@ -907,8 +905,6 @@
     <string name="native_no_logos_yet">No logos yet, click + to upload one</string>
     <string name="native_note_icon_error">Couldn\'t change the note icon.</string>
     <!-- Native registration and complete instance administration. -->
-    <string name="native_register_password_short">Password must be at least 6 characters.</string>
-    <string name="native_register_password_mismatch">Passwords do not match.</string>
     <string name="native_register_failed">Registration failed.</string>
     <string name="native_register_pending_title">Registration pending approval</string>
     <string name="native_register_pending_body">Your account has been submitted. An administrator will review it shortly and you\'ll be able to sign in once approved.</string>
@@ -1060,4 +1056,5 @@
     <string name="native_err_email_in_use_by_another">This email is already in use by another user.</string>
     <string name="native_err_registration_pending">A registration request for this email is already pending.</string>
     <string name="native_err_user_already_exists">A user with this email already exists.</string>
+    <string name="native_something_went_wrong">Something went wrong</string>
 </resources>

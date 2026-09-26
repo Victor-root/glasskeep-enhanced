@@ -108,7 +108,7 @@ sealed class SaveNoteResult {
  *  per-note): the server silently no-ops (200, not an error) rather than
  *  applying this device's now-outdated arrangement, and the next refresh()
  *  will show the other device's order instead. No Rejected case, unlike
- *  AddCollaboratorResult/ChangePasswordResult: this method is only ever
+ *  AddCollaboratorResult: this method is only ever
  *  called from SyncQueueWorker's replay (see reorderQueued), which relies
  *  on a thrown exception, not a returned value, to know a write failed and
  *  needs retrying (see SyncQueueWorker's own class doc comment) - same
@@ -124,14 +124,6 @@ sealed class ReorderResult {
 sealed class DeleteResult {
     data object Deleted : DeleteResult()
     data object Stale : DeleteResult()
-}
-
-/** Outcome of a password change. Rejected carries the HTTP code rather
- *  than the server's own error text: same convention NativeLoginScreen
- *  already uses for its own rejected-login message, not a new one. */
-sealed class ChangePasswordResult {
-    data class Saved(val token: String, val user: UserDto) : ChangePasswordResult()
-    data class Rejected(val httpCode: Int) : ChangePasswordResult()
 }
 
 /** Outcome of adding a collaborator (POST /api/notes/:id/collaborate).
@@ -1436,17 +1428,13 @@ class NotesRepository(
      *  other session (see server/index.js's token_version bump): the
      *  caller must store the returned token (mirrors NativeLoginScreen's
      *  own container.tokenStore.token = ... at its call site) or every
-     *  request after this one fails as unauthorized. */
-    suspend fun changePassword(currentPassword: String?, newPassword: String): ChangePasswordResult {
+     *  request after this one fails as unauthorized. A refusal is thrown
+     *  with the server's own `error` text. */
+    suspend fun changePassword(currentPassword: String?, newPassword: String): String {
         NativeDebug.d("NotesRepository.changePassword")
         val response = api.changePassword(ChangePasswordRequest(currentPassword, newPassword))
-        val token = response.body()?.token
-        val user = response.body()?.user
-        if (!response.isSuccessful || token == null || user == null) {
-            NativeDebug.e("NotesRepository.changePassword rejected: HTTP ${response.code()}")
-            return ChangePasswordResult.Rejected(response.code())
-        }
-        return ChangePasswordResult.Saved(token, user)
+        return response.body()?.token?.takeIf { response.isSuccessful }
+            ?: throw response.refusal("POST /api/user/change-password")
     }
 
     /** Rotates and returns this account's secret recovery key in plain
