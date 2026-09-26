@@ -105,7 +105,7 @@ class NativeAppActivity : ComponentActivity() {
                         NativeDebug.d(
                             "NativeAppActivity system bars: dark=${currentDark.value} signedIn=${currentSignedIn.value} " +
                                 "noteOverride=${noteOverrideArgb?.let { "#%08X".format(it) }} " +
-                                "baseColor=${baseColor?.let { "#%08X".format(it) }}",
+                                "baseColor=${"#%08X".format(baseColor)}",
                         )
                         (view.context as ComponentActivity).applyThemedSystemBars(currentDark.value, baseColor)
                     }

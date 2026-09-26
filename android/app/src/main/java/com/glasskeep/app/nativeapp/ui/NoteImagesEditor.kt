@@ -1,9 +1,7 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.graphics.BitmapFactory
-import android.os.Build
 import android.util.Base64
-import android.view.WindowManager
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -32,7 +30,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,8 +44,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -59,7 +54,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.NoteImageData
@@ -199,22 +193,9 @@ fun FullscreenImageViewer(
     val nextLabel = stringResource(R.string.native_note_detail_image_next)
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
-        val density = LocalDensity.current
-        SideEffect {
-            // The web mounts and unmounts the viewer at once: no window
-            // animation either way.
-            window?.setWindowAnimations(0)
-            window?.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            window?.setDimAmount(0.30f)
-            // backdrop-blur-md, where the platform can blur what is behind.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                window?.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-                window?.attributes = window?.attributes?.apply {
-                    blurBehindRadius = with(density) { cssBlur(12.dp).roundToPx() }
-                }
-            }
-        }
+        // The web mounts and unmounts the viewer at once, over a
+        // backdrop-blur-md scrim.
+        DialogWindowBackdrop(dim = 0.30f, blur = 12.dp)
         BoxWithConstraints(
             Modifier
                 .fillMaxSize()

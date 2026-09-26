@@ -1872,7 +1872,7 @@ fun NoteDetailScreen(
             // inside flushLiveEdits/patchNoteQueued; still queued edits
             // catch up next time SyncQueueWorker runs regardless.
             try {
-                if (removeEmpty && current != null) {
+                if (removeEmpty) {
                     cancelPendingAutosaves()
                     repository.trashNoteQueued(current.id, null)
                     repository.deleteNotePermanentlyQueued(current.id)

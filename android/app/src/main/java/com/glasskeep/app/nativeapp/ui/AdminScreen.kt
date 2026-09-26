@@ -683,7 +683,7 @@ private fun PowerProgressDialog(progress: PowerProgress, dark: Boolean, titleCol
             Spacer(Modifier.height(4.dp))
             Text(
                 when {
-                    done -> stringResource(R.string.native_admin_reload_in, progress.secondsLeft ?: 0)
+                    done -> stringResource(R.string.native_admin_reload_in, progress.secondsLeft)
                     restart -> stringResource(R.string.native_admin_restart_waiting)
                     else -> stringResource(R.string.native_admin_shutdown_waiting)
                 },

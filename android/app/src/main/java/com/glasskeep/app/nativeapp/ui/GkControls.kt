@@ -3,6 +3,7 @@ package com.glasskeep.app.nativeapp.ui
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.view.WindowManager
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedVisibility
@@ -968,14 +969,7 @@ internal fun GkDialog(
             usePlatformDefaultWidth = false,
         ),
     ) {
-        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
-        SideEffect {
-            window?.setWindowAnimations(0)
-            if (scrimAlpha != null) {
-                window?.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                window?.setDimAmount(scrimAlpha)
-            }
-        }
+        DialogWindowBackdrop(dim = scrimAlpha)
         val shape = RoundedCornerShape(cornerRadius)
         Column(
             modifier = Modifier
@@ -989,6 +983,30 @@ internal fun GkDialog(
                 .padding(contentPadding),
             content = content,
         )
+    }
+}
+
+/**
+ * The window of the dialog it is called from, painted as the web's plain
+ * overlays: no window animation, [dim] as its flat scrim when given (the
+ * platform's own otherwise), and what lies behind blurred by the CSS
+ * [blur] radius where the platform can (Android 12+).
+ */
+@Composable
+internal fun DialogWindowBackdrop(dim: Float? = null, blur: Dp? = null) {
+    val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+    val blurPx = blur?.let { with(LocalDensity.current) { cssBlur(it).roundToPx() } }
+    SideEffect {
+        if (window == null) return@SideEffect
+        window.setWindowAnimations(0)
+        if (dim != null) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.setDimAmount(dim)
+        }
+        if (blurPx != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.attributes = window.attributes.apply { blurBehindRadius = blurPx }
+        }
     }
 }
 

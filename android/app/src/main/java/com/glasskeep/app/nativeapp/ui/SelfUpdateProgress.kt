@@ -1,7 +1,5 @@
 package com.glasskeep.app.nativeapp.ui
 
-import android.os.Build
-import android.view.WindowManager
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -31,7 +29,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +47,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -62,7 +58,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.network.MemoryUsageDto
 import com.glasskeep.app.nativeapp.data.network.SelfUpdateSystemDto
@@ -136,20 +131,8 @@ internal fun SelfUpdateProgress(update: ServerUpdateState, themeId: String?, dar
             decorFitsSystemWindows = false,
         ),
     ) {
-        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
-        val density = LocalDensity.current
-        SideEffect {
-            window?.setWindowAnimations(0)
-            window?.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            window?.setDimAmount(0.6f)
-            // backdrop-blur-sm, where the platform can blur what is behind.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                window?.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-                window?.attributes = window?.attributes?.apply {
-                    blurBehindRadius = with(density) { cssBlur(8.dp).roundToPx() }
-                }
-            }
-        }
+        // backdrop-blur-sm over the scrim.
+        DialogWindowBackdrop(dim = 0.6f, blur = 8.dp)
         val shape = RoundedCornerShape(16.dp)
         Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
             Column(
