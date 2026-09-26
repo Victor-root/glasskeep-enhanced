@@ -77,6 +77,7 @@ import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
+import com.glasskeep.app.nativeapp.data.RichQuote
 import com.glasskeep.app.nativeapp.data.network.UserAiSettingsDto
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.LightBorderColor
@@ -357,11 +358,6 @@ private fun ChangelogDocument(markdown: String, dark: Boolean, borderColor: Colo
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             )
             RichBlockKind.DIVIDER -> Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
-            RichBlockKind.QUOTE -> Row(Modifier.height(IntrinsicSize.Min).alpha(0.85f)) {
-                Box(Modifier.width(3.dp).fillMaxHeight().background(borderColor))
-                Spacer(Modifier.width(16.dp))
-                DocText(block, BodyStyle, textColor, dark, Modifier.weight(1f))
-            }
             RichBlockKind.HEADING_1 -> DocText(block, H1Style, textColor, dark)
             RichBlockKind.HEADING_2 -> Column {
                 DocText(block, H2Style, if (dark) Indigo300 else Indigo600, dark)
@@ -397,7 +393,15 @@ private fun ChangelogDocument(markdown: String, dark: Boolean, borderColor: Colo
                     DocText(block, BodyStyle, textColor, dark, Modifier.padding(start = start))
                 }
             }
-            RichBlockKind.PARAGRAPH -> DocText(block, BodyStyle, textColor, dark)
+            RichBlockKind.PARAGRAPH -> if (block.quote != null) {
+                Row(Modifier.height(IntrinsicSize.Min).alpha(0.85f)) {
+                    Box(Modifier.width(3.dp).fillMaxHeight().background(borderColor))
+                    Spacer(Modifier.width(16.dp))
+                    DocText(block, BodyStyle, textColor, dark, Modifier.weight(1f))
+                }
+            } else {
+                DocText(block, BodyStyle, textColor, dark)
+            }
         }
         previousBottom = bottom
     }
@@ -508,6 +512,7 @@ private data class DocBlock(
     val marks: List<RichMark>,
     val indent: Int = 0,
     val number: Int = 0,
+    val quote: RichQuote? = null,
 )
 
 /** The Markdown's blocks as `marked` lays them out: a paragraph's lines
@@ -517,20 +522,20 @@ private fun docBlocksOf(markdown: String): List<DocBlock> {
     val out = mutableListOf<DocBlock>()
     for (block in MarkdownDoc.toRichBlocks(markdown)) {
         val previous = out.lastOrNull()
-        when (block.kind) {
-            RichBlockKind.PARAGRAPH -> if (block.text.isNotEmpty()) {
-                out.add(DocBlock(block.kind, block.text.replace('\n', ' '), block.marks))
-            }
-            RichBlockKind.QUOTE -> if (previous?.kind == RichBlockKind.QUOTE) {
+        when {
+            block.quote != null -> if (previous != null && previous.quote?.id == block.quote.id) {
                 val offset = previous.text.length + 1
                 out[out.lastIndex] = previous.copy(
                     text = previous.text + " " + block.text,
                     marks = previous.marks + block.marks.map { it.copy(start = it.start + offset, end = it.end + offset) },
                 )
             } else {
-                out.add(DocBlock(block.kind, block.text, block.marks))
+                out.add(DocBlock(block.kind, block.text, block.marks, quote = block.quote))
             }
-            RichBlockKind.NUMBERED_ITEM -> out.add(
+            block.kind == RichBlockKind.PARAGRAPH -> if (block.text.isNotEmpty()) {
+                out.add(DocBlock(block.kind, block.text.replace('\n', ' '), block.marks))
+            }
+            block.kind == RichBlockKind.NUMBERED_ITEM -> out.add(
                 DocBlock(
                     block.kind,
                     block.text,

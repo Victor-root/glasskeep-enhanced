@@ -19,9 +19,9 @@ data class RichInputResult(val edit: RichEdit, val disarm: RichMarkType? = null)
  * A rule looks at the block's text before the caret, what was just typed
  * included, and the first one that matches in the web's own plugin order
  * wins. None runs in a code block or right after inline code. The flat
- * model holds no list or code block inside a quote and nothing but text in
- * a list item, so the rules that would build those there do nothing, as a
- * rule the web's schema refuses does nothing on the web.
+ * model holds no quote inside a quote and nothing but text in a list
+ * item, so the rules that would build those there do nothing, as a rule
+ * the web's schema refuses does nothing on the web.
  */
 object RichInputRules {
 
@@ -136,7 +136,7 @@ object RichInputRules {
             wrap(blocks, index, cut, RichBlockKind.BULLET_ITEM)
         },
         BlockRule(Regex("""^$S*>$S\z""")) { blocks, index, _, cut ->
-            wrap(blocks, index, cut, RichBlockKind.QUOTE)
+            quote(blocks, index, cut)
         },
         MarkRule(Regex("""(?:^|$S)(\*\*(?!$S+\*\*)((?:[^*]+))\*\*(?!$S+\*\*))\z"""), RichMarkType.BOLD),
         MarkRule(Regex("""(?:^|$S)(__(?!$S+__)((?:[^_]+))__(?!$S+__))\z"""), RichMarkType.BOLD),
@@ -149,8 +149,8 @@ object RichInputRules {
     private fun done(blocks: List<RichBlock>, index: Int, replacement: List<RichBlock>, focus: RichBlock): RichEdit =
         RichEdit(RichDoc.normalizeNesting(blocks.replaceAt(index, replacement)), focus.id, 0)
 
-    /** wrappingInputRule: a paragraph goes into a list or a quote, joining
-     *  the one right above it. */
+    /** wrappingInputRule for a list: a paragraph goes into a list where it
+     *  stands, in its quote if any, joining the list right above it. */
     private fun wrap(blocks: List<RichBlock>, index: Int, cut: Int, kind: RichBlockKind, checked: Boolean = false): RichEdit? {
         val block = blocks[index]
         if (block.kind != RichBlockKind.PARAGRAPH) return null
@@ -158,12 +158,21 @@ object RichInputRules {
         return done(blocks, index, listOf(wrapped), wrapped)
     }
 
-    /** textblockTypeInputRule: a paragraph or heading, or a quote paragraph
-     *  (which the model can only take out of its quote, as the toolbar
-     *  does), becomes a heading with the level's default attributes. */
+    /** wrappingInputRule for the quote: a paragraph or heading goes into a
+     *  quote, joining the one right above it. In a quote already it would
+     *  make a quote inside the quote, which the model does not hold. */
+    private fun quote(blocks: List<RichBlock>, index: Int, cut: Int): RichEdit? {
+        val block = blocks[index]
+        if (block.kind != RichBlockKind.PARAGRAPH && !block.kind.isHeading || block.quote != null) return null
+        val wrapped = rest(block, cut).copy(quote = blocks.getOrNull(index - 1)?.quote ?: RichQuote())
+        return done(blocks, index, listOf(wrapped), wrapped)
+    }
+
+    /** textblockTypeInputRule: a paragraph or heading, in a quote or not,
+     *  becomes a heading with the level's default attributes. */
     private fun heading(blocks: List<RichBlock>, index: Int, cut: Int, level: Int): RichEdit? {
         val block = blocks[index]
-        if (block.kind != RichBlockKind.PARAGRAPH && !block.kind.isHeading && block.kind != RichBlockKind.QUOTE) return null
+        if (block.kind != RichBlockKind.PARAGRAPH && !block.kind.isHeading) return null
         val kind = when (level) {
             1 -> RichBlockKind.HEADING_1
             2 -> RichBlockKind.HEADING_2
@@ -191,12 +200,12 @@ object RichInputRules {
     }
 
     /** nodeInputRule: the rule goes right above the paragraph or heading,
-     *  which keeps whatever followed the caret. */
+     *  in its quote, and the block keeps whatever followed the caret. */
     private fun horizontalRule(blocks: List<RichBlock>, index: Int, cut: Int): RichEdit? {
         val block = blocks[index]
         if (block.kind != RichBlockKind.PARAGRAPH && !block.kind.isHeading) return null
         val kept = rest(block, cut)
-        return done(blocks, index, listOf(RichDoc.newBlock(RichBlockKind.DIVIDER), kept), kept)
+        return done(blocks, index, listOf(RichDoc.newBlock(RichBlockKind.DIVIDER).copy(quote = block.quote), kept), kept)
     }
 
     /**

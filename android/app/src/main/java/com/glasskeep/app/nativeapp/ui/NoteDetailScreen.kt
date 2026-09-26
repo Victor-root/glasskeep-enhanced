@@ -918,6 +918,10 @@ fun NoteDetailScreen(
         applyRichEdit(RichEdits.setKind(richBlocks ?: return, id, kind))
     }
 
+    fun toggleRichQuote(id: String) {
+        applyRichEdit(RichEdits.toggleQuote(richBlocks ?: return, id))
+    }
+
     fun toggleRichCodeBlock(id: String, start: Int, end: Int) {
         applyRichEdit(RichEdits.toggleCodeBlock(richBlocks ?: return, id, start, end))
     }
@@ -942,10 +946,8 @@ fun NoteDetailScreen(
         richBlocks = blocks.map { if (it.id == id) it.copy(align = align) else it }
     }
 
-    /** indent()/outdent(), bounded to the same 0..8 range Indent.js uses. */
     fun shiftRichIndent(id: String, delta: Int) {
-        val blocks = richBlocks ?: return
-        richBlocks = blocks.map { if (it.id == id) it.copy(indent = (it.indent + delta).coerceIn(0, 8)) else it }
+        applyRichEdit(RichEdits.shiftIndent(richBlocks ?: return, id, delta))
     }
 
     fun insertRichDivider(id: String, start: Int, end: Int) {
@@ -957,18 +959,8 @@ fun NoteDetailScreen(
         richBlocks = blocks.map { if (it.id == id) it.copy(checked = !it.checked) else it }
     }
 
-    /** The toolbar's eraser, `clearNodes().unsetAllMarks()` on the web:
-     *  the selection loses every mark and the block goes back to being a
-     *  plain paragraph. */
     fun clearRichFormatting(id: String, start: Int, end: Int) {
-        val blocks = richBlocks ?: return
-        richBlocks = blocks.map { block ->
-            if (block.id == id) {
-                block.copy(kind = RichBlockKind.PARAGRAPH, marks = RichDoc.clearAllMarks(block.marks, start, end))
-            } else {
-                block
-            }
-        }
+        applyRichEdit(RichEdits.clearFormatting(richBlocks ?: return, id, start, end))
     }
 
     /** Enter: an input rule the line break completes, else the split,
@@ -1004,6 +996,7 @@ fun NoteDetailScreen(
     val richToolbarActions = remember {
         RichToolbarActions(
             setBlockKind = ::setRichBlockKind,
+            toggleQuote = ::toggleRichQuote,
             toggleCodeBlock = ::toggleRichCodeBlock,
             toggleMark = ::toggleRichMark,
             setMark = ::setRichMark,

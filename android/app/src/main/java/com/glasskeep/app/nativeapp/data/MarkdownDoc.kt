@@ -66,9 +66,14 @@ object MarkdownDoc {
             paragraph.clear()
         }
 
+        var quote: RichQuote? = null
         var index = 0
         while (index < lines.size) {
             val line = lines[index]
+            // Consecutive quoted lines make one quote; any other line, a
+            // blank one included, ends it.
+            val quoted = QUOTE.matchEntire(line)
+            if (quoted == null) quote = null
             val fence = FENCE.matchEntire(line)
             if (fence != null) {
                 flushParagraph()
@@ -116,10 +121,10 @@ object MarkdownDoc {
                 index++
                 continue
             }
-            val quote = QUOTE.matchEntire(line)
-            if (quote != null) {
+            if (quoted != null) {
                 flushParagraph()
-                blocks.add(inlineBlock(RichBlockKind.QUOTE, quote.groupValues[1]))
+                if (quote == null) quote = RichQuote()
+                blocks.add(inlineBlock(RichBlockKind.PARAGRAPH, quoted.groupValues[1]).copy(quote = quote))
                 index++
                 continue
             }

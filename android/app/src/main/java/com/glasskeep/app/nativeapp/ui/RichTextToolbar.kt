@@ -92,6 +92,7 @@ import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichDoc
+import com.glasskeep.app.nativeapp.data.RichEdits
 import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.TypographyBlock
@@ -110,6 +111,7 @@ fun richToolbarModeOf(raw: String?): RichToolbarMode =
  *  active block's current selection. */
 class RichToolbarActions(
     val setBlockKind: (id: String, kind: RichBlockKind) -> Unit,
+    val toggleQuote: (id: String) -> Unit,
     val toggleCodeBlock: (id: String, start: Int, end: Int) -> Unit,
     val toggleMark: (id: String, start: Int, end: Int, type: RichMarkType) -> Unit,
     val setMark: (id: String, start: Int, end: Int, type: RichMarkType, value: String?, color: String?) -> Unit,
@@ -710,7 +712,7 @@ fun RichFormatToolbar(
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_indent),
                         active = false,
-                        enabled = enabled && activeBlock.indent < 8,
+                        enabled = enabled && RichEdits.canShiftIndent(activeBlock, 1),
                         colors = colors,
                         titleColor = titleColor,
                         fixedTint = IndentTint,
@@ -719,7 +721,7 @@ fun RichFormatToolbar(
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_outdent),
                         active = false,
-                        enabled = enabled && activeBlock.indent > 0,
+                        enabled = enabled && RichEdits.canShiftIndent(activeBlock, -1),
                         colors = colors,
                         titleColor = titleColor,
                         fixedTint = OutdentTint,
@@ -745,11 +747,11 @@ fun RichFormatToolbar(
                     ) { tint -> InlineCodeIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_quote),
-                        active = activeBlock?.kind == RichBlockKind.QUOTE,
+                        active = activeBlock?.quote != null,
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
-                        onClick = { activeBlock?.let { actions.setBlockKind(it.id, RichBlockKind.QUOTE) } },
+                        onClick = { activeBlock?.let { actions.toggleQuote(it.id) } },
                     ) { tint -> QuoteIcon(size = 20.dp, tint = tint) }
                     separatorButton()
                     linkButton()

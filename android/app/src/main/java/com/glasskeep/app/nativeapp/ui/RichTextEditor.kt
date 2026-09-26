@@ -116,6 +116,7 @@ import com.glasskeep.app.nativeapp.data.TypographyProfile
 import com.glasskeep.app.nativeapp.data.hasText
 import com.glasskeep.app.nativeapp.data.isHeading
 import com.glasskeep.app.nativeapp.data.isListItem
+import com.glasskeep.app.nativeapp.data.sharesQuoteWith
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightBorderColor
@@ -263,7 +264,7 @@ fun RichTextEditor(
     }
     // Tiptap's Placeholder: only a document holding a single empty
     // paragraph shows it.
-    val placeholderId = blocks.singleOrNull()?.takeIf { it.kind == RichBlockKind.PARAGRAPH && it.text.isEmpty() }?.id
+    val placeholderId = blocks.singleOrNull()?.takeIf { it.kind == RichBlockKind.PARAGRAPH && it.quote == null && it.text.isEmpty() }?.id
     val placeholder = stringResource(R.string.native_richtext_placeholder)
 
     InterceptPlatformTextInput(
@@ -328,59 +329,50 @@ fun RichTextEditor(
                 )
             }
 
-            for (row in flow.rows) {
-                if (row.gapBefore > 0f) Spacer(Modifier.height(row.gapBefore.dp))
-                when (row) {
-                    is RichQuoteRow -> {
-                        val first = blocks[row.first]
-                        val style = richBlockTextStyle(first, typography, taskStrike, dark, titleColor, RichSurface.EDITOR)
-                        RichQuoteCard(
-                            indent = (first.indent * IndentStepEm * style.fontSize.value).dp,
+            @Composable
+            fun Rows(flow: RichFlow) {
+                for (row in flow.rows) {
+                    if (row.gapBefore > 0f) Spacer(Modifier.height(row.gapBefore.dp))
+                    when (row) {
+                        is RichQuoteRow -> RichQuoteCard(
+                            indent = row.indent.dp,
                             accent = accent,
                             noteColor = noteColor,
                             dark = dark,
-                        ) {
-                            for (index in row.first..row.last) {
-                                val block = blocks[index]
-                                if (index > row.first) Spacer(Modifier.height(5.6.dp))
-                                Field(
-                                    block,
-                                    richBlockTextStyle(block, typography, taskStrike, dark, titleColor, RichSurface.EDITOR).copy(fontStyle = FontStyle.Italic),
-                                    Modifier.fillMaxWidth(),
-                                )
-                            }
-                        }
-                    }
-                    is RichBlockRow -> {
-                        val block = blocks[row.index]
-                        val style = richBlockTextStyle(block, typography, taskStrike, dark, titleColor, RichSurface.EDITOR)
-                        val indent = (block.indent * IndentStepEm * style.fontSize.value).dp
-                        when (block.kind) {
-                            RichBlockKind.DIVIDER -> RichDivider(if (dark) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.2f))
-                            RichBlockKind.CODE_BLOCK -> RichEditorCodeBlock(
-                                indent = indent,
-                                dark = dark,
-                                copyText = block.text,
-                                noteColor = noteColor,
-                                armable = !readModeEnabled,
-                            ) { onArmedFocus ->
-                                Field(block, style, Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onArmedFocus() }, splits = false)
-                            }
-                            else -> RichListRow(
-                                block = block,
-                                style = style,
-                                list = row.list,
-                                indent = indent,
-                                accent = accent,
-                                onToggleChecked = { onToggleChecked(block.id) },
-                            ) { textModifier ->
-                                Field(block, style, textModifier.fillMaxWidth().then(if (taskStrike && block.isChecked) Modifier.alpha(0.6f) else Modifier))
+                        ) { Rows(row.inner) }
+                        is RichBlockRow -> {
+                            val block = blocks[row.index]
+                            val style = richBlockTextStyle(block, typography, taskStrike, dark, titleColor, RichSurface.EDITOR)
+                            val indent = (block.indent * IndentStepEm * style.fontSize.value).dp
+                            when (block.kind) {
+                                RichBlockKind.DIVIDER -> RichDivider(if (dark) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.2f))
+                                RichBlockKind.CODE_BLOCK -> RichEditorCodeBlock(
+                                    indent = indent,
+                                    dark = dark,
+                                    copyText = block.text,
+                                    noteColor = noteColor,
+                                    armable = !readModeEnabled,
+                                ) { onArmedFocus ->
+                                    Field(block, style, Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onArmedFocus() }, splits = false)
+                                }
+                                else -> RichListRow(
+                                    block = block,
+                                    style = style,
+                                    list = row.list,
+                                    indent = indent,
+                                    accent = accent,
+                                    onToggleChecked = { onToggleChecked(block.id) },
+                                ) { textModifier ->
+                                    Field(block, style, textModifier.fillMaxWidth().then(if (taskStrike && block.isChecked) Modifier.alpha(0.6f) else Modifier))
+                                }
                             }
                         }
                     }
                 }
+                if (flow.gapAfter > 0f) Spacer(Modifier.height(flow.gapAfter.dp))
             }
-            if (flow.gapAfter > 0f) Spacer(Modifier.height(flow.gapAfter.dp))
+
+            Rows(flow)
         }
     }
 }
@@ -412,6 +404,59 @@ fun RichTextReader(
     var shownCopy by remember { mutableStateOf<String?>(null) }
 
     @Composable
+    fun Rows(flow: RichFlow) {
+        for (row in flow.rows) {
+            if (row.gapBefore > 0f) Spacer(Modifier.height(row.gapBefore.dp))
+            when (row) {
+                is RichQuoteRow -> RichQuoteCard(
+                    indent = row.indent.dp,
+                    accent = accent,
+                    noteColor = noteColor,
+                    dark = dark,
+                ) { Rows(row.inner) }
+                is RichBlockRow -> {
+                    val block = blocks[row.index]
+                    val style = richBlockTextStyle(block, typography, taskStrike, dark, titleColor, surface)
+                    val indent = (block.indent * IndentStepEm * style.fontSize.value).dp
+                    when (block.kind) {
+                        // `border-top: 1px solid currentColor` (preflight): no rule
+                        // softens the view's rule the way the editor's is.
+                        RichBlockKind.DIVIDER -> RichDivider(titleColor)
+                        RichBlockKind.CODE_BLOCK -> RichReaderCodeBlock(
+                            block = block,
+                            style = style,
+                            indent = indent,
+                            dark = dark,
+                            noteColor = noteColor,
+                            surface = surface,
+                            copyShown = shownCopy == block.id,
+                            onTap = { shownCopy = block.id },
+                        )
+                        else -> RichListRow(
+                            block = block,
+                            style = style,
+                            list = row.list,
+                            indent = indent,
+                            accent = accent,
+                            onToggleChecked = null,
+                        ) { textModifier ->
+                            ReaderText(
+                                block = block,
+                                style = style,
+                                dark = dark,
+                                surface = surface,
+                                noteColor = noteColor,
+                                modifier = textModifier.then(if (taskStrike && block.isChecked) Modifier.alpha(0.6f) else Modifier),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        if (flow.gapAfter > 0f) Spacer(Modifier.height(flow.gapAfter.dp))
+    }
+
+    @Composable
     fun Body() {
         Column(
             modifier
@@ -423,71 +468,7 @@ fun RichTextReader(
                     }
                 },
         ) {
-            for (row in flow.rows) {
-                if (row.gapBefore > 0f) Spacer(Modifier.height(row.gapBefore.dp))
-                when (row) {
-                    is RichQuoteRow -> {
-                        val first = blocks[row.first]
-                        val style = richBlockTextStyle(first, typography, taskStrike, dark, titleColor, surface)
-                        RichQuoteCard(
-                            indent = (first.indent * IndentStepEm * style.fontSize.value).dp,
-                            accent = accent,
-                            noteColor = noteColor,
-                            dark = dark,
-                        ) {
-                            for (index in row.first..row.last) {
-                                val block = blocks[index]
-                                if (index > row.first) Spacer(Modifier.height(5.6.dp))
-                                ReaderText(
-                                    block = block,
-                                    style = richBlockTextStyle(block, typography, taskStrike, dark, titleColor, surface).copy(fontStyle = FontStyle.Italic),
-                                    dark = dark,
-                                    surface = surface,
-                                    noteColor = noteColor,
-                                )
-                            }
-                        }
-                    }
-                    is RichBlockRow -> {
-                        val block = blocks[row.index]
-                        val style = richBlockTextStyle(block, typography, taskStrike, dark, titleColor, surface)
-                        val indent = (block.indent * IndentStepEm * style.fontSize.value).dp
-                        when (block.kind) {
-                            // `border-top: 1px solid currentColor` (preflight): no rule
-                            // softens the view's rule the way the editor's is.
-                            RichBlockKind.DIVIDER -> RichDivider(titleColor)
-                            RichBlockKind.CODE_BLOCK -> RichReaderCodeBlock(
-                                block = block,
-                                style = style,
-                                indent = indent,
-                                dark = dark,
-                                noteColor = noteColor,
-                                surface = surface,
-                                copyShown = shownCopy == block.id,
-                                onTap = { shownCopy = block.id },
-                            )
-                            else -> RichListRow(
-                                block = block,
-                                style = style,
-                                list = row.list,
-                                indent = indent,
-                                accent = accent,
-                                onToggleChecked = null,
-                            ) { textModifier ->
-                                ReaderText(
-                                    block = block,
-                                    style = style,
-                                    dark = dark,
-                                    surface = surface,
-                                    noteColor = noteColor,
-                                    modifier = textModifier.then(if (taskStrike && block.isChecked) Modifier.alpha(0.6f) else Modifier),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            if (flow.gapAfter > 0f) Spacer(Modifier.height(flow.gapAfter.dp))
+            Rows(flow)
         }
     }
 
@@ -498,15 +479,17 @@ private val RichBlock.isChecked: Boolean get() = kind == RichBlockKind.TASK_ITEM
 
 // ---------- The block flow: the web's margins, lists and quotes ----------
 
-/** One line of the flow: a block, or a run of quote paragraphs sharing one
- *  card, [gapBefore] under whatever came before. */
+/** One line of the flow: a block, or a quote card holding the flow of its
+ *  own blocks, [gapBefore] under whatever came before. */
 private sealed interface RichRow {
     val gapBefore: Float
 }
 
 private class RichBlockRow(val index: Int, override val gapBefore: Float, val list: RichListPlacement?) : RichRow
 
-private class RichQuoteRow(val first: Int, val last: Int, override val gapBefore: Float) : RichRow
+/** A quote card [indent] from the column's edge, its blocks laid out in
+ *  [inner]. */
+private class RichQuoteRow(val inner: RichFlow, val indent: Float, override val gapBefore: Float) : RichRow
 
 /** A list item's columns, from the note's left edge: its text, and where
  *  its marker belongs (the checkbox's left edge; the bullet and the number
@@ -526,93 +509,111 @@ private class FlowBox(val id: Int, val top: Float, val bottom: Float)
  * the largest margin of the boxes that end above it or start under it,
  * CSS's margin collapsing: 0 between paragraphs, headings and list items,
  * 1.6 between task items and 2.4 around a task list, 9.6 around a quote,
- * 16 around code and 13.6 around a rule, 1.6 above a nested list.
+ * 16 around code and 13.6 around a rule, 1.6 above a nested list. A quote
+ * lays its own blocks out the same way inside its padding, which no margin
+ * crosses, two paragraphs in a row there 5.6 apart (`blockquote p + p`).
  *
  * Lists nest by [RichBlock.nestLevel]: a bullet or ordered list pads its
  * items 17.6 (16 once nested, the marker in that gutter), a task list 0
  * (20 inside another task item) and puts its text 24 right of the
  * checkbox; the Indent extension moves a bullet or ordered item whole but
  * only a task item's text. Ordered items count with the web's `gk-ol`
- * counter: a nested list starts at 1, a new top-level list too unless it
- * follows a code block. [itemEm] is a list item's font size.
+ * counter as Chrome scopes it: the reset a list gets after a paragraph,
+ * heading, rule, quote or other list only reaches its own items, so that
+ * list starts at 1, a nested one too; a list opening the note or a quote,
+ * or following a code block, counts on with the one counter all such lists
+ * share across the note. [itemEm] is a list item's font size, and the em
+ * of a quote's indent.
  */
 private fun richFlow(blocks: List<RichBlock>, itemEm: Float): RichFlow {
-    class Level(val kind: RichBlockKind, val list: FlowBox, var item: FlowBox, var counter: Int, var childStart: Float)
+    var noteCounter = 0
 
-    var nextId = 0
-    val levels = mutableListOf<Level>()
-    val rows = mutableListOf<RichRow>()
-    var previousChain = emptyList<FlowBox>()
-    var topCounter = 0
-    var i = 0
-    while (i < blocks.size) {
-        val block = blocks[i]
-        var last = i
-        var placement: RichListPlacement? = null
-        val chain: List<FlowBox>
-        if (block.kind.isListItem) {
-            val level = block.nestLevel.coerceIn(0, levels.size)
-            while (levels.size > level + 1) levels.removeAt(levels.lastIndex)
-            val task = block.kind == RichBlockKind.TASK_ITEM
-            val itemBox = FlowBox(nextId++, if (task) 1.6f else 0f, if (task) 1.6f else 0f)
-            val current = levels.getOrNull(level)
-            if (current != null && current.kind == block.kind) {
-                current.item = itemBox
+    fun flow(from: Int, to: Int, inQuote: Boolean): RichFlow {
+        class Level(val kind: RichBlockKind, val list: FlowBox, var item: FlowBox, val sharesCounter: Boolean, var counter: Int, var childStart: Float)
+
+        var nextId = 0
+        val levels = mutableListOf<Level>()
+        val rows = mutableListOf<RichRow>()
+        var previousChain = emptyList<FlowBox>()
+        var i = from
+        while (i < to) {
+            val block = blocks[i]
+            val previous = if (i > from) blocks[i - 1] else null
+            var last = i
+            var placement: RichListPlacement? = null
+            var inner: RichFlow? = null
+            val chain: List<FlowBox>
+            if (block.quote != null && !inQuote) {
+                levels.clear()
+                while (last + 1 < to && blocks[last + 1].sharesQuoteWith(block)) last++
+                inner = flow(i, last + 1, inQuote = true)
+                chain = listOf(FlowBox(nextId++, 9.6f, 9.6f))
+            } else if (block.kind.isListItem) {
+                val level = block.nestLevel.coerceIn(0, levels.size)
+                while (levels.size > level + 1) levels.removeAt(levels.lastIndex)
+                val task = block.kind == RichBlockKind.TASK_ITEM
+                val itemBox = FlowBox(nextId++, if (task) 1.6f else 0f, if (task) 1.6f else 0f)
+                val current = levels.getOrNull(level)
+                if (current != null && current.kind == block.kind) {
+                    current.item = itemBox
+                } else {
+                    if (current != null) levels.removeAt(level)
+                    val listMargin = when {
+                        task -> 2.4f
+                        level > 0 -> 1.6f
+                        else -> 0f
+                    }
+                    val sharesCounter = level == 0 &&
+                        (previous == null || previous.kind == RichBlockKind.CODE_BLOCK && previous.sharesQuoteWith(block))
+                    levels.add(Level(block.kind, FlowBox(nextId++, listMargin, if (task) 2.4f else 0f), itemBox, sharesCounter, 0, 0f))
+                }
+                val entry = levels[level]
+                val parentStart = if (level == 0) 0f else levels[level - 1].childStart
+                val padding = when {
+                    level == 0 -> if (task) 0f else 17.6f
+                    task -> if (levels[level - 1].kind == RichBlockKind.TASK_ITEM) 20f else 0f
+                    else -> 16f
+                }
+                val indent = block.indent * IndentStepEm * itemEm
+                val number = when {
+                    block.kind != RichBlockKind.NUMBERED_ITEM -> null
+                    entry.sharesCounter -> ++noteCounter
+                    else -> ++entry.counter
+                }
+                placement = if (task) {
+                    val checkbox = parentStart + padding
+                    entry.childStart = checkbox + 24f
+                    RichListPlacement(checkbox + 24f + indent, checkbox, null)
+                } else {
+                    val item = parentStart + padding + indent
+                    entry.childStart = item
+                    RichListPlacement(item, item, number)
+                }
+                chain = levels.flatMap { listOf(it.list, it.item) }
             } else {
-                if (current != null) levels.removeAt(level)
-                val listMargin = when {
-                    task -> 2.4f
-                    level > 0 -> 1.6f
+                levels.clear()
+                val margin = when (block.kind) {
+                    RichBlockKind.CODE_BLOCK -> 16f
+                    RichBlockKind.DIVIDER -> 13.6f
                     else -> 0f
                 }
-                val start = if (level == 0 && blocks.getOrNull(i - 1)?.kind == RichBlockKind.CODE_BLOCK) topCounter else 0
-                levels.add(Level(block.kind, FlowBox(nextId++, listMargin, if (task) 2.4f else 0f), itemBox, start, 0f))
+                val top = if (inQuote && block.kind == RichBlockKind.PARAGRAPH && previous?.kind == RichBlockKind.PARAGRAPH) 5.6f else margin
+                chain = listOf(FlowBox(nextId++, top, margin))
             }
-            val entry = levels[level]
-            val parentStart = if (level == 0) 0f else levels[level - 1].childStart
-            val padding = when {
-                level == 0 -> if (task) 0f else 17.6f
-                task -> if (levels[level - 1].kind == RichBlockKind.TASK_ITEM) 20f else 0f
-                else -> 16f
-            }
-            val indent = block.indent * IndentStepEm * itemEm
-            val number = if (block.kind == RichBlockKind.NUMBERED_ITEM) {
-                entry.counter += 1
-                if (level == 0) topCounter = entry.counter
-                entry.counter
+            val shared = previousChain.zip(chain).takeWhile { (a, b) -> a.id == b.id }.size
+            val gap = (previousChain.drop(shared).map { it.bottom } + chain.drop(shared).map { it.top }).maxOrNull() ?: 0f
+            rows += if (inner != null) {
+                RichQuoteRow(inner, (block.quote?.indent ?: 0) * IndentStepEm * itemEm, gap)
             } else {
-                null
+                RichBlockRow(i, gap, placement)
             }
-            placement = if (task) {
-                val checkbox = parentStart + padding
-                entry.childStart = checkbox + 24f
-                RichListPlacement(checkbox + 24f + indent, checkbox, null)
-            } else {
-                val item = parentStart + padding + indent
-                entry.childStart = item
-                RichListPlacement(item, item, number)
-            }
-            chain = levels.flatMap { listOf(it.list, it.item) }
-        } else {
-            levels.clear()
-            val margin = when (block.kind) {
-                RichBlockKind.QUOTE -> {
-                    while (blocks.getOrNull(last + 1)?.kind == RichBlockKind.QUOTE) last++
-                    9.6f
-                }
-                RichBlockKind.CODE_BLOCK -> 16f
-                RichBlockKind.DIVIDER -> 13.6f
-                else -> 0f
-            }
-            chain = listOf(FlowBox(nextId++, margin, margin))
+            previousChain = chain
+            i = last + 1
         }
-        val shared = previousChain.zip(chain).takeWhile { (a, b) -> a.id == b.id }.size
-        val gap = (previousChain.drop(shared).map { it.bottom } + chain.drop(shared).map { it.top }).maxOrNull() ?: 0f
-        rows += if (block.kind == RichBlockKind.QUOTE) RichQuoteRow(i, last, gap) else RichBlockRow(i, gap, placement)
-        previousChain = chain
-        i = last + 1
+        return RichFlow(rows, previousChain.maxOfOrNull { it.bottom } ?: 0f)
     }
-    return RichFlow(rows, previousChain.maxOfOrNull { it.bottom } ?: 0f)
+
+    return flow(0, blocks.size, inQuote = false)
 }
 
 // ---------- Blocks ----------
@@ -693,7 +694,7 @@ private fun RichDivider(color: Color) {
  * (at most the column), an 8px bar in the accent outside its padding, the
  * accent wash, a 1px frame of the note colour on its other three sides,
  * round right corners, and the big serif opening quote in its gutter.
- * Holds every paragraph of one quote.
+ * Holds every block of one quote.
  */
 @Composable
 private fun RichQuoteCard(
@@ -1308,11 +1309,13 @@ private fun LinkTapPopover(bounds: Rect, dark: Boolean, onOpen: () -> Unit, onEd
  *
  * Line heights are the CSS ones: 1.5 for a paragraph in the view (the
  * page's own) but 1.55 in the editor (`.rt-editor-content`), 20px in a
- * card (`text-sm`); 1.5 for headings, 1.45 for list items, 1.6 for
- * quotes. A `pre` is 0.9em at 1.5 in the view, the editor shrinks its
- * code once more (0.9em inside 0.9em) at 1.55, and a card's is 12.6/18.
- * A size mark bigger than the text grows every line of its block, the
- * closest Compose gets to CSS growing the lines that hold it.
+ * card (`text-sm`); 1.5 for headings, 1.45 for list items. A `pre` is
+ * 0.9em at 1.5 in the view, the editor shrinks its code once more (0.9em
+ * inside 0.9em) at 1.55, and a card's is 12.6/18. A quote sets 1.6, which
+ * its paragraphs and code take, and its italic, which everything in it
+ * takes but a heading, whose style sets its own. A size mark bigger than
+ * the text grows every line of its block, the closest Compose gets to CSS
+ * growing the lines that hold it.
  */
 private fun richBlockTextStyle(
     block: RichBlock,
@@ -1330,10 +1333,11 @@ private fun richBlockTextStyle(
         surface == RichSurface.EDITOR -> base * 0.81f
         else -> base * 0.9f
     }
+    val quoted = block.quote != null
     val lineHeightFactor = when {
         block.kind.isHeading -> 1.5f
-        block.kind == RichBlockKind.QUOTE -> 1.6f
         block.kind.isListItem -> 1.45f
+        quoted -> 1.6f
         surface == RichSurface.CARD -> 20f / 14f
         code && surface == RichSurface.EDITOR -> 1.55f
         code -> 1.5f
@@ -1351,7 +1355,7 @@ private fun richBlockTextStyle(
         color = richColorOf(preset.color, dark) ?: titleColor,
         fontSize = fontSize.sp,
         fontWeight = FontWeight(preset.weight),
-        fontStyle = if (preset.italic) FontStyle.Italic else FontStyle.Normal,
+        fontStyle = if (preset.italic || quoted && !block.kind.isHeading) FontStyle.Italic else FontStyle.Normal,
         textDecoration = if (decorations.isEmpty()) TextDecoration.None else TextDecoration.combine(decorations),
         fontFamily = if (code) FontFamily.Monospace else null,
         lineHeight = (if (code && surface == RichSurface.CARD) 18f else lineBox * lineHeightFactor).sp,
