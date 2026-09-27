@@ -243,12 +243,12 @@ object RichInputRules {
         var text = block.text
         var marks = block.marks
         if (textEnd < caret) {
+            marks = RichDoc.pruneMarks(RichDoc.replaceMarks(marks, text.length, textEnd, caret, 0))
             text = text.removeRange(textEnd, caret)
-            marks = deleteSpan(marks, textEnd, caret)
         }
         if (textStart > from) {
+            marks = RichDoc.pruneMarks(RichDoc.replaceMarks(marks, text.length, from + startSpaces, textStart, 0))
             text = text.removeRange(from + startSpaces, textStart)
-            marks = deleteSpan(marks, from + startSpaces, textStart)
         }
         val markStart = from + startSpaces
         val markEnd = markStart + inner.length
@@ -259,16 +259,6 @@ object RichInputRules {
         }
         val marked = block.copy(text = text, marks = marks)
         return RichInputResult(RichEdit(blocks.replaceAt(index, listOf(marked)), block.id, markEnd), disarm = type)
-    }
-
-    /** The marks once `[from, to)` of the text is deleted. */
-    private fun deleteSpan(marks: List<RichMark>, from: Int, to: Int): List<RichMark> {
-        val length = to - from
-        return marks.mapNotNull { m ->
-            val start = if (m.start >= to) m.start - length else minOf(m.start, from)
-            val end = if (m.end >= to) m.end - length else minOf(m.end, from)
-            if (start < end) m.copy(start = start, end = end) else null
-        }
     }
 
     /** run()'s guard: the text right before the caret (right after it at a

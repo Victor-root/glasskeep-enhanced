@@ -91,12 +91,19 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichBlockKind
+import com.glasskeep.app.nativeapp.data.PendingMark
 import com.glasskeep.app.nativeapp.data.RichDoc
+import com.glasskeep.app.nativeapp.data.RichEdit
 import com.glasskeep.app.nativeapp.data.RichEdits
 import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
+import com.glasskeep.app.nativeapp.data.RichPos
+import com.glasskeep.app.nativeapp.data.RichSelection
+import com.glasskeep.app.nativeapp.data.RichSpan
 import com.glasskeep.app.nativeapp.data.TypographyBlock
 import com.glasskeep.app.nativeapp.data.TypographyProfile
+import com.glasskeep.app.nativeapp.data.hasText
+import com.glasskeep.app.nativeapp.data.resolve
 
 /** editorToolbarMode: the user's saved choice between the phone default
  *  (one dense row of the most-used tools) and the full four-group bar. */
@@ -104,23 +111,6 @@ enum class RichToolbarMode { SIMPLE, ADVANCED }
 
 fun richToolbarModeOf(raw: String?): RichToolbarMode =
     if (raw == "advanced") RichToolbarMode.ADVANCED else RichToolbarMode.SIMPLE
-
-/** Everything the toolbar can do to the document, in one holder so the
- *  bar itself takes one parameter instead of a dozen lambdas. Each call
- *  names the block and the range it applies to, which is always the
- *  active block's current selection. */
-class RichToolbarActions(
-    val setBlockKind: (id: String, kind: RichBlockKind) -> Unit,
-    val toggleQuote: (id: String) -> Unit,
-    val toggleCodeBlock: (id: String, start: Int, end: Int) -> Unit,
-    val toggleMark: (id: String, start: Int, end: Int, type: RichMarkType) -> Unit,
-    val setMark: (id: String, start: Int, end: Int, type: RichMarkType, value: String?, color: String?) -> Unit,
-    val clearMark: (id: String, start: Int, end: Int, type: RichMarkType) -> Unit,
-    val clearFormatting: (id: String, start: Int, end: Int) -> Unit,
-    val setAlign: (id: String, align: RichAlign) -> Unit,
-    val shiftIndent: (id: String, delta: Int) -> Unit,
-    val insertDivider: (id: String, start: Int, end: Int) -> Unit,
-)
 
 /**
  * The toolbar's theme colours: `--rt-btn-active-bg` / `--rt-btn-active-text`
@@ -142,7 +132,7 @@ private enum class RichPopoverKind { FONT, SIZE, UNDERLINE, COLOR, HIGHLIGHT, TA
 /** Where the link popover applies, fixed as it opens: the whole link the
  *  selection sits in (extendMarkRange), else the selection itself, and
  *  that link's address. */
-private class RichLinkTarget(val blockId: String, val start: Int, val end: Int, val href: String?)
+private class RichLinkTarget(val selection: RichSelection, val href: String?)
 
 /**
  * The formatting bar as the web draws it inside the mobile sheet
@@ -160,7 +150,6 @@ private class RichLinkTarget(val blockId: String, val start: Int, val end: Int, 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RichFormatToolbar(
-    blocks: List<RichBlock>,
     state: RichEditorState,
     mode: RichToolbarMode,
     dark: Boolean,
@@ -168,39 +157,48 @@ fun RichFormatToolbar(
     titleColor: Color,
     taskStrike: Boolean,
     onTaskStrikeChange: (Boolean) -> Unit,
-    actions: RichToolbarActions,
     typography: TypographyProfile,
 ) {
-    val activeBlock = blocks.find { it.id == state.activeId }
-    val selection = state.safeSelectionIn(activeBlock)
-    val enabled = activeBlock != null
-    val listKinds = activeBlock?.let { RichEdits.listKindsAt(blocks, it.id) }.orEmpty()
+    val editing = state.editing
+    val blocks = editing?.blocks.orEmpty()
+    val span = editing?.span
+    val enabled = span != null
+    val listKinds = span?.let { RichEdits.listKindsIn(blocks, it) }.orEmpty()
     val colors = remember(themeId, dark) { RichToolbarColors(themeId, dark) }
     var openPopover by remember { mutableStateOf<RichPopoverKind?>(null) }
     var linkTarget by remember { mutableStateOf<RichLinkTarget?>(null) }
-    val caretMarks = activeBlock?.takeIf { selection.collapsed }
-        ?.let { RichDoc.marksAtCaret(it.marks, it.text.length, selection.start) }
+    val caretMarks = span?.takeIf { it.collapsed }
+        ?.let { blocks[it.start].let { block -> RichDoc.marksAtCaret(block.marks, block.text.length, it.startOffset) } }
         .orEmpty()
 
-    /** The mark of [type] the selection sits in: the one covering the whole
-     *  selection, or at a collapsed caret the one it types into. */
+    /** The mark of [type] the selection shows (getAttributes): at a
+     *  collapsed caret the one it types into, else the first one in the
+     *  selected text. */
     fun markOf(type: RichMarkType): RichMark? {
-        val block = activeBlock ?: return null
-        if (selection.collapsed) return caretMarks.firstOrNull { it.type == type }
-        return RichDoc.markAt(block.marks, type, selection.min, selection.max)
+        val selected = span ?: return null
+        if (selected.collapsed) return caretMarks.firstOrNull { it.type == type }
+        return RichEdits.markIn(blocks, selected, type)
     }
 
     // At a collapsed caret, what is armed for the next keystroke wins over
     // the marks around it (ProseMirror's stored marks, see RichEditorState).
     fun pendingOf(type: RichMarkType): PendingMark? =
-        state.pendingMarks.firstOrNull { it.type == type }
+        editing?.pendingMarks?.firstOrNull { it.type == type }
 
     fun isActive(type: RichMarkType): Boolean {
-        val block = activeBlock ?: return false
-        if (!selection.collapsed) return RichDoc.isMarkActive(block.marks, type, selection.min, selection.max)
+        val selected = span ?: return false
+        if (!selected.collapsed) return RichEdits.isMarkActive(blocks, selected, type)
         pendingOf(type)?.let { return !it.remove }
         return caretMarks.any { it.type == type }
     }
+
+    /** isActive for a block style over the selection ([RichEdits.nodeActive]). */
+    fun nodeActive(test: (RichBlock) -> Boolean): Boolean = span != null && RichEdits.nodeActive(blocks, span, test)
+
+    fun alignActive(align: RichAlign): Boolean =
+        nodeActive { it.kind.hasText && it.kind != RichBlockKind.CODE_BLOCK && it.align == align }
+
+    fun command(change: (List<RichBlock>, RichSpan) -> RichEdit?) = state.command(change)
 
     fun valueOf(type: RichMarkType): String? {
         pendingOf(type)?.let { return if (it.remove) null else it.value }
@@ -213,29 +211,29 @@ fun RichFormatToolbar(
     }
 
     fun toggle(type: RichMarkType) {
-        val block = activeBlock ?: return
-        if (selection.collapsed) {
+        val selected = span ?: return
+        if (selected.collapsed) {
             state.togglePending(type, activeAtCaret = caretMarks.any { it.type == type })
         } else {
-            actions.toggleMark(block.id, selection.min, selection.max, type)
+            state.markCommand { b, s -> RichEdits.toggleMark(b, s, type) }
         }
     }
 
     fun apply(type: RichMarkType, value: String?, color: String? = null) {
-        val block = activeBlock ?: return
-        if (selection.collapsed) {
+        val selected = span ?: return
+        if (selected.collapsed) {
             state.setPending(type, value, color)
         } else {
-            actions.setMark(block.id, selection.min, selection.max, type, value, color)
+            state.markCommand { b, s -> RichEdits.setMark(b, s, type, value, color) }
         }
     }
 
     fun clear(type: RichMarkType) {
-        val block = activeBlock ?: return
-        if (selection.collapsed) {
+        val selected = span ?: return
+        if (selected.collapsed) {
             state.clearPending(type, activeAtCaret = caretMarks.any { it.type == type })
         } else {
-            actions.clearMark(block.id, selection.min, selection.max, type)
+            state.markCommand { b, s -> RichEdits.clearMark(b, s, type) }
         }
     }
 
@@ -369,9 +367,7 @@ fun RichFormatToolbar(
                         if (isActive(RichMarkType.UNDERLINE)) {
                             clear(RichMarkType.UNDERLINE)
                         } else {
-                            val touched = activeBlock?.marks?.firstOrNull {
-                                it.type == RichMarkType.UNDERLINE && it.start < selection.max && it.end > selection.min
-                            }
+                            val touched = markOf(RichMarkType.UNDERLINE)
                             apply(RichMarkType.UNDERLINE, touched?.value ?: "simple", touched?.color)
                         }
                     },
@@ -404,9 +400,8 @@ fun RichFormatToolbar(
                 colors = colors,
                 titleColor = titleColor,
                 onClick = {
-                    val block = activeBlock ?: return@RichToolbarButton
                     state.clearAllPending()
-                    actions.clearFormatting(block.id, selection.min, selection.max)
+                    command { b, s -> RichEdits.clearFormatting(b, s) }
                 },
             ) { tint -> ClearFormattingIcon(size = 20.dp, tint = tint) }
         }
@@ -474,7 +469,7 @@ fun RichFormatToolbar(
                 colors = colors,
                 titleColor = titleColor,
                 fixedTint = BulletListTint,
-                onClick = { activeBlock?.let { actions.setBlockKind(it.id, RichBlockKind.BULLET_ITEM) } },
+                onClick = { command { b, s -> RichEdits.setKind(b, s, RichBlockKind.BULLET_ITEM) } },
             ) { tint -> BulletListIcon(size = 20.dp, tint = tint) }
         }
         val numberedButton: @Composable FlowRowScope.() -> Unit = {
@@ -485,7 +480,7 @@ fun RichFormatToolbar(
                 colors = colors,
                 titleColor = titleColor,
                 fixedTint = NumberedListTint,
-                onClick = { activeBlock?.let { actions.setBlockKind(it.id, RichBlockKind.NUMBERED_ITEM) } },
+                onClick = { command { b, s -> RichEdits.setKind(b, s, RichBlockKind.NUMBERED_ITEM) } },
             ) { tint -> NumberedListIcon(size = 20.dp, tint = tint) }
         }
         val taskButton: @Composable FlowRowScope.() -> Unit = {
@@ -511,7 +506,7 @@ fun RichFormatToolbar(
                     fixedTint = if (dark) TaskListTintDark else TaskListTintLight,
                     contentDescription = stringResource(R.string.native_richtext_task_list),
                     chevronDescription = stringResource(R.string.native_richtext_task_list_options),
-                    onClick = { activeBlock?.let { actions.setBlockKind(it.id, RichBlockKind.TASK_ITEM) } },
+                    onClick = { command { b, s -> RichEdits.setKind(b, s, RichBlockKind.TASK_ITEM) } },
                     onChevron = { openPopover = if (open) null else RichPopoverKind.TASK },
                 ) { tint -> TaskListIcon(size = 20.dp, tint = tint) }
             }
@@ -521,36 +516,36 @@ fun RichFormatToolbar(
                 contentDescription = stringResource(R.string.native_richtext_align_left),
                 // "Left" reads as active whenever nothing else is chosen
                 // (RichTextToolbar.jsx:444), not only after an explicit set.
-                active = activeBlock?.align == RichAlign.LEFT,
+                active = enabled && RichAlign.entries.none { it != RichAlign.LEFT && alignActive(it) },
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { activeBlock?.let { actions.setAlign(it.id, RichAlign.LEFT) } },
+                onClick = { command { b, s -> RichEdits.setAlign(b, s, RichAlign.LEFT) } },
             ) { tint -> AlignLeftIcon(size = 20.dp, tint = tint) }
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_align_center),
-                active = activeBlock?.align == RichAlign.CENTER,
+                active = alignActive(RichAlign.CENTER),
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { activeBlock?.let { actions.setAlign(it.id, RichAlign.CENTER) } },
+                onClick = { command { b, s -> RichEdits.setAlign(b, s, RichAlign.CENTER) } },
             ) { tint -> AlignCenterIcon(size = 20.dp, tint = tint) }
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_align_right),
-                active = activeBlock?.align == RichAlign.RIGHT,
+                active = alignActive(RichAlign.RIGHT),
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { activeBlock?.let { actions.setAlign(it.id, RichAlign.RIGHT) } },
+                onClick = { command { b, s -> RichEdits.setAlign(b, s, RichAlign.RIGHT) } },
             ) { tint -> AlignRightIcon(size = 20.dp, tint = tint) }
             if (withJustify) {
                 RichToolbarButton(
                     contentDescription = stringResource(R.string.native_richtext_align_justify),
-                    active = activeBlock?.align == RichAlign.JUSTIFY,
+                    active = alignActive(RichAlign.JUSTIFY),
                     enabled = enabled,
                     colors = colors,
                     titleColor = titleColor,
-                    onClick = { activeBlock?.let { actions.setAlign(it.id, RichAlign.JUSTIFY) } },
+                    onClick = { command { b, s -> RichEdits.setAlign(b, s, RichAlign.JUSTIFY) } },
                 ) { tint -> AlignJustifyIcon(size = 20.dp, tint = tint) }
             }
         }
@@ -561,7 +556,7 @@ fun RichFormatToolbar(
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { activeBlock?.let { actions.insertDivider(it.id, selection.min, selection.max) } },
+                onClick = { command { b, s -> RichEdits.insertDivider(b, s) } },
             ) { tint -> SeparatorIcon(size = 20.dp, tint = tint) }
         }
         val linkButton: @Composable FlowRowScope.() -> Unit = {
@@ -582,19 +577,19 @@ fun RichFormatToolbar(
                                 if (url.isNotEmpty()) {
                                     // With nothing selected the link is armed
                                     // for what is typed next, as setLink does.
-                                    if (target.start < target.end) {
-                                        actions.setMark(target.blockId, target.start, target.end, RichMarkType.LINK, url, null)
-                                    } else {
+                                    if (target.selection.collapsed) {
                                         state.setPending(RichMarkType.LINK, url)
+                                    } else {
+                                        state.markCommand { b, _ -> target.selection.resolve(b)?.let { RichEdits.setMark(b, it, RichMarkType.LINK, url) } ?: b }
                                     }
                                     openPopover = null
                                 }
                             },
                             onRemove = {
-                                if (target.start < target.end) {
-                                    actions.clearMark(target.blockId, target.start, target.end, RichMarkType.LINK)
-                                } else {
+                                if (target.selection.collapsed) {
                                     state.clearPending(RichMarkType.LINK, activeAtCaret = false)
+                                } else {
+                                    state.markCommand { b, _ -> target.selection.resolve(b)?.let { RichEdits.clearMark(b, it, RichMarkType.LINK) } ?: b }
                                 }
                                 openPopover = null
                             },
@@ -611,15 +606,19 @@ fun RichFormatToolbar(
                         if (open) {
                             openPopover = null
                         } else {
-                            val block = activeBlock ?: return@RichLinkButton
+                            val current = editing ?: return@RichLinkButton
+                            val selected = span ?: return@RichLinkButton
                             // extendMarkRange("link"): inside a link, the whole link.
-                            val link = RichDoc.markAt(block.marks, RichMarkType.LINK, selection.min, selection.max)
+                            val block = blocks[selected.start]
+                            val link = if (selected.start == selected.end) {
+                                RichDoc.markAt(block.marks, RichMarkType.LINK, selected.startOffset, selected.endOffset)
+                            } else {
+                                null
+                            }
                             val armed = pendingOf(RichMarkType.LINK)?.takeUnless { it.remove }?.value
                             linkTarget = RichLinkTarget(
-                                block.id,
-                                link?.start ?: selection.min,
-                                link?.end ?: selection.max,
-                                armed ?: link?.value,
+                                if (link != null) RichSelection(RichPos(block.id, link.start), RichPos(block.id, link.end)) else current.selection,
+                                armed ?: link?.value ?: markOf(RichMarkType.LINK)?.value,
                             )
                             openPopover = RichPopoverKind.LINK
                         }
@@ -713,30 +712,30 @@ fun RichFormatToolbar(
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_indent),
                         active = false,
-                        enabled = enabled && RichEdits.canShiftIndent(blocks, activeBlock.id, 1),
+                        enabled = span != null && RichEdits.canShiftIndent(blocks, span, 1),
                         colors = colors,
                         titleColor = titleColor,
                         fixedTint = IndentTint,
-                        onClick = { activeBlock?.let { actions.shiftIndent(it.id, 1) } },
+                        onClick = { command { b, s -> RichEdits.shiftIndent(b, s, 1) } },
                     ) { tint -> IndentIncreaseIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_outdent),
                         active = false,
-                        enabled = enabled && RichEdits.canShiftIndent(blocks, activeBlock.id, -1),
+                        enabled = span != null && RichEdits.canShiftIndent(blocks, span, -1),
                         colors = colors,
                         titleColor = titleColor,
                         fixedTint = OutdentTint,
-                        onClick = { activeBlock?.let { actions.shiftIndent(it.id, -1) } },
+                        onClick = { command { b, s -> RichEdits.shiftIndent(b, s, -1) } },
                     ) { tint -> IndentDecreaseIcon(size = 20.dp, tint = tint) }
                 }
                 RichToolbarGroup(divider = colors.divider, last = false) {
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_code_block),
-                        active = activeBlock?.kind == RichBlockKind.CODE_BLOCK,
+                        active = nodeActive { it.kind == RichBlockKind.CODE_BLOCK },
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
-                        onClick = { activeBlock?.let { actions.toggleCodeBlock(it.id, selection.min, selection.max) } },
+                        onClick = { command { b, s -> RichEdits.toggleCodeBlock(b, s) } },
                     ) { tint -> CodeBlockIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_inline_code),
@@ -748,11 +747,11 @@ fun RichFormatToolbar(
                     ) { tint -> InlineCodeIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_quote),
-                        active = activeBlock != null && activeBlock.quotes.isNotEmpty(),
+                        active = span != null && RichEdits.quotedIn(blocks, span),
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
-                        onClick = { activeBlock?.let { actions.toggleQuote(it.id) } },
+                        onClick = { command { b, s -> RichEdits.toggleQuote(b, s) } },
                     ) { tint -> QuoteIcon(size = 20.dp, tint = tint) }
                     separatorButton()
                     linkButton()
@@ -760,21 +759,22 @@ fun RichFormatToolbar(
                 RichToolbarGroup(divider = colors.divider, last = true) {
                     val hint = stringResource(R.string.native_richtext_block_style_hint)
                     val paragraph = stringResource(R.string.native_richtext_paragraph)
+                    // BlockStyleButtons.jsx: `current = headingLevel ? h${level} : "p"` -
+                    // Paragraphe reads active for ANY non-heading block
+                    // (a bullet/numbered/task item, a quote...), not
+                    // only the literal RichBlockKind.PARAGRAPH.
+                    val heading = (1..5).map { headingKindFor(it) }.firstOrNull { kind -> nodeActive { it.kind == kind } }
                     RichStyleButton(
                         label = paragraph,
                         tooltip = String.format(hint, paragraph),
                         cap = 12.48f,
                         block = typography.p,
-                        // BlockStyleButtons.jsx: `current = headingLevel ? h${level} : "p"` -
-                        // Paragraphe reads active for ANY non-heading block
-                        // (a bullet/numbered/task item, a quote...), not
-                        // only the literal RichBlockKind.PARAGRAPH.
-                        active = activeBlock != null && (1..5).none { activeBlock.kind == headingKindFor(it) },
+                        active = enabled && heading == null,
                         enabled = enabled,
                         colors = colors,
                         dark = dark,
                         titleColor = titleColor,
-                    ) { activeBlock?.let { actions.setBlockKind(it.id, RichBlockKind.PARAGRAPH) } }
+                    ) { command { b, s -> RichEdits.setKind(b, s, RichBlockKind.PARAGRAPH) } }
                     for (level in 1..5) {
                         val kind = headingKindFor(level)
                         val label = String.format(stringResource(R.string.native_richtext_heading_level), level)
@@ -783,12 +783,12 @@ fun RichFormatToolbar(
                             tooltip = String.format(hint, label),
                             cap = HeadingSampleCaps[level - 1],
                             block = typography.forKind(kind),
-                            active = activeBlock?.kind == kind,
+                            active = heading == kind,
                             enabled = enabled,
                             colors = colors,
                             dark = dark,
                             titleColor = titleColor,
-                        ) { activeBlock?.let { actions.setBlockKind(it.id, kind) } }
+                        ) { command { b, s -> RichEdits.setKind(b, s, kind) } }
                     }
                 }
             }

@@ -85,11 +85,11 @@ object RichTyping {
             val moved = select(state, offset, offset)
             return if (moved.selection == state.selection) state else type(moved, text, newCursorPosition, composing)
         }
+        if (text == "\n" && span.collapsed) return enter(state)
         val code = block.kind == RichBlockKind.CODE_BLOCK
         if (span.start == span.end && (code || '\n' !in text)) return typeInBlock(state, span, text, newCursorPosition, composing)
         return when {
             text.isEmpty() -> applied(state, RichEdits.deleteSelection(state.blocks, span))
-            text == "\n" && span.collapsed -> enter(state)
             text == "\n" -> applied(state, RichEdits.splitSelection(state.blocks, span))
             else -> insertAcross(state, span, text)
         }

@@ -117,7 +117,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -151,15 +150,9 @@ import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.NoteConversion
 import com.glasskeep.app.nativeapp.data.NoteImageData
 import com.glasskeep.app.nativeapp.data.NoteImages
-import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
-import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichDoc
-import com.glasskeep.app.nativeapp.data.RichEdit
 import com.glasskeep.app.nativeapp.data.RichEdits
-import com.glasskeep.app.nativeapp.data.RichInputRules
-import com.glasskeep.app.nativeapp.data.RichMark
-import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.formatIso
@@ -356,14 +349,6 @@ fun NoteDetailScreen(
     // True once the load below is over: the cached copy, then the
     // server's, or its failure.
     var loadSettled by remember { mutableStateOf(false) }
-    val richFocusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
-    var pendingRichFocus by remember { mutableStateOf<String?>(null) }
-    // One-shot cursor-position override for mergeRichBlockWithPrevious:
-    // the merged block keeps its existing id, so its RichTextBlockField
-    // is not freshly created (that's what TextRange.Zero on first
-    // composition is for) - this is read once by that exact block's own
-    // safety-net LaunchedEffect and removed.
-    val pendingRichSelections = remember { mutableStateMapOf<String, TextRange>() }
     var showConvertConfirm by remember { mutableStateOf(false) }
     // readModeEnabled decides which face a text note opens on, unless it
     // was just created; the footer toggle flips it for this note only
@@ -635,8 +620,8 @@ fun NoteDetailScreen(
     /** Puts the caret at the end of rich block [id]. */
     fun focusRichBlockEnd(id: String) {
         val block = richBlocks?.firstOrNull { it.id == id } ?: return
-        pendingRichSelections[id] = TextRange(block.text.length)
-        pendingRichFocus = id
+        richEditorState.placeCaret(id, block.text.length)
+        richEditorState.requestFocus()
     }
 
     /** Where Enter in the title lands: the end of the body, or a
@@ -894,118 +879,6 @@ fun NoteDetailScreen(
     fun updateChecklistEntries(entries: List<ChecklistEntry>, persist: Boolean) {
         editability = editability?.copy(checklistItems = entries)
         if (persist) saveChecklistItems(entries)
-    }
-
-    // ---------- Rich text block edits (RichDoc.parse-approved notes only) ----------
-
-    fun changeRichBlockText(id: String, newText: String, newMarks: List<RichMark>) {
-        val blocks = richBlocks ?: return
-        richBlocks = blocks.map { if (it.id == id) it.copy(text = newText, marks = newMarks) else it }
-    }
-
-    /** A structural edit's result: the new blocks, and the caret it
-     *  leaves, if it moves one. */
-    fun applyRichEdit(edit: RichEdit?) {
-        edit ?: return
-        richBlocks = edit.blocks
-        edit.focusId?.let { id ->
-            pendingRichSelections[id] = TextRange(edit.caret)
-            pendingRichFocus = id
-        }
-    }
-
-    fun setRichBlockKind(id: String, kind: RichBlockKind) {
-        applyRichEdit(RichEdits.setKind(richBlocks ?: return, id, kind))
-    }
-
-    fun toggleRichQuote(id: String) {
-        applyRichEdit(RichEdits.toggleQuote(richBlocks ?: return, id))
-    }
-
-    fun toggleRichCodeBlock(id: String, start: Int, end: Int) {
-        applyRichEdit(RichEdits.toggleCodeBlock(richBlocks ?: return, id, start, end))
-    }
-
-    fun toggleRichMark(id: String, start: Int, end: Int, type: RichMarkType) {
-        val blocks = richBlocks ?: return
-        richBlocks = blocks.map { if (it.id == id) it.copy(marks = RichDoc.toggleMark(it.marks, type, start, end)) else it }
-    }
-
-    fun setRichMark(id: String, start: Int, end: Int, type: RichMarkType, value: String?, color: String?) {
-        val blocks = richBlocks ?: return
-        richBlocks = blocks.map { if (it.id == id) it.copy(marks = RichDoc.setMark(it.marks, type, start, end, value, color)) else it }
-    }
-
-    fun clearRichMark(id: String, start: Int, end: Int, type: RichMarkType) {
-        val blocks = richBlocks ?: return
-        richBlocks = blocks.map { if (it.id == id) it.copy(marks = RichDoc.clearMark(it.marks, type, start, end)) else it }
-    }
-
-    fun setRichAlign(id: String, align: RichAlign) {
-        val blocks = richBlocks ?: return
-        richBlocks = blocks.map { if (it.id == id) it.copy(align = align) else it }
-    }
-
-    fun shiftRichIndent(id: String, delta: Int) {
-        applyRichEdit(RichEdits.shiftIndent(richBlocks ?: return, id, delta))
-    }
-
-    fun insertRichDivider(id: String, start: Int, end: Int) {
-        applyRichEdit(RichEdits.insertDivider(richBlocks ?: return, id, start, end))
-    }
-
-    fun toggleRichChecked(id: String) {
-        val blocks = richBlocks ?: return
-        richBlocks = blocks.map { if (it.id == id) it.copy(checked = !it.checked) else it }
-    }
-
-    fun clearRichFormatting(id: String, start: Int, end: Int) {
-        applyRichEdit(RichEdits.clearFormatting(richBlocks ?: return, id, start, end))
-    }
-
-    /** Enter: an input rule the line break completes, else the split,
-     *  with the word before it linked when it is an address. */
-    fun splitRichBlock(id: String, position: Int) {
-        val blocks = richBlocks ?: return
-        applyRichEdit(
-            RichInputRules.enter(blocks, id, position)
-                ?: RichEdits.split(RichInputRules.linkBeforeBreak(blocks, id, position), id, position),
-        )
-    }
-
-    /** What was typed into block [id], through the input rules: true when
-     *  one applied. */
-    fun typeRichText(id: String, text: String, marks: List<RichMark>, caret: Int, inserted: String): Boolean {
-        val result = RichInputRules.typed(richBlocks ?: return false, id, text, marks, caret, inserted) ?: return false
-        applyRichEdit(result.edit)
-        result.disarm?.let { richEditorState.clearPending(it, activeAtCaret = true) }
-        return true
-    }
-
-    fun mergeRichBlockWithPrevious(id: String) {
-        applyRichEdit(RichEdits.joinBackward(richBlocks ?: return, id))
-    }
-
-    fun insertRichLines(id: String, newText: String, newMarks: List<RichMark>, start: Int, end: Int) {
-        applyRichEdit(RichEdits.insertLines(richBlocks ?: return, id, newText, newMarks, start, end))
-    }
-
-    // Bundled once: the formatting bar takes one actions object rather than
-    // a dozen separate lambdas, and remembering it keeps the bar from
-    // recomposing on every unrelated state change in this screen.
-    val richToolbarActions = remember {
-        RichToolbarActions(
-            setBlockKind = ::setRichBlockKind,
-            toggleQuote = ::toggleRichQuote,
-            toggleCodeBlock = ::toggleRichCodeBlock,
-            toggleMark = ::toggleRichMark,
-            setMark = ::setRichMark,
-            clearMark = ::clearRichMark,
-            clearFormatting = ::clearRichFormatting,
-            setAlign = ::setRichAlign,
-            shiftIndent = ::shiftRichIndent,
-            insertDivider = ::insertRichDivider,
-        )
     }
 
     // ---------- Drawing note edits (DrawingContent.parse-approved notes only) ----------
@@ -1721,22 +1594,6 @@ fun NoteDetailScreen(
         pendingChecklistFocus = null
     }
 
-    // Same reasoning as the checklist auto-focus above: a freshly
-    // split-off or appended block isn't laid out the instant
-    // pendingRichFocus is set, and FocusRequester.requestFocus() throws if
-    // called before its target attaches, so this is best-effort.
-    LaunchedEffect(pendingRichFocus, richBlocks) {
-        val id = pendingRichFocus ?: return@LaunchedEffect
-        val blocks = richBlocks ?: return@LaunchedEffect
-        if (blocks.none { it.id == id }) return@LaunchedEffect
-        try {
-            richFocusRequesters.getOrPut(id) { FocusRequester() }.requestFocus()
-        } catch (t: Throwable) {
-            NativeDebug.e("NoteDetailScreen rich block auto-focus failed for id=$id", t)
-        }
-        pendingRichFocus = null
-    }
-
     /**
      * performConvertNoteType() (App.jsx:6841-6928): rewrites the open note
      * as the other kind, in place. Text becomes a checklist by reading the
@@ -2175,16 +2032,7 @@ fun NoteDetailScreen(
                     accent = richAccent,
                     readModeEnabled = container.editorPrefs.readModeEnabled,
                     minHeight = minHeight,
-                    focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
-                    onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
-                    onEnter = { id, position -> splitRichBlock(id, position) },
-                    onInsertLines = { id, newText, newMarks, start, end -> insertRichLines(id, newText, newMarks, start, end) },
-                    onTyped = { id, newText, newMarks, caret, inserted -> typeRichText(id, newText, newMarks, caret, inserted) },
-                    onToggleChecked = { id -> toggleRichChecked(id) },
-                    onMergeWithPrevious = { id -> mergeRichBlockWithPrevious(id) },
-                    onTapBlank = { id -> focusRichBlockEnd(id) },
-                    pendingSelectionFor = { id -> pendingRichSelections[id] },
-                    onPendingSelectionConsumed = { id -> pendingRichSelections.remove(id) },
+                    onBlocksChange = { richBlocks = it },
                     suppressKeyboard = showFormatSheet,
                 )
             }
@@ -2459,7 +2307,6 @@ fun NoteDetailScreen(
                         onClose = { showFormatSheet = false },
                     ) {
                         RichFormatToolbar(
-                            blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
                             state = richEditorState,
                             mode = richToolbarModeOf(container.editorPrefs.toolbarMode),
                             dark = dark,
@@ -2476,7 +2323,6 @@ fun NoteDetailScreen(
                                     }
                                 }
                             },
-                            actions = richToolbarActions,
                             typography = container.editorPrefs.typography.activeProfile,
                         )
                     }

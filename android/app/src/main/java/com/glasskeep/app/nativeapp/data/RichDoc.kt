@@ -801,37 +801,6 @@ object RichDoc {
             if (start < end) m.copy(start = start - from, end = end - from) else null
         }
 
-    /** The `[start, oldEnd, newEnd)` window an edit from [oldText] to
-     *  [newText] touched: the common prefix and suffix around it are
-     *  untouched, `newText[start, newEnd)` is what replaced
-     *  `oldText[start, oldEnd)`. */
-    data class EditSpan(val start: Int, val oldEnd: Int, val newEnd: Int) {
-        val delta: Int get() = (newEnd - start) - (oldEnd - start)
-    }
-
-    fun diffEdit(oldText: String, newText: String): EditSpan {
-        val maxPrefix = minOf(oldText.length, newText.length)
-        var prefix = 0
-        while (prefix < maxPrefix && oldText[prefix] == newText[prefix]) prefix++
-        val maxSuffix = maxPrefix - prefix
-        var suffix = 0
-        while (suffix < maxSuffix && oldText[oldText.length - 1 - suffix] == newText[newText.length - 1 - suffix]) suffix++
-        return EditSpan(start = prefix, oldEnd = oldText.length - suffix, newEnd = newText.length - suffix)
-    }
-
-    /** Re-bases [marks] after `oldText -> newText` (see [diffEdit]). A mark
-     *  spanning all the way across the edited region is extended to keep
-     *  spanning it, typing in the middle of a bolded word stays bold; a
-     *  mark only partly overlapping is trimmed to whatever part of it is
-     *  still there. New text is never retroactively styled from a partial
-     *  overlap, only a full one or an insertion where [marksAtCaret] says
-     *  the mark applies; select it and toggle a mark explicitly otherwise. */
-    fun adjustMarksForEdit(oldText: String, newText: String, marks: List<RichMark>): List<RichMark> {
-        if (oldText == newText) return marks
-        val span = diffEdit(oldText, newText)
-        return replaceMarks(marks, oldText.length, span.start, span.oldEnd, span.newEnd - span.start)
-    }
-
     /**
      * [marks] once `[from, to)` of a text [textLength] long is replaced by
      * [inserted] characters. A mark spanning the whole replaced range spans

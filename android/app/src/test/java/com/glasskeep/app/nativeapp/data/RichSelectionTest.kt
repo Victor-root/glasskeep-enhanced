@@ -322,6 +322,12 @@ class RichSelectionTest {
         val session = RichImeSession({ state }, { state = it }, {})
         session.enter()
         assertEquals("""codeBlock["abc"] paragraph[] paragraph["zz"]""", show(state.blocks))
+        state = RichEditing(blocks, RichSelection.caret(blocks[0].id, 5))
+        session.commitText("\n", 1)
+        assertEquals("""codeBlock["abc"] paragraph[] paragraph["zz"]""", show(state.blocks))
+        state = RichEditing(blocks, RichSelection.caret(blocks[0].id, 3))
+        session.commitText("\n", 1)
+        assertEquals("""codeBlock["abc\n\n\n"] paragraph["zz"]""", show(state.blocks))
     }
 
     @Test

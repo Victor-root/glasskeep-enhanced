@@ -1,6 +1,49 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.content.ClipData
+import android.content.Context
+import android.view.KeyEvent
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.magnifier
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.focusTarget
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.TextToolbar
+import androidx.compose.ui.platform.TextToolbarStatus
+import androidx.compose.ui.platform.nativeClipboardManager
+import com.glasskeep.app.nativeapp.data.RichEditing
+import com.glasskeep.app.nativeapp.data.RichPos
+import com.glasskeep.app.nativeapp.data.RichSelection
+import com.glasskeep.app.nativeapp.data.resolve
+import com.glasskeep.app.nativeapp.data.textLength
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -9,7 +52,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,7 +67,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
@@ -42,9 +83,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.dropShadow
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -52,15 +91,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.shadow.Shadow
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
@@ -81,13 +114,11 @@ import androidx.compose.ui.text.LinkInteractionListener
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -142,92 +173,26 @@ private const val IndentStepEm = 1.75f
 /** `--rt-accent` of the default theme (see WorkspaceTheme.rtAccent). */
 internal val RichDefaultAccent = Color(0xFF6366F1)
 
-/**
- * Which block the formatting bar acts on and where its cursor sits.
- * Hoisted out of [RichTextEditor] because on a phone the web puts the bar
- * in a bottom sheet between the scroll area and the footer
- * (NoteModal.jsx:927-948), so the two halves read the same state.
- *
- * Like ProseMirror's own selection it outlives the editor's focus: opening
- * the sheet blurs the text, yet the bar still knows the block and range it
- * works on, the first block's start until the user taps anywhere.
- */
-class RichEditorState {
-    var activeId by mutableStateOf<String?>(null)
-    var selection by mutableStateOf(TextRange.Zero)
-
-    /** ProseMirror's stored marks, ported: with nothing selected, tapping
-     *  Bold (or picking a colour) arms that mark, or disarms it, for
-     *  whatever is typed next. Cleared as soon as the cursor moves or the
-     *  text is inserted. */
-    var pendingMarks by mutableStateOf<List<PendingMark>>(emptyList())
-        private set
-
-    /** Arms [type] for what is typed next, or takes it away when it is
-     *  already on there ([activeAtCaret]). */
-    fun togglePending(type: RichMarkType, activeAtCaret: Boolean) {
-        val current = pendingMarks.firstOrNull { it.type == type }
-        pendingMarks = pendingMarks.filterNot { it.type == type } + when {
-            current != null -> emptyList()
-            else -> listOf(PendingMark(type, remove = activeAtCaret))
-        }
-    }
-
-    fun setPending(type: RichMarkType, value: String?, color: String? = null) {
-        pendingMarks = pendingMarks.filterNot { it.type == type } + PendingMark(type, value, color)
-    }
-
-    fun clearPending(type: RichMarkType, activeAtCaret: Boolean) {
-        pendingMarks = pendingMarks.filterNot { it.type == type } +
-            if (activeAtCaret) listOf(PendingMark(type, remove = true)) else emptyList()
-    }
-
-    fun clearAllPending() {
-        pendingMarks = emptyList()
-    }
-}
-
-/** One armed-but-not-yet-applied mark (see [RichEditorState.pendingMarks]);
- *  [remove] stores the mark's absence instead. */
-data class PendingMark(
-    val type: RichMarkType,
-    val value: String? = null,
-    val color: String? = null,
-    val remove: Boolean = false,
-)
-
-@Composable
-fun rememberRichEditorState(): RichEditorState = remember { RichEditorState() }
-
-/** The active block's selection, clamped to that block's own current text:
- *  switching to a shorter block right after editing a longer one could
- *  otherwise leave a stale, out-of-range selection around for one frame. */
-internal fun RichEditorState.safeSelectionIn(block: RichBlock?): TextRange =
-    block?.let {
-        TextRange(
-            selection.start.coerceIn(0, it.text.length),
-            selection.end.coerceIn(0, it.text.length),
-        )
-    } ?: TextRange.Zero
-
 /** Where the blocks are shown: the editor, the note's read view, or a
  *  note card's preview, whose text is `text-sm`. */
 private enum class RichSurface { EDITOR, READER, CARD }
 
 /**
- * The native rich-text editor's body: one text field per block, laid out
- * with the web's own block CSS (see [richFlow]). Its formatting bar is a
- * separate composable ([RichFormatToolbar]) because the web puts it in a
- * bottom sheet at the foot of the modal, not above the text.
+ * The native rich-text editor: the whole document one editing surface, as
+ * the web's contenteditable is, its blocks laid out with the web's own block
+ * CSS (see [richFlow]). The selection runs across blocks: a tap places the
+ * caret (showing its handle, a tap on the caret offers Paste), a double tap
+ * or a long press selects a word and the drag after the long press goes on
+ * word by word, the handles move either end with a magnifier, and Cut, Copy,
+ * Paste and Select all show above the selection. One keyboard session edits
+ * the whole document ([richTextInput]); with the formatting sheet open
+ * ([suppressKeyboard]) the text still takes the caret and selections but the
+ * keyboard stays down, the web's inputmode="none". Its formatting bar is a
+ * separate composable ([RichFormatToolbar]) sharing [state].
  *
- * Enter splits a block and Backspace at a block's start joins it back the
- * way Tiptap does (RichEdits), multi-line text pasted into a block becomes
- * one block per line, and a tap on the editor's blank area puts the caret
- * at the end of the last block ([onTapBlank]). With the formatting sheet
- * open ([suppressKeyboard]) the text still takes the caret and selections
- * but the keyboard stays down, the web's inputmode="none".
- *
- * A selection cannot run across blocks here: each block is its own field.
+ * With the read-mode preference off, the web's edit extras: a tapped link
+ * offers Open and Edit, a tapped inline code or code block shows its copy
+ * button first, and neither brings the keyboard up.
  */
 @Composable
 fun RichTextEditor(
@@ -241,146 +206,731 @@ fun RichTextEditor(
     accent: Color,
     readModeEnabled: Boolean,
     minHeight: Dp,
-    focusRequesterFor: (id: String) -> FocusRequester,
-    onTextEdited: (id: String, newText: String, newMarks: List<RichMark>) -> Unit,
-    onEnter: (id: String, atPosition: Int) -> Unit,
-    onInsertLines: (id: String, newText: String, newMarks: List<RichMark>, start: Int, end: Int) -> Unit,
-    onTyped: (id: String, newText: String, newMarks: List<RichMark>, caret: Int, inserted: String) -> Boolean,
-    onToggleChecked: (id: String) -> Unit,
-    onMergeWithPrevious: (id: String) -> Unit,
-    onTapBlank: (lastTextBlockId: String) -> Unit,
-    pendingSelectionFor: (id: String) -> TextRange? = { null },
-    onPendingSelectionConsumed: (id: String) -> Unit = {},
+    onBlocksChange: (List<RichBlock>) -> Unit,
     suppressKeyboard: Boolean = false,
 ) {
     val itemEm = typography.p.size * RemPx
     val flow = remember(blocks, itemEm) { richFlow(blocks, itemEm) }
-    val firstTextId = blocks.firstOrNull { it.kind.hasText }?.id
-    val lastTextId = blocks.lastOrNull { it.kind.hasText }?.id
-    // The bar works on the first block until the text is touched.
-    LaunchedEffect(blocks.map { it.id }) {
-        if (blocks.none { it.id == state.activeId }) {
-            state.activeId = firstTextId
-            state.selection = TextRange.Zero
-        }
+    SideEffect {
+        state.onBlocksChange = onBlocksChange
+        state.keyboardSuppressed = suppressKeyboard
+        state.sync(blocks)
     }
     // Tiptap's Placeholder: only a document holding a single empty
     // paragraph shows it.
     val placeholderId = blocks.singleOrNull()?.takeIf { it.kind == RichBlockKind.PARAGRAPH && it.quotes.isEmpty() && it.text.isEmpty() }?.id
     val placeholder = stringResource(R.string.native_richtext_placeholder)
+    val selectionColors = LocalTextSelectionColors.current
+    val paint = remember(state) { derivedStateOf { RichSelectionPaint.of(state.editing) } }
+    val caretAlpha = remember { mutableFloatStateOf(1f) }
+    val magnifier = remember { mutableStateOf(Offset.Unspecified) }
+    val actions = rememberRichTextActions(state)
+    val focusManager = LocalFocusManager.current
+    val haptics = LocalHapticFeedback.current
+    val bringIntoView = remember { BringIntoViewRequester() }
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+
+    // CursorAnimationState: 500ms on, 500ms off, solid again on every change.
+    val editing = state.editing
+    LaunchedEffect(editing?.selection, editing?.blocks, state.focused) {
+        caretAlpha.floatValue = 1f
+        if (!state.focused) return@LaunchedEffect
+        while (true) {
+            delay(500)
+            caretAlpha.floatValue = 0f
+            delay(500)
+            caretAlpha.floatValue = 1f
+        }
+    }
+    // The caret kept in sight as the text changes and as the keyboard comes
+    // up, once the text is laid out; a selection being dragged is left where
+    // the finger is.
+    LaunchedEffect(editing?.blocks, state.focused, imeBottom) {
+        if (!state.focused) return@LaunchedEffect
+        withFrameNanos {}
+        state.caretRect()?.let { bringIntoView.bringIntoView(it) }
+    }
+    // Typing puts the caret's handle and the menu away, as losing the focus does.
+    LaunchedEffect(editing?.blocks) {
+        state.cursorHandle = false
+        actions.hideMenu()
+    }
+    LaunchedEffect(state.focused) {
+        if (state.focused) return@LaunchedEffect
+        state.cursorHandle = false
+        actions.hideMenu()
+    }
+    LaunchedEffect(suppressKeyboard) {
+        if (suppressKeyboard) state.keyboard?.hide()
+    }
 
     InterceptPlatformTextInput(
         interceptor = { request, nextHandler ->
             if (suppressKeyboard) awaitCancellation() else nextHandler.startInputMethod(request)
         },
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = minHeight)
-                // `.rt-editor-content { padding: .15rem .1rem }`.
-                .padding(horizontal = 1.6.dp, vertical = 2.4.dp)
-                .pointerInput(lastTextId) {
-                    detectTapGestures { lastTextId?.let(onTapBlank) }
-                },
+                .onPlaced { state.layouts.root = it }
+                .onGloballyPositioned { actions.onMoved() }
+                .bringIntoViewRequester(bringIntoView)
+                .richEditorGestures(state, actions, magnifier, haptics, editExtras = !readModeEnabled) { focusManager.clearFocus() }
+                .richTextInput(state, actions::handleKey, actions::onMenuAction)
+                .focusRequester(state.focusRequester)
+                .focusTarget()
+                .onKeyEvent { actions.handleKey(it.nativeKeyEvent) }
+                .magnifier(sourceCenter = { magnifier.value }),
         ) {
-            @Composable
-            fun Field(block: RichBlock, style: TextStyle, modifier: Modifier, splits: Boolean = true) {
-                RichTextBlockField(
-                    block = block,
-                    style = style,
-                    dark = dark,
-                    surface = RichSurface.EDITOR,
-                    placeholder = if (block.id == placeholderId) placeholder else null,
-                    focusRequester = focusRequesterFor(block.id),
-                    pendingMarks = if (state.activeId == block.id) state.pendingMarks else emptyList(),
-                    onConsumePending = { state.clearAllPending() },
-                    onFocusGained = { selection ->
-                        state.activeId = block.id
-                        state.selection = selection
-                        state.clearAllPending()
-                    },
-                    onSelectionChanged = { selection ->
-                        if (state.activeId == block.id) {
-                            state.selection = selection
-                            state.clearAllPending()
-                        }
-                    },
-                    onSelectionPlaced = { selection -> if (state.activeId == block.id) state.selection = selection },
-                    onTextEdited = { newText, newMarks, newSelection ->
-                        onTextEdited(block.id, newText, newMarks)
-                        if (state.activeId == block.id) state.selection = newSelection
-                    },
-                    onEnter = if (splits) { position -> onEnter(block.id, position) } else null,
-                    onInsertLines = if (splits) {
-                        { newText, newMarks, start, end -> onInsertLines(block.id, newText, newMarks, start, end) }
-                    } else {
-                        null
-                    },
-                    onTyped = if (splits) {
-                        { newText, newMarks, caret, inserted -> onTyped(block.id, newText, newMarks, caret, inserted) }
-                    } else {
-                        null
-                    },
-                    onMerge = { onMergeWithPrevious(block.id) },
-                    pendingSelection = pendingSelectionFor(block.id),
-                    onPendingSelectionConsumed = { onPendingSelectionConsumed(block.id) },
-                    editExtras = !readModeEnabled,
-                    noteColor = noteColor,
-                    modifier = modifier,
-                )
-            }
+            Column(
+                // `.rt-editor-content { padding: .15rem .1rem }`.
+                Modifier.fillMaxWidth().padding(horizontal = 1.6.dp, vertical = 2.4.dp),
+            ) {
+                @Composable
+                fun EditorText(block: RichBlock, style: TextStyle, modifier: Modifier) {
+                    RichEditorText(
+                        block = block,
+                        style = style,
+                        dark = dark,
+                        state = state,
+                        paint = paint,
+                        caretAlpha = caretAlpha,
+                        selectionColor = selectionColors.backgroundColor,
+                        placeholder = if (block.id == placeholderId) placeholder else null,
+                        noteColor = noteColor,
+                        modifier = modifier,
+                    )
+                }
 
-            @Composable
-            fun Rows(flow: RichFlow) {
-                for (row in flow.rows) {
-                    if (row.gapBefore > 0f) Spacer(Modifier.height(row.gapBefore.dp))
-                    when (row) {
-                        is RichQuoteRow -> RichQuoteCard(
-                            indent = row.indent.dp,
-                            accent = accent,
-                            noteColor = noteColor,
-                            dark = dark,
-                        ) { Rows(row.inner) }
-                        is RichBlockRow -> {
-                            val block = blocks[row.index]
-                            val look = richRowLook(row, block, typography, taskStrike, dark, titleColor, RichSurface.EDITOR)
-                            when (block.kind) {
-                                RichBlockKind.DIVIDER -> RichDivider(
-                                    if (dark) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.2f),
-                                    start = row.start.dp,
-                                    modifier = look.faded,
-                                )
-                                RichBlockKind.CODE_BLOCK -> RichEditorCodeBlock(
-                                    indent = look.indent,
-                                    dark = dark,
-                                    copyText = block.text,
-                                    noteColor = noteColor,
-                                    armable = !readModeEnabled,
-                                    modifier = look.faded,
-                                ) { onArmedFocus ->
-                                    Field(block, look.style, Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onArmedFocus() }, splits = false)
-                                }
-                                else -> RichListRow(
-                                    block = block,
-                                    style = look.style,
-                                    list = row.list,
-                                    indent = look.indent,
-                                    accent = accent,
-                                    onToggleChecked = { onToggleChecked(block.id) },
-                                    modifier = look.faded,
-                                ) { textModifier ->
-                                    Field(block, look.style, textModifier.fillMaxWidth().then(if (taskStrike && block.isChecked) Modifier.alpha(0.6f) else Modifier))
+                @Composable
+                fun Rows(flow: RichFlow) {
+                    for (row in flow.rows) {
+                        if (row.gapBefore > 0f) Spacer(Modifier.height(row.gapBefore.dp))
+                        when (row) {
+                            is RichQuoteRow -> RichQuoteCard(
+                                indent = row.indent.dp,
+                                accent = accent,
+                                noteColor = noteColor,
+                                dark = dark,
+                            ) { Rows(row.inner) }
+                            is RichBlockRow -> {
+                                val block = blocks[row.index]
+                                val look = richRowLook(row, block, typography, taskStrike, dark, titleColor, RichSurface.EDITOR)
+                                when (block.kind) {
+                                    RichBlockKind.DIVIDER -> RichDivider(
+                                        if (dark) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.2f),
+                                        start = row.start.dp,
+                                        modifier = look.faded,
+                                    )
+                                    RichBlockKind.CODE_BLOCK -> RichEditorCodeBlock(
+                                        indent = look.indent,
+                                        dark = dark,
+                                        copyText = block.text,
+                                        noteColor = noteColor,
+                                        armed = if (readModeEnabled) null else state.armedCodeBlock == block.id,
+                                        onArm = { armed -> state.armedCodeBlock = if (armed) block.id else null },
+                                        modifier = look.faded,
+                                    ) {
+                                        EditorText(block, look.style, Modifier.fillMaxWidth())
+                                    }
+                                    else -> RichListRow(
+                                        block = block,
+                                        style = look.style,
+                                        list = row.list,
+                                        indent = look.indent,
+                                        accent = accent,
+                                        onToggleChecked = { state.toggleChecked(block.id) },
+                                        modifier = look.faded,
+                                    ) { textModifier ->
+                                        EditorText(block, look.style, textModifier.fillMaxWidth().then(if (taskStrike && block.isChecked) Modifier.alpha(0.6f) else Modifier))
+                                    }
                                 }
                             }
                         }
                     }
+                    if (flow.gapAfter > 0f) Spacer(Modifier.height(flow.gapAfter.dp))
                 }
-                if (flow.gapAfter > 0f) Spacer(Modifier.height(flow.gapAfter.dp))
-            }
 
-            Rows(flow)
+                Rows(flow)
+            }
+            RichSelectionHandles(state, actions, magnifier, selectionColors.handleColor)
         }
+    }
+}
+
+/** What each block paints of the selection: the selected part of its
+ *  text, whether its line break is selected too, the caret, the
+ *  composition. */
+private class RichSelectionPaint(
+    val selected: Map<String, Pair<Int, Int>>,
+    val lineBreaks: Set<String>,
+    val caret: RichPos?,
+    val composing: Pair<String, Pair<Int, Int>>?,
+) {
+    companion object {
+        private val None = RichSelectionPaint(emptyMap(), emptySet(), null, null)
+
+        fun of(editing: RichEditing?): RichSelectionPaint {
+            val blocks = editing?.blocks ?: return None
+            val span = editing.span ?: return None
+            val composing = editing.composition?.resolve(blocks)?.takeIf { it.start == it.end }?.let {
+                blocks[it.start].id to (it.startOffset to it.endOffset)
+            }
+            if (span.collapsed) return RichSelectionPaint(emptyMap(), emptySet(), editing.selection.head, composing)
+            val selected = HashMap<String, Pair<Int, Int>>()
+            val lineBreaks = HashSet<String>()
+            for (i in span.start..span.end) {
+                val block = blocks[i]
+                if (!block.kind.hasText) continue
+                val from = span.fromIn(i)
+                val to = span.toIn(i, block.text.length)
+                if (from < to) selected[block.id] = from to to
+                if (i < span.end) lineBreaks += block.id
+            }
+            return RichSelectionPaint(selected, lineBreaks, null, composing)
+        }
+    }
+}
+
+/**
+ * One block's text in the editor: its styled text with the selection
+ * behind it (the selected line break as a space's width at the end of the
+ * line, as Chrome paints it), the keyboard's composition underlined, and
+ * the caret, 2dp in the text's colour, blinking. Registers its layout for
+ * hit tests, the handles and the keyboard.
+ */
+@Composable
+private fun RichEditorText(
+    block: RichBlock,
+    style: TextStyle,
+    dark: Boolean,
+    state: RichEditorState,
+    paint: State<RichSelectionPaint>,
+    caretAlpha: State<Float>,
+    selectionColor: Color,
+    placeholder: String?,
+    noteColor: String?,
+    modifier: Modifier,
+) {
+    val annotated = remember(block, style, dark) { annotatedTextFor(block, style, dark, RichSurface.EDITOR) }
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val uriHandler = LocalUriHandler.current
+    DisposableEffect(block.id) { onDispose { state.layouts.remove(block.id) } }
+    Box(modifier) {
+        if (placeholder != null) {
+            Text(placeholder, style = style.copy(color = if (dark) Color(0xFF6B7280) else Color(0xFF9CA3AF)))
+        }
+        BasicText(
+            text = annotated,
+            style = style,
+            onTextLayout = {
+                layout = it
+                state.layouts.setLayout(block.id, it)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .onPlaced { state.layouts.setCoordinates(block.id, it) }
+                .drawBehind {
+                    val text = layout ?: return@drawBehind
+                    val now = paint.value
+                    now.selected[block.id]?.let { (from, to) -> drawPath(text.getPathForRange(from, to), selectionColor) }
+                    if (block.id in now.lineBreaks) {
+                        val line = text.lineCount - 1
+                        drawRect(
+                            selectionColor,
+                            Offset(text.getLineRight(line), text.getLineTop(line)),
+                            Size(style.fontSize.toPx() * 0.28f, text.getLineBottom(line) - text.getLineTop(line)),
+                        )
+                    }
+                    now.composing?.takeIf { it.first == block.id }?.let { (_, range) ->
+                        val (from, to) = range
+                        if (from < to) {
+                            val thickness = 1.dp.toPx()
+                            forEachLineSegment(text, from, to) { left, right, baseline ->
+                                val y = baseline + maxOf(thickness, 0.075f * style.fontSize.toPx()) + thickness / 2f
+                                drawLine(style.color, Offset(left, y), Offset(right, y), thickness)
+                            }
+                        }
+                    }
+                    drawRichDecorations(text, block, style, dark, RichSurface.EDITOR)
+                }
+                .drawWithContent {
+                    drawContent()
+                    val caret = paint.value.caret?.takeIf { it.blockId == block.id } ?: return@drawWithContent
+                    if (!state.focused || caretAlpha.value == 0f) return@drawWithContent
+                    val rect = (layout ?: return@drawWithContent).getCursorRect(caret.offset.coerceIn(0, block.text.length))
+                    val width = 2.dp.toPx()
+                    val x = (rect.left + width / 2f).coerceAtMost(size.width - width / 2f)
+                    drawLine(style.color, Offset(x, rect.top), Offset(x, rect.bottom), width)
+                },
+        )
+        val code = state.armedCode?.takeIf { it.first == block.id }?.second
+        val link = state.tappedLink?.takeIf { it.first == block.id }?.second
+        val textLayout = if (code != null || link != null) layout else null
+        if (code != null && textLayout != null) InlineCodeCopy(code, block.text, textLayout, noteColor, dark)
+        if (link != null && textLayout != null) {
+            val start = link.start.coerceIn(0, block.text.length)
+            val end = link.end.coerceIn(start, block.text.length)
+            LinkTapPopover(
+                bounds = textLayout.getPathForRange(start, end).getBounds(),
+                dark = dark,
+                onOpen = {
+                    state.tappedLink = null
+                    uriHandler.openUri(RichDoc.ensureSchemeUrl(link.value.orEmpty()))
+                },
+                onEdit = {
+                    state.tappedLink = null
+                    state.placeCaret(block.id, start)
+                    state.requestFocus()
+                },
+                onDismiss = { state.tappedLink = null },
+            )
+        }
+    }
+}
+
+// ---------- Hit tests and positions ----------
+
+/**
+ * The position under [point], in the editor's frame: in the block whose
+ * text is nearest vertically, at the character boundary nearest [point];
+ * below the last block, the end of the last one, as a tap on the editor's
+ * blank area does on the web.
+ */
+private fun RichEditorState.positionAt(point: Offset): RichPos? {
+    val blocks = editing?.blocks ?: return null
+    var best: Triple<RichBlock, TextLayoutResult, Offset>? = null
+    var bestDistance = Float.MAX_VALUE
+    var lowest = Float.NEGATIVE_INFINITY
+    for (block in blocks) {
+        if (!block.kind.hasText) continue
+        val (layout, origin) = layouts.placed(block.id) ?: continue
+        val top = origin.y
+        val bottom = origin.y + layout.size.height
+        lowest = maxOf(lowest, bottom)
+        val distance = when {
+            point.y < top -> top - point.y
+            point.y > bottom -> point.y - bottom
+            else -> 0f
+        }
+        if (distance < bestDistance) {
+            bestDistance = distance
+            best = Triple(block, layout, origin)
+        }
+    }
+    val (block, layout, origin) = best ?: return null
+    if (point.y > lowest) blocks.lastOrNull { it.kind.hasText }?.let { return RichPos(it.id, it.text.length) }
+    return RichPos(block.id, layout.getOffsetForPosition(point - origin))
+}
+
+/** The character under [point] and its block, for the edit extras' taps
+ *  on links and inline code; null between characters or past a line. */
+private fun RichEditorState.characterAt(point: Offset): Pair<RichBlock, Int>? {
+    val pos = positionAt(point) ?: return null
+    val block = editing?.blocks?.firstOrNull { it.id == pos.blockId } ?: return null
+    val (layout, origin) = layouts.placed(block.id) ?: return null
+    return layout.charAt(point - origin, block.text.length)?.let { block to it }
+}
+
+/** The word at [pos] (getWordBoundary), or the caret there between words. */
+private fun RichEditorState.wordAt(pos: RichPos): RichSelection {
+    val layout = layouts.layout(pos.blockId) ?: return RichSelection(pos, pos)
+    val word = layout.getWordBoundary(pos.offset.coerceIn(0, layout.layoutInput.text.length))
+    return if (word.collapsed) RichSelection(pos, pos) else RichSelection(pos.copy(offset = word.start), pos.copy(offset = word.end))
+}
+
+/** [pos]'s caret rectangle, in the editor's frame. */
+private fun RichEditorState.caretRectAt(pos: RichPos): Rect? {
+    val (layout, origin) = layouts.placed(pos.blockId) ?: return null
+    return layout.getCursorRect(pos.offset.coerceIn(0, layout.layoutInput.text.length)).translate(origin)
+}
+
+/** Where the caret (the selection's moving end) is, in the editor's frame. */
+private fun RichEditorState.caretRect(): Rect? = editing?.selection?.head?.let { caretRectAt(it) }
+
+/** A handle's anchor for [pos]: the bottom of its line, at the caret. */
+private fun RichEditorState.handleAnchor(pos: RichPos): Offset? {
+    val (layout, origin) = layouts.placed(pos.blockId) ?: return null
+    val offset = pos.offset.coerceIn(0, layout.layoutInput.text.length)
+    val line = layout.getLineForOffset(offset)
+    return Offset(layout.getHorizontalPosition(offset, usePrimaryDirection = true), layout.getLineBottom(line)) + origin
+}
+
+/** The magnifier's centre for a finger at [finger] over [pos]: on the
+ *  middle of that line, the finger's x kept within the line. */
+private fun RichEditorState.magnifierCenter(finger: Offset, pos: RichPos): Offset {
+    val (layout, origin) = layouts.placed(pos.blockId) ?: return Offset.Unspecified
+    val offset = pos.offset.coerceIn(0, layout.layoutInput.text.length)
+    val line = layout.getLineForOffset(offset)
+    val x = (finger.x - origin.x).coerceIn(layout.getLineLeft(line), layout.getLineRight(line))
+    return Offset(x, (layout.getLineTop(line) + layout.getLineBottom(line)) / 2f) + origin
+}
+
+/** The selection's bounding box, in the editor's frame. */
+private fun RichEditorState.selectionRect(): Rect? {
+    val current = editing ?: return null
+    val span = current.span ?: return null
+    val start = caretRectAt(RichPos(current.blocks[span.start].id, span.startOffset)) ?: return null
+    val end = caretRectAt(RichPos(current.blocks[span.end].id, span.endOffset)) ?: return null
+    return Rect(minOf(start.left, end.left), start.top, maxOf(start.right, end.right), end.bottom)
+}
+
+// ---------- Gestures ----------
+
+/**
+ * Taps, double taps and long presses on the text, as a text field takes
+ * them; a drag is left to the note's scroll, unless it follows a long
+ * press, which then selects on word by word under the magnifier. Taps a
+ * child took (a checkbox, a copy button) are its own.
+ */
+private fun Modifier.richEditorGestures(
+    state: RichEditorState,
+    actions: RichTextActions,
+    magnifier: MutableState<Offset>,
+    haptics: HapticFeedback,
+    editExtras: Boolean,
+    clearFocus: () -> Unit,
+): Modifier = pointerInput(state, editExtras) {
+    var lastTapUp = 0L
+    var lastTapAt = Offset.Unspecified
+    awaitEachGesture {
+        val down = awaitFirstDown()
+        var up: PointerInputChange? = null
+        val longPress = try {
+            withTimeout(viewConfiguration.longPressTimeoutMillis) {
+                while (true) {
+                    val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                    if (change.changedToUpIgnoreConsumed()) {
+                        if (!change.isConsumed) up = change
+                        break
+                    }
+                    if (change.isConsumed || (change.position - down.position).getDistance() > viewConfiguration.touchSlop) break
+                }
+            }
+            false
+        } catch (_: PointerEventTimeoutCancellationException) {
+            true
+        }
+        if (longPress) {
+            val at = state.positionAt(down.position) ?: return@awaitEachGesture
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            state.armedCode = null
+            state.tappedLink = null
+            val word = state.wordAt(at)
+            state.select(word)
+            state.cursorHandle = word.collapsed
+            if (!state.focused) state.requestFocus()
+            actions.hideMenu()
+            magnifier.value = state.magnifierCenter(down.position, at)
+            while (true) {
+                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                if (change.changedToUpIgnoreConsumed()) break
+                change.consume()
+                val here = state.positionAt(change.position) ?: continue
+                state.select(unionOf(state, word, state.wordAt(here)))
+                magnifier.value = state.magnifierCenter(change.position, here)
+            }
+            magnifier.value = Offset.Unspecified
+            actions.showMenu()
+            return@awaitEachGesture
+        }
+        val tap = up ?: return@awaitEachGesture
+        val double = down.uptimeMillis - lastTapUp < viewConfiguration.doubleTapTimeoutMillis &&
+            (down.position - lastTapAt).getDistance() < 100.dp.toPx()
+        lastTapUp = tap.uptimeMillis
+        lastTapAt = tap.position
+        val at = state.positionAt(tap.position) ?: return@awaitEachGesture
+        if (double) {
+            lastTapUp = 0L
+            val word = state.wordAt(at)
+            state.select(word)
+            state.cursorHandle = word.collapsed
+            actions.showMenu()
+            return@awaitEachGesture
+        }
+        if (editExtras) {
+            val hit = state.characterAt(tap.position)
+            val marks = hit?.first?.marks.orEmpty()
+            val index = hit?.second
+            val link = index?.let { i -> marks.firstOrNull { it.type == RichMarkType.LINK && !it.value.isNullOrBlank() && it.start <= i && it.end > i } }
+            val code = index?.let { i -> marks.firstOrNull { it.type == RichMarkType.CODE && it.start <= i && it.end > i } }
+            val armed = state.armedCode
+            when {
+                link != null -> {
+                    tap.consume()
+                    state.armedCode = null
+                    clearFocus()
+                    state.tappedLink = hit.first.id to link
+                    return@awaitEachGesture
+                }
+                code != null && (armed?.first != hit.first.id || armed.second != code) -> {
+                    tap.consume()
+                    clearFocus()
+                    state.armedCode = hit.first.id to code
+                    return@awaitEachGesture
+                }
+                else -> state.armedCode = null
+            }
+        }
+        state.armedCodeBlock = null
+        val caret = RichSelection(at, at)
+        if (state.focused && state.editing?.selection == caret) {
+            actions.toggleMenu()
+        } else {
+            actions.hideMenu()
+            state.select(caret)
+        }
+        state.cursorHandle = true
+        if (state.focused) {
+            if (!state.keyboardSuppressed) state.keyboard?.show()
+        } else {
+            state.requestFocus()
+        }
+    }
+}
+
+/** The long press's first word and the word under the finger, as one
+ *  selection whose moving end follows the finger. */
+private fun unionOf(state: RichEditorState, first: RichSelection, here: RichSelection): RichSelection {
+    val flat = state.editing?.flat ?: return first
+    val firstStart = flat.offsetOf(first.anchor) ?: return first
+    val hereStart = flat.offsetOf(here.anchor) ?: return first
+    return if (hereStart < firstStart) RichSelection(first.head, here.anchor) else RichSelection(first.anchor, here.head)
+}
+
+// ---------- Handles ----------
+
+private enum class RichHandleKind { START, END, CURSOR }
+
+/** The selection's handles, while the text has the focus: one at each end
+ *  of a selection, one under the caret once it was placed by a tap. */
+@Composable
+private fun RichSelectionHandles(state: RichEditorState, actions: RichTextActions, magnifier: MutableState<Offset>, color: Color) {
+    state.layouts.version
+    val editing = state.editing ?: return
+    if (!state.focused) return
+    val span = editing.span ?: return
+    if (span.collapsed) {
+        if (state.cursorHandle) RichHandle(state, actions, magnifier, color, RichHandleKind.CURSOR)
+    } else {
+        RichHandle(state, actions, magnifier, color, RichHandleKind.START)
+        RichHandle(state, actions, magnifier, color, RichHandleKind.END)
+    }
+}
+
+/**
+ * One handle, Android's own shape (a 25dp drop, its square corner on the
+ * text position, the caret's pointing up), in a popup so the note's edges
+ * never clip it, hidden once its end scrolls out of sight. Dragging it
+ * moves its end of the selection (the caret, for the caret's) with the
+ * magnifier over it; the menu comes back when it is let go.
+ */
+@Composable
+private fun RichHandle(state: RichEditorState, actions: RichTextActions, magnifier: MutableState<Offset>, color: Color, kind: RichHandleKind) {
+    val density = LocalDensity.current
+    val size = with(density) { 25.dp.roundToPx() }
+    val current = rememberUpdatedState(kind)
+
+    fun end(): RichPos? {
+        val editing = state.editing ?: return null
+        val span = editing.span ?: return null
+        return when (current.value) {
+            RichHandleKind.START -> RichPos(editing.blocks[span.start].id, span.startOffset)
+            RichHandleKind.END, RichHandleKind.CURSOR -> RichPos(editing.blocks[span.end].id, span.endOffset)
+        }
+    }
+
+    val provider = remember(state) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
+                state.layouts.version
+                val anchor = end()?.let { state.handleAnchor(it) } ?: return IntOffset(-10 * size, -10 * size)
+                val x = when (current.value) {
+                    RichHandleKind.START -> anchor.x - size
+                    RichHandleKind.END -> anchor.x
+                    RichHandleKind.CURSOR -> anchor.x - size / 2f
+                }
+                return IntOffset(anchorBounds.left + x.roundToInt(), anchorBounds.top + anchor.y.roundToInt())
+            }
+        }
+    }
+    val visible = end()?.let { state.handleAnchor(it) }?.let { state.layouts.isVisible(it) } == true
+    if (!visible) return
+    Popup(popupPositionProvider = provider, properties = PopupProperties(focusable = false, excludeFromSystemGesture = true, clippingEnabled = false)) {
+        var frame by remember { mutableStateOf<LayoutCoordinates?>(null) }
+        Box(
+            Modifier
+                .size(25.dp)
+                .onPlaced { frame = it }
+                .drawWithCache {
+                    val radius = this.size.width / 2f
+                    val shape = Path().apply {
+                        addOval(Rect(Offset.Zero, this@drawWithCache.size))
+                        when (current.value) {
+                            RichHandleKind.START -> addRect(Rect(radius, 0f, this@drawWithCache.size.width, radius))
+                            RichHandleKind.END -> addRect(Rect(0f, 0f, radius, radius))
+                            RichHandleKind.CURSOR -> {
+                                moveTo(radius, 0f)
+                                lineTo(radius + radius * 0.7071f, radius - radius * 0.7071f)
+                                lineTo(radius - radius * 0.7071f, radius - radius * 0.7071f)
+                                close()
+                            }
+                        }
+                    }
+                    onDrawBehind { drawPath(shape, color) }
+                }
+                .pointerInput(state) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        down.consume()
+                        val root = state.layouts.root ?: return@awaitEachGesture
+                        val handle = frame ?: return@awaitEachGesture
+                        val start = end() ?: return@awaitEachGesture
+                        val editing = state.editing ?: return@awaitEachGesture
+                        val span = editing.span ?: return@awaitEachGesture
+                        val fixed = when (current.value) {
+                            RichHandleKind.START -> RichPos(editing.blocks[span.end].id, span.endOffset)
+                            RichHandleKind.END -> RichPos(editing.blocks[span.start].id, span.startOffset)
+                            RichHandleKind.CURSOR -> null
+                        }
+                        val anchor = state.handleAnchor(start) ?: return@awaitEachGesture
+                        // What the finger holds above the text position, in the
+                        // editor's frame, whatever the popup does meanwhile.
+                        val grab = anchor - root.screenToLocal(handle.localToScreen(down.position)) - Offset(0f, 1f)
+                        actions.hideMenu()
+                        var moved = false
+                        while (true) {
+                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                            if (change.changedToUpIgnoreConsumed()) break
+                            change.consume()
+                            val finger = root.screenToLocal(handle.localToScreen(change.position)) + grab
+                            val at = state.positionAt(finger) ?: continue
+                            moved = true
+                            state.select(if (fixed == null) RichSelection(at, at) else RichSelection(fixed, at))
+                            magnifier.value = state.magnifierCenter(finger, at)
+                        }
+                        magnifier.value = Offset.Unspecified
+                        if (moved || current.value != RichHandleKind.CURSOR) actions.showMenu() else actions.toggleMenu()
+                    }
+                },
+        )
+    }
+}
+
+// ---------- Clipboard, menu and keys ----------
+
+@Composable
+private fun rememberRichTextActions(state: RichEditorState): RichTextActions {
+    val toolbar = LocalTextToolbar.current
+    val clipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    return remember(state, toolbar, clipboard, scope) { RichTextActions(state, toolbar, clipboard, context, scope) }
+}
+
+/**
+ * Cut, Copy, Paste and Select all over the selection, the floating menu
+ * Android shows above a text field's selection that offers them, and the
+ * keys a hardware keyboard or the input method sends.
+ */
+private class RichTextActions(
+    private val state: RichEditorState,
+    private val toolbar: TextToolbar,
+    private val clipboard: Clipboard,
+    private val context: Context,
+    private val scope: CoroutineScope,
+) {
+    fun showMenu() {
+        val editing = state.editing ?: return
+        val span = editing.span ?: return
+        val root = state.layouts.root?.takeIf { it.isAttached } ?: return
+        val rect = (if (span.collapsed) state.caretRect() else state.selectionRect()) ?: return
+        val whole = span.start == 0 && span.startOffset == 0 && span.end == editing.blocks.lastIndex &&
+            span.endOffset == editing.blocks.last().textLength
+        toolbar.showMenu(
+            rect = Rect(root.localToRoot(rect.topLeft), root.localToRoot(rect.bottomRight)),
+            onCopyRequested = if (span.collapsed) null else ({ copy(); hideMenu() }),
+            onPasteRequested = if (clipboard.nativeClipboardManager.hasPrimaryClip()) ({ paste(); hideMenu() }) else null,
+            onCutRequested = if (span.collapsed) null else ({ cut(); hideMenu() }),
+            onSelectAllRequested = if (whole) null else ({ state.selectAll(); showMenu() }),
+        )
+    }
+
+    fun hideMenu() {
+        if (toolbar.status == TextToolbarStatus.Shown) toolbar.hide()
+    }
+
+    fun toggleMenu() = if (toolbar.status == TextToolbarStatus.Shown) hideMenu() else showMenu()
+
+    /** The menu follows its selection as the note scrolls. */
+    fun onMoved() {
+        if (toolbar.status == TextToolbarStatus.Shown && state.focused) showMenu()
+    }
+
+    fun copy() {
+        val text = state.selectedText() ?: return
+        scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("text", text))) }
+    }
+
+    fun cut() {
+        copy()
+        state.deleteSelection()
+    }
+
+    fun paste() {
+        scope.launch {
+            val clip = clipboard.getClipEntry()?.clipData ?: return@launch
+            val text = (0 until clip.itemCount).joinToString("") { clip.getItemAt(it).coerceToText(context) }
+            if (text.isNotEmpty()) state.paste(text)
+        }
+    }
+
+    /** The input method's own menu (performContextMenuAction). */
+    fun onMenuAction(id: Int): Boolean {
+        when (id) {
+            android.R.id.selectAll -> state.selectAll()
+            android.R.id.copy -> copy()
+            android.R.id.cut -> cut()
+            android.R.id.paste, android.R.id.pasteAsPlainText -> paste()
+            else -> return false
+        }
+        return true
+    }
+
+    /**
+     * A key: Backspace, Delete and Enter as the keyboard's own, the arrows
+     * moving the caret a character (Shift extending the selection),
+     * Ctrl+A, C, X and V, and any other character typed in.
+     */
+    fun handleKey(event: KeyEvent): Boolean {
+        if (state.editing == null) return false
+        if (event.action != KeyEvent.ACTION_DOWN) return event.keyCode in HandledKeys
+        val ctrl = event.isCtrlPressed
+        when {
+            event.keyCode == KeyEvent.KEYCODE_DEL -> state.ime.backspace()
+            event.keyCode == KeyEvent.KEYCODE_FORWARD_DEL -> state.ime.deleteForward()
+            event.keyCode == KeyEvent.KEYCODE_ENTER || event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER -> state.ime.enter()
+            event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> state.moveCaret(forward = false, extend = event.isShiftPressed)
+            event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT -> state.moveCaret(forward = true, extend = event.isShiftPressed)
+            ctrl && event.keyCode == KeyEvent.KEYCODE_A -> state.selectAll()
+            ctrl && event.keyCode == KeyEvent.KEYCODE_C -> copy()
+            ctrl && event.keyCode == KeyEvent.KEYCODE_X -> cut()
+            ctrl && event.keyCode == KeyEvent.KEYCODE_V -> paste()
+            else -> {
+                val char = event.unicodeChar
+                if (char == 0 || ctrl || event.isAltPressed || Character.isISOControl(char)) return false
+                state.ime.commitText(String(Character.toChars(char)), 1)
+            }
+        }
+        return true
+    }
+
+    private companion object {
+        val HandledKeys = setOf(
+            KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+        )
     }
 }
 
@@ -801,7 +1351,8 @@ private fun quoteFrameColor(noteColor: String?, dark: Boolean): Color {
 
 /** The editor's `pre` (globalCSS.js:3069-3083): 9.6/13.6 padding inside a
  *  1px border, 8px radius. With the read-mode preference off the web's
- *  edit extras arm a copy button on the first tap ([armable]); otherwise a
+ *  edit extras arm a copy button on the first tap ([armed] not null, the
+ *  editor's taps disarming it), which clears itself after 5s; otherwise a
  *  tap simply places the caret. */
 @Composable
 private fun RichEditorCodeBlock(
@@ -809,15 +1360,15 @@ private fun RichEditorCodeBlock(
     dark: Boolean,
     copyText: String,
     noteColor: String?,
-    armable: Boolean,
+    armed: Boolean?,
+    onArm: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    field: @Composable (onFocus: () -> Unit) -> Unit,
+    text: @Composable () -> Unit,
 ) {
-    var armed by remember { mutableStateOf(false) }
     LaunchedEffect(armed) {
-        if (armed) {
+        if (armed == true) {
             delay(5000)
-            armed = false
+            onArm(false)
         }
     }
     val shape = RoundedCornerShape(8.dp)
@@ -829,18 +1380,16 @@ private fun RichEditorCodeBlock(
             .border(1.dp, if (dark) RtDividerDark else RtDividerLight, shape)
             .padding(horizontal = 14.6.dp, vertical = 10.6.dp),
     ) {
-        field { armed = false }
-        if (armable) {
-            if (armed) {
-                CodeCopyButton(
-                    text = copyText,
-                    noteColor = noteColor,
-                    dark = dark,
-                    modifier = Modifier.align(Alignment.TopEnd).offset(x = 6.6.dp, y = (-2.6).dp),
-                )
-            } else {
-                Box(Modifier.matchParentSize().pointerInput(Unit) { detectTapGestures { armed = true } })
-            }
+        text()
+        when (armed) {
+            true -> CodeCopyButton(
+                text = copyText,
+                noteColor = noteColor,
+                dark = dark,
+                modifier = Modifier.align(Alignment.TopEnd).offset(x = 6.6.dp, y = (-2.6).dp),
+            )
+            false -> Box(Modifier.matchParentSize().pointerInput(Unit) { detectTapGestures { onArm(true) } })
+            null -> Unit
         }
     }
 }
@@ -1025,212 +1574,6 @@ private fun InlineCodeCopy(mark: RichMark, text: String, layout: TextLayoutResul
         val height = if (below) maxOf(layout.size.height, y + chip.height + gap) else layout.size.height
         layout(width, height) { chip.place(x, y) }
     }
-}
-
-/** The shared editable field: one BasicTextField carrying the block's own
- *  style, the caret in the text colour. Enter splits the block and a
- *  multi-line insertion becomes several blocks ([onEnter],
- *  [onInsertLines], null inside a code block, where both are plain
- *  newlines); Backspace at its start joins it backward ([onMerge]). What
- *  is typed outside an IME composition, or a composition that ends, goes
- *  through the input rules first ([onTyped], true when one applied). */
-@Composable
-private fun RichTextBlockField(
-    block: RichBlock,
-    style: TextStyle,
-    dark: Boolean,
-    surface: RichSurface,
-    placeholder: String?,
-    focusRequester: FocusRequester,
-    pendingMarks: List<PendingMark>,
-    onConsumePending: () -> Unit,
-    onFocusGained: (TextRange) -> Unit,
-    onSelectionChanged: (TextRange) -> Unit,
-    onSelectionPlaced: (TextRange) -> Unit,
-    onTextEdited: (newText: String, newMarks: List<RichMark>, newSelection: TextRange) -> Unit,
-    onEnter: ((position: Int) -> Unit)?,
-    onInsertLines: ((newText: String, newMarks: List<RichMark>, start: Int, end: Int) -> Unit)?,
-    onTyped: ((newText: String, newMarks: List<RichMark>, caret: Int, inserted: String) -> Boolean)?,
-    onMerge: () -> Unit,
-    pendingSelection: TextRange?,
-    onPendingSelectionConsumed: () -> Unit,
-    editExtras: Boolean,
-    noteColor: String?,
-    modifier: Modifier = Modifier,
-) {
-    // Cursor at the start on first composition: a freshly split-off block's
-    // whole text is "what came after the cursor".
-    var fieldValue by remember(block.id) {
-        mutableStateOf(TextFieldValue(annotatedTextFor(block, style, dark, surface), TextRange.Zero))
-    }
-    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    // EditExtras, with the read-mode preference off: a tapped inline code
-    // shows its copy chip, until 5s pass or it is tapped again (which then
-    // places the caret); a tapped link offers Open and Edit. Both keep the
-    // keyboard down.
-    var armedCode by remember(block.id) { mutableStateOf<RichMark?>(null) }
-    var tappedLink by remember(block.id) { mutableStateOf<RichMark?>(null) }
-    LaunchedEffect(armedCode) {
-        if (armedCode != null) {
-            delay(5000)
-            armedCode = null
-        }
-    }
-    val focusManager = LocalFocusManager.current
-    val uriHandler = LocalUriHandler.current
-    // Changes that did not come from this field (a toolbar mark, a split, a
-    // join) rebuild the styled value from the model, keeping whatever
-    // selection still fits, unless an edit left an explicit caret for this
-    // block ([pendingSelection]), which wins once.
-    LaunchedEffect(block.text, block.marks, style, pendingSelection) {
-        val rebuilt = annotatedTextFor(block, style, dark, surface)
-        val pending = pendingSelection
-        if (pending != null) {
-            val placed = TextRange(pending.start.coerceIn(0, rebuilt.length), pending.end.coerceIn(0, rebuilt.length))
-            fieldValue = TextFieldValue(rebuilt, placed)
-            onSelectionPlaced(placed)
-            onPendingSelectionConsumed()
-        } else if (fieldValue.annotatedString.text != rebuilt.text || fieldValue.annotatedString.spanStyles != rebuilt.spanStyles) {
-            fieldValue = TextFieldValue(
-                rebuilt,
-                TextRange(
-                    fieldValue.selection.start.coerceIn(0, rebuilt.length),
-                    fieldValue.selection.end.coerceIn(0, rebuilt.length),
-                ),
-            )
-        }
-    }
-
-    BasicTextField(
-        value = fieldValue,
-        onValueChange = { new ->
-            if (new.text == fieldValue.text) {
-                val moved = new.selection != fieldValue.selection
-                val compositionEnded = fieldValue.composition != null && new.composition == null
-                fieldValue = new
-                if (moved) onSelectionChanged(new.selection)
-                if (compositionEnded && new.selection.collapsed) onTyped?.invoke(new.text, block.marks, new.selection.end, "")
-                return@BasicTextField
-            }
-            val span = RichDoc.diffEdit(fieldValue.text, new.text)
-            val inserted = span.oldEnd == span.start && span.newEnd > span.start
-            var newMarks = RichDoc.adjustMarksForEdit(fieldValue.text, new.text, block.marks)
-            if (inserted && pendingMarks.isNotEmpty()) {
-                newMarks = pendingMarks.fold(newMarks) { acc, pending ->
-                    if (pending.remove) {
-                        RichDoc.clearMark(acc, pending.type, span.start, span.newEnd)
-                    } else {
-                        RichDoc.setMark(acc, pending.type, span.start, span.newEnd, pending.value, pending.color)
-                    }
-                }
-                onConsumePending()
-            }
-            val newline = inserted && new.text.substring(span.start, span.newEnd).contains('\n')
-            when {
-                newline && onEnter != null && span.newEnd == span.start + 1 -> onEnter(span.start)
-                newline && onInsertLines != null -> onInsertLines(new.text, newMarks, span.start, span.newEnd)
-                else -> {
-                    val typed = span.newEnd > span.start && new.composition == null &&
-                        new.selection.collapsed && new.selection.end == span.newEnd
-                    val ruled = typed && onTyped?.invoke(
-                        new.text,
-                        newMarks,
-                        span.newEnd,
-                        new.text.substring(span.start, span.newEnd),
-                    ) == true
-                    if (!ruled) {
-                        val updated = block.copy(text = new.text, marks = newMarks)
-                        fieldValue = TextFieldValue(annotatedTextFor(updated, style, dark, surface), new.selection)
-                        onTextEdited(new.text, newMarks, new.selection)
-                    }
-                }
-            }
-        },
-        textStyle = style,
-        cursorBrush = SolidColor(style.color),
-        onTextLayout = { layout = it },
-        decorationBox = { inner ->
-            Box {
-                if (placeholder != null && fieldValue.text.isEmpty()) {
-                    Text(placeholder, style = style.copy(color = if (dark) Color(0xFF6B7280) else Color(0xFF9CA3AF)))
-                }
-                inner()
-                val textLayout = layout
-                val code = armedCode
-                if (code != null && textLayout != null) InlineCodeCopy(code, block.text, textLayout, noteColor, dark)
-                val link = tappedLink
-                if (link != null && textLayout != null) {
-                    val start = link.start.coerceIn(0, block.text.length)
-                    val end = link.end.coerceIn(start, block.text.length)
-                    LinkTapPopover(
-                        bounds = textLayout.getPathForRange(start, end).getBounds(),
-                        dark = dark,
-                        onOpen = {
-                            tappedLink = null
-                            uriHandler.openUri(RichDoc.ensureSchemeUrl(link.value.orEmpty()))
-                        },
-                        onEdit = {
-                            tappedLink = null
-                            fieldValue = fieldValue.copy(selection = TextRange(start))
-                            focusRequester.requestFocus()
-                        },
-                        onDismiss = { tappedLink = null },
-                    )
-                }
-            }
-        },
-        modifier = modifier
-            .then(
-                if (editExtras) {
-                    Modifier.pointerInput(block.marks) {
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                            val up = waitForUpOrCancellation(PointerEventPass.Initial) ?: return@awaitEachGesture
-                            // TAP_MOVE_PX: anything longer is a scroll.
-                            if ((up.position - down.position).getDistance() > 24.dp.toPx()) return@awaitEachGesture
-                            val at = layout?.charAt(down.position, block.text.length)
-                            val link = at?.let { i ->
-                                block.marks.firstOrNull { it.type == RichMarkType.LINK && !it.value.isNullOrBlank() && it.start <= i && it.end > i }
-                            }
-                            val code = at?.let { i ->
-                                block.marks.firstOrNull { it.type == RichMarkType.CODE && it.start <= i && it.end > i }
-                            }
-                            when {
-                                link != null -> {
-                                    up.consume()
-                                    armedCode = null
-                                    focusManager.clearFocus()
-                                    tappedLink = link
-                                }
-                                code != null && code != armedCode -> {
-                                    up.consume()
-                                    focusManager.clearFocus()
-                                    armedCode = code
-                                }
-                                else -> armedCode = null
-                            }
-                        }
-                    }
-                } else {
-                    Modifier
-                },
-            )
-            .focusRequester(focusRequester)
-            .onFocusChanged { focus -> if (focus.isFocused) onFocusGained(fieldValue.selection) }
-            .drawBehind { layout?.let { drawRichDecorations(it, block, style, dark, surface) } }
-            // Backspace at the start of the block, when the keyboard sends a
-            // real key event for it.
-            .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && event.key == Key.Backspace &&
-                    fieldValue.selection.collapsed && fieldValue.selection.start == 0
-                ) {
-                    onMerge()
-                    true
-                } else {
-                    false
-                }
-            },
-    )
 }
 
 /** The character under [position], or null past the end of its line. */
