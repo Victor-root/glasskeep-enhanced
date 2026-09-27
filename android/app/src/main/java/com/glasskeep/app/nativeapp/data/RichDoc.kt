@@ -775,7 +775,7 @@ object RichDoc {
 
     /** Applies [type] over `[start, end)`, first clearing any existing
      *  same-type mark from that range so instances of one type never
-     *  overlap each other. */
+     *  overlap each other, and joining it to an identical one it touches. */
     fun setMark(
         marks: List<RichMark>,
         type: RichMarkType,
@@ -785,8 +785,7 @@ object RichDoc {
         color: String? = null,
     ): List<RichMark> {
         if (start >= end) return marks
-        val cleared = clearMark(marks, type, start, end)
-        return (cleared + RichMark(start, end, type, value, color)).sortedBy { it.start }
+        return mergeAdjacent(clearMark(marks, type, start, end) + RichMark(start, end, type, value, color))
     }
 
     fun toggleMark(marks: List<RichMark>, type: RichMarkType, start: Int, end: Int): List<RichMark> =
@@ -830,24 +829,46 @@ object RichDoc {
     fun adjustMarksForEdit(oldText: String, newText: String, marks: List<RichMark>): List<RichMark> {
         if (oldText == newText) return marks
         val span = diffEdit(oldText, newText)
-        val insertion = span.oldEnd == span.start && span.newEnd > span.start
+        return replaceMarks(marks, oldText.length, span.start, span.oldEnd, span.newEnd - span.start)
+    }
+
+    /**
+     * [marks] once `[from, to)` of a text [textLength] long is replaced by
+     * [inserted] characters. A mark spanning the whole replaced range spans
+     * what replaces it, so typing inside a bold word stays bold; one only
+     * partly overlapping it keeps what is left of it. Every mark of the
+     * schema is inclusive: typed at a mark's end, or at the very start of a
+     * block, the new text takes the mark there ([marksAtCaret]). A mark
+     * whose whole text goes is kept empty, where what the keyboard types
+     * back in the same batch (an autocorrection) takes it; [pruneMarks]
+     * drops it once the batch is over.
+     */
+    fun replaceMarks(marks: List<RichMark>, textLength: Int, from: Int, to: Int, inserted: Int): List<RichMark> {
+        val delta = inserted - (to - from)
+        val insertion = from == to && inserted > 0
         return marks.mapNotNull { m ->
             when {
-                // Inclusive marks: typing right after a bold word (or a
-                // link) keeps writing in it, and typing at the very start
-                // of a block takes the marks of its first character.
-                insertion && m.end == span.start -> m.copy(end = m.end + span.delta)
-                insertion && span.start == 0 && m.start == 0 && oldText.isNotEmpty() ->
-                    m.copy(end = m.end + span.delta)
-                m.end <= span.start -> m
-                m.start >= span.oldEnd -> m.copy(start = m.start + span.delta, end = m.end + span.delta)
-                m.start <= span.start && m.end >= span.oldEnd -> m.copy(end = m.end + span.delta)
-                m.start < span.start -> m.copy(end = span.start)
-                m.end > span.oldEnd -> m.copy(start = span.newEnd, end = m.end + span.delta)
+                insertion && m.end == from -> m.copy(end = m.end + delta)
+                insertion && from == 0 && m.start == 0 && textLength > 0 -> m.copy(end = m.end + delta)
+                m.end <= from -> m
+                m.start >= to -> m.copy(start = m.start + delta, end = m.end + delta)
+                m.start <= from && m.end >= to -> m.copy(end = m.end + delta)
+                m.start < from -> m.copy(end = from)
+                m.end > to -> m.copy(start = from + inserted, end = m.end + delta)
                 else -> null
             }
         }
     }
+
+    fun pruneMarks(marks: List<RichMark>): List<RichMark> =
+        if (marks.all { it.start < it.end }) marks else marks.filter { it.start < it.end }
+
+    /** [block] with `[from, to)` of its text replaced by [inserted], its
+     *  marks following ([replaceMarks]). */
+    fun replaceText(block: RichBlock, from: Int, to: Int, inserted: String): RichBlock = block.copy(
+        text = block.text.substring(0, from) + inserted + block.text.substring(to),
+        marks = replaceMarks(block.marks, block.text.length, from, to, inserted.length),
+    )
 
     /** LinkPopover.jsx's ensureSchemeURL: an http(s), mailto or tel link is
      *  kept as typed, an e-mail address becomes a mailto: link, a phone

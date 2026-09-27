@@ -359,19 +359,7 @@ object RichEdits {
      *  paragraph a bullet or ordered item holds is skipped, its item moves. */
     fun shiftIndent(blocks: List<RichBlock>, id: String, delta: Int): RichEdit? {
         val index = blocks.indexOfFirst { it.id == id }
-        if (index < 0) return null
-        val block = blocks[index]
-        val moved = indentTargets(blocks, index)
-        val runs = block.quotes.indices.map { quoteRange(blocks, index, it) }
-        val quotes = block.quotes.map { it.copy(indent = shifted(it.indent, delta)) }
-        return RichEdit(
-            blocks.mapIndexed { i, b ->
-                val indent = if (i in moved) shifted(b.indent, delta) else b.indent
-                val held = runs.count { i in it }
-                val quoted = if (held == 0) b.quotes else quotes.take(held) + b.quotes.drop(held)
-                if (indent == b.indent && held == 0) b else b.copy(indent = indent, quotes = quoted)
-            },
-        )
+        return if (index < 0) null else shiftIndent(blocks, RichSpan.caret(index, 0), delta)
     }
 
     /** Whether the indent button ([delta] 1) or the outdent one (-1) can
@@ -417,6 +405,474 @@ object RichEdits {
     fun needsTrailingParagraph(blocks: List<RichBlock>): Boolean =
         blocks.lastOrNull()?.let { it.kind != RichBlockKind.PARAGRAPH || it.quotes.isNotEmpty() || it.nestLevel > 0 } ?: true
 
+    // ---------- Selections across blocks ----------
+
+    /**
+     * Backspace, Delete or Cut over a selection (deleteSelection), what the
+     * web leaves:
+     * - inside one block, the selected text goes;
+     * - the whole document leaves one empty paragraph (Tiptap's
+     *   clearDocument);
+     * - a whole list, or a whole list item holding more than its line, goes;
+     * - selected from the very first character of a line, a list, an item or
+     *   a quote to inside the node next to it, or to the very start of a
+     *   later line, the nodes before the end go whole: the end's block keeps
+     *   its kind and place and only loses what was selected of it (an item
+     *   still holding lines that stay keeps its own, emptied);
+     * - otherwise the start's block takes what follows the end.
+     */
+    fun deleteSelection(blocks: List<RichBlock>, span: RichSpan): RichEdit {
+        val first = blocks[span.start]
+        if (span.start == span.end) {
+            val cut = RichDoc.replaceText(first, span.startOffset, span.endOffset, "")
+            return RichEdit(blocks.replaceAt(span.start, listOf(cut.copy(marks = RichDoc.pruneMarks(cut.marks)))), first.id, span.startOffset)
+        }
+        val atStart = span.startOffset == 0
+        val atEnd = span.endOffset == blocks[span.end].textLength
+        if (atStart && atEnd && span.start == 0 && span.end == blocks.lastIndex) {
+            val paragraph = RichDoc.newBlock()
+            return RichEdit(listOf(paragraph), paragraph.id, 0)
+        }
+        val a = holders(blocks, span.start)
+        val b = holders(blocks, span.end)
+        val shared = a.zip(b).takeWhile { (x, y) -> x == y }.size
+        if (atStart && atEnd) coveredNode(a, b, shared)?.let { return removeRange(blocks, it) }
+        if (atStart && (span.endOffset == 0 || startsBeside(blocks, a, b, shared, span))) return dropBefore(blocks, span)
+        return replaceSelection(blocks, span)
+    }
+
+    /** The selection cleared the way typing or pasting over it clears it
+     *  (replaceRangeWith): the start's block takes what follows the end,
+     *  kept as plain text when either is a code block, and everything in
+     *  between goes. From a divider, what follows the end stays where it is. */
+    fun replaceSelection(blocks: List<RichBlock>, span: RichSpan): RichEdit {
+        if (span.start == span.end) return deleteSelection(blocks, span)
+        val first = blocks[span.start]
+        if (!first.kind.hasText) return dropBefore(blocks, span)
+        val last = blocks[span.end]
+        val tail = if (last.kind.hasText) last.text.substring(span.endOffset) else ""
+        val code = first.kind == RichBlockKind.CODE_BLOCK || last.kind == RichBlockKind.CODE_BLOCK
+        val marks = when {
+            first.kind == RichBlockKind.CODE_BLOCK -> emptyList()
+            code -> RichDoc.clipMarks(first.marks, 0, span.startOffset)
+            else -> RichDoc.clipMarks(first.marks, 0, span.startOffset) +
+                RichDoc.clipMarks(last.marks, span.endOffset, last.text.length).map {
+                    it.copy(start = it.start + span.startOffset, end = it.end + span.startOffset)
+                }
+        }
+        val merged = first.copy(text = first.text.substring(0, span.startOffset) + tail, marks = marks.sortedBy { it.start })
+        return RichEdit(RichDoc.normalizeNesting(blocks.replaceRange(span.start, span.end + 1, listOf(merged))), merged.id, span.startOffset)
+    }
+
+    /**
+     * Enter over a selection: it is deleted ([deleteSelection]) and the block
+     * the caret is left in is split there as a plain block (splitBlock), not
+     * as a list item: in an item, what follows becomes a line the item holds.
+     * The new line is a paragraph when the selection ended at the end of its
+     * block, the block's kind otherwise; started at the very start of a
+     * heading, the heading's own half becomes a paragraph.
+     */
+    fun splitSelection(blocks: List<RichBlock>, span: RichSpan): RichEdit? {
+        val atEnd = span.endOffset == blocks[span.end].textLength
+        val atStart = span.startOffset == 0
+        val deleted = deleteSelection(blocks, span)
+        val id = deleted.focusId ?: return deleted
+        val index = deleted.blocks.indexOfFirst { it.id == id }
+        val block = deleted.blocks[index]
+        if (!block.kind.hasText || block.kind == RichBlockKind.CODE_BLOCK) return deleted
+        val at = deleted.caret.coerceIn(0, block.text.length)
+        val item = block.kind.isListItem
+        val headKind = if (!atEnd && atStart && !item && block.kind != RichBlockKind.PARAGRAPH) RichBlockKind.PARAGRAPH else block.kind
+        val head = block.copy(kind = headKind, text = block.text.substring(0, at), marks = RichDoc.clipMarks(block.marks, 0, at))
+        val rest = RichDoc.newBlock(if (item || atEnd) RichBlockKind.PARAGRAPH else block.kind).copy(
+            text = block.text.substring(at),
+            marks = RichDoc.clipMarks(block.marks, at, block.text.length),
+            align = block.align,
+            indent = paragraphIndent(block),
+            nestLevel = block.listDepth,
+            quotes = block.quotes,
+        )
+        return RichEdit(RichDoc.normalizeNesting(deleted.blocks.replaceAt(index, listOf(head, rest))), rest.id, 0)
+    }
+
+    /** [kind] applied from the toolbar to what [span] selects: one block
+     *  as [setKind] does, several as the web's list buttons and style
+     *  gallery do ([toggleListAcross], [setTypeAcross]). */
+    fun setKind(blocks: List<RichBlock>, span: RichSpan, kind: RichBlockKind): RichEdit? {
+        if (span.start == span.end) return setKind(blocks, blocks[span.start].id, kind)
+        val updated = if (kind.isListItem) toggleListAcross(blocks, span, kind) else setTypeAcross(blocks, span, kind)
+        return if (updated == blocks) null else RichEdit(RichDoc.normalizeNesting(updated))
+    }
+
+    /**
+     * The quote button over several blocks (toggleWrap): selected all inside
+     * one quote, the nodes it selects there leave it (lift), the quote split
+     * around them; otherwise they all go into one new quote where they stand
+     * (wrapIn), whole lists and quotes included. Inside a single list the
+     * web does nothing, a quote cannot go there.
+     */
+    fun toggleQuote(blocks: List<RichBlock>, span: RichSpan): RichEdit? {
+        if (span.start == span.end) return toggleQuote(blocks, blocks[span.start].id)
+        val a = holders(blocks, span.start)
+        val b = holders(blocks, span.end)
+        // Quotes come first in the chain: when the nodes both ends share are
+        // all quotes, the innermost one is the parent the web works in.
+        val depth = a.zip(b).takeWhile { (x, y) -> x == y }.size
+        if (a.take(depth).any { it !is QuoteHolder }) return null
+        val range = a[depth].range.first..b[depth].range.last
+        val updated = if (depth > 0) {
+            val quote = blocks[span.start].quotes[depth - 1]
+            val rest = RichQuote(indent = quote.indent)
+            blocks.mapIndexed { i, block ->
+                when {
+                    i in range -> block.copy(quotes = block.quotes.take(depth - 1) + block.quotes.drop(depth))
+                    i > range.last && block.quotes.getOrNull(depth - 1)?.id == quote.id ->
+                        block.copy(quotes = block.quotes.take(depth - 1) + rest + block.quotes.drop(depth))
+                    else -> block
+                }
+            }
+        } else {
+            val quote = RichQuote()
+            blocks.mapIndexed { i, block ->
+                if (i in range) block.copy(quotes = listOf(quote) + block.quotes) else block
+            }
+        }
+        return RichEdit(RichDoc.normalizeNesting(updated))
+    }
+
+    /**
+     * smartToggleCodeBlock over several blocks: when they are all code
+     * blocks, the first one becomes a paragraph again; otherwise every
+     * top-level node the selection touches (a whole list, a whole quote)
+     * becomes one code block, one line per block, the caret at its end.
+     */
+    fun toggleCodeBlock(blocks: List<RichBlock>, span: RichSpan): RichEdit? {
+        if (span.start == span.end) return toggleCodeBlock(blocks, blocks[span.start].id, span.startOffset, span.endOffset)
+        if (nodeActive(blocks, span) { it.kind == RichBlockKind.CODE_BLOCK }) {
+            val block = blocks[span.start]
+            return RichEdit(blocks.replaceAt(span.start, listOf(block.copy(kind = RichBlockKind.PARAGRAPH, indent = 0))))
+        }
+        val from = topLevelRange(blocks, span.start).first
+        val to = topLevelRange(blocks, span.end).last
+        val code = RichDoc.newBlock(RichBlockKind.CODE_BLOCK).copy(
+            text = blocks.subList(from, to + 1).filter { it.kind.hasText }.joinToString("\n") { it.text },
+        )
+        return RichEdit(blocks.replaceRange(from, to + 1, listOf(code)), code.id, code.text.length)
+    }
+
+    /** setTextAlign: every paragraph and heading the selection touches, the
+     *  line of a list item included; a code block has no alignment. */
+    fun setAlign(blocks: List<RichBlock>, span: RichSpan, align: RichAlign): RichEdit? {
+        val updated = blocks.mapIndexed { i, block ->
+            if (i in span.start..span.end && block.kind.hasText && block.kind != RichBlockKind.CODE_BLOCK) block.copy(align = align) else block
+        }
+        return if (updated == blocks) null else RichEdit(updated)
+    }
+
+    /** indent()/outdent() over a selection: every node it touches moves one
+     *  step, once, as [shiftIndent] moves the nodes holding one block. */
+    fun shiftIndent(blocks: List<RichBlock>, span: RichSpan, delta: Int): RichEdit? {
+        val moved = (span.start..span.end).flatMap { indentTargets(blocks, it) }.toSet()
+        val quotes = (span.start..span.end).flatMap { blocks[it].quotes }.map { it.id }.toSet()
+        val updated = blocks.mapIndexed { i, block ->
+            val indent = if (i in moved) shifted(block.indent, delta) else block.indent
+            val quoted = block.quotes.map { if (it.id in quotes) it.copy(indent = shifted(it.indent, delta)) else it }
+            if (indent == block.indent && quoted == block.quotes) block else block.copy(indent = indent, quotes = quoted)
+        }
+        return if (updated == blocks) null else RichEdit(updated)
+    }
+
+    /** Whether the indent (1) or outdent (-1) button can act on [span]: any
+     *  node it touches can move; outdent inside bullet or ordered items only
+     *  looks at the nearest such item of the selection's start. */
+    fun canShiftIndent(blocks: List<RichBlock>, span: RichSpan, delta: Int): Boolean {
+        if (span.start == span.end) return canShiftIndent(blocks, blocks[span.start].id, delta)
+        val inItems = (span.start..span.end).all { i ->
+            blocks[i].kind.isOrderedOrBullet || holdingItems(blocks, i).any { blocks[it].kind.isOrderedOrBullet }
+        }
+        if (delta < 0 && inItems) return canShiftIndent(blocks, blocks[span.start].id, delta)
+        return (span.start..span.end).any { canShiftIndent(blocks, blocks[it].id, delta) }
+    }
+
+    /** The list kinds lit for [span]: those of the lists holding all of it. */
+    fun listKindsIn(blocks: List<RichBlock>, span: RichSpan): Set<RichBlockKind> {
+        if (span.start == span.end) return listKindsAt(blocks, blocks[span.start].id)
+        val a = holders(blocks, span.start)
+        val b = holders(blocks, span.end)
+        return a.zip(b).takeWhile { (x, y) -> x == y }.mapNotNull { (it.first as? ListHolder)?.kind }.toSet()
+    }
+
+    /** The eraser over a selection: every block it touches is cleared out of
+     *  its lists and quotes, and every mark of the selected text goes. */
+    fun clearFormatting(blocks: List<RichBlock>, span: RichSpan): RichEdit? {
+        if (span.start == span.end) return clearFormatting(blocks, blocks[span.start].id, span.startOffset, span.endOffset)
+        val cleared = (span.start..span.end).fold(blocks) { acc, i -> clearNodes(acc, i) }
+        return RichEdit(RichDoc.normalizeNesting(clearMark(cleared, span, null)))
+    }
+
+    /** setHorizontalRule over a selection across blocks: the selection is
+     *  cleared as typing clears it, and the rule goes where the caret is. */
+    fun insertDivider(blocks: List<RichBlock>, span: RichSpan): RichEdit? {
+        if (span.start == span.end) return insertDivider(blocks, blocks[span.start].id, span.startOffset, span.endOffset)
+        val cleared = replaceSelection(blocks, span)
+        val id = cleared.focusId ?: return cleared
+        return insertDivider(cleared.blocks, id, cleared.caret, cleared.caret)
+    }
+
+    /** setMark over a selection: [type] on all the text it covers, but in a
+     *  code block, whose text takes no mark. */
+    fun setMark(blocks: List<RichBlock>, span: RichSpan, type: RichMarkType, value: String? = null, color: String? = null): List<RichBlock> =
+        mapSelectedText(blocks, span) { marks, from, to -> RichDoc.setMark(marks, type, from, to, value, color) }
+
+    /** unsetMark over a selection; a null [type] clears every mark. */
+    fun clearMark(blocks: List<RichBlock>, span: RichSpan, type: RichMarkType?): List<RichBlock> =
+        mapSelectedText(blocks, span) { marks, from, to ->
+            if (type == null) RichDoc.clearAllMarks(marks, from, to) else RichDoc.clearMark(marks, type, from, to)
+        }
+
+    /** toggleMark over a selection: off when all its text has it, else on. */
+    fun toggleMark(blocks: List<RichBlock>, span: RichSpan, type: RichMarkType): List<RichBlock> =
+        if (isMarkActive(blocks, span, type)) clearMark(blocks, span, type) else setMark(blocks, span, type)
+
+    /** isMarkActive: [type] covers every selected character, a code
+     *  block's text included, which never has it. */
+    fun isMarkActive(blocks: List<RichBlock>, span: RichSpan, type: RichMarkType): Boolean {
+        var any = false
+        for (i in span.start..span.end) {
+            val block = blocks[i]
+            if (!block.kind.hasText) continue
+            val from = span.fromIn(i)
+            val to = span.toIn(i, block.text.length)
+            if (from >= to) continue
+            if (!RichDoc.isMarkActive(block.marks, type, from, to)) return false
+            any = true
+        }
+        return any
+    }
+
+    /** getAttributes: the first mark of [type] in the selected text, in
+     *  document order, which the toolbar shows (a colour, a size...). */
+    fun markIn(blocks: List<RichBlock>, span: RichSpan, type: RichMarkType): RichMark? {
+        for (i in span.start..span.end) {
+            val block = blocks[i]
+            if (!block.kind.hasText) continue
+            val from = span.fromIn(i)
+            val to = span.toIn(i, block.text.length)
+            block.marks.filter { it.type == type && it.start < to && it.end > from }.minByOrNull { it.start }?.let { return it }
+        }
+        return null
+    }
+
+    /** isActive for a node attribute across a selection: every block it
+     *  touches matches [test], and each sits right after the one before in
+     *  the same parent, the web measuring the selection against the nodes
+     *  that match (two list items never do, their lines being apart). */
+    fun nodeActive(blocks: List<RichBlock>, span: RichSpan, test: (RichBlock) -> Boolean): Boolean {
+        if (!(span.start..span.end).all { test(blocks[it]) }) return false
+        return (span.start until span.end).all { holders(blocks, it).dropLast(1) == holders(blocks, it + 1).dropLast(1) }
+    }
+
+    /** Whether one quote holds all of [span] (isActive("blockquote")). */
+    fun quotedIn(blocks: List<RichBlock>, span: RichSpan): Boolean {
+        val a = blocks[span.start].quotes
+        return a.isNotEmpty() && (span.start..span.end).all { blocks[it].quotes.firstOrNull()?.id == a.first().id }
+    }
+
+    // ---------- Selections across blocks: helpers ----------
+
+    /** A node holding blocks: a quote, a list, a list item with all it
+     *  holds, or a block's own line. */
+    private sealed interface Holder {
+        val range: IntRange
+    }
+
+    private data class QuoteHolder(val id: String, override val range: IntRange) : Holder
+
+    private data class ListHolder(val kind: RichBlockKind, override val range: IntRange) : Holder
+
+    private data class ItemHolder(val index: Int, override val range: IntRange) : Holder
+
+    private data class LineHolder(val index: Int) : Holder {
+        override val range: IntRange get() = index..index
+    }
+
+    /** The nodes holding block [index], outermost first, down to its own
+     *  line: its quotes, then the list and the item of each list level
+     *  holding it (a list item's line being held by the item itself). */
+    private fun holders(blocks: List<RichBlock>, index: Int): List<Holder> {
+        val block = blocks[index]
+        val items = holdingItems(blocks, index).asReversed() + listOfNotNull(index.takeIf { block.kind.isListItem })
+        return block.quotes.indices.map { QuoteHolder(block.quotes[it].id, quoteRange(blocks, index, it)) } +
+            items.flatMap { listOf(ListHolder(blocks[it].kind, listRange(blocks, it)), ItemHolder(it, it..subtreeEnd(blocks, it))) } +
+            LineHolder(index)
+    }
+
+    /** The node selected whole that the web deletes whole: the innermost one
+     *  holding both ends, when its two ends are the selection's, unless its
+     *  lines are the two ends (they are then emptied instead), or it is an
+     *  item alone in its list (the list goes instead). */
+    private fun coveredNode(a: List<Holder>, b: List<Holder>, shared: Int): IntRange? {
+        val start = a.last().range.first
+        val end = b.last().range.last
+        for (i in shared - 1 downTo 0) {
+            val holder = a[i]
+            if (holder.range.first != start || holder.range.last != end) return null
+            if (a.size == shared + 1 && b.size == shared + 1) return null
+            if (holder is ItemHolder && a[i - 1].range == holder.range) continue
+            return holder.range
+        }
+        return null
+    }
+
+    /** deleteRange's shortcut: the selection starts the node it is in and
+     *  ends inside the node beside it, which keeps content after the end, in
+     *  a parent that can lose the first one (not an item's own line). */
+    private fun startsBeside(blocks: List<RichBlock>, a: List<Holder>, b: List<Holder>, shared: Int, span: RichSpan): Boolean {
+        val near = a[shared]
+        val far = b[shared]
+        val parent = a.getOrNull(shared - 1)
+        if (near.range.first != span.start) return false
+        if (parent is ItemHolder && near is LineHolder && near.index == parent.index) return false
+        return span.endOffset < blocks[span.end].textLength || far.range.last > span.end
+    }
+
+    /** Everything before the end's block goes, but the line of an item that
+     *  still holds blocks, emptied; the end's block loses what was selected. */
+    private fun dropBefore(blocks: List<RichBlock>, span: RichSpan): RichEdit {
+        val last = blocks[span.end]
+        val kept = (span.start until span.end).filter { blocks[it].kind.isListItem && subtreeEnd(blocks, it) >= span.end }.toSet()
+        val trimmed = if (last.kind.hasText) RichDoc.replaceText(last, 0, span.endOffset, "").let { it.copy(marks = RichDoc.pruneMarks(it.marks)) } else last
+        val updated = blocks.mapIndexedNotNull { i, block ->
+            when {
+                i in kept -> block.copy(text = "", marks = emptyList())
+                i in span.start until span.end -> null
+                i == span.end -> trimmed
+                else -> block
+            }
+        }
+        val normalized = RichDoc.normalizeNesting(updated)
+        return caretNear(normalized, normalized.indexOfFirst { it.id == last.id }, atStart = true)
+    }
+
+    /** The blocks of [range] removed, the caret on what follows them. */
+    private fun removeRange(blocks: List<RichBlock>, range: IntRange): RichEdit {
+        val remaining = blocks.filterIndexed { i, _ -> i !in range }
+        if (remaining.isEmpty()) {
+            val paragraph = RichDoc.newBlock()
+            return RichEdit(listOf(paragraph), paragraph.id, 0)
+        }
+        val normalized = RichDoc.normalizeNesting(remaining)
+        return caretNear(normalized, range.first.coerceAtMost(normalized.lastIndex), atStart = true)
+    }
+
+    /** The caret on block [index] (its start, or its end when not
+     *  [atStart]), or on the nearest block with text when it has none. */
+    private fun caretNear(blocks: List<RichBlock>, index: Int, atStart: Boolean): RichEdit {
+        val block = blocks[index]
+        if (block.kind.hasText) return RichEdit(blocks, block.id, if (atStart) 0 else block.text.length)
+        blocks.drop(index + 1).firstOrNull { it.kind.hasText }?.let { return RichEdit(blocks, it.id, 0) }
+        blocks.take(index).lastOrNull { it.kind.hasText }?.let { return RichEdit(blocks, it.id, it.text.length) }
+        return RichEdit(blocks)
+    }
+
+    /** [transform] applied to the marks of each block's selected text. */
+    private fun mapSelectedText(
+        blocks: List<RichBlock>,
+        span: RichSpan,
+        transform: (marks: List<RichMark>, from: Int, to: Int) -> List<RichMark>,
+    ): List<RichBlock> = blocks.mapIndexed { i, block ->
+        if (i !in span.start..span.end || !block.kind.hasText || block.kind == RichBlockKind.CODE_BLOCK) return@mapIndexed block
+        val from = span.fromIn(i)
+        val to = span.toIn(i, block.text.length)
+        if (from >= to) block else block.copy(marks = transform(block.marks, from, to))
+    }
+
+    /**
+     * The list buttons over several blocks (toggleList). Inside a list, or
+     * one of its items: an item of the list's own kind lifts the items the
+     * selection covers out of the list (liftListItem), the other of bullet
+     * and ordered converts that list. Elsewhere the nodes it covers go into
+     * one list (wrapInList): each paragraph an item, anything else (a
+     * heading, code, a rule, a list) held by the item before; when the
+     * first is not a paragraph they are all cleared first (clearNodes) and
+     * each becomes an item. A quote the model cannot put in an item stays
+     * out of the list.
+     */
+    private fun toggleListAcross(blocks: List<RichBlock>, span: RichSpan, kind: RichBlockKind): List<RichBlock> {
+        val a = holders(blocks, span.start)
+        val b = holders(blocks, span.end)
+        val shared = a.zip(b).takeWhile { (x, y) -> x == y }.size
+        val closest = a.indexOfLast { it is ListHolder }
+        if (shared >= 1 && closest >= 0 && shared - (closest + 1) <= 1) {
+            val list = a[closest] as ListHolder
+            if (list.kind == kind || list.kind.isOrderedOrBullet && kind.isOrderedOrBullet && list.kind != kind) {
+                return if (list.kind == kind) liftItemsAcross(blocks, a, b, shared, kind) else convertList(blocks, list.range.first, kind)
+            }
+        }
+        val parent = a.getOrNull(shared - 1)
+        val wraps = (parent == null || parent is QuoteHolder) && a[shared] is LineHolder && blocks[span.start].kind == RichBlockKind.PARAGRAPH
+        if (!wraps) {
+            val cleared = (span.start..span.end).fold(blocks) { acc, i -> clearNodes(acc, i) }
+            return cleared.mapIndexed { i, block ->
+                if (i in span.start..span.end && block.kind.hasText) block.copy(kind = kind, checked = false) else block
+            }
+        }
+        val range = a[shared].range.first..b[shared].range.last
+        val updated = blocks.toMutableList()
+        var nesting = false
+        var i = range.first
+        while (i <= range.last) {
+            val node = holders(blocks, i)[shared]
+            val block = blocks[i]
+            when {
+                node is QuoteHolder -> nesting = false
+                node is LineHolder && block.kind == RichBlockKind.PARAGRAPH -> {
+                    updated[i] = block.copy(kind = kind, checked = false)
+                    nesting = true
+                }
+                nesting -> for (j in node.range) updated[j] = blocks[j].copy(nestLevel = blocks[j].nestLevel + 1)
+            }
+            i = node.range.last + 1
+        }
+        return updated
+    }
+
+    /** liftListItem over several items: the innermost list of this item
+     *  type holding both ends gives up every item of it the selection
+     *  touches, each with what it holds. */
+    private fun liftItemsAcross(blocks: List<RichBlock>, a: List<Holder>, b: List<Holder>, shared: Int, kind: RichBlockKind): List<RichBlock> {
+        val task = kind == RichBlockKind.TASK_ITEM
+        val level = (shared - 1 downTo 0).firstOrNull { i ->
+            (a[i] as? ListHolder)?.let { (it.kind == RichBlockKind.TASK_ITEM) == task } == true
+        } ?: return blocks
+        val first = (a[level + 1] as ItemHolder).index
+        val last = (b[level + 1] as ItemHolder).index
+        val nest = blocks[first].nestLevel
+        val items = (first..last).filter { blocks[it].kind.isListItem && blocks[it].nestLevel == nest && blocks[it].sharesQuoteWith(blocks[first]) }
+        return items.fold(blocks) { acc, index -> liftItem(acc, index) }
+    }
+
+    /**
+     * The style gallery over several blocks (setNode): every paragraph,
+     * heading and code block it touches takes the style, with the default
+     * alignment and indent; a list item's own line can only be a paragraph,
+     * so a heading skips it, unless nothing else can take it: everything is
+     * then cleared out of its lists first (clearNodes).
+     */
+    private fun setTypeAcross(blocks: List<RichBlock>, span: RichSpan, kind: RichBlockKind): List<RichBlock> {
+        val range = span.start..span.end
+        val heading = kind.isHeading
+        val canTake = { block: RichBlock -> block.kind.hasText && (!heading || !block.kind.isListItem) }
+        val source = if (range.any { canTake(blocks[it]) }) blocks else range.fold(blocks) { acc, i -> clearNodes(acc, i) }
+        return source.mapIndexed { i, block ->
+            when {
+                i !in range || !canTake(block) -> block
+                block.kind.isListItem -> block.copy(align = RichAlign.LEFT, indent = if (block.kind == RichBlockKind.TASK_ITEM) 0 else block.indent)
+                else -> block.copy(kind = kind, align = RichAlign.LEFT, indent = 0)
+            }
+        }
+    }
+
     /** Whether the list item [index] joins the item right above it
      *  (joinItemBackward): an item of the same list, which holds no nested
      *  item of the same item type (listItemHasSubList). */
@@ -443,7 +899,7 @@ object RichEdits {
 
     /** The index of the list item holding block [index], one level up (for
      *  a list item, its parent item), or null outside any. */
-    private fun holdingItem(blocks: List<RichBlock>, index: Int): Int? {
+    internal fun holdingItem(blocks: List<RichBlock>, index: Int): Int? {
         val block = blocks[index]
         val level = block.nestLevel - 1
         var j = index - 1
@@ -489,15 +945,22 @@ object RichEdits {
         } else {
             item.copy(kind = RichBlockKind.PARAGRAPH, indent = paragraphIndent(item))
         }
-        var end = index + 1
-        while (end < blocks.size && blocks[end].sharesQuoteWith(item) && blocks[end].nestLevel > item.nestLevel) end++
+        val end = subtreeEnd(blocks, index)
         return blocks.mapIndexed { i, b ->
             when (i) {
                 index -> lifted
-                in index + 1 until end -> b.copy(nestLevel = b.nestLevel - 1)
+                in index + 1..end -> b.copy(nestLevel = b.nestLevel - 1)
                 else -> b
             }
         }
+    }
+
+    /** The last block list item [index] holds, or [index] itself. */
+    private fun subtreeEnd(blocks: List<RichBlock>, index: Int): Int {
+        val item = blocks[index]
+        var end = index
+        while (end + 1 < blocks.size && blocks[end + 1].sharesQuoteWith(item) && blocks[end + 1].nestLevel > item.nestLevel) end++
+        return end
     }
 
     /** liftEmptyBlock on an empty block of a quote: in the middle of its

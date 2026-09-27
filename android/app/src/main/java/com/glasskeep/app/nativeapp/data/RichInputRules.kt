@@ -294,6 +294,8 @@ object RichInputRules {
         val wrapped = word.length > 2 &&
             (word.first() == '(' && word.last() == ')' || word.first() == '[' && word.last() == ']')
         val value = if (wrapped) word.substring(1, word.length - 1) else word
+        // Every address linkify takes has a dot, an @ or a scheme's colon.
+        if (value.none { it == '.' || it == '@' || it == ':' }) return null
         val href = linkHref(value) ?: return null
         if (!shouldAutoLink(value)) return null
         val from = before.lastIndexOf(word) + if (wrapped) 1 else 0
