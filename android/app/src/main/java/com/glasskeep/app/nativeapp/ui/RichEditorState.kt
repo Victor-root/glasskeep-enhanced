@@ -15,7 +15,9 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.toSize
 import com.glasskeep.app.nativeapp.data.PendingMark
+import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
+import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichClipboard
 import com.glasskeep.app.nativeapp.data.RichCommand
 import com.glasskeep.app.nativeapp.data.RichCommands
@@ -217,10 +219,14 @@ class RichEditorState {
     /** The value and colour of [type] the bar shows and starts from
      *  (getAttributes): what is armed at the caret first, else [markOf].
      *  A colour, font or size taken away there shows none, the textStyle
-     *  armed lacking it; any other mark taken away shows the caret's own
-     *  again, the web then reading the marks around the caret. */
+     *  armed lacking it, unless inline code is armed: excluding every other
+     *  mark, it leaves no textStyle armed. Any other mark taken away shows
+     *  the caret's own again, the web then reading the marks around it. */
     private fun attributesOf(type: RichMarkType): PendingMark? {
-        pendingOf(type)?.let { armed -> if (!armed.remove) return armed else if (type.isTextStyle) return null }
+        pendingOf(type)?.let { armed ->
+            if (!armed.remove) return armed
+            if (type.isTextStyle && typingMarks().none { it.type == RichMarkType.CODE }) return null
+        }
         return markOf(type)?.let { PendingMark(it.type, it.value, it.color) }
     }
 
@@ -286,6 +292,47 @@ class RichEditorState {
         val index = RichFontSizes.indexOf(current).takeIf { it >= 0 } ?: RichFontSizes.indexOf(RichDefaultFontSize)
         val next = RichFontSizes[(index + delta).coerceIn(0, RichFontSizes.lastIndex)]
         if (next == RichDefaultFontSize) clearMark(RichMarkType.FONT_SIZE) else applyMark(RichMarkType.FONT_SIZE, next)
+    }
+
+    /** isActive for a block style over the selection ([RichEdits.nodeActive]). */
+    internal fun nodeActive(test: (RichBlock) -> Boolean): Boolean {
+        val current = editing ?: return false
+        val span = current.span ?: return false
+        return RichEdits.nodeActive(current.blocks, span, test)
+    }
+
+    /** Whether the [align] button reads active; left whenever no other
+     *  alignment does (RichTextToolbar.jsx isAlignLeft). */
+    internal fun alignActive(align: RichAlign): Boolean = if (align == RichAlign.LEFT) {
+        editing?.span != null && RichAlign.entries.none { it != RichAlign.LEFT && alignActive(it) }
+    } else {
+        nodeActive { it.kind.hasText && it.kind != RichBlockKind.CODE_BLOCK && it.align == align }
+    }
+
+    /** The heading the style gallery shows, null for the paragraph style
+     *  (BlockStyleButtons.jsx: any block but a heading reads "p"). */
+    internal fun headingShown(): RichBlockKind? = (1..5).map(::headingKindFor).firstOrNull { kind -> nodeActive { it.kind == kind } }
+
+    /** The kinds of list whose buttons read active ([RichEdits.listKindsIn]). */
+    internal fun listKinds(): Set<RichBlockKind> {
+        val current = editing ?: return emptySet()
+        val span = current.span ?: return emptySet()
+        return RichEdits.listKindsIn(current.blocks, span)
+    }
+
+    /** Whether the quote button reads active ([RichEdits.quotedIn]). */
+    internal fun quoted(): Boolean {
+        val current = editing ?: return false
+        val span = current.span ?: return false
+        return RichEdits.quotedIn(current.blocks, span)
+    }
+
+    /** Whether indent ([direction] 1) or outdent (-1) can act
+     *  ([RichEdits.canShiftIndent]). */
+    internal fun canIndent(direction: Int): Boolean {
+        val current = editing ?: return false
+        val span = current.span ?: return false
+        return RichEdits.canShiftIndent(current.blocks, span, direction)
     }
 
     /** What Copy writes for the selection, or null with nothing selected. */

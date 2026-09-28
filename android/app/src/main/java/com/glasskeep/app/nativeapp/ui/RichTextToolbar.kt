@@ -81,7 +81,6 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.RichAlign
-import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichCommand
 import com.glasskeep.app.nativeapp.data.RichDoc
@@ -91,7 +90,6 @@ import com.glasskeep.app.nativeapp.data.RichPos
 import com.glasskeep.app.nativeapp.data.RichSelection
 import com.glasskeep.app.nativeapp.data.TypographyBlock
 import com.glasskeep.app.nativeapp.data.TypographyProfile
-import com.glasskeep.app.nativeapp.data.hasText
 import com.glasskeep.app.nativeapp.data.resolve
 
 /** editorToolbarMode: the user's saved choice between the phone default
@@ -152,15 +150,10 @@ fun RichFormatToolbar(
     val blocks = editing?.blocks.orEmpty()
     val span = editing?.span
     val enabled = span != null
-    val listKinds = span?.let { RichEdits.listKindsIn(blocks, it) }.orEmpty()
+    val listKinds = state.listKinds()
     val colors = remember(themeId, dark) { RichToolbarColors(themeId, dark) }
     var openPopover by remember { mutableStateOf<RichPopoverKind?>(null) }
     var linkTarget by remember { mutableStateOf<RichLinkTarget?>(null) }
-    /** isActive for a block style over the selection ([RichEdits.nodeActive]). */
-    fun nodeActive(test: (RichBlock) -> Boolean): Boolean = span != null && RichEdits.nodeActive(blocks, span, test)
-
-    fun alignActive(align: RichAlign): Boolean =
-        nodeActive { it.kind.hasText && it.kind != RichBlockKind.CODE_BLOCK && it.align == align }
 
     val toolbarLabel = stringResource(R.string.native_richtext_toolbar_label)
     Column(
@@ -420,9 +413,7 @@ fun RichFormatToolbar(
         val alignButtons: @Composable FlowRowScope.(withJustify: Boolean) -> Unit = { withJustify ->
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_align_left),
-                // "Left" reads as active whenever nothing else is chosen
-                // (RichTextToolbar.jsx:444), not only after an explicit set.
-                active = enabled && RichAlign.entries.none { it != RichAlign.LEFT && alignActive(it) },
+                active = state.alignActive(RichAlign.LEFT),
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
@@ -430,7 +421,7 @@ fun RichFormatToolbar(
             ) { tint -> AlignLeftIcon(size = 20.dp, tint = tint) }
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_align_center),
-                active = alignActive(RichAlign.CENTER),
+                active = state.alignActive(RichAlign.CENTER),
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
@@ -438,7 +429,7 @@ fun RichFormatToolbar(
             ) { tint -> AlignCenterIcon(size = 20.dp, tint = tint) }
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_align_right),
-                active = alignActive(RichAlign.RIGHT),
+                active = state.alignActive(RichAlign.RIGHT),
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
@@ -447,7 +438,7 @@ fun RichFormatToolbar(
             if (withJustify) {
                 RichToolbarButton(
                     contentDescription = stringResource(R.string.native_richtext_align_justify),
-                    active = alignActive(RichAlign.JUSTIFY),
+                    active = state.alignActive(RichAlign.JUSTIFY),
                     enabled = enabled,
                     colors = colors,
                     titleColor = titleColor,
@@ -618,7 +609,7 @@ fun RichFormatToolbar(
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_indent),
                         active = false,
-                        enabled = span != null && RichEdits.canShiftIndent(blocks, span, 1),
+                        enabled = state.canIndent(1),
                         colors = colors,
                         titleColor = titleColor,
                         fixedTint = IndentTint,
@@ -627,7 +618,7 @@ fun RichFormatToolbar(
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_outdent),
                         active = false,
-                        enabled = span != null && RichEdits.canShiftIndent(blocks, span, -1),
+                        enabled = state.canIndent(-1),
                         colors = colors,
                         titleColor = titleColor,
                         fixedTint = OutdentTint,
@@ -637,7 +628,7 @@ fun RichFormatToolbar(
                 RichToolbarGroup(divider = colors.divider, last = false) {
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_code_block),
-                        active = nodeActive { it.kind == RichBlockKind.CODE_BLOCK },
+                        active = state.nodeActive { it.kind == RichBlockKind.CODE_BLOCK },
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
@@ -653,7 +644,7 @@ fun RichFormatToolbar(
                     ) { tint -> InlineCodeIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_quote),
-                        active = span != null && RichEdits.quotedIn(blocks, span),
+                        active = state.quoted(),
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
@@ -669,7 +660,7 @@ fun RichFormatToolbar(
                     // Paragraphe reads active for ANY non-heading block
                     // (a bullet/numbered/task item, a quote...), not
                     // only the literal RichBlockKind.PARAGRAPH.
-                    val heading = (1..5).map { headingKindFor(it) }.firstOrNull { kind -> nodeActive { it.kind == kind } }
+                    val heading = state.headingShown()
                     RichStyleButton(
                         label = paragraph,
                         tooltip = String.format(hint, paragraph),
