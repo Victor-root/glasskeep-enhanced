@@ -875,6 +875,14 @@ fun NoteDetailScreen(
         if (merged != current) saveTags(merged)
     }
 
+    /** Leaves the tag menu, what was typed in it kept as tags
+     *  (useModalState.js's blur). */
+    fun closeTagsPicker() {
+        addTagsFromInput(tagInput)
+        showTagsPicker = false
+        tagInput = ""
+    }
+
     // ---------- Checklist item and section edits ----------
 
     /** Persists the given item list immediately, matching setTags()'s and
@@ -2408,10 +2416,17 @@ fun NoteDetailScreen(
                             (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty()),
                         showTrashButton = viewMode || !edit.isTextType,
                         trashed = currentNote.trashed,
-                        onColorClick = { showColorPicker = true },
-                        onImageClick = { showImageMenu = true },
-                        onLogoClick = { openLogoPicker() },
-                        onTagsClick = { tagInput = ""; showTagsPicker = true },
+                        onColorClick = { showColorPicker = !showColorPicker },
+                        onImageClick = { showImageMenu = !showImageMenu },
+                        onLogoClick = { if (showLogoPicker) showLogoPicker = false else openLogoPicker() },
+                        onTagsClick = {
+                            if (showTagsPicker) {
+                                closeTagsPicker()
+                            } else {
+                                tagInput = ""
+                                showTagsPicker = true
+                            }
+                        },
                         onUndoClick = { undoNote() },
                         onRedoClick = { redoNote() },
                         onModeClick = {
@@ -2437,7 +2452,7 @@ fun NoteDetailScreen(
                         onFormatClick = { showFormatSheet = !showFormatSheet },
                         onCollaborateClick = { openCollaborators() },
                         onTrashClick = { askTrash() },
-                        onKebabClick = { menuExpanded = true },
+                        onKebabClick = { menuExpanded = !menuExpanded },
                         imagePanel = {
                             if (showImageMenu) {
                                 AddImageMenu(
@@ -2498,11 +2513,10 @@ fun NoteDetailScreen(
                                     },
                                     onToggle = { tag -> toggleTag(tag) },
                                     onCreate = { raw -> addTagsFromInput(raw); tagInput = "" },
-                                    // Backspace in the empty field drops the last tag,
-                                    // and leaving the panel keeps what was typed
-                                    // (ModalFooter.jsx's keydown, useModalState.js's blur).
+                                    // Backspace in the empty field drops the last tag
+                                    // (ModalFooter.jsx's keydown).
                                     onBackspaceEmpty = { currentNote.tags.lastOrNull()?.let { toggleTag(it) } },
-                                    onDismiss = { addTagsFromInput(tagInput); showTagsPicker = false; tagInput = "" },
+                                    onDismiss = { closeTagsPicker() },
                                 )
                             }
                         },
