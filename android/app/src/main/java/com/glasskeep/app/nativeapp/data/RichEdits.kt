@@ -315,13 +315,13 @@ object RichEdits {
     }
 
     /**
-     * Text pasted (or typed) with line breaks into block [id]: [newText] is
-     * the block's whole new text and [newMarks] its marks, the pasted part
-     * being `[insertStart, insertEnd)`. Every line break inside the pasted
-     * part starts a new paragraph (plainTextToPasteSlice, one paragraph per
-     * line) held where the block's text is, in its quotes and list item:
-     * the first line joins the block, the last one takes what was after the
-     * caret.
+     * Lines typed at once into block [id] (a keyboard committing text with
+     * line breaks in it): [newText] is the block's whole new text and
+     * [newMarks] its marks, the typed part being `[insertStart, insertEnd)`.
+     * Every line break inside the typed part starts a new paragraph, one
+     * per line as a plain-text paste makes them, held where the block's
+     * text is, in its quotes and list item: the first line joins the block,
+     * the last one takes what was after the caret.
      */
     fun insertLines(
         blocks: List<RichBlock>,

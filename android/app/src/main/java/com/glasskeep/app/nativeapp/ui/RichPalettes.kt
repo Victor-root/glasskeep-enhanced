@@ -5,6 +5,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.glasskeep.app.R
+import com.glasskeep.app.nativeapp.data.CssColors
 
 /**
  * Every palette and list the rich-text toolbar offers, ported value for
@@ -125,16 +126,29 @@ val RichFonts = listOf(
 fun richFontFor(value: String?): RichFontOption? =
     value?.takeIf { it.isNotBlank() }?.let { v -> RichFonts.firstOrNull { it.value == v } }
 
-/** "18px" -> 18f. Anything else (an em value, a bare number) is ignored
- *  rather than guessed at. */
-fun richFontSizeOf(value: String?): Float? =
-    value?.trim()?.removeSuffix("px")?.trim()?.toFloatOrNull()
+/** A size in CSS px: "18px" -> 18f, and the other absolute units
+ *  ("11pt" from Google Docs or Word) converted as CSS does. A size relative
+ *  to the text around it (em, %, a keyword) is ignored rather than guessed
+ *  at. */
+fun richFontSizeOf(value: String?): Float? {
+    val match = CssLength.matchEntire(value?.trim()?.lowercase() ?: return null) ?: return null
+    val number = match.groupValues[1].toFloatOrNull() ?: return null
+    return CssPxPerUnit[match.groupValues[2]]?.let { number * it }
+}
+
+private val CssLength = Regex("""([0-9]*\.?[0-9]+)\s*(px|pt|pc|in|cm|mm|q)""")
+
+private val CssPxPerUnit = mapOf(
+    "px" to 1f, "pt" to 96f / 72f, "pc" to 16f, "in" to 96f, "cm" to 96f / 2.54f, "mm" to 96f / 25.4f, "q" to 96f / 101.6f,
+)
 
 /**
  * Resolves any colour string a mark can carry: one of the eight highlight
- * slots, or a plain CSS hex (#rgb, #rrggbb, #rrggbbaa). Returns null for
- * anything else, so a caller can fall back to the inherited colour rather
- * than paint something wrong.
+ * slots, or a CSS colour with a fixed value (hex, rgb(), hsl() or a name:
+ * what a colour becomes once pasted from a page or copied on the web).
+ * Returns null for anything else (currentcolor, another var()), so a
+ * caller can fall back to the inherited colour rather than paint something
+ * wrong.
  */
 fun richColorOf(value: String?, dark: Boolean): Color? {
     val raw = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
@@ -142,25 +156,8 @@ fun richColorOf(value: String?, dark: Boolean): Color? {
     if (slot != null && slot in 1..8) {
         return Color((if (dark) HighlightDark else HighlightLight)[slot - 1])
     }
-    return parseHexColor(raw)
+    return CssColors.parse(raw)?.let { Color(red = it.red, green = it.green, blue = it.blue, alpha = it.alpha) }
 }
 
 private val HighlightSlotRegex = Regex("""var\(\s*--rt-hl-(\d)\s*\)""")
 
-private fun parseHexColor(raw: String): Color? {
-    if (!raw.startsWith("#")) return null
-    val hex = raw.substring(1)
-    val expanded = when (hex.length) {
-        3 -> hex.map { "$it$it" }.joinToString("") + "ff"
-        4 -> hex.map { "$it$it" }.joinToString("")
-        6 -> hex + "ff"
-        8 -> hex
-        else -> return null
-    }
-    val value = expanded.toLongOrNull(16) ?: return null
-    val r = ((value shr 24) and 0xFF).toInt()
-    val g = ((value shr 16) and 0xFF).toInt()
-    val b = ((value shr 8) and 0xFF).toInt()
-    val a = (value and 0xFF).toInt()
-    return Color(red = r, green = g, blue = b, alpha = a)
-}

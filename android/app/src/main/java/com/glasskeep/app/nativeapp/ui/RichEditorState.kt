@@ -22,6 +22,7 @@ import com.glasskeep.app.nativeapp.data.RichFlat
 import com.glasskeep.app.nativeapp.data.RichImeSession
 import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
+import com.glasskeep.app.nativeapp.data.RichPaste
 import com.glasskeep.app.nativeapp.data.RichSelection
 import com.glasskeep.app.nativeapp.data.RichSpan
 import com.glasskeep.app.nativeapp.data.RichTyping
@@ -65,6 +66,9 @@ class RichEditorState {
 
     /** Set while the formatting sheet keeps the keyboard down. */
     internal var keyboardSuppressed = false
+
+    /** The "plain" paste preference: a paste reads the clipboard's text only. */
+    internal var plainPaste = false
 
     /** The keyboard connected to the editor, while one is. */
     internal var keyboard: RichKeyboard? = null
@@ -175,11 +179,11 @@ class RichEditorState {
         requestFocus()
     }
 
-    /** The selection's text as Copy writes it, or null with nothing selected. */
-    internal fun selectedText(): String? {
+    /** What Copy writes for the selection, or null with nothing selected. */
+    internal fun selectedClip(): RichClipboard.Clip? {
         val current = editing ?: return null
         val span = current.span?.takeUnless { it.collapsed } ?: return null
-        return RichClipboard.plainText(current.blocks, span)
+        return RichClipboard.copy(current.blocks, span)
     }
 
     /** Cut's deletion, once the text is copied. */
@@ -190,9 +194,11 @@ class RichEditorState {
         replace(RichEditing(edit.blocks, RichSelection.caret(requireNotNull(edit.focusId), edit.caret)))
     }
 
-    internal fun paste(text: String) {
+    /** A clipboard's [text] and [html] pasted over the selection, as plain
+     *  text with [asPlainText] or the plain paste preference ([plainPaste]). */
+    internal fun paste(text: String, html: String?, asPlainText: Boolean) {
         val current = editing ?: return
-        replace(RichTyping.paste(current, text))
+        RichPaste.paste(current, text, html, plainPaste, asPlainText)?.let(::replace)
     }
 
     /** A task item's checkbox ticked or unticked. */

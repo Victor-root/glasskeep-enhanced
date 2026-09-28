@@ -2031,6 +2031,7 @@ fun NoteDetailScreen(
                     titleColor = titleColor,
                     accent = richAccent,
                     readModeEnabled = container.editorPrefs.readModeEnabled,
+                    plainPaste = container.editorPrefs.pasteMode == "plain",
                     minHeight = minHeight,
                     onBlocksChange = { richBlocks = it },
                     suppressKeyboard = showFormatSheet,

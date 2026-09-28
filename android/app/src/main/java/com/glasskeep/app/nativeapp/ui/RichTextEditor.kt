@@ -205,6 +205,7 @@ fun RichTextEditor(
     titleColor: Color,
     accent: Color,
     readModeEnabled: Boolean,
+    plainPaste: Boolean,
     minHeight: Dp,
     onBlocksChange: (List<RichBlock>) -> Unit,
     suppressKeyboard: Boolean = false,
@@ -214,6 +215,7 @@ fun RichTextEditor(
     SideEffect {
         state.onBlocksChange = onBlocksChange
         state.keyboardSuppressed = suppressKeyboard
+        state.plainPaste = plainPaste
         state.sync(blocks)
     }
     // Tiptap's Placeholder: only a document holding a single empty
@@ -869,8 +871,8 @@ private class RichTextActions(
     }
 
     fun copy() {
-        val text = state.selectedText() ?: return
-        scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("text", text))) }
+        val clip = state.selectedClip() ?: return
+        scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newHtmlText("text", clip.text, clip.html))) }
     }
 
     fun cut() {
@@ -878,11 +880,14 @@ private class RichTextActions(
         state.deleteSelection()
     }
 
-    fun paste() {
+    /** The clipboard's text and markup pasted, only its text with
+     *  [asPlainText] (the web's Ctrl+Shift+V). */
+    fun paste(asPlainText: Boolean = false) {
         scope.launch {
             val clip = clipboard.getClipEntry()?.clipData ?: return@launch
             val text = (0 until clip.itemCount).joinToString("") { clip.getItemAt(it).coerceToText(context) }
-            if (text.isNotEmpty()) state.paste(text)
+            val html = (0 until clip.itemCount).firstNotNullOfOrNull { clip.getItemAt(it).htmlText }
+            state.paste(text, html, asPlainText)
         }
     }
 
@@ -892,7 +897,8 @@ private class RichTextActions(
             android.R.id.selectAll -> state.selectAll()
             android.R.id.copy -> copy()
             android.R.id.cut -> cut()
-            android.R.id.paste, android.R.id.pasteAsPlainText -> paste()
+            android.R.id.paste -> paste()
+            android.R.id.pasteAsPlainText -> paste(asPlainText = true)
             else -> return false
         }
         return true
@@ -901,7 +907,8 @@ private class RichTextActions(
     /**
      * A key: Backspace, Delete and Enter as the keyboard's own, the arrows
      * moving the caret a character (Shift extending the selection),
-     * Ctrl+A, C, X and V, and any other character typed in.
+     * Ctrl+A, C, X and V (with Shift, pasting plain text), and any other
+     * character typed in.
      */
     fun handleKey(event: KeyEvent): Boolean {
         if (state.editing == null) return false
@@ -916,7 +923,7 @@ private class RichTextActions(
             ctrl && event.keyCode == KeyEvent.KEYCODE_A -> state.selectAll()
             ctrl && event.keyCode == KeyEvent.KEYCODE_C -> copy()
             ctrl && event.keyCode == KeyEvent.KEYCODE_X -> cut()
-            ctrl && event.keyCode == KeyEvent.KEYCODE_V -> paste()
+            ctrl && event.keyCode == KeyEvent.KEYCODE_V -> paste(asPlainText = event.isShiftPressed)
             else -> {
                 val char = event.unicodeChar
                 if (char == 0 || ctrl || event.isAltPressed || Character.isISOControl(char)) return false

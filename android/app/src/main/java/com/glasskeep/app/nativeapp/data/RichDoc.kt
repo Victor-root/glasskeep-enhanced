@@ -119,14 +119,7 @@ object RichDoc {
 
     /** Parses `content` into editable blocks, or null when it isn't rich
      *  Tiptap content at all, or uses anything outside the vocabulary above. */
-    fun parse(content: String?): List<RichBlock>? {
-        val doc = NoteContent.parseRichDoc(content) ?: return null
-        return try {
-            parseDoc(doc)
-        } catch (_: Exception) {
-            null
-        }
-    }
+    fun parse(content: String?): List<RichBlock>? = NoteContent.parseRichDoc(content)?.let(::parseDocJson)
 
     /** Card previews only paint the document's first [maxNodes] top-level
      *  nodes, a whole list or quote counting as one, as contentToHTMLPreview()
@@ -141,6 +134,14 @@ object RichDoc {
         } catch (_: Exception) {
             null
         }
+    }
+
+    /** A Tiptap `doc` node as blocks, or null when it uses anything outside
+     *  the vocabulary above. */
+    internal fun parseDocJson(doc: JsonObject): List<RichBlock>? = try {
+        parseDoc(doc)
+    } catch (_: Exception) {
+        null
     }
 
     private fun parseDoc(doc: JsonObject, maxNodes: Int = Int.MAX_VALUE): List<RichBlock>? {
@@ -439,17 +440,22 @@ object RichDoc {
      *  the attrs this editor actually sets are emitted, everything else is
      *  left for Tiptap's own schema defaults to fill in on the other end. */
     fun encode(blocks: List<RichBlock>): String {
-        val nodes = encodeQuoted(normalizeNesting(blocks), depth = 0)
-        val doc = buildJsonObject {
-            put("type", "doc")
-            put("content", JsonArray(nodes.ifEmpty { listOf(buildJsonObject { put("type", "paragraph") }) }))
-        }
         val envelope = buildJsonObject {
             put("v", 1)
             put("format", "tiptap")
-            put("doc", doc)
+            put("doc", encodeDoc(blocks))
         }
         return envelope.toString()
+    }
+
+    /** The Tiptap `doc` node of [blocks], one textblock or rule per block
+     *  in document order. */
+    internal fun encodeDoc(blocks: List<RichBlock>): JsonObject {
+        val nodes = encodeQuoted(normalizeNesting(blocks), depth = 0)
+        return buildJsonObject {
+            put("type", "doc")
+            put("content", JsonArray(nodes.ifEmpty { listOf(buildJsonObject { put("type", "paragraph") }) }))
+        }
     }
 
     /** The nodes of [blocks], all held by the same [depth] quotes: a run of

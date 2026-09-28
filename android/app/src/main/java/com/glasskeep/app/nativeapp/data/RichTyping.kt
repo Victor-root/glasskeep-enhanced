@@ -159,31 +159,6 @@ object RichTyping {
         return next
     }
 
-    /**
-     * Plain text pasted over the selection: one paragraph per line
-     * (plainTextToPasteSlice), the first joining the line the caret is on,
-     * the last taking what followed the caret, all without marks; into a
-     * code block the text goes as it is.
-     */
-    fun paste(state: RichEditing, raw: String): RichEditing {
-        val text = raw.replace("\r\n", "\n").replace('\r', '\n')
-        val span = state.span ?: return state
-        val cleared = if (span.collapsed) state.copy(composition = null) else applied(state, RichEdits.replaceSelection(state.blocks, span))
-        val at = cleared.span ?: return state
-        val index = at.start
-        val block = cleared.blocks[index]
-        if (!block.kind.hasText) return cleared
-        val from = at.startOffset
-        val inserted = RichDoc.replaceText(block, from, from, text).let { b ->
-            if (b.kind == RichBlockKind.CODE_BLOCK) b else b.copy(marks = RichDoc.clearAllMarks(b.marks, from, from + text.length))
-        }
-        val blocks = cleared.blocks.replaceAt(index, listOf(inserted))
-        if (block.kind == RichBlockKind.CODE_BLOCK || '\n' !in text) {
-            return RichEditing(blocks, RichSelection.caret(block.id, from + text.length))
-        }
-        return applied(cleared, RichEdits.insertLines(blocks, block.id, inserted.text, inserted.marks, from, from + text.length))
-    }
-
     /** The input rules run on what was just typed before the caret
      *  ([inserted], empty when a composition just ended), or null when none
      *  applies. A mark rule leaves its mark disarmed for what follows. */

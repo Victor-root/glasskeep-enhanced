@@ -5,6 +5,27 @@ object RichClipboard {
     private val TrailingSpace = Regex("[${RichDoc.JsSpace}]+$")
     private val BlankRun = Regex("\n{3,}")
 
+    /** A copy's text/plain and text/html. */
+    data class Clip(val text: String, val html: String)
+
+    /**
+     * What the web's Copy writes for [span]: its text ([plainText]) and its
+     * markup ([RichPaste.copyHtml]); inside one code block, or one piece of
+     * inline code, the bare selected text as both (plainTextCodeCopy.js).
+     */
+    fun copy(blocks: List<RichBlock>, span: RichSpan): Clip {
+        codeText(blocks, span)?.let { return Clip(it, it) }
+        return Clip(plainText(blocks, span), RichPaste.copyHtml(blocks, span))
+    }
+
+    private fun codeText(blocks: List<RichBlock>, span: RichSpan): String? {
+        if (span.start != span.end) return null
+        val block = blocks[span.start]
+        val inCode = block.kind == RichBlockKind.CODE_BLOCK ||
+            block.marks.any { it.type == RichMarkType.CODE && it.start <= span.startOffset && span.endOffset <= it.end }
+        return if (inCode) block.text.substring(span.startOffset, span.endOffset) else null
+    }
+
     /**
      * The selection as plain text, sliceToCleanPlainText (richTextClipboard.js):
      * one line per block, a list item with "- " or its number in its list
