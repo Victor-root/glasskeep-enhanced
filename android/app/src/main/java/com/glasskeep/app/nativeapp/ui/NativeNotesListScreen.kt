@@ -2909,7 +2909,7 @@ private fun CardImageGrid(images: List<NoteImageData>, subtextColor: Color) {
                 modifier = Modifier.height(IntrinsicSize.Max),
             ) {
                 row.forEach { image ->
-                    val bitmap = rememberDecodedImage(image.src)
+                    val bitmap = rememberDecodedImageAsync(image.src)
                     Box(
                         Modifier
                             .weight(1f)

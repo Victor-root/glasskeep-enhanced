@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp.ui
 
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.util.LruCache
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -57,7 +58,9 @@ import androidx.compose.ui.window.DialogProperties
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.NoteImageData
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /** ModalImagesGrid.jsx's `max-height: 360px` on every image. */
 private val NoteImageMaxHeight = 360.dp
@@ -339,17 +342,40 @@ private fun ViewerNavButton(
     }
 }
 
-// internal, not private: SettingsScreen.kt (same package, different file)
-// reuses this to render the account's avatar, same data: URL shape.
-@Composable
-internal fun rememberDecodedImage(dataUrl: String): ImageBitmap? = remember(dataUrl) {
-    try {
+/** The data: URL images decoded so far, shared by every screen: the same
+ *  logo on a hundred cards, a card built again (the list filtered, a view
+ *  switched) or a note opened from its card draws at once instead of
+ *  decoding again. Bounded by the pixels it keeps. */
+private val decodedImages = object : LruCache<String, ImageBitmap>((Runtime.getRuntime().maxMemory() / 8).toInt()) {
+    override fun sizeOf(key: String, value: ImageBitmap): Int = value.width * value.height * 4
+}
+
+private fun decodeDataImage(dataUrl: String): ImageBitmap? {
+    decodedImages.get(dataUrl)?.let { return it }
+    return try {
         val base64 = dataUrl.substringAfter("base64,", "")
-        if (base64.isEmpty()) return@remember null
+        if (base64.isEmpty()) return null
         val bytes = Base64.decode(base64, Base64.DEFAULT)
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()?.also { decodedImages.put(dataUrl, it) }
     } catch (t: Throwable) {
         NativeDebug.e("Failed to decode note image", t)
         null
     }
+}
+
+// internal, not private: SettingsScreen.kt (same package, different file)
+// reuses this to render the account's avatar, same data: URL shape.
+@Composable
+internal fun rememberDecodedImage(dataUrl: String): ImageBitmap? = remember(dataUrl) { decodeDataImage(dataUrl) }
+
+/** [rememberDecodedImage] off the main thread, for a screen showing many
+ *  at once that must not wait on them (the notes list's cards): null
+ *  until decoded, unless it already was. */
+@Composable
+internal fun rememberDecodedImageAsync(dataUrl: String): ImageBitmap? {
+    val image = remember(dataUrl) { mutableStateOf(decodedImages.get(dataUrl)) }
+    LaunchedEffect(image) {
+        if (image.value == null) image.value = withContext(Dispatchers.Default) { decodeDataImage(dataUrl) }
+    }
+    return image.value
 }
