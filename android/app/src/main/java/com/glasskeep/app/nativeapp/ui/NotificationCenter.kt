@@ -217,7 +217,9 @@ fun NotificationCenter(
                 // later `html.dark .gk-notif-center` rule wins, a neutral
                 // grey under the statusbar-coloured header.
                 .background(if (dark) Color(0xF51C1C26) else statusBar)
-                .sheetEdges(shape, dark),
+                // No `inset 0 1px 0` top highlight: CSS paints it under the
+                // header, whose opaque phone fill covers it.
+                .topSheetBottomBorder(shape, if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)),
         ) {
             NotificationCenterHeader(
                 background = statusBar,
@@ -305,23 +307,15 @@ fun NotificationCenter(
     }
 }
 
-/** The mobile sheet keeps only its bottom border (1px, following the
- *  rounded corners) and the `inset 0 1px 0` highlight along its top. */
-private fun Modifier.sheetEdges(shape: Shape, dark: Boolean): Modifier = drawWithContent {
+/** A top sheet on a phone keeps only its bottom border (1px, following
+ *  the rounded corners). Shared with the sync sheet. */
+internal fun Modifier.topSheetBottomBorder(shape: Shape, color: Color): Modifier = drawWithContent {
     drawContent()
     val stroke = 1.dp.toPx()
-    drawRect(
-        color = if (dark) Color.White.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.90f),
-        size = Size(size.width, stroke),
-    )
     val outline = shape.createOutline(Size(size.width - stroke, size.height - stroke), layoutDirection, this)
     clipRect(top = size.height / 2f) {
         translate(stroke / 2f, stroke / 2f) {
-            drawOutline(
-                outline,
-                color = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f),
-                style = Stroke(width = stroke),
-            )
+            drawOutline(outline, color = color, style = Stroke(width = stroke))
         }
     }
 }

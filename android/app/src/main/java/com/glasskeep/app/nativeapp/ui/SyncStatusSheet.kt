@@ -50,10 +50,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawOutline
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.platform.LocalConfiguration
@@ -218,7 +214,7 @@ internal fun SyncStatusSheet(
                 .dropShadow(shape, Shadow(radius = 28.dp, color = sheetShadow.copy(alpha = 0.12f), spread = (-4).dp, offset = DpOffset(0.dp, 10.dp)))
                 .clip(shape)
                 .background(statusBarBg)
-                .bottomBorder(shape, if (dark) Color(0xFF364153) else Color(0xFFE5E7EB)),
+                .topSheetBottomBorder(shape, if (dark) Color(0xFF364153) else Color(0xFFE5E7EB)),
         ) {
             Column(Modifier.fillMaxWidth()) {
                 SyncSheetHeader(
@@ -334,19 +330,6 @@ internal fun SyncStatusSheet(
                     lineHeight = 24.sp,
                 )
             }
-        }
-    }
-}
-
-/** The mobile sheet keeps only its bottom border, around the rounded
- *  corners. */
-private fun Modifier.bottomBorder(shape: RoundedCornerShape, color: Color): Modifier = drawWithContent {
-    drawContent()
-    val stroke = 1.dp.toPx()
-    val outline = shape.createOutline(Size(size.width - stroke, size.height - stroke), layoutDirection, this)
-    clipRect(top = size.height / 2f) {
-        translate(stroke / 2f, stroke / 2f) {
-            drawOutline(outline, color = color, style = Stroke(width = stroke))
         }
     }
 }
