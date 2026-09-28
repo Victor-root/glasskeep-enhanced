@@ -343,8 +343,7 @@ internal class SettingsActions(
                 toasts.success(context.getString(R.string.native_settings_password_success), "key")
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsActions changePassword failed", t)
-                // The web shows the server's own words, untranslated.
-                passwordError = context.requestErrorText(t).ifEmpty { context.getString(R.string.native_something_went_wrong) }
+                passwordError = context.localizedServerError(context.requestErrorText(t), R.string.native_something_went_wrong)
             } finally {
                 passwordSaving = false
             }

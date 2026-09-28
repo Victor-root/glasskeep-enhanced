@@ -984,6 +984,7 @@
     <string name="native_err_no_valid_fields">No valid fields to update.</string>
     <string name="native_err_current_passphrase">Current passphrase is incorrect.</string>
     <string name="native_err_current_passphrase_required">Current passphrase is required.</string>
+    <string name="native_err_current_password">Current password is incorrect.</string>
     <string name="native_err_encryption_already_enabled">At-rest encryption is already enabled.</string>
     <string name="native_err_passphrase_mismatch">The passphrases do not match.</string>
     <string name="native_err_passphrase_too_short">Passphrase must be at least 8 characters.</string>

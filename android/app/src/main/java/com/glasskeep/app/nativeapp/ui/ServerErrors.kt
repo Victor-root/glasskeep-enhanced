@@ -75,6 +75,7 @@ private val ServerErrorPatterns = listOf(
     "Refusing to accept" to R.string.native_err_plaintext_http,
     "Current passphrase is incorrect" to R.string.native_err_current_passphrase,
     "Current passphrase is required" to R.string.native_err_current_passphrase_required,
+    "Current password is incorrect" to R.string.native_err_current_password,
     "Invalid email or password" to R.string.native_err_invalid_credentials,
     "Too many sign-in attempts" to R.string.native_err_too_many_sign_in,
     "Invalid token" to R.string.native_err_invalid_token,
