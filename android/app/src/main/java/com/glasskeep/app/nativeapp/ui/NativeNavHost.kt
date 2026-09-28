@@ -6,18 +6,18 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.EaseIn
 import androidx.compose.animation.core.EaseOut
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -33,6 +33,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -43,13 +44,29 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -78,6 +95,7 @@ import com.glasskeep.app.nativeapp.restartApp
 import com.glasskeep.app.nativeapp.syncErrorKindOf
 import com.glasskeep.app.nativeapp.syncReminderAlarms
 import com.glasskeep.app.reminders.ReminderSyncWorker
+import kotlin.math.min
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -461,6 +479,7 @@ fun NativeNavHost(
     // own root (TooltipPortal.jsx).
     val tooltips = rememberTooltipController()
     val popovers = remember { GkPopovers() }
+    val noteCards = remember { NoteCards() }
     // "Edge-to-edge in landscape" off means the whole shell stays clear of
     // the left cutout, exactly what the web does by putting --safe-left
     // back on <body> (App.jsx:1703). Left only: the other three edges are
@@ -621,7 +640,12 @@ fun NativeNavHost(
             // draws them over it, its own "notes" destination empty.
             if (route == "notes" || route in ListOverlayRoutes) {
                 // Out of the accessibility tree while covered, as it is out of sight.
-                Box(Modifier.fillMaxSize().then(if (route != "notes") Modifier.clearAndSetSemantics {} else Modifier)) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .onGloballyPositioned { noteCards.screen = it.boundsInWindow() }
+                        .then(if (route != "notes") Modifier.clearAndSetSemantics {} else Modifier),
+                ) {
                     NativeNotesListScreen(
                         container = container,
                         serverUrl = serverUrl,
@@ -637,6 +661,7 @@ fun NativeNavHost(
                         onPendingNewNoteTypeConsumed = onPendingNewNoteTypeConsumed,
                         onSignedOut = goToSignIn,
                         covered = { currentEntry?.destination?.route != "notes" },
+                        noteCards = noteCards,
                     )
                     ListCover(route)
                 }
@@ -746,30 +771,30 @@ fun NativeNavHost(
                         onBack = { navController.popBackStack() },
                     )
                 }
-                // noteModalIn / noteModalOut on a phone: a fade plus a 14px
-                // rise, 200ms ease-out in, 180ms ease-in out.
+                // Over the list, NoteOpening draws the note's opening and
+                // closing itself.
                 composable(
                     route = NoteRoute,
                     arguments = listOf(navArgument("new") { type = NavType.BoolType; defaultValue = false }),
-                    enterTransition = {
-                        if (initialState.destination.route == "notes") {
-                            fadeIn(tween(200, easing = EaseOut)) +
-                                slideInVertically(tween(200, easing = EaseOut)) { with(density) { NoteRise.roundToPx() } }
-                        } else {
-                            null
-                        }
-                    },
-                    popExitTransition = { if (targetState.destination.route == "notes") noteModalOut else null },
+                    enterTransition = { if (initialState.destination.route == "notes") EnterTransition.None else null },
+                    popExitTransition = { if (targetState.destination.route == "notes") ExitTransition.None else null },
                 ) { backStackEntry ->
                     val noteId = backStackEntry.arguments?.getString("noteId") ?: return@composable
-                    NoteDetailScreen(
-                        container = container,
-                        serverUrl = serverUrl,
+                    NoteOpening(
                         noteId = noteId,
-                        onBack = { navController.popBackStack() },
-                        isNew = backStackEntry.arguments?.getBoolean("new") == true,
-                        onUnarchived = { onNoteUnarchived() },
-                    )
+                        cards = noteCards,
+                        overList = { navController.previousBackStackEntry?.destination?.route == "notes" },
+                        closingToList = { navController.currentBackStackEntry?.destination?.route == "notes" },
+                    ) {
+                        NoteDetailScreen(
+                            container = container,
+                            serverUrl = serverUrl,
+                            noteId = noteId,
+                            onBack = { navController.popBackStack() },
+                            isNew = backStackEntry.arguments?.getBoolean("new") == true,
+                            onUnarchived = { onNoteUnarchived() },
+                        )
+                    }
                 }
                 // Side by side: the two panes pop in over the list, which
                 // stays in place under them, and the note they leave behind
@@ -841,6 +866,108 @@ fun NativeNavHost(
         }
     }
 }
+
+/**
+ * A note's screen opening over the notes list and closing back to it.
+ * Opened from its card, it grows out of it: laid out whole, it is drawn at
+ * the card's width, clipped to the card's bounds and 12dp corners and
+ * fading in over the first quarter, and eases out to the whole screen in
+ * 300ms; it shrinks back into the card, wherever the card now is, in
+ * 250ms, when the card is still on screen. Otherwise the web's noteModalIn
+ * / noteModalOut on a phone: a fade and a 14px rise, 200ms ease-out in,
+ * 180ms ease-in out. Back from under another note, it leaves the
+ * NavHost's own transition alone. The note learns when it covers the
+ * screen through LocalNoteCoversScreen.
+ */
+@Composable
+private fun AnimatedVisibilityScope.NoteOpening(
+    noteId: String,
+    cards: NoteCards,
+    overList: () -> Boolean,
+    closingToList: () -> Boolean,
+    content: @Composable () -> Unit,
+) {
+    var shown by rememberSaveable { mutableStateOf(false) }
+    val opening = remember { !shown && overList() }
+    // Saved with the note's screen, for its way back from under another one.
+    val fromCard = rememberSaveable { cards.openedFromCard == noteId }
+    LaunchedEffect(Unit) {
+        shown = true
+        if (cards.openedFromCard == noteId) cards.openedFromCard = null
+    }
+    val closing = remember(transition.targetState) { transition.targetState == EnterExitState.PostExit && closingToList() }
+    val zooming = remember(transition.targetState) { fromCard && (opening || closing) && cards.onScreen(noteId) != null }
+    val progress by transition.animateFloat(
+        transitionSpec = {
+            val showing = targetState == EnterExitState.Visible
+            when {
+                zooming -> tween(if (showing) 300 else 250, easing = FastOutSlowInEasing)
+                showing -> tween(200, easing = EaseOut)
+                else -> tween(180, easing = EaseIn)
+            }
+        },
+        label = "noteOpening",
+    ) { state ->
+        when (state) {
+            EnterExitState.PreEnter -> if (opening) 0f else 1f
+            EnterExitState.Visible -> 1f
+            EnterExitState.PostExit -> if (closing) 0f else 1f
+        }
+    }
+    val coversScreen by remember {
+        derivedStateOf { transition.targetState == EnterExitState.Visible && progress >= 1f }
+    }
+    val density = LocalDensity.current
+    val rise = with(density) { NoteRise.toPx() }
+    val cardCorner = with(density) { CardCorner.toPx() }
+    val frame = remember { WindowOrigin() }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { frame.offset = it.positionInWindow() }
+            .graphicsLayer {
+                val p = progress
+                val card = if (zooming) cards.bounds[noteId]?.translate(-frame.offset) else null
+                if (card != null) {
+                    val bounds = lerp(card, Rect(Offset.Zero, size), p)
+                    val scale = bounds.width / size.width
+                    transformOrigin = TransformOrigin(0f, 0f)
+                    scaleX = scale
+                    scaleY = scale
+                    translationX = bounds.left
+                    translationY = bounds.top
+                    if (p < 1f) {
+                        shape = TopRoundRect(bounds.height / scale, lerp(cardCorner, 0f, p) / scale)
+                        clip = true
+                    }
+                    alpha = (p / ZoomFadeIn).coerceAtMost(1f)
+                } else if (p < 1f) {
+                    alpha = p
+                    translationY = (1f - p) * rise
+                }
+            },
+    ) {
+        CompositionLocalProvider(LocalNoteCoversScreen provides coversScreen, content = content)
+    }
+}
+
+/** Where a layout sits in the window, as last laid out. */
+private class WindowOrigin {
+    var offset = Offset.Zero
+}
+
+/** The top [height] of a layer with [radius] corners: the card a note's
+ *  screen grows out of, in that screen's own units. */
+private class TopRoundRect(private val height: Float, private val radius: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline =
+        Outline.Rounded(RoundRect(0f, 0f, size.width, min(height, size.height), CornerRadius(radius)))
+}
+
+/** A note card's corners (NoteCard's RoundedCornerShape). */
+private val CardCorner = 12.dp
+
+/** The part of the growth over which a note fades in over its card. */
+private const val ZoomFadeIn = 0.25f
 
 /**
  * Over the notes list, under what covers it: the web's instant

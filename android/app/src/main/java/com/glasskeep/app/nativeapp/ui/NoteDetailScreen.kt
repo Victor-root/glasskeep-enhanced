@@ -66,6 +66,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -254,9 +255,28 @@ private fun Editability.rebaselined(
  *  of this user's notes, and how many. Mirrors App.jsx's tagsWithCounts. */
 private data class TagCount(val tag: String, val count: Int)
 
+/** The system bars in [color], once the note's screen covers the whole
+ *  screen (LocalNoteCoversScreen), read here so that moment recomposes
+ *  nothing else. Keyed on the pane too: the note left alone once the other
+ *  pane of a side-by-side view closes takes the bars back after that one
+ *  let go. */
+@Composable
+private fun NoteSystemBars(container: NativeAppContainer, color: Color, splitPane: SplitPane?) {
+    val coversScreen = LocalNoteCoversScreen.current
+    LaunchedEffect(color, splitPane, coversScreen) {
+        container.statusBarOverride.value = color.toArgb().takeIf { coversScreen }
+    }
+}
+
 /** The ids of the notes the server announces changed (note_updated), the
  *  web's "note-updated" bus (App.jsx:3779-3792). */
 internal val LocalNoteUpdates = staticCompositionLocalOf<Flow<String>> { emptyFlow() }
+
+/** Whether the note's screen covers the whole screen, which it does but
+ *  while growing out of its card or shrinking back into it
+ *  (NativeNavHost's NoteOpening): until then the system bars keep the
+ *  list's colour. */
+internal val LocalNoteCoversScreen = compositionLocalOf { true }
 
 /**
  * Milestone: opening and safely editing a single note, every note type the
@@ -1825,9 +1845,7 @@ fun NoteDetailScreen(
     // rest of the screen does. The collaboration modal hands them its own
     // surface while it is open, and the note's colour back after.
     val systemBarColor = if (showCollaborators) collaboratorsSurface(dark) else modalBg
-    // Keyed on the pane too: the note left alone once the other pane of a
-    // side-by-side view closes takes the bars back after that one let go.
-    LaunchedEffect(systemBarColor, splitPane) { container.statusBarOverride.value = systemBarColor.toArgb() }
+    NoteSystemBars(container, systemBarColor, splitPane)
     DisposableEffect(Unit) { onDispose { container.statusBarOverride.value = null } }
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
