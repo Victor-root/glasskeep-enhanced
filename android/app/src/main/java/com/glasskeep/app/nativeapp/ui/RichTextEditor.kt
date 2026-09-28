@@ -443,6 +443,8 @@ private fun RichEditorText(
     modifier: Modifier,
 ) {
     val padded = remember(block, style, dark) { paddedTextFor(block, style, dark, RichSurface.EDITOR) }
+    val pads = richPads(editor = true)
+    val justified = rememberWebJustified(padded, style, pads)
     val fonts = LocalFontFamilyResolver.current
     val drawnLines = remember(block, style, lines, dark, fonts) { richLinesOf(block, style, lines, dark, RichSurface.EDITOR, fonts) }
     var layout by remember { mutableStateOf<PaddedLayout?>(null) }
@@ -453,14 +455,15 @@ private fun RichEditorText(
             Text(placeholder, style = style.copy(color = if (dark) Color(0xFF6B7280) else Color(0xFF9CA3AF)).webItalic())
         }
         BasicText(
-            text = padded.text,
-            style = style,
+            text = justified.text,
+            style = justified.style,
             onTextLayout = {
+                justified.onLayout(it)
                 val laid = PaddedLayout(it, padded)
                 layout = laid
                 state.layouts.setLayout(block.id, laid)
             },
-            inlineContent = richPads(editor = true),
+            inlineContent = pads,
             modifier = Modifier
                 .fillMaxWidth()
                 .onPlaced { state.layouts.setCoordinates(block.id, it) }
@@ -1771,6 +1774,8 @@ private fun ReaderText(
         LinkInteractionListener { link -> (link as? LinkAnnotation.Url)?.let { uriHandler.openUri(it.url) } }
     }
     val padded = remember(block, style, dark, surface) { paddedTextFor(block, style, dark, surface, openLink) }
+    val pads = richPads(editor = false)
+    val justified = rememberWebJustified(padded, style, pads)
     val fonts = LocalFontFamilyResolver.current
     val drawnLines = remember(block, style, lines, dark, surface, fonts) { richLinesOf(block, style, lines, dark, surface, fonts) }
     var layout by remember { mutableStateOf<PaddedLayout?>(null) }
@@ -1787,10 +1792,13 @@ private fun ReaderText(
     val armable = surface == RichSurface.READER && codeMarks.isNotEmpty()
     Box(modifier) {
         Text(
-            padded.text,
-            style = style,
-            onTextLayout = { layout = PaddedLayout(it, padded) },
-            inlineContent = richPads(editor = false),
+            justified.text,
+            style = justified.style,
+            onTextLayout = {
+                justified.onLayout(it)
+                layout = PaddedLayout(it, padded)
+            },
+            inlineContent = pads,
             modifier = Modifier
                 .fillMaxWidth()
                 .drawWithContent {

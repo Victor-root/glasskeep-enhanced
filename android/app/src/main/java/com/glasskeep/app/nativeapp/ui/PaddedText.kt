@@ -1,11 +1,13 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 
@@ -44,6 +46,7 @@ internal class PaddedText private constructor(
     private val breaks: IntArray,
     private val carets: IntArray,
     private val inserted: IntArray,
+    private val pads: List<AnnotatedString.Range<String>>,
 ) {
     /** Where a caret at [offset] is laid out: past a joiner, the pads
      *  closing a run and a break there, before the pads opening one. */
@@ -67,6 +70,11 @@ internal class PaddedText private constructor(
         return offset - if (found >= 0) found else -found - 1
     }
 
+    /** The placeholders [inlineContent] gives the pads, where a Text lays
+     *  them out: to measure the text as a Text would. */
+    fun placeholders(inlineContent: Map<String, InlineTextContent>): List<AnnotatedString.Range<Placeholder>> =
+        pads.mapNotNull { pad -> inlineContent[pad.item]?.let { AnnotatedString.Range(it.placeholder, pad.start, pad.end) } }
+
     companion object {
         /** [text] with its [runs] padded, and broken where the WebView
          *  breaks it. */
@@ -89,6 +97,7 @@ internal class PaddedText private constructor(
             }
             val carets = IntArray(length + 1)
             val inserted = mutableListOf<Int>()
+            val pads = mutableListOf<AnnotatedString.Range<String>>()
             val builder = AnnotatedString.Builder(length + 2 * runs.size)
             var copied = 0
             fun insert(char: Char) {
@@ -97,6 +106,7 @@ internal class PaddedText private constructor(
             }
             fun pad(id: String) {
                 inserted += builder.length
+                pads += AnnotatedString.Range(id, builder.length, builder.length + 1)
                 builder.appendInlineContent(id, PadChar.toString())
             }
             for (i in 0..length) {
@@ -113,7 +123,7 @@ internal class PaddedText private constructor(
                 opening[i]?.forEach(::pad)
             }
             builder.append(text.text, copied, length)
-            return PaddedText(builder.toAnnotatedString(), length, opens, closes, breaks, carets, inserted.toIntArray())
+            return PaddedText(builder.toAnnotatedString(), length, opens, closes, breaks, carets, inserted.toIntArray(), pads)
                 .withAnnotationsOf(text)
         }
 
@@ -140,7 +150,7 @@ internal class PaddedText private constructor(
                 is LinkAnnotation.Clickable -> builder.addLink(item, at.start, at.end)
             }
         }
-        return PaddedText(builder.toAnnotatedString(), length, opens, closes, breaks, carets, inserted)
+        return PaddedText(builder.toAnnotatedString(), length, opens, closes, breaks, carets, inserted, pads)
     }
 }
 

@@ -1,10 +1,14 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withLink
+import androidx.compose.ui.unit.sp
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -39,6 +43,14 @@ class PaddedTextTest {
         assertEquals(TextRange(0, 4), padded.box(0, 2))
         assertEquals(TextRange(4, 8), padded.box(2, 4))
         assertEquals(TextRange(1, 7), padded.range(0, 4))
+    }
+
+    @Test
+    fun `the pads' placeholders sit where the pads are laid out`() {
+        val padded = PaddedText.of(AnnotatedString("ab cd e"), listOf(PaddedRun(3 until 5, CodePadId)))
+        val code = Placeholder(5.sp, 1.sp, PlaceholderVerticalAlign.AboveBaseline)
+        val placeholders = padded.placeholders(mapOf(CodePadId to InlineTextContent(code) {}))
+        assertEquals(listOf(AnnotatedString.Range(code, 3, 4), AnnotatedString.Range(code, 6, 7)), placeholders)
     }
 
     @Test
