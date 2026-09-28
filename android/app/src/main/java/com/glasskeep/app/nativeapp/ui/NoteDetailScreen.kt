@@ -355,6 +355,16 @@ fun NoteDetailScreen(
     // a tag or a checklist item. See Editability.originalRichBlocks for
     // the as-loaded snapshot this diffs against.
     var richBlocks by remember { mutableStateOf<List<RichBlock>?>(null) }
+
+    /** What the footer's undo and redo step through (useModalHistory.js's
+     *  snap()). */
+    fun currentSnapshot() = NoteSnapshot(
+        title = titleText,
+        body = bodyText,
+        richBlocks = richBlocks,
+        checklistItems = editability?.checklistItems,
+    )
+
     // True once the load below is over: the cached copy, then the
     // server's, or its failure.
     var loadSettled by remember { mutableStateOf(false) }
@@ -1433,22 +1443,8 @@ fun NoteDetailScreen(
             }
             audioClips = editability?.originalAudioClips.orEmpty()
             audioCaptionText = editability?.originalAudioCaptionText
-            history.reset(
-                NoteSnapshot(
-                    title = titleText,
-                    body = bodyText,
-                    richBlocks = richBlocks,
-                    checklistItems = editability?.checklistItems,
-                ),
-            )
+            history.reset(currentSnapshot())
         }
-
-        fun currentSnapshot() = NoteSnapshot(
-            title = titleText,
-            body = bodyText,
-            richBlocks = richBlocks,
-            checklistItems = editability?.checklistItems,
-        )
 
         var cacheBaseline: NoteSnapshot? = null
         repository.cachedNoteDetailOrNull(noteId)?.let { cached ->
@@ -1510,29 +1506,23 @@ fun NoteDetailScreen(
             return@LaunchedEffect
         }
         delay(1000)
-        history.record(
-            NoteSnapshot(
-                title = titleText,
-                body = bodyText,
-                richBlocks = richBlocks,
-                checklistItems = editability?.checklistItems,
-            ),
-        )
+        history.record(currentSnapshot())
     }
 
     fun applySnapshot(snapshot: NoteSnapshot) {
-        val unchanged = snapshot.title == titleText &&
-            snapshot.body == bodyText &&
-            snapshot.richBlocks == richBlocks &&
-            snapshot.checklistItems == editability?.checklistItems
+        val current = currentSnapshot()
         // Only arm the guard when the state really moves: otherwise no
         // recomposition follows to clear it, and the next real edit
         // would be swallowed.
-        if (unchanged) return
+        if (snapshot == current) return
         history.restoring = true
         titleText = snapshot.title
         bodyText = snapshot.body
-        richBlocks = snapshot.richBlocks
+        if (snapshot.richContent != current.richContent) {
+            // The web's editor takes it through setContent.
+            snapshot.richBlocks?.let(richEditorState::setContent)
+            richBlocks = snapshot.richBlocks
+        }
         if (snapshot.checklistItems != null && snapshot.checklistItems != editability?.checklistItems) {
             editability = editability?.copy(checklistItems = snapshot.checklistItems)
             // Checklist rows persist as they change rather than through
@@ -1543,21 +1533,18 @@ fun NoteDetailScreen(
     }
 
     fun undoNote() {
+        // The footer's undo and redo blur whatever has the focus first on a
+        // phone (ModalFooter.jsx): the keyboard goes.
+        focusManager.clearFocus()
         // The web flushes its pending debounce first, so whatever was
         // typed in the last second becomes its own step instead of being
         // swallowed by the undo (useModalHistory.js's flush()).
-        history.record(
-            NoteSnapshot(
-                title = titleText,
-                body = bodyText,
-                richBlocks = richBlocks,
-                checklistItems = editability?.checklistItems,
-            ),
-        )
+        history.record(currentSnapshot())
         history.undo()?.let { applySnapshot(it) }
     }
 
     fun redoNote() {
+        focusManager.clearFocus()
         history.redo()?.let { applySnapshot(it) }
     }
 
@@ -1670,14 +1657,7 @@ fun NoteDetailScreen(
                     bodyText = ""
                 }
                 SyncQueueWorker.triggerNow(context)
-                history.reset(
-                    NoteSnapshot(
-                        title = titleText,
-                        body = bodyText,
-                        richBlocks = richBlocks,
-                        checklistItems = editability?.checklistItems,
-                    ),
-                )
+                history.reset(currentSnapshot())
                 toasts.success(if (toChecklist) convertedToChecklistMessage else convertedToTextMessage)
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen convertNoteType failed", t)

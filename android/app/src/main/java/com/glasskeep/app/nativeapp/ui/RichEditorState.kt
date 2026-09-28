@@ -34,6 +34,7 @@ import com.glasskeep.app.nativeapp.data.RichTyping
 import com.glasskeep.app.nativeapp.data.hasText
 import com.glasskeep.app.nativeapp.data.isTextStyle
 import com.glasskeep.app.nativeapp.data.resolve
+import com.glasskeep.app.nativeapp.data.textLength
 
 /**
  * The rich editor's state: the document as the editor last edited it, its
@@ -88,26 +89,38 @@ class RichEditorState {
 
     /**
      * The document the editor is handed. A change that did not come from
-     * the editor itself (undo, a version from elsewhere, the trailing
-     * paragraph added) replaces what it holds: the selection stays when its
-     * blocks are still there, else falls back to where it was in the text,
-     * and the keyboard is told.
+     * the editor itself (a version from elsewhere, the trailing paragraph
+     * added) replaces what it holds: the selection stays when its blocks
+     * are still there, else falls back to where it was in the text.
      */
     internal fun sync(blocks: List<RichBlock>) {
         val current = editing
         if (current != null && current.blocks === blocks || blocks.isEmpty()) return
-        val flat = RichFlat(blocks)
         val selection = when {
             current == null -> firstCaret(blocks)
             current.selection.resolve(blocks) != null -> current.selection
             else -> {
                 val offset = current.flat.offsetOf(current.selection.head) ?: 0
-                RichTyping.caretAt(flat, offset).let { RichSelection(it, it) }
+                RichTyping.caretAt(RichFlat(blocks), offset).let { RichSelection(it, it) }
             }
         }
-        val textChanged = current == null || current.flat.text != flat.text
-        editing = RichEditing(blocks, selection)
-        keyboard?.documentReplaced(requireNotNull(editing), textChanged)
+        adopt(RichEditing(blocks, selection))
+    }
+
+    /** Tiptap's setContent, how the note's undo and redo hand the web's
+     *  editor a document: [blocks] replace all it holds, the selection
+     *  following that replacement to the end of the last line of text. */
+    internal fun setContent(blocks: List<RichBlock>) {
+        val last = blocks.lastOrNull { it.kind.hasText } ?: return
+        adopt(RichEditing(blocks, RichSelection.caret(last.id, last.textLength)))
+    }
+
+    /** [next], from outside the editor, becomes what it holds, and the
+     *  keyboard is told. */
+    private fun adopt(next: RichEditing) {
+        val textChanged = editing?.flat?.text != next.flat.text
+        editing = next
+        keyboard?.documentReplaced(next, textChanged)
     }
 
     /** Keeps [next] as what the editor holds, telling the note when its

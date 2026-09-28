@@ -7,6 +7,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.glasskeep.app.nativeapp.data.ChecklistEntry
 import com.glasskeep.app.nativeapp.data.RichBlock
+import com.glasskeep.app.nativeapp.data.RichDoc
+import java.util.Objects
 
 /**
  * useModalHistory.js, natively: chunk-level undo/redo for the open
@@ -18,12 +20,21 @@ import com.glasskeep.app.nativeapp.data.RichBlock
  * as soon as a new change lands, and colour, tags, images, drawings and
  * audio deliberately left out of the tracked state.
  */
-internal data class NoteSnapshot(
+internal class NoteSnapshot(
     val title: String,
     val body: String,
     val richBlocks: List<RichBlock>?,
     val checklistItems: List<ChecklistEntry>?,
-)
+) {
+    /** The rich body as saved, what the web keeps and compares (its
+     *  mBody): the blocks' ids play no part. */
+    val richContent: String? = richBlocks?.let(RichDoc::encode)
+
+    override fun equals(other: Any?): Boolean = other is NoteSnapshot && title == other.title && body == other.body &&
+        richContent == other.richContent && checklistItems == other.checklistItems
+
+    override fun hashCode(): Int = Objects.hash(title, body, richContent, checklistItems)
+}
 
 internal class NoteHistory {
     private val entries = mutableListOf<NoteSnapshot>()
