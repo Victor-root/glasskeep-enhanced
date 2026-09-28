@@ -231,10 +231,10 @@ fun RichTextEditor(
     val paint = remember(state) { derivedStateOf { RichSelectionPaint.of(state.editing) } }
     val caretAlpha = remember { mutableFloatStateOf(1f) }
     val magnifier = remember { mutableStateOf(Offset.Unspecified) }
-    val actions = rememberRichTextActions(state)
+    val bringIntoView = remember { BringIntoViewRequester() }
+    val actions = rememberRichTextActions(state, bringIntoView)
     val focusManager = LocalFocusManager.current
     val haptics = LocalHapticFeedback.current
-    val bringIntoView = remember { BringIntoViewRequester() }
     val density = LocalDensity.current
     val imeBottom = WindowInsets.ime.getBottom(density)
     val autoScrollDispatcher = remember { NestedScrollDispatcher() }
@@ -928,12 +928,14 @@ private fun RichHandle(
 // ---------- Clipboard, menu and keys ----------
 
 @Composable
-private fun rememberRichTextActions(state: RichEditorState): RichTextActions {
+private fun rememberRichTextActions(state: RichEditorState, bringIntoView: BringIntoViewRequester): RichTextActions {
     val toolbar = LocalTextToolbar.current
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    return remember(state, toolbar, clipboard, scope) { RichTextActions(state, toolbar, clipboard, context, scope) }
+    return remember(state, bringIntoView, toolbar, clipboard, scope) {
+        RichTextActions(state, bringIntoView, toolbar, clipboard, context, scope)
+    }
 }
 
 /**
@@ -943,11 +945,16 @@ private fun rememberRichTextActions(state: RichEditorState): RichTextActions {
  */
 private class RichTextActions(
     private val state: RichEditorState,
+    private val bringIntoView: BringIntoViewRequester,
     private val toolbar: TextToolbar,
     private val clipboard: Clipboard,
     private val context: Context,
     private val scope: CoroutineScope,
 ) {
+    /** Where Up and Down aim while they follow one another, Blink keeping
+     *  the x of the first one, with the selection the last one left. */
+    private var verticalGoal: Pair<RichSelection, Float>? = null
+
     fun showMenu() {
         val editing = state.editing ?: return
         val span = editing.span ?: return
@@ -1010,21 +1017,26 @@ private class RichTextActions(
     }
 
     /**
-     * A key: Backspace, Delete and Enter as the keyboard's own, the arrows
-     * moving the caret a character (Shift extending the selection),
-     * Ctrl+A, C, X and V (with Shift, pasting plain text), and any other
-     * character typed in.
+     * A key: Backspace, Delete and Enter as the keyboard's own, the arrows,
+     * Home and End moving the caret as a browser does (Shift extending the
+     * selection), Ctrl+A, C, X and V (with Shift, pasting plain text), and
+     * any other character typed in.
      */
     fun handleKey(event: KeyEvent): Boolean {
         if (state.editing == null) return false
         if (event.action != KeyEvent.ACTION_DOWN) return event.keyCode in HandledKeys
         val ctrl = event.isCtrlPressed
+        val shift = event.isShiftPressed
         when {
             event.keyCode == KeyEvent.KEYCODE_DEL -> state.ime.backspace()
             event.keyCode == KeyEvent.KEYCODE_FORWARD_DEL -> state.ime.deleteForward()
             event.keyCode == KeyEvent.KEYCODE_ENTER || event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER -> state.ime.enter()
-            event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> state.moveCaret(forward = false, extend = event.isShiftPressed)
-            event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT -> state.moveCaret(forward = true, extend = event.isShiftPressed)
+            event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> moved { state.moveCaret(forward = false, extend = shift) }
+            event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT -> moved { state.moveCaret(forward = true, extend = shift) }
+            event.keyCode == KeyEvent.KEYCODE_DPAD_UP -> moved { moveVertically(down = false, extend = shift) }
+            event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN -> moved { moveVertically(down = true, extend = shift) }
+            event.keyCode == KeyEvent.KEYCODE_MOVE_HOME -> moved { moveToEdge(end = false, document = ctrl, extend = shift) }
+            event.keyCode == KeyEvent.KEYCODE_MOVE_END -> moved { moveToEdge(end = true, document = ctrl, extend = shift) }
             ctrl && event.keyCode == KeyEvent.KEYCODE_A -> state.selectAll()
             ctrl && event.keyCode == KeyEvent.KEYCODE_C -> copy()
             ctrl && event.keyCode == KeyEvent.KEYCODE_X -> cut()
@@ -1038,10 +1050,88 @@ private class RichTextActions(
         return true
     }
 
+    /** [move] done by a key, then the caret brought into sight, as a
+     *  browser scrolls it there. */
+    private fun moved(move: () -> Unit) {
+        move()
+        scope.launch { state.caretRect()?.let { bringIntoView.bringIntoView(it) } }
+    }
+
+    /**
+     * Up, or Down with [down], as Blink moves the caret: onto the line above
+     * or below, through the lines of every block of text, where it lies
+     * nearest the same x; past the first line to its start, past the last
+     * one to its end. A rule on the way, which the web selects whole, is
+     * stepped over to where its next press lands: the end of the text
+     * before it going up, the start of the text after it going down.
+     */
+    private fun moveVertically(down: Boolean, extend: Boolean) {
+        val editing = state.editing ?: return
+        val head = editing.selection.head
+        val index = editing.blocks.indexOfFirst { it.id == head.blockId }
+        val (layout, origin) = state.layouts.placed(head.blockId) ?: return
+        val offset = head.offset.coerceIn(0, layout.layoutInput.text.length)
+        val x = verticalGoal?.takeIf { it.first == editing.selection }?.second
+            ?: (origin.x + layout.getHorizontalPosition(offset, usePrimaryDirection = true))
+        val target = lineAfter(editing.blocks, index, layout.getLineForOffset(offset), down, x) ?: return
+        state.select(if (extend) RichSelection(editing.selection.anchor, target) else RichSelection(target, target))
+        verticalGoal = state.editing?.selection?.let { it to x }
+    }
+
+    /** Where the caret goes from [line] of block [index] one line [down] or
+     *  up, aiming at [x] in the editor's frame. */
+    private fun lineAfter(blocks: List<RichBlock>, index: Int, line: Int, down: Boolean, x: Float): RichPos? {
+        val here = blocks.getOrNull(index) ?: return null
+        val (layout, origin) = state.layouts.placed(here.id) ?: return null
+        val next = if (down) line + 1 else line - 1
+        if (next in 0 until layout.lineCount) return positionOnLine(here, layout, origin, next, x)
+        val step = if (down) 1 else -1
+        var beyond = index + step
+        var ruled = false
+        while (beyond in blocks.indices && !blocks[beyond].kind.hasText) {
+            ruled = true
+            beyond += step
+        }
+        val block = blocks.getOrNull(beyond) ?: return RichPos(here.id, if (down) here.textLength else 0)
+        if (ruled) return RichPos(block.id, if (down) 0 else block.textLength)
+        val (blockLayout, blockOrigin) = state.layouts.placed(block.id) ?: return null
+        return positionOnLine(block, blockLayout, blockOrigin, if (down) 0 else blockLayout.lineCount - 1, x)
+    }
+
+    private fun positionOnLine(block: RichBlock, layout: TextLayoutResult, origin: Offset, line: Int, x: Float): RichPos {
+        val y = (layout.getLineTop(line) + layout.getLineBottom(line)) / 2f
+        return RichPos(block.id, layout.getOffsetForPosition(Offset(x - origin.x, y)).coerceAtMost(block.textLength))
+    }
+
+    /** Home, or End with [end]: the start or end of the caret's line, of the
+     *  whole note with [document] (Ctrl). A line the text wraps after ends
+     *  before the spaces it wraps at, where a tap past it lands too. */
+    private fun moveToEdge(end: Boolean, document: Boolean, extend: Boolean) {
+        val editing = state.editing ?: return
+        val head = editing.selection.head
+        val target = if (document) {
+            val text = editing.blocks.filter { it.kind.hasText }
+            val block = (if (end) text.lastOrNull() else text.firstOrNull()) ?: return
+            RichPos(block.id, if (end) block.textLength else 0)
+        } else {
+            val block = editing.blocks.firstOrNull { it.id == head.blockId } ?: return
+            val layout = state.layouts.layout(block.id) ?: return
+            val line = layout.getLineForOffset(head.offset.coerceIn(0, layout.layoutInput.text.length))
+            val offset = when {
+                !end -> layout.getLineStart(line)
+                line == layout.lineCount - 1 -> block.textLength
+                else -> layout.getLineEnd(line, visibleEnd = true)
+            }
+            RichPos(block.id, offset.coerceAtMost(block.textLength))
+        }
+        state.select(if (extend) RichSelection(editing.selection.anchor, target) else RichSelection(target, target))
+    }
+
     private companion object {
         val HandledKeys = setOf(
             KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_MOVE_HOME, KeyEvent.KEYCODE_MOVE_END,
         )
     }
 }
