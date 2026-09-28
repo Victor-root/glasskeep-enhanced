@@ -27,15 +27,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -46,26 +56,49 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
+import com.glasskeep.app.nativeapp.StatusBarOverride
+import com.glasskeep.app.nativeapp.rememberSystemBarsClaim
+
+/** How far MobileCreateFab.jsx's backdrop is in: it fades in and out over
+ *  200ms ease-out. */
+@Composable
+fun animateCreateNoteVeil(open: Boolean): State<Float> =
+    animateFloatAsState(if (open) 1f else 0f, tween(200, easing = GkEaseOut), label = "createNoteVeil")
 
 /**
- * MobileCreateFab.jsx's backdrop: black at 30%, fading in and out over
- * 200ms ease-out. It is its own layer because the web stacks it under the
- * sticky header (z-30 against z-40): the header stays sharp and undimmed
- * above it. The backdrop's 2px blur is applied by the caller to the page
- * layer underneath, since a blur here would only blur this empty box.
- * Taps are caught by the caller too, header included.
+ * MobileCreateFab.jsx's backdrop, [veil] of the way in: black at 30%,
+ * over what [createNoteBlur] blurs by 2px under it. The web stacks it
+ * under its header (z-30 against z-40); here it covers the header too,
+ * and the system bars dim with it ([CreateNoteSystemBars]). Taps are
+ * caught by the caller.
  */
 @Composable
-fun CreateNoteScrim(open: Boolean) {
-    AnimatedVisibility(
-        visible = open,
-        modifier = Modifier.fillMaxSize(),
-        enter = fadeIn(animationSpec = tween(200, easing = GkEaseOut)),
-        exit = fadeOut(animationSpec = tween(200, easing = GkEaseOut)),
-    ) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
+fun CreateNoteScrim(veil: () -> Float) {
+    Box(Modifier.fillMaxSize().drawBehind { drawRect(createNoteScrimColor(veil())) })
+}
+
+/** The backdrop's 2px blur over this layer, [veil] of the way in. */
+fun Modifier.createNoteBlur(veil: () -> Float): Modifier = graphicsLayer {
+    val radius = cssBlur(2.dp).toPx() * veil()
+    renderEffect = if (radius > 0f) BlurEffect(radius, radius, TileMode.Clamp) else null
+}
+
+/** The system bars under the backdrop, [veil] of the way in: their [base]
+ *  colour with its black laid over it. */
+@Composable
+fun CreateNoteSystemBars(override: StatusBarOverride, base: Color, veil: () -> Float) {
+    val claim = rememberSystemBarsClaim(override)
+    val currentBase by rememberUpdatedState(base)
+    val currentVeil by rememberUpdatedState(veil)
+    LaunchedEffect(claim) {
+        snapshotFlow {
+            val shown = currentVeil()
+            if (shown > 0f) createNoteScrimColor(shown).compositeOver(currentBase).toArgb() else null
+        }.collect { claim.argb = it }
     }
 }
+
+private fun createNoteScrimColor(veil: Float) = Color.Black.copy(alpha = 0.3f * veil)
 
 /**
  * Same bottom-right "speed dial" as MobileCreateFab.jsx: a round "+"

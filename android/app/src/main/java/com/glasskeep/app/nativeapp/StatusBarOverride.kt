@@ -1,8 +1,11 @@
 package com.glasskeep.app.nativeapp
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 
 /**
@@ -33,4 +36,15 @@ class StatusBarOverride {
         /** Null while the screen leaves the bars to the others. */
         var argb: Int? by mutableStateOf(null)
     }
+}
+
+/** A claim in [override] for as long as this is composed. */
+@Composable
+fun rememberSystemBarsClaim(override: StatusBarOverride): StatusBarOverride.Claim {
+    val claim = remember { StatusBarOverride.Claim() }
+    DisposableEffect(override) {
+        override.add(claim)
+        onDispose { override.remove(claim) }
+    }
+    return claim
 }

@@ -872,6 +872,7 @@ fun NativeNotesListScreen(
     // whenever anything was open over the list.
     val pullToRefreshEnabled = !fabOpen && !searchOpen && !headerMenuOpen && !selectionMode &&
         !sidebarOpen && !notificationsOpen && !syncSheetOpen
+    val fabVeil = animateCreateNoteVeil(fabOpen)
 
     Box(
         Modifier
@@ -890,9 +891,7 @@ fun NativeNotesListScreen(
                 },
             ),
     ) {
-        // MobileCreateFab's backdrop-blur-[2px] blurs what lies under its
-        // scrim: the page, not the header drawn above it.
-        Box(Modifier.fillMaxSize().blur(if (fabOpen) cssBlur(2.dp) else 0.dp)) {
+        Box(Modifier.fillMaxSize().createNoteBlur { fabVeil.value }) {
             if (container.shellPrefs.floatingCards) {
                 FloatingCardsBackground(dark = dark, workspace = true)
             }
@@ -1053,8 +1052,6 @@ fun NativeNotesListScreen(
             }
         }
 
-        if (!selectionMode && secondaryView == null) CreateNoteScrim(open = fabOpen)
-
         if (selectionMode) {
             val visibleIds = filteredNotes.mapTo(linkedSetOf()) { it.id }
             val allVisibleSelected = visibleIds.isNotEmpty() && visibleIds.all { it in selectedIds }
@@ -1212,9 +1209,9 @@ fun NativeNotesListScreen(
         }
 
         // The header and the status-bar strip it slides under: above the
-        // page, the create menu's scrim and the dock (z-40 against 30 and 35
-        // on the web), and above the search's tap catcher while searching.
-        Box(Modifier.fillMaxSize().zIndex(if (searchOpen) 2f else 0f)) {
+        // page and the dock (z-40 against 35 on the web), and above the
+        // search's tap catcher while searching.
+        Box(Modifier.fillMaxSize().zIndex(if (searchOpen) 2f else 0f).createNoteBlur { fabVeil.value }) {
             NativeHeader(
                 dark = dark,
                 themeId = themeId,
@@ -1290,6 +1287,9 @@ fun NativeNotesListScreen(
             )
             SwipeRefreshIndicator(pullToRefreshState, pullRefreshing)
         }
+
+        if (!selectionMode && secondaryView == null) CreateNoteScrim { fabVeil.value }
+        CreateNoteSystemBars(container.statusBarOverride, WorkspaceTheme.statusBarColor(themeId, dark)) { fabVeil.value }
 
         if (fabOpen) {
             // The web swallows the next tap anywhere outside the menu, the

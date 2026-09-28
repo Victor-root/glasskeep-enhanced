@@ -62,7 +62,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
@@ -136,7 +135,7 @@ import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NoteExporter
-import com.glasskeep.app.nativeapp.StatusBarOverride
+import com.glasskeep.app.nativeapp.rememberSystemBarsClaim
 import com.glasskeep.app.nativeapp.data.AiClient
 import com.glasskeep.app.nativeapp.data.AiMessage
 import com.glasskeep.app.nativeapp.data.AiNoteDto
@@ -258,11 +257,7 @@ private data class TagCount(val tag: String, val count: Int)
 /** The system bars in [color] for as long as the note is shown. */
 @Composable
 private fun NoteSystemBars(container: NativeAppContainer, color: Color) {
-    val claim = remember { StatusBarOverride.Claim() }
-    DisposableEffect(Unit) {
-        container.statusBarOverride.add(claim)
-        onDispose { container.statusBarOverride.remove(claim) }
-    }
+    val claim = rememberSystemBarsClaim(container.statusBarOverride)
     SideEffect { claim.argb = color.toArgb() }
 }
 
