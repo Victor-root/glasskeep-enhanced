@@ -1,13 +1,18 @@
 package com.glasskeep.app.nativeapp.data
 
+import com.glasskeep.app.nativeapp.data.pm.PmAddMarkStep
+import com.glasskeep.app.nativeapp.data.pm.PmAttrs
 import com.glasskeep.app.nativeapp.data.pm.PmClipboardParser
 import com.glasskeep.app.nativeapp.data.pm.PmDomSerializer
 import com.glasskeep.app.nativeapp.data.pm.PmFragment
+import com.glasskeep.app.nativeapp.data.pm.PmMapping
 import com.glasskeep.app.nativeapp.data.pm.PmMark
 import com.glasskeep.app.nativeapp.data.pm.PmMarkType
 import com.glasskeep.app.nativeapp.data.pm.PmNode
+import com.glasskeep.app.nativeapp.data.pm.PmRemoveMarkStep
 import com.glasskeep.app.nativeapp.data.pm.PmSchema
 import com.glasskeep.app.nativeapp.data.pm.PmSlice
+import com.glasskeep.app.nativeapp.data.pm.PmStep
 import com.glasskeep.app.nativeapp.data.pm.PmTransform
 import com.glasskeep.app.nativeapp.data.pm.pmTextNear
 import kotlinx.serialization.json.JsonArray
@@ -44,12 +49,17 @@ object RichPaste {
         val caret = if (plainMode && text.isNotEmpty()) {
             replaceSelection(tr, from, to, PmClipboardParser.plainTextSlice(text))
         } else {
-            val slice = PmClipboardParser.parse(text, html, asPlainText, tree.doc.resolve(from)) ?: return null
+            val slice = PmClipboardParser.parse(text, html, asPlainText, tree.doc.resolve(from))
+            if (from != to) {
+                val backward = state.selection.head == RichPos(state.blocks[span.start].id, span.startOffset)
+                linkSelection(state.blocks, tree.doc, if (backward) to else from, if (backward) from else to, slice)?.let { return it }
+            }
+            if (slice == null) return null
             val single = slice.content.firstChild.takeIf { slice.openStart == 0 && slice.openEnd == 0 && slice.content.childCount == 1 }
             if (single != null) replaceWith(tr, from, to, single) else replaceSelection(tr, from, to, slice)
         } ?: return null
-        val (doc, finalCaret) = afterPaste(tree.doc, tr.doc, caret, pasteRules = html?.contains("data-pm-slice") != true)
-        return toEditing(state.blocks, doc, finalCaret)
+        val result = appended(tree.doc, tr, pasteRules = html?.contains("data-pm-slice") != true, anchor = caret, head = caret)
+        return toEditing(state.blocks, result)
     }
 
     /** The text/html the web puts on the clipboard for [span] of [blocks]. */
@@ -119,55 +129,96 @@ object RichPaste {
 
     // ---------- What follows a paste ----------
 
-    /** A markdown paste rule: markPasteRule() with [find]. */
-    private class MarkRule(pattern: String, val type: PmMarkType) {
-        val find = Regex(pattern.replace("\\s", JsSpace))
+    /** A paste rule's match in a textblock's text: where it starts, the
+     *  whole match, the part that takes the mark and the mark's attributes. */
+    private class Match(val index: Int, val full: String, val captured: String, val attrs: PmAttrs? = null)
+
+    /** markPasteRule() with [find], adding [type] ([rich] in the blocks). */
+    private class MarkRule(val type: PmMarkType, val rich: RichMarkType, val find: (String) -> List<Match>)
+
+    /** A markdown paste rule, its pattern in JavaScript's syntax. */
+    private fun regexRule(pattern: String, type: PmMarkType, rich: RichMarkType): MarkRule {
+        val regex = Regex(pattern.replace("\\s", JsSpace))
+        return MarkRule(type, rich) { text -> regex.findAll(text).map { Match(it.range.first, it.value, it.groupValues.last()) }.toList() }
     }
 
-    /** JavaScript's \s. */
-    private const val JsSpace = "[\\t\\n\\u000b\\u000c\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+    private const val JsSpace = "[${RichDoc.JsSpace}]"
     private val JsSpaceChar = Regex(JsSpace)
 
-    private val Highlight = MarkRule("(?:^|\\s)(==(?!\\s+==)((?:[^=]+))==(?!\\s+==))", PmSchema.highlight)
-    private val Strike = MarkRule("(?:^|\\s)(~~(?!\\s+~~)((?:[^~]+))~~(?!\\s+~~))", PmSchema.strike)
-    private val ItalicStar = MarkRule("(?:^|\\s)(\\*(?!\\s+\\*)((?:[^*]+))\\*(?!\\s+\\*))", PmSchema.italic)
-    private val ItalicUnderscore = MarkRule("(?:^|\\s)(_(?!\\s+_)((?:[^_]+))_(?!\\s+_))", PmSchema.italic)
-    private val Code = MarkRule("(^|[^`])`([^`]+)`(?!`)", PmSchema.code)
-    private val BoldStar = MarkRule("(?:^|\\s)(\\*\\*(?!\\s+\\*\\*)((?:[^*]+))\\*\\*(?!\\s+\\*\\*))", PmSchema.bold)
-    private val BoldUnderscore = MarkRule("(?:^|\\s)(__(?!\\s+__)((?:[^_]+))__(?!\\s+__))", PmSchema.bold)
+    /** The Link extension's paste rule: each address linkify finds. */
+    private val LinkRule = MarkRule(PmSchema.link, RichMarkType.LINK) { text ->
+        RichLinks.pasteRuleLinks(text).map {
+            val value = text.substring(it.start, it.end)
+            Match(it.start, value, value, mapOf("href" to it.href))
+        }
+    }
+    private val Highlight = regexRule("(?:^|\\s)(==(?!\\s+==)((?:[^=]+))==(?!\\s+==))", PmSchema.highlight, RichMarkType.HIGHLIGHT)
+    private val Strike = regexRule("(?:^|\\s)(~~(?!\\s+~~)((?:[^~]+))~~(?!\\s+~~))", PmSchema.strike, RichMarkType.STRIKE)
+    private val ItalicStar = regexRule("(?:^|\\s)(\\*(?!\\s+\\*)((?:[^*]+))\\*(?!\\s+\\*))", PmSchema.italic, RichMarkType.ITALIC)
+    private val ItalicUnderscore = regexRule("(?:^|\\s)(_(?!\\s+_)((?:[^_]+))_(?!\\s+_))", PmSchema.italic, RichMarkType.ITALIC)
+    private val Code = regexRule("(^|[^`])`([^`]+)`(?!`)", PmSchema.code, RichMarkType.CODE)
+    private val BoldStar = regexRule("(?:^|\\s)(\\*\\*(?!\\s+\\*\\*)((?:[^*]+))\\*\\*(?!\\s+\\*\\*))", PmSchema.bold, RichMarkType.BOLD)
+    private val BoldUnderscore = regexRule("(?:^|\\s)(__(?!\\s+__)((?:[^_]+))__(?!\\s+__))", PmSchema.bold, RichMarkType.BOLD)
+
+    /** A document after a paste, its selection, and the mark typing no
+     *  longer carries on from the caret (the stored marks a rule left). */
+    private class Pasted(val doc: PmNode, val anchor: Int, val head: Int, val disarmed: RichMarkType?)
 
     /**
-     * The transactions the web's plugins append to a paste, in the order
-     * Tiptap lists them: the highlight paste rule, TrailingNode, then the
-     * strike, italic, code and bold paste rules. Paste rules skip a paste
-     * of the web's own markup, as they do there. Each sees the document
-     * as the ones before it left it, and the caret follows their changes.
+     * The transactions the web's plugins append to [tr], in the order
+     * Tiptap lists them: the link paste rule, autolink, the highlight paste
+     * rule, TrailingNode, then the strike, italic, code and bold paste
+     * rules, and autolink once more over what those did. Paste rules run
+     * on a paste only ([pasteRules]), never on the web's own markup, as
+     * there. Each sees the document the ones before it left, and the
+     * selection follows their changes.
      */
-    private fun afterPaste(original: PmNode, pasted: PmNode, caret: Int, pasteRules: Boolean): Pair<PmNode, Int> {
-        var doc = pasted
-        var position = caret
-        fun adopt(tr: PmTransform?) {
-            if (tr == null) return
-            doc = tr.doc
-            position = tr.mapping.map(position)
-            val resolved = doc.resolve(position)
-            if (!resolved.parent.inlineContent) position = pmTextNear(resolved, 1)
+    private fun appended(original: PmNode, tr: PmTransform, pasteRules: Boolean, anchor: Int, head: Int): Pasted {
+        var doc = tr.doc
+        var anchorAt = anchor
+        var headAt = head
+        var disarmed: RichMarkType? = null
+        val steps = tr.steps.toMutableList()
+        fun adopt(next: PmTransform?, stored: RichMarkType? = null) {
+            if (next == null) return
+            doc = next.doc
+            val mapping = next.mapping
+            val rHead = doc.resolve(mapping.map(headAt))
+            if (rHead.parent.inlineContent) {
+                val rAnchor = doc.resolve(mapping.map(anchorAt))
+                anchorAt = if (rAnchor.parent.inlineContent) rAnchor.pos else rHead.pos
+                headAt = rHead.pos
+            } else {
+                headAt = pmTextNear(rHead, 1)
+                anchorAt = headAt
+            }
+            disarmed = stored
+            steps += next.steps
         }
-        if (pasteRules) adopt(markRule(original, doc, Highlight))
+        fun rule(rule: MarkRule) {
+            if (!pasteRules) return
+            val (next, stored) = markRule(original, doc, rule) ?: return
+            adopt(next, stored)
+        }
+        rule(LinkRule)
+        adopt(autolink(original, doc, steps.toList()))
+        val linkedDoc = doc
+        val linkedSteps = steps.size
+        rule(Highlight)
         if (doc.lastChild?.type !== PmSchema.paragraph) {
             val end = doc.content.size
             adopt(PmTransform(doc).replace(end, end, PmSlice(PmFragment.from(PmSchema.paragraph.create()), 0, 0)))
         }
-        if (pasteRules) {
-            for (rule in listOf(Strike, ItalicStar, ItalicUnderscore, Code, BoldStar, BoldUnderscore)) adopt(markRule(original, doc, rule))
-        }
-        return doc to position
+        for (markdown in listOf(Strike, ItalicStar, ItalicUnderscore, Code, BoldStar, BoldUnderscore)) rule(markdown)
+        adopt(autolink(linkedDoc, doc, steps.subList(linkedSteps, steps.size).toList()))
+        return Pasted(doc, anchorAt, headAt, disarmed)
     }
 
-    /** One paste rule over what changed since [original]; null when it
-     *  changes nothing, or when one of its matches is refused (the whole
-     *  rule is then dropped, as on the web). */
-    private fun markRule(original: PmNode, doc: PmNode, rule: MarkRule): PmTransform? {
+    /** One paste rule over what changed since [original]: its transaction
+     *  and the mark it leaves off what is typed next, or null when it
+     *  changes nothing or one of its matches is refused (the whole rule is
+     *  then dropped, as on the web). */
+    private fun markRule(original: PmNode, doc: PmNode, rule: MarkRule): Pair<PmTransform, RichMarkType?>? {
         val diffStart = original.content.findDiffStart(doc.content) ?: return null
         val diffEnd = original.content.findDiffEnd(doc.content)?.second ?: return null
         if (diffStart == diffEnd) return null
@@ -175,38 +226,41 @@ object RichPaste {
         val to = diffEnd - 1
         val tr = PmTransform(doc)
         var refused = false
+        var disarmed: RichMarkType? = null
         doc.nodesBetween(from, to, { node, pos, _, _ ->
             if (node.type.code || !(node.isText || node.isTextblock || node.isInline)) return@nodesBetween true
             val resolvedFrom = maxOf(from, pos)
             val resolvedTo = minOf(to, pos + node.content.size)
             if (resolvedFrom >= resolvedTo) return@nodesBetween true
             val text = node.textBetween(resolvedFrom - pos, resolvedTo - pos, null, "￼")
-            for (match in rule.find.findAll(text)) {
-                val start = resolvedFrom + match.range.first + 1
-                val end = start + match.value.length
-                if (!markMatch(doc, tr, tr.mapping.map(start), tr.mapping.map(end), match, rule.type)) refused = true
+            for (match in rule.find(text)) {
+                val start = resolvedFrom + match.index + 1
+                val end = start + match.full.length
+                val stepsBefore = tr.steps.size
+                if (!markMatch(tr, tr.mapping.map(start), tr.mapping.map(end), match, rule.type)) refused = true
+                if (tr.steps.size > stepsBefore) disarmed = null
+                // removeStoredMark() unless the match ends the text.
+                if (match.captured.isNotEmpty() && match.index + match.full.length < text.length) disarmed = rule.rich
             }
             true
         })
-        return if (refused || tr.steps.isEmpty()) null else tr
+        return if (refused || tr.steps.isEmpty()) null else tr to disarmed
     }
 
     /** markPasteRule()'s handler: the markers around the text go, the text
      *  takes the mark. False when a mark there excludes it (inline code). */
-    private fun markMatch(doc: PmNode, tr: PmTransform, from: Int, to: Int, match: MatchResult, type: PmMarkType): Boolean {
-        val captureGroup = match.groupValues.last()
-        if (captureGroup.isEmpty()) return true
-        val fullMatch = match.value
-        val startSpaces = fullMatch.indexOfFirst { !JsSpaceChar.matches(it.toString()) }
-        val textStart = from + fullMatch.indexOf(captureGroup)
-        val textEnd = textStart + captureGroup.length
-        val excluded = marksBetween(doc, from, to).any { (mark, markTo) ->
+    private fun markMatch(tr: PmTransform, from: Int, to: Int, match: Match, type: PmMarkType): Boolean {
+        if (match.captured.isEmpty()) return true
+        val startSpaces = match.full.indexOfFirst { !JsSpaceChar.matches(it.toString()) }
+        val textStart = from + match.full.indexOf(match.captured)
+        val textEnd = textStart + match.captured.length
+        val excluded = marksBetween(tr.doc, from, to).any { (mark, markTo) ->
             mark.type.excluded.any { it === type && it !== mark.type } && markTo > textStart
         }
         if (excluded) return false
         if (textEnd < to) tr.delete(textEnd, to)
         if (textStart > from) tr.delete(from + startSpaces, textStart)
-        tr.addMark(from + startSpaces, from + startSpaces + captureGroup.length, type.create())
+        tr.addMark(from + startSpaces, from + startSpaces + match.captured.length, type.create(match.attrs))
         return true
     }
 
@@ -221,16 +275,142 @@ object RichPaste {
         return marks
     }
 
+    /** A range [steps] changed, before and after them (getChangedRanges). */
+    private data class Change(val oldFrom: Int, val oldTo: Int, val newFrom: Int, val newTo: Int)
+
+    /** getChangedRanges(): what each step changed, as it stands once all
+     *  have run, every range once and none another one holds. A mark step
+     *  changed the range it marked. */
+    private fun changedRanges(steps: List<PmStep>): List<Change> {
+        val maps = steps.map { it.getMap() }
+        val mapping = PmMapping(maps)
+        val inverse = mapping.invert()
+        val changes = mutableListOf<Change>()
+        maps.forEachIndexed { index, map ->
+            val ranges = mutableListOf<Pair<Int, Int>>()
+            if (map.ranges.isEmpty()) {
+                when (val step = steps[index]) {
+                    is PmAddMarkStep -> ranges += step.from to step.to
+                    is PmRemoveMarkStep -> ranges += step.from to step.to
+                    else -> return@forEachIndexed
+                }
+            } else {
+                map.forEach { oldStart, oldEnd, _, _ -> ranges += oldStart to oldEnd }
+            }
+            val after = mapping.slice(index)
+            for ((from, to) in ranges) {
+                val newStart = after.map(from, -1)
+                val newEnd = after.map(to)
+                changes += Change(inverse.map(newStart, -1), inverse.map(newEnd), newStart, newEnd)
+            }
+        }
+        val unique = changes.distinct()
+        if (unique.size == 1) return unique
+        return unique.filterIndexed { index, change ->
+            unique.indices.none { other ->
+                other != index && unique[other].let {
+                    change.oldFrom >= it.oldFrom && change.oldTo <= it.oldTo && change.newFrom >= it.newFrom && change.newTo <= it.newTo
+                }
+            }
+        }
+    }
+
+    /**
+     * The Link extension's autolink after [steps] took [oldDoc] to [doc]:
+     * in each range they changed, the last word of the first textblock when
+     * the range spans several, or the last word before the range's end when
+     * the range ends with whitespace, becomes a link when linkify finds an
+     * address there ([RichLinks.lastWordLinks]) not in inline code nor
+     * already in a link. Null when nothing is linked.
+     */
+    private fun autolink(oldDoc: PmNode, doc: PmNode, steps: List<PmStep>): PmTransform? {
+        if (steps.isEmpty() || oldDoc.eq(doc)) return null
+        val tr = PmTransform(doc)
+        for (change in changedRanges(steps)) {
+            val textblocks = mutableListOf<Pair<PmNode, Int>>()
+            doc.nodesBetween(change.newFrom, change.newTo, { node, pos, _, _ ->
+                if (node.isTextblock) textblocks += node to pos
+                true
+            })
+            val (block, pos) = textblocks.firstOrNull() ?: continue
+            val text = if (textblocks.size > 1) {
+                doc.textBetween(pos, pos + block.nodeSize, null, " ")
+            } else {
+                if (!RichLinks.endsWithWhitespace(doc.textBetween(change.newFrom, change.newTo, " ", " "))) continue
+                doc.textBetween(pos, change.newTo, null, " ")
+            }
+            for (link in RichLinks.lastWordLinks(text)) {
+                val from = pos + link.start + 1
+                val to = pos + link.end + 1
+                if (doc.rangeHasMark(from, to, PmSchema.code)) continue
+                if (marksBetween(doc, from, to).any { it.first.type === PmSchema.link }) continue
+                tr.addMark(from, to, PmSchema.link.create(mapOf("href" to link.href)))
+            }
+        }
+        return tr.takeIf { it.steps.isNotEmpty() }
+    }
+
+    /**
+     * handlePasteLink: over a selection, a clipboard whose text is one
+     * address and nothing else links the selection there (setMark()) rather
+     * than replacing it, when something selected can take a link. The
+     * selection stays. Null when that does not apply.
+     */
+    private fun linkSelection(old: List<RichBlock>, doc: PmNode, anchor: Int, head: Int, slice: PmSlice?): RichEditing? {
+        val content = slice?.content ?: PmFragment.Empty
+        val href = RichLinks.wholeLink((0 until content.childCount).joinToString("") { content.child(it).textContent }) ?: return null
+        val from = minOf(anchor, head)
+        val to = maxOf(anchor, head)
+        if (!canSetMark(doc, from, to, PmSchema.link)) return null
+        val tr = PmTransform(doc)
+        val attrs = mapOf("href" to href)
+        doc.nodesBetween(from, to, { node, pos, _, _ ->
+            val trimmedFrom = maxOf(pos, from)
+            val trimmedTo = minOf(pos + node.nodeSize, to)
+            val links = node.marks.filter { it.type === PmSchema.link }
+            if (links.isEmpty()) {
+                tr.addMark(trimmedFrom, trimmedTo, PmSchema.link.create(attrs))
+            } else {
+                for (link in links) tr.addMark(trimmedFrom, trimmedTo, PmSchema.link.create(link.attrs + attrs))
+            }
+            true
+        })
+        return toEditing(old, appended(doc, tr, pasteRules = false, anchor = anchor, head = head))
+    }
+
+    /** canSetMark() over a selection: some inline node in it sits where
+     *  [type] is allowed, among marks that do not exclude it. */
+    private fun canSetMark(doc: PmNode, from: Int, to: Int, type: PmMarkType): Boolean {
+        var supported = false
+        doc.nodesBetween(from, to, { node, _, parent, _ ->
+            if (supported) return@nodesBetween false
+            if (node.isInline) {
+                val parentAllows = parent == null || parent.type.allowsMarkType(type)
+                val marksAllow = node.marks.any { it.type === type } || node.marks.none { it.type.excludes(type) }
+                supported = parentAllows && marksAllow
+            }
+            !supported
+        })
+        return supported
+    }
+
     // ---------- Back to blocks ----------
 
-    /** [doc] as blocks, the caret at [caret]; blocks left as they were keep
-     *  their ids and what they carry beyond the document. */
-    private fun toEditing(old: List<RichBlock>, doc: PmNode, caret: Int): RichEditing? {
-        val starts = blockStarts(doc)
-        val index = starts.indexOfLast { it <= caret }
-        val parsed = RichDoc.parseDocJson(flatModel(doc.toJson(), inItem = false).single()) ?: return null
+    /** A paste's result as blocks: blocks left as they were keep their ids
+     *  and what they carry beyond the document. */
+    private fun toEditing(old: List<RichBlock>, pasted: Pasted): RichEditing? {
+        val starts = blockStarts(pasted.doc)
+        val parsed = RichDoc.parseDocJson(flatModel(pasted.doc.toJson()).single()) ?: return null
         val blocks = keepUnchanged(old, parsed)
-        return RichEditing(blocks, RichSelection.caret(blocks[index].id, caret - starts[index]))
+        fun at(position: Int): RichPos {
+            val index = starts.indexOfLast { it <= position }
+            return RichPos(blocks[index].id, position - starts[index])
+        }
+        return RichEditing(
+            blocks,
+            RichSelection(at(pasted.anchor), at(pasted.head)),
+            pendingMarks = pasted.disarmed?.let { listOf(PendingMark(it, remove = true)) }.orEmpty(),
+        )
     }
 
     /** A quote inside a list item gives its blocks to the item; an ordered

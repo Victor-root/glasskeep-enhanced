@@ -8,16 +8,20 @@ package com.glasskeep.app.nativeapp.data.pm
  * out, and no mapping here is ever mirrored.
  */
 
-/** How a step moves positions: `[start, oldSize, newSize]` triples. */
-internal class PmStepMap(val ranges: IntArray) {
+/** How a step moves positions: `[start, oldSize, newSize]` triples, read
+ *  the other way round when [inverted]. */
+internal class PmStepMap(val ranges: IntArray, private val inverted: Boolean = false) {
+    private val oldIndex = if (inverted) 2 else 1
+    private val newIndex = if (inverted) 1 else 2
+
     fun map(pos: Int, assoc: Int = 1): Int {
         var diff = 0
         var i = 0
         while (i < ranges.size) {
-            val start = ranges[i]
+            val start = ranges[i] - if (inverted) diff else 0
             if (start > pos) break
-            val oldSize = ranges[i + 1]
-            val newSize = ranges[i + 2]
+            val oldSize = ranges[i + oldIndex]
+            val newSize = ranges[i + newIndex]
             val end = start + oldSize
             if (pos <= end) {
                 val side = if (oldSize == 0) assoc else if (pos == start) -1 else if (pos == end) 1 else assoc
@@ -34,13 +38,17 @@ internal class PmStepMap(val ranges: IntArray) {
         var i = 0
         while (i < ranges.size) {
             val start = ranges[i]
-            val oldSize = ranges[i + 1]
-            val newSize = ranges[i + 2]
-            f(start, start + oldSize, start + diff, start + diff + newSize)
+            val oldStart = start - if (inverted) diff else 0
+            val newStart = start + if (inverted) 0 else diff
+            val oldSize = ranges[i + oldIndex]
+            val newSize = ranges[i + newIndex]
+            f(oldStart, oldStart + oldSize, newStart, newStart + newSize)
             diff += newSize - oldSize
             i += 3
         }
     }
+
+    fun invert() = PmStepMap(ranges, !inverted)
 
     companion object {
         val Empty = PmStepMap(IntArray(0))
@@ -49,6 +57,11 @@ internal class PmStepMap(val ranges: IntArray) {
 
 internal class PmMapping(private val maps: List<PmStepMap>) {
     fun map(pos: Int, assoc: Int = 1): Int = maps.fold(pos) { p, map -> map.map(p, assoc) }
+
+    /** The maps from [from] on. */
+    fun slice(from: Int) = PmMapping(maps.subList(from, maps.size))
+
+    fun invert() = PmMapping(maps.asReversed().map { it.invert() })
 }
 
 internal sealed class PmStep {

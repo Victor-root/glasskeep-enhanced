@@ -16,10 +16,11 @@ import org.junit.Test
 
 /**
  * Pastes and copies recorded in the web editor (rich-paste/web-*.json).
- * A paste: the note, the selection, the clipboard, and what the web left;
- * replayed here, it must leave the same blocks with the caret in the same
- * place. A copy: the note, the selection, and the clipboard's markup and
- * text, which the app's copy must match.
+ * A paste: the note, the selection (anchor then head), the clipboard, and
+ * what the web left; replayed here, it must leave the same blocks, the same
+ * selection and, at a caret, the same marks for what is typed next. A copy:
+ * the note, the selection, and the clipboard's markup and text, which the
+ * app's copy must match.
  */
 class RichPasteCorpusTest {
     private class Case(json: JsonObject, val plain: Boolean) {
@@ -31,7 +32,9 @@ class RichPasteCorpusTest {
         val text = json.getValue("text").jsonPrimitive.content
         val shift = (json["shift"] as? JsonPrimitive)?.booleanOrNull ?: false
         val expected = json.getValue("expected").jsonObject
+        val anchor: Pair<Int, Int> = position(json.getValue("anchor"))
         val head: Pair<Int, Int> = position(json.getValue("head"))
+        val typing = (json["typing"] as? JsonArray)?.map { it.jsonPrimitive.content }?.sorted()
 
         private fun position(value: JsonElement): Pair<Int, Int> = value.jsonArray.let { it[0].jsonPrimitive.int to it[1].jsonPrimitive.int }
     }
@@ -64,7 +67,8 @@ class RichPasteCorpusTest {
 
     @Test
     fun pastesAsTheWebEditorDoes() {
-        val cases = load("rich-paste/web-rich.json", plain = false) + load("rich-paste/web-plain.json", plain = true)
+        val cases = load("rich-paste/web-rich.json", plain = false) + load("rich-paste/web-plain.json", plain = true) +
+            load("rich-paste/web-links.json", plain = false) + load("rich-paste/web-links-plain.json", plain = true)
         val failures = mutableListOf<String>()
         var checked = 0
         for (case in cases) {
@@ -84,10 +88,13 @@ class RichPasteCorpusTest {
                 ?: error("${case.name}: the web's result does not parse")
             val got = show(result.blocks)
             val want = show(expected)
-            val head = result.selection.head
-            val caret = result.blocks.indexOfFirst { it.id == head.blockId } to head.offset
-            if (got != want || caret != case.head) {
-                failures += "${case.name}\n--- web (caret ${case.head}):\n$want\n--- app (caret $caret):\n$got"
+            fun at(pos: RichPos) = result.blocks.indexOfFirst { it.id == pos.blockId } to pos.offset
+            val anchor = at(result.selection.anchor)
+            val head = at(result.selection.head)
+            val typing = if (result.selection.collapsed) typingMarks(result) else null
+            if (got != want || anchor != case.anchor || head != case.head || typing != case.typing) {
+                failures += "${case.name}\n--- web (${case.anchor}..${case.head}, typing ${case.typing}):\n$want\n" +
+                    "--- app ($anchor..$head, typing $typing):\n$got"
             }
             checked++
         }
@@ -95,6 +102,18 @@ class RichPasteCorpusTest {
             System.err.println("${failures.size} of $checked differ:\n" + failures.joinToString("\n\n"))
         }
         assertEquals(emptyList<String>(), failures.map { it.lineSequence().first() })
+    }
+
+    /** The web's names of the marks what is typed at the caret takes. */
+    private fun typingMarks(state: RichEditing): List<String> {
+        val head = state.selection.head
+        val block = state.blocks.first { it.id == head.blockId }
+        return RichTyping.typingMarks(block, head.offset, state.pendingMarks).map {
+            when (it.type) {
+                RichMarkType.TEXT_COLOR, RichMarkType.FONT_FAMILY, RichMarkType.FONT_SIZE -> "textStyle"
+                else -> it.type.name.lowercase()
+            }
+        }.distinct().sorted()
     }
 
     /** The web's text walker glues a task list's items on one line; the app

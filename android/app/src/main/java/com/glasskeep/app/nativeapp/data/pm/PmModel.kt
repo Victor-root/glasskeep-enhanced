@@ -530,6 +530,21 @@ internal open class PmNode(val type: PmNodeType, val attrs: PmAttrs, val content
     open fun textBetween(from: Int, to: Int, blockSeparator: String? = null, leafText: String? = null) =
         content.textBetween(from, to, blockSeparator, leafText)
 
+    /** The node's text, its blocks run together. */
+    open val textContent: String get() = textBetween(0, content.size, "")
+
+    /** Whether a node in `[from, to)` carries a mark of [type]. */
+    fun rangeHasMark(from: Int, to: Int, type: PmMarkType): Boolean {
+        var found = false
+        if (to > from) {
+            nodesBetween(from, to, { node, _, _, _ ->
+                if (node.marks.any { it.type === type }) found = true
+                !found
+            })
+        }
+        return found
+    }
+
     open fun eq(other: PmNode): Boolean = this === other || (sameMarkup(other) && content.eq(other.content))
 
     fun sameMarkup(other: PmNode) = hasMarkup(other.type, other.attrs, other.marks)
@@ -606,6 +621,8 @@ internal class PmTextNode(type: PmNodeType, override val text: String, marks: Li
     override val nodeSize get() = text.length
 
     override fun textBetween(from: Int, to: Int, blockSeparator: String?, leafText: String?) = text.substring(from, to)
+
+    override val textContent get() = text
 
     override fun mark(marks: List<PmMark>): PmNode = if (marks === this.marks) this else PmTextNode(type, text, marks)
 
