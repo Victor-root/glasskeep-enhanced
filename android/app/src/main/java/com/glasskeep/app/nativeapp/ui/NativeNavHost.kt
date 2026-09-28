@@ -12,6 +12,7 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.EaseIn
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -41,11 +42,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -389,11 +392,14 @@ fun NativeNavHost(
         }
     }
     // Signing out, or a session the server refused: the sign-in screen,
-    // with nothing of the session's own screens left behind it.
-    fun goToSignIn() {
-        realtimeClient.stop()
-        navController.navigate("login") {
-            popUpTo(navController.graph.id) { inclusive = true }
+    // with nothing of the session's own screens left behind it. Remembered,
+    // so the notes list it is handed to stays skippable.
+    val goToSignIn: () -> Unit = remember(realtimeClient, navController) {
+        {
+            realtimeClient.stop()
+            navController.navigate("login") {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
         }
     }
     LaunchedEffect(unlockedIntoForcedPasswordChange) {
@@ -480,7 +486,6 @@ fun NativeNavHost(
     fun onNoteUnarchived() {
         if (notesView == SidebarArchived) notesView = null
     }
-    val noteCardsShown = remember(signedIn) { NoteCardsShown() }
     // api.js's auth-expired (App.jsx's cleanupClientSession, which keeps
     // the queue): back to sign-in from wherever the app is, over nothing
     // the session opened, the cached notes dropped. Waits for the screens
@@ -610,6 +615,32 @@ fun NativeNavHost(
                     )
                 }
             } else {
+            // The notes list stays composed under a note, side by side and
+            // the side panels, as the web keeps its list mounted under its
+            // modals and panels: coming back rebuilds nothing. The NavHost
+            // draws them over it, its own "notes" destination empty.
+            if (route == "notes" || route in ListOverlayRoutes) {
+                // Out of the accessibility tree while covered, as it is out of sight.
+                Box(Modifier.fillMaxSize().then(if (route != "notes") Modifier.clearAndSetSemantics {} else Modifier)) {
+                    NativeNotesListScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        activeTagFilter = notesView,
+                        onActiveTagFilterChange = { notesView = it },
+                        onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
+                        onOpenNewNote = { noteId -> navController.navigate("notes/$noteId?new=true") },
+                        onOpenSettings = { navController.navigate("settings") },
+                        onOpenAdmin = { navController.navigate("admin") },
+                        onOpenQrScanner = { qrScannerOpen = true },
+                        onOpenSideBySide = { first, second -> navController.navigate("compare/$first/$second") },
+                        pendingNewNoteType = pendingNewNoteType,
+                        onPendingNewNoteTypeConsumed = onPendingNewNoteTypeConsumed,
+                        onSignedOut = goToSignIn,
+                        covered = { currentEntry?.destination?.route != "notes" },
+                    )
+                    ListCover(route)
+                }
+            }
             NavHost(navController = navController, startDestination = startDestination) {
                 // The signed-out screens are hash routes on the web: they swap
                 // instantly, with none of NavHost's default cross-fade.
@@ -661,79 +692,24 @@ fun NativeNavHost(
                         )
                     }
                 }
-                // Under the settings and admin panels the notes list neither
-                // fades nor moves: it sits behind the web's instant
-                // bg-black/50 scrim while the panel slides in, and is simply
-                // there again, with no scrim, the moment the panel starts
-                // sliding out (SettingsPanel.jsx:286-295, AdminPanel.jsx:477).
-                // An open note leaves it in place too, under the web's
-                // `scrimFadeIn` 50% black (200ms in, 180ms out).
+                // The list itself is drawn under the NavHost (above); what
+                // opens over it animates alone, and signing in or out swaps
+                // the page at once, like the web's hash route.
                 composable(
                     route = "notes",
-                    // Signing in swaps the page at once, like the web's hash route.
-                    enterTransition = {
-                        if (initialState.destination.route in SignedOutRoutes) EnterTransition.None else null
-                    },
-                    exitTransition = {
-                        if (targetState.destination.route in ListOverlayRoutes) ExitTransition.KeepUntilTransitionsFinished else null
-                    },
-                    popEnterTransition = {
-                        if (initialState.destination.route in ListOverlayRoutes) EnterTransition.None else null
-                    },
-                ) {
-                    val nextRoute = navController.currentBackStackEntryAsState().value?.destination?.route
-                    val coveredByPanel = transition.targetState == EnterExitState.PostExit && nextRoute in SidePanelRoutes
-                    // Which overlay last covered the list, kept after it pops
-                    // so its scrim can fade back out.
-                    var coveringRoute by remember { mutableStateOf<String?>(null) }
-                    LaunchedEffect(nextRoute) {
-                        if (nextRoute != null && nextRoute != "notes") coveringRoute = nextRoute
-                    }
-                    val noteScrim by transition.animateFloat(
-                        transitionSpec = {
-                            if (targetState == EnterExitState.PostExit) tween(200, easing = EaseOut) else tween(180, easing = EaseIn)
-                        },
-                        label = "noteScrim",
-                    ) { state ->
-                        if (state != EnterExitState.Visible && coveringRoute == NoteRoute) 0.5f else 0f
-                    }
-                    Box {
-                        NativeNotesListScreen(
-                            container = container,
-                            serverUrl = serverUrl,
-                            activeTagFilter = notesView,
-                            onActiveTagFilterChange = { notesView = it },
-                            onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
-                            onOpenNewNote = { noteId -> navController.navigate("notes/$noteId?new=true") },
-                            onOpenSettings = { navController.navigate("settings") },
-                            onOpenAdmin = { navController.navigate("admin") },
-                            onOpenQrScanner = { qrScannerOpen = true },
-                            onOpenSideBySide = { first, second -> navController.navigate("compare/$first/$second") },
-                            pendingNewNoteType = pendingNewNoteType,
-                            onPendingNewNoteTypeConsumed = onPendingNewNoteTypeConsumed,
-                            cardsShown = noteCardsShown,
-                            onSignedOut = ::goToSignIn,
-                        )
-                        if (coveredByPanel) {
-                            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f)))
-                        }
-                        if (noteScrim > 0f) {
-                            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = noteScrim)))
-                        }
-                    }
-                }
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None },
+                    popExitTransition = { ExitTransition.None },
+                ) {}
                 // The web's settings panel, a full-width sheet sliding in from
                 // the right.
                 composable(
                     route = "settings",
                     enterTransition = { SidePanelEnter },
-                    // Handing over to the admin panel, this one stays put
-                    // until the other has slid over it: the web slides it out
-                    // underneath, over the notes list, which is not composed
-                    // here at that moment.
-                    exitTransition = {
-                        if (targetState.destination.route == AdminRoute) ExitTransition.KeepUntilTransitionsFinished else null
-                    },
+                    // Handing over to the admin panel, it slides out under
+                    // the one sliding in, over the notes list, as on the web.
+                    exitTransition = { SidePanelExit },
                     popExitTransition = { SidePanelExit },
                 ) {
                     SettingsScreen(
@@ -864,6 +840,33 @@ fun NativeNavHost(
             )
         }
     }
+}
+
+/**
+ * Over the notes list, under what covers it: the web's instant
+ * bg-black/50 behind a side panel, gone the moment it starts sliding out
+ * (SettingsPanel.jsx:286-295, AdminPanel.jsx:477), and a note's
+ * `scrimFadeIn` 50% black, 200ms in and 180ms out. While anything covers
+ * the list, it takes the touches that would reach it.
+ */
+@Composable
+private fun ListCover(route: String) {
+    val noteOpen = route == NoteRoute
+    val noteScrim by animateFloatAsState(
+        targetValue = if (noteOpen) 0.5f else 0f,
+        animationSpec = if (noteOpen) tween(200, easing = EaseOut) else tween(180, easing = EaseIn),
+        label = "noteScrim",
+    )
+    val panel = route in SidePanelRoutes
+    Box(
+        Modifier
+            .fillMaxSize()
+            .drawBehind {
+                val alpha = if (panel) 0.5f else noteScrim
+                if (alpha > 0f) drawRect(Color.Black.copy(alpha = alpha))
+            }
+            .then(if (route != "notes") Modifier.blockTouchesBelow() else Modifier),
+    )
 }
 
 /** One settings read, applied to both live states. Best-effort: a failure

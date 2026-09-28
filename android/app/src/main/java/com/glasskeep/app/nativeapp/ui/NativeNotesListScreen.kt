@@ -2,7 +2,6 @@ package com.glasskeep.app.nativeapp.ui
 
 import android.os.Build
 import android.os.SystemClock
-import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -123,6 +122,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -142,7 +142,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.zIndex
-import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.ImageCompression
@@ -222,9 +221,9 @@ fun NativeNotesListScreen(
     container: NativeAppContainer,
     serverUrl: String,
     /** The drawer's view (the web's `tagFilter`): null for the notes, or
-     *  one of TagSidebar's sentinels. Held above this screen, which a note
-     *  replaces, because a note unarchived from the archive switches it
-     *  back to the notes (App.jsx:4855-4859). */
+     *  one of TagSidebar's sentinels. Held above this screen because a
+     *  note unarchived from the archive switches it back to the notes
+     *  (App.jsx:4855-4859). */
     activeTagFilter: String?,
     onActiveTagFilterChange: (String?) -> Unit,
     onOpenNote: (String) -> Unit,
@@ -240,30 +239,19 @@ fun NativeNotesListScreen(
     pendingNewNoteType: String? = null,
     onPendingNewNoteTypeConsumed: () -> Unit = {},
     onSignedOut: () -> Unit,
-    /** The cards already shown, held above this screen for the same
-     *  reason as [activeTagFilter]. */
-    cardsShown: NoteCardsShown,
+    /** Whether a note, side by side or a side panel covers this screen,
+     *  which stays composed under them as the web keeps its list mounted
+     *  under its modals: back is then theirs. */
+    covered: () -> Boolean,
 ) {
     val dark = LocalGkDark.current
     val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     // null (as opposed to an actually-empty list) means Room's cold Flow
-    // has not delivered its first emission to THIS collector yet - on
-    // every fresh composition (i.e. every return from a note, since this
-    // whole screen is a NavHost destination that gets torn down and
-    // rebuilt, see the DisposableEffect above) that first emission is not
-    // instant, so for a frame or several `notes` would otherwise read as
-    // empty even though the account has plenty of notes. That transient
-    // "empty" used to be indistinguishable from a genuinely empty account,
-    // which mattered because the scrollable list below measures at zero
-    // height during it and Compose's verticalScroll clamps notesScrollState
-    // down to that zero max - a clamp nothing later reverses once the real
-    // notes arrive, which is what was destroying the restored scroll
-    // position on every note visit (confirmed via the GKScroll log trail:
-    // value=14094 restored, then value=0 maxValue=0 with notes.size still
-    // 0, then real notes.size=209 with maxValue correctly 91694 but value
-    // stuck at 0). rawNotes == null gates the scrollable branch below so
-    // it never mounts against that transient zero.
+    // has not delivered its first emission yet, which is not instant: the
+    // scrollable list below must not mount against that transient empty
+    // list, whose zero height would clamp a restored scroll position down
+    // to the top for good.
     val rawNotes by repository.observeNotes().collectAsState(initial = null)
     val notes = rawNotes ?: emptyList()
     // The archive and the trash are each their own server list
@@ -272,6 +260,7 @@ fun NativeNotesListScreen(
     // opening one starts from "loading" as the web empties its list first
     // (App.jsx:7525).
     val secondaryView = secondaryViewOf(activeTagFilter)
+    val cardsShown = remember { NoteCardsShown() }
     val secondaryNotes: List<NoteEntity>? = key(secondaryView) {
         val flow = remember(repository) {
             when (secondaryView) {
@@ -302,22 +291,8 @@ fun NativeNotesListScreen(
     var pullRefreshing by remember { mutableStateOf(false) }
     var creatingNote by remember { mutableStateOf(false) }
     var fabOpen by remember { mutableStateOf(false) }
-    // Scroll-reset investigation: this whole composable is a NavHost
-    // destination, torn down while a note covers it and rebuilt fresh on
-    // return - confirm that's actually happening (and when) alongside the
-    // scroll-state logging near notesScrollState below. Own tag ("GKScroll"),
-    // kept apart from "GKNative" (colour/status-bar debugging) on request.
-    if (BuildConfig.DEBUG) {
-        val instanceId = remember {
-            System.identityHashCode(Any()).also { Log.d("GKScroll", "NativeNotesListScreen ENTER composition instance=$it") }
-        }
-        DisposableEffect(Unit) {
-            onDispose { Log.d("GKScroll", "NativeNotesListScreen LEAVE composition instance=$instanceId") }
-        }
-    }
-    // Saveable like the scroll position below, and for the same reason: an
-    // open note replaces this whole screen, while on the web the list keeps
-    // its search, filters and assistant answer under the note.
+    // Saveable like the scroll position below, so the page comes back as it
+    // was after Android stopped the app in the background.
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     // Bumped by the header's search button only, the one place the web
@@ -346,29 +321,11 @@ fun NativeNotesListScreen(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
 
-    // Survives the note visit that tears this whole NavHost destination
-    // down: "notes" leaves composition entirely while a note covers it, and
-    // a plain remember (what rememberScrollState uses) does not survive
-    // that, so every return from a note started a brand new ScrollState at
-    // 0. rememberSaveable's state, unlike plain remember, is
-    // captured/restored by NavHost's SaveableStateHolder across exactly
-    // that dispose/recompose cycle. Tag "GKScroll" (distinct from
-    // "GKNative", used for the earlier status-bar-color debugging) - filter
-    // logcat on it to see whether this identity survives a note visit.
     val notesScrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
-    SideEffect {
-        if (BuildConfig.DEBUG) {
-            Log.d(
-                "GKScroll",
-                "notesScrollState id=${System.identityHashCode(notesScrollState)} value=${notesScrollState.value} " +
-                    "maxValue=${notesScrollState.maxValue} notes.size=${notes.size} refreshing=$refreshing",
-            )
-        }
-    }
     var headerVisible by rememberSaveable { mutableStateOf(true) }
     // The header floats over the page, which keeps a slot of the same
-    // height for it; measured, and kept across note visits so a return
-    // draws the right slot from its first frame.
+    // height for it; measured, and saveable so a restored page draws the
+    // right slot from its first frame.
     var headerHeightPx by rememberSaveable { mutableIntStateOf(with(density) { DefaultHeaderHeight.roundToPx() }) }
     var bannerHeightPx by remember { mutableIntStateOf(0) }
     var screenHeightPx by remember { mutableIntStateOf(0) }
@@ -804,9 +761,6 @@ fun NativeNotesListScreen(
 
     // Each view reads its list as it opens (App.jsx:3190-3205).
     LaunchedEffect(serverUrl, activeTagFilter) {
-        if (BuildConfig.DEBUG) {
-            Log.d("GKScroll", "LaunchedEffect(serverUrl, activeTagFilter) loading view $activeTagFilter - this restarts on every fresh composition, not just a real change")
-        }
         loadView(activeTagFilter)
     }
 
@@ -890,7 +844,7 @@ fun NativeNotesListScreen(
     // The web closes the topmost overlay first, in App.jsx's own popstate
     // order; the header menu and the dialogs are windows of their own and
     // take back before this. Nothing open leaves back to the system.
-    BackHandler(enabled = fabOpen || notificationsOpen || syncSheetOpen || searchOpen || selectionMode || sidebarOpen) {
+    UncoveredBackHandler(covered, enabled = fabOpen || notificationsOpen || syncSheetOpen || searchOpen || selectionMode || sidebarOpen) {
         when {
             fabOpen -> fabOpen = false
             notificationsOpen -> notificationsOpen = false
@@ -911,6 +865,9 @@ fun NativeNotesListScreen(
         label = "headerHide",
     )
     val pullToRefreshState = rememberPullToRefreshState()
+    // Whether the focus is on this screen, whose one text field is the search.
+    var fieldFocused by remember { mutableStateOf(false) }
+    ReleaseFocusWhenCovered(covered, hasFocus = { fieldFocused })
     // App.jsx:4972-4982: the old app switched its pull-to-refresh off
     // whenever anything was open over the list.
     val pullToRefreshEnabled = !fabOpen && !searchOpen && !headerMenuOpen && !selectionMode &&
@@ -921,6 +878,7 @@ fun NativeNotesListScreen(
             .fillMaxSize()
             .then(bgModifier)
             .onSizeChanged { screenHeightPx = it.height }
+            .onFocusChanged { fieldFocused = it.hasFocus }
             .pullToRefresh(
                 isRefreshing = pullRefreshing,
                 state = pullToRefreshState,
@@ -1119,7 +1077,10 @@ fun NativeNotesListScreen(
                         },
                         onClick = {
                             val ids = selectedIds.toList()
-                            if (ids.size == 2) onOpenSideBySide(ids[0], ids[1])
+                            if (ids.size == 2) {
+                                exitSelection()
+                                onOpenSideBySide(ids[0], ids[1])
+                            }
                         },
                     ),
                 )
@@ -1476,6 +1437,26 @@ private val DefaultHeaderHeight = 77.dp
 
 // The room the web makes above the list for the selection dock on a phone.
 private val SelectionShim = 44.dp
+
+/** BackHandler for this screen's own layers, which yields to what covers
+ *  it; [covered] is read here, so a note opening or closing recomposes
+ *  nothing else of the screen. */
+@Composable
+private fun UncoveredBackHandler(covered: () -> Boolean, enabled: Boolean, onBack: () -> Unit) {
+    BackHandler(enabled = enabled && !covered(), onBack = onBack)
+}
+
+/** What covers this screen takes the focus from its field, as a tap out of
+ *  the web's search field blurs it: typing never lands in the search under
+ *  a note. A screen that took the focus first keeps it. */
+@Composable
+private fun ReleaseFocusWhenCovered(covered: () -> Boolean, hasFocus: () -> Boolean) {
+    val isCovered = covered()
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(isCovered) {
+        if (isCovered && hasFocus()) focusManager.clearFocus()
+    }
+}
 
 /** The web's empty and loading lines: 16px, centred, gray-500 / gray-400. */
 @Composable
@@ -2582,11 +2563,9 @@ internal data class NoteCardPlace(val list: NoteCardList, val listView: Boolean,
  * The cards each place shows, for `noteAppear` (globalCSS.js:540,
  * 589-592): a card fades in where it was not shown yet, as the web's card
  * does when it mounts, a new note shifting the others from one column to
- * the other included. Held above the screen, which a note or a panel
- * replaces where the web keeps its list mounted under them, so coming
- * back fades nothing in.
+ * the other included.
  */
-class NoteCardsShown {
+private class NoteCardsShown {
     private val shown = HashMap<NoteCardPlace, Set<String>>()
 
     internal fun isNew(place: NoteCardPlace, id: String): Boolean = id !in shown[place].orEmpty()
