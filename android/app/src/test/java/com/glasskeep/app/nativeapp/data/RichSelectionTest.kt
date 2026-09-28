@@ -224,7 +224,10 @@ class RichSelectionTest {
             """blockquote{"indent":1}[paragraph{"indent":1}["aa"],paragraph{"indent":1}["bb"]]""",
             show(pressed(quote, "aa", "bb", RichCommand.Indent(1))),
         )
-        assertEquals("""paragraph["a","a11"{bold}] paragraph["b"{bold},"b22"] paragraph["cc33"]""", show(RichEdits.toggleMark(d1, span(d1, "a1", "b2"), RichMarkType.BOLD)))
+        assertEquals(
+            """paragraph["a","a11"{bold}] paragraph["b"{bold},"b22"] paragraph["cc33"]""",
+            show(pressed(d1, "a1", "b2", RichCommand.SetMark(RichMarkType.BOLD))),
+        )
         assertEquals(
             """paragraph["aa11"] paragraph["bb22"] bulletList[listItem[paragraph["cc33"]]] paragraph["dd44"]""",
             show(pressed(d2, "a1", "b2", RichCommand.ClearFormatting)),

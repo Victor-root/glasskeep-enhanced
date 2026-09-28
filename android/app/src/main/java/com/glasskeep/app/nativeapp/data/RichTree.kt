@@ -15,8 +15,8 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * The note's blocks as the web editor's own document (data/pm), which a
- * paste and the formatting bar's block commands run on as the web runs
- * them, and the way back to blocks.
+ * paste and the formatting bar's commands run on as the web runs them,
+ * and the way back to blocks.
  *
  * The flat block model cannot hold a quote inside a list item, which the
  * web can build; such a quote is lifted, its blocks staying in the item
@@ -108,6 +108,36 @@ internal class RichTree(val blocks: List<RichBlock>) {
                     else -> block
                 }
             }
+        }
+    }
+}
+
+/** [state]'s armed marks as the web's stored marks: null when none is
+ *  armed, else every mark what is typed at its caret takes. */
+internal fun storedMarks(state: RichEditing): List<PmMark>? {
+    if (state.pendingMarks.isEmpty() || !state.selection.collapsed) return null
+    val head = state.selection.head
+    val block = state.blocks.firstOrNull { it.id == head.blockId } ?: return null
+    val typing = RichTyping.typingMarks(block, head.offset, state.pendingMarks).map { RichMark(0, 1, it.type, it.value, it.color) }
+    return PmMark.setFrom(RichDoc.encodeMarks(typing).map(PmSchema::markFromJson))
+}
+
+/** The web's [stored] marks as what [state]'s caret arms: each one unlike
+ *  the mark of its type around the caret, and the absence of each mark
+ *  around it they lack. None when [stored] is null. */
+internal fun pendingMarks(stored: List<PmMark>?, state: RichEditing): List<PendingMark> {
+    if (stored == null || !state.selection.collapsed) return emptyList()
+    val head = state.selection.head
+    val block = state.blocks.firstOrNull { it.id == head.blockId } ?: return emptyList()
+    val around = RichDoc.marksAtCaret(block.marks, block.text.length, head.offset)
+    val typed = stored.flatMap { RichDoc.parseMark(it.toJson(), 0, 1).orEmpty() }
+    return RichMarkType.entries.mapNotNull { type ->
+        val wanted = typed.firstOrNull { it.type == type }
+        val present = around.firstOrNull { it.type == type }
+        when {
+            wanted == null -> present?.let { PendingMark(type, remove = true) }
+            present != null && present.value == wanted.value && present.color == wanted.color -> null
+            else -> PendingMark(type, wanted.value, wanted.color)
         }
     }
 }

@@ -127,13 +127,22 @@ internal class PmAllSelection(doc: PmNode) : PmSelection(doc.resolve(0), doc.res
 }
 
 /** A transform carrying a selection through its steps: [selection] follows
- *  them until a command sets another one. */
-internal class PmTransaction(doc: PmNode, selection: PmSelection) : PmTransform(doc) {
+ *  them until a command sets another one. [storedMarks], the marks what
+ *  is typed next takes when set, go with any step or selection set. */
+internal class PmTransaction(doc: PmNode, selection: PmSelection, storedMarks: List<PmMark>? = null) : PmTransform(doc) {
     private var current = selection
     private var currentFor = 0
 
     /** Whether a command set the selection itself. */
     var selectionSet = false
+        private set
+
+    var storedMarks = storedMarks
+        private set
+
+    /** Whether a command changed [storedMarks] since the last step or
+     *  selection set. */
+    var storedMarksSet = false
         private set
 
     var selection: PmSelection
@@ -148,5 +157,25 @@ internal class PmTransaction(doc: PmNode, selection: PmSelection) : PmTransform(
             current = value
             currentFor = steps.size
             selectionSet = true
+            storedMarks = null
+            storedMarksSet = false
         }
+
+    /** [mark] joins what is typed next takes. */
+    fun addStoredMark(mark: PmMark) {
+        storedMarks = mark.addToSet(storedMarks ?: selection.head.marks())
+        storedMarksSet = true
+    }
+
+    /** No mark of [type] in what is typed next takes. */
+    fun removeStoredMark(type: PmMarkType) {
+        storedMarks = (storedMarks ?: selection.head.marks()).filterNot { it.type === type }
+        storedMarksSet = true
+    }
+
+    override fun addStep(step: PmStep, doc: PmNode) {
+        super.addStep(step, doc)
+        storedMarks = null
+        storedMarksSet = false
+    }
 }

@@ -354,7 +354,7 @@ object RichDoc {
 
     /** One Tiptap mark can become more than one [RichMark]: a `textStyle`
      *  carries up to three independent attributes (colour, family, size). */
-    private fun parseMark(obj: JsonObject, start: Int, end: Int): List<RichMark>? {
+    internal fun parseMark(obj: JsonObject, start: Int, end: Int): List<RichMark>? {
         val attrs = obj["attrs"] as? JsonObject
         fun attr(key: String): String? = (attrs?.get(key) as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
         return when (nodeType(obj)) {
@@ -693,7 +693,7 @@ object RichDoc {
     /** The three textStyle attributes are three separate [RichMark]s here
      *  but ONE `textStyle` mark in Tiptap, so they are folded back together
      *  before being written out. */
-    private fun encodeMarks(active: List<RichMark>): List<JsonObject> {
+    internal fun encodeMarks(active: List<RichMark>): List<JsonObject> {
         val out = mutableListOf<JsonObject>()
         val textStyle = buildJsonObject {
             for (m in active) when (m.type) {
@@ -783,9 +783,8 @@ object RichDoc {
         return result.sortedBy { it.start }
     }
 
-    /** The mark half of the web's `clearNodes().unsetAllMarks()`: every
-     *  type dropped from `[start, end)` at once. */
-    fun clearAllMarks(marks: List<RichMark>, start: Int, end: Int): List<RichMark> =
+    /** Every type dropped from `[start, end)` at once. */
+    private fun clearAllMarks(marks: List<RichMark>, start: Int, end: Int): List<RichMark> =
         RichMarkType.entries.fold(marks) { acc, type -> clearMark(acc, type, start, end) }
 
     /** Applies [type] over `[start, end)` as ProseMirror's addMark does: a

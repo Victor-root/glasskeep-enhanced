@@ -26,13 +26,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * The formatting bar's commands, recorded in the web editor
- * (rich-commands/web-commands.json): a note, a selection (anchor then
- * head) and what the bar shows for it, then each button as
- * RichTextToolbar.jsx runs it, and what the web left. Replayed through the
- * app's own bar logic, each must leave the same blocks, the same selection,
- * at a caret the same marks for what is typed next, and the bar showing the
- * same.
+ * The formatting bar's commands, recorded in the web editor: a note, a
+ * selection (anchor then head) and what the bar shows for it, then each
+ * button as RichTextToolbar.jsx and LinkPopover.jsx run it ("a,b" pressing
+ * a then b), and what the web left. Replayed through the app's own bar
+ * logic, each must leave the same blocks, the same selection, at a caret
+ * the same marks for what is typed next, and the bar showing the same.
  */
 class RichCommandCorpusTest {
     private fun position(value: JsonElement): Pair<Int, Int> = value.jsonArray.let { it[0].jsonPrimitive.int to it[1].jsonPrimitive.int }
@@ -59,12 +58,19 @@ class RichCommandCorpusTest {
         }
     }
 
-    /** What RichFormatToolbar's button for [cmd] does. */
+    /** What RichFormatToolbar's button for [cmd] does, then NoteDetailScreen's
+     *  TrailingNode once the command landed. */
     private fun press(state: RichEditorState, cmd: String) {
+        pressButton(state, cmd)
+        val pressed = requireNotNull(state.editing).blocks
+        if (RichEdits.needsTrailingParagraph(pressed)) state.sync(pressed + RichDoc.newBlock())
+    }
+
+    private fun pressButton(state: RichEditorState, cmd: String) {
         fun indent(delta: Int) {
             val editing = requireNotNull(state.editing)
             val span = editing.span ?: return
-            if (RichEdits.canShiftIndent(editing.blocks, span, delta)) state.blockCommand(RichCommand.Indent(delta))
+            if (RichEdits.canShiftIndent(editing.blocks, span, delta)) state.command(RichCommand.Indent(delta))
         }
         when (cmd) {
             "bold" -> state.toggleMark(RichMarkType.BOLD)
@@ -88,22 +94,24 @@ class RichCommandCorpusTest {
             "sizeDown" -> state.stepFontSize(-1)
             "family" -> state.applyMark(RichMarkType.FONT_FAMILY, "Inter, sans-serif")
             "familyClear" -> state.clearMark(RichMarkType.FONT_FAMILY)
-            "clear" -> state.blockCommand(RichCommand.ClearFormatting)
-            "bullet" -> state.blockCommand(RichCommand.ToggleList(RichBlockKind.BULLET_ITEM))
-            "ordered" -> state.blockCommand(RichCommand.ToggleList(RichBlockKind.NUMBERED_ITEM))
-            "task" -> state.blockCommand(RichCommand.ToggleList(RichBlockKind.TASK_ITEM))
-            "alignLeft" -> state.blockCommand(RichCommand.Align(RichAlign.LEFT))
-            "alignCenter" -> state.blockCommand(RichCommand.Align(RichAlign.CENTER))
-            "alignRight" -> state.blockCommand(RichCommand.Align(RichAlign.RIGHT))
-            "alignJustify" -> state.blockCommand(RichCommand.Align(RichAlign.JUSTIFY))
-            "hr" -> state.blockCommand(RichCommand.Divider)
+            "clear" -> state.command(RichCommand.ClearFormatting)
+            "bullet" -> state.command(RichCommand.ToggleList(RichBlockKind.BULLET_ITEM))
+            "ordered" -> state.command(RichCommand.ToggleList(RichBlockKind.NUMBERED_ITEM))
+            "task" -> state.command(RichCommand.ToggleList(RichBlockKind.TASK_ITEM))
+            "alignLeft" -> state.command(RichCommand.Align(RichAlign.LEFT))
+            "alignCenter" -> state.command(RichCommand.Align(RichAlign.CENTER))
+            "alignRight" -> state.command(RichCommand.Align(RichAlign.RIGHT))
+            "alignJustify" -> state.command(RichCommand.Align(RichAlign.JUSTIFY))
+            "hr" -> state.command(RichCommand.Divider)
             "indent" -> indent(1)
             "outdent" -> indent(-1)
-            "codeBlock" -> state.blockCommand(RichCommand.CodeBlock)
-            "quote" -> state.blockCommand(RichCommand.Quote)
-            "paragraph" -> state.blockCommand(RichCommand.SetStyle(RichBlockKind.PARAGRAPH))
-            "h1" -> state.blockCommand(RichCommand.SetStyle(RichBlockKind.HEADING_1))
-            "h3" -> state.blockCommand(RichCommand.SetStyle(RichBlockKind.HEADING_3))
+            "codeBlock" -> state.command(RichCommand.CodeBlock)
+            "quote" -> state.command(RichCommand.Quote)
+            "paragraph" -> state.command(RichCommand.SetStyle(RichBlockKind.PARAGRAPH))
+            "h1" -> state.command(RichCommand.SetStyle(RichBlockKind.HEADING_1))
+            "h3" -> state.command(RichCommand.SetStyle(RichBlockKind.HEADING_3))
+            "linkApply" -> state.command(RichCommand.SetLink("https://example.org"))
+            "linkRemove" -> state.command(RichCommand.UnsetLink)
             else -> error("unknown command $cmd")
         }
     }
@@ -129,6 +137,7 @@ class RichCommandCorpusTest {
         value("size", state.markValue(RichMarkType.FONT_SIZE))
         value("family", state.markValue(RichMarkType.FONT_FAMILY))
         value("highlight", state.markValue(RichMarkType.HIGHLIGHT))
+        value("linkHref", state.markValue(RichMarkType.LINK))
         value("ulStyle", state.markValue(RichMarkType.UNDERLINE))
         value("ulColor", state.underlineColor())
         val lists = state.listKinds()
@@ -161,9 +170,17 @@ class RichCommandCorpusTest {
         }.distinct().sorted()
     }
 
+    /** Every button over notes of every kind of block. */
     @Test
-    fun formatsAsTheWebEditorDoes() {
-        val text = requireNotNull(javaClass.classLoader!!.getResource("rich-commands/web-commands.json")).readText()
+    fun formatsAsTheWebEditorDoes() = replay("rich-commands/web-commands.json")
+
+    /** The link popover, autolink after the other buttons, text styles
+     *  taken off in lists and quotes, and one button after another. */
+    @Test
+    fun marksAndLinksAsTheWebEditorDoes() = replay("rich-commands/web-marks.json")
+
+    private fun replay(resource: String) {
+        val text = requireNotNull(javaClass.classLoader!!.getResource(resource)).readText()
         val failures = mutableListOf<String>()
         var checked = 0
         for (element in Json.parseToJsonElement(text) as JsonArray) {
@@ -187,10 +204,7 @@ class RichCommandCorpusTest {
                 val label = "$name.$cmd"
                 val state = selected()
                 val result = try {
-                    press(state, cmd)
-                    // NoteDetailScreen's TrailingNode, once the command landed.
-                    val pressed = requireNotNull(state.editing).blocks
-                    if (RichEdits.needsTrailingParagraph(pressed)) state.sync(pressed + RichDoc.newBlock())
+                    cmd.split(",").forEach { press(state, it) }
                     requireNotNull(state.editing)
                 } catch (e: Exception) {
                     failures += "$label: ${e.javaClass.simpleName} ${e.message}\n${e.stackTrace.take(6).joinToString("\n")}"

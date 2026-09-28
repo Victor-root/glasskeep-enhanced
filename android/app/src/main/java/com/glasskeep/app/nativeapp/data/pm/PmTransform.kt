@@ -148,10 +148,14 @@ internal open class PmTransform(var doc: PmNode) {
     val mapping get() = PmMapping(maps.toList())
 
     fun step(step: PmStep): PmTransform {
-        doc = step.apply(doc)
+        addStep(step, step.apply(doc))
+        return this
+    }
+
+    protected open fun addStep(step: PmStep, doc: PmNode) {
         steps.add(step)
         maps.add(step.getMap())
-        return this
+        this.doc = doc
     }
 
     fun replace(from: Int, to: Int = from, slice: PmSlice = PmSlice.Empty): PmTransform {
@@ -322,16 +326,23 @@ internal open class PmTransform(var doc: PmNode) {
 
     fun insert(pos: Int, content: PmFragment) = replaceWith(pos, pos, content)
 
+    /** mark.ts removeMark() with a mark type: every mark of [type] off the
+     *  inline nodes of `[from, to)`. */
+    fun removeMark(from: Int, to: Int, type: PmMarkType) = removeMarks(from, to) { marks -> marks.filter { it.type === type } }
+
     /** mark.ts removeMark(): [mark], or every mark when null, off the inline
      *  nodes of `[from, to)`, one step per mark and run of nodes. */
-    fun removeMark(from: Int, to: Int, mark: PmMark? = null) {
+    fun removeMark(from: Int, to: Int, mark: PmMark? = null) =
+        removeMarks(from, to) { marks -> if (mark == null) marks else listOfNotNull(mark.takeIf { it.isInSet(marks) }) }
+
+    private fun removeMarks(from: Int, to: Int, removed: (List<PmMark>) -> List<PmMark>) {
         class Matched(val style: PmMark, val from: Int, var to: Int, var step: Int)
         val matched = mutableListOf<Matched>()
         var stepIndex = 0
         doc.nodesBetween(from, to, { node, pos, _, _ ->
             if (!node.isInline) return@nodesBetween true
             stepIndex++
-            val toRemove = if (mark == null) node.marks else listOfNotNull(mark.takeIf { it.isInSet(node.marks) })
+            val toRemove = removed(node.marks)
             val end = minOf(pos + node.nodeSize, to)
             for (style in toRemove) {
                 val found = matched.lastOrNull { it.step == stepIndex - 1 && style.eq(it.style) }

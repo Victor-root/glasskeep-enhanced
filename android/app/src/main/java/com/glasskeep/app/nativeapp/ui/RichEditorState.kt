@@ -30,7 +30,6 @@ import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.RichPaste
 import com.glasskeep.app.nativeapp.data.RichSelection
-import com.glasskeep.app.nativeapp.data.RichSpan
 import com.glasskeep.app.nativeapp.data.RichTyping
 import com.glasskeep.app.nativeapp.data.hasText
 import com.glasskeep.app.nativeapp.data.isTextStyle
@@ -143,36 +142,12 @@ class RichEditorState {
         runCatching { focusRequester.requestFocus() }
     }
 
-    /** One of the bar's block commands, run as the web runs it
-     *  ([RichCommands]). The text keeps the focus, every command of the
-     *  web's bar starting with focus(). */
-    fun blockCommand(command: RichCommand) {
+    /** One of the bar's commands, run as the web runs it ([RichCommands]).
+     *  The text keeps the focus, every command of the web's bar starting
+     *  with focus(). */
+    fun command(command: RichCommand) {
         val current = editing ?: return
         RichCommands.run(current, command)?.let(::replace)
-        requestFocus()
-    }
-
-    /** A mark command over the selected text: [change] gets the blocks and
-     *  the selection in document order, and only the blocks change. The
-     *  text keeps the focus. */
-    fun markCommand(change: (List<RichBlock>, RichSpan) -> List<RichBlock>) {
-        val current = editing ?: return
-        val span = current.span ?: return
-        replace(RichEditing(change(current.blocks, span), current.selection, pendingMarks = current.pendingMarks))
-        requestFocus()
-    }
-
-    fun setPending(type: RichMarkType, value: String?, color: String? = null) = updatePending { pending ->
-        pending.filterNot { it.type == type } + PendingMark(type, value, color)
-    }
-
-    fun clearPending(type: RichMarkType, activeAtCaret: Boolean) = updatePending { pending ->
-        pending.filterNot { it.type == type } + if (activeAtCaret) listOf(PendingMark(type, remove = true)) else emptyList()
-    }
-
-    private fun updatePending(change: (List<PendingMark>) -> List<PendingMark>) {
-        val current = editing ?: return
-        editing = current.copy(pendingMarks = change(current.pendingMarks))
         requestFocus()
     }
 
@@ -196,7 +171,7 @@ class RichEditorState {
     /** The mark of [type] the selection shows (getAttributes): at a
      *  collapsed caret the one it types into, else the first one in the
      *  selected text. */
-    internal fun markOf(type: RichMarkType): RichMark? {
+    private fun markOf(type: RichMarkType): RichMark? {
         val current = editing ?: return null
         val span = current.span ?: return null
         if (span.collapsed) return caretMarks().firstOrNull { it.type == type }
@@ -205,7 +180,7 @@ class RichEditorState {
 
     // At a collapsed caret, what is armed for the next keystroke wins over
     // the marks around it (ProseMirror's stored marks).
-    internal fun pendingOf(type: RichMarkType): PendingMark? = editing?.pendingMarks?.firstOrNull { it.type == type }
+    private fun pendingOf(type: RichMarkType): PendingMark? = editing?.pendingMarks?.firstOrNull { it.type == type }
 
     /** Whether [type]'s button reads active (isActive), for a mark whose
      *  value and colour [attrs] accepts. */
@@ -238,38 +213,13 @@ class RichEditorState {
 
     /** A mark's button (toggleMark): off when it reads active, else on; at
      *  a caret, for what is typed next. */
-    fun toggleMark(type: RichMarkType) {
-        val span = editing?.span ?: return
-        if (span.collapsed) {
-            if (isMarkActive(type)) clearMark(type) else applyMark(type, null)
-        } else {
-            markCommand { b, s -> RichEdits.toggleMark(b, s, type) }
-        }
-    }
+    fun toggleMark(type: RichMarkType) = if (isMarkActive(type)) clearMark(type) else applyMark(type, null)
 
-    /** setMark: [type] over the selection, or armed at a caret. Inline code
-     *  takes no other mark (`excludes: "_"`): armed, it disarms all the
-     *  others, and none is armed while it is. */
-    fun applyMark(type: RichMarkType, value: String?, color: String? = null) {
-        val span = editing?.span ?: return
-        when {
-            !span.collapsed -> markCommand { b, s -> RichEdits.setMark(b, s, type, value, color) }
-            type == RichMarkType.CODE -> updatePending {
-                caretMarks().filter { it.type != type }.map { PendingMark(it.type, remove = true) } + PendingMark(type)
-            }
-            typingMarks().any { it.type == RichMarkType.CODE } -> requestFocus()
-            else -> setPending(type, value, color)
-        }
-    }
+    /** setMark: [type] over the selection, or armed at a caret. */
+    fun applyMark(type: RichMarkType, value: String?, color: String? = null) = command(RichCommand.SetMark(type, value, color))
 
-    fun clearMark(type: RichMarkType) {
-        val span = editing?.span ?: return
-        if (span.collapsed) {
-            clearPending(type, activeAtCaret = caretMarks().any { it.type == type })
-        } else {
-            markCommand { b, s -> RichEdits.clearMark(b, s, type) }
-        }
-    }
+    /** unsetMark, or unsetColor, unsetFontFamily, unsetFontSize. */
+    fun clearMark(type: RichMarkType) = command(RichCommand.UnsetMark(type))
 
     /** The underline button (toggleUnderline with the style shown, "simple"
      *  without one, and the colour shown): off when the selection has an

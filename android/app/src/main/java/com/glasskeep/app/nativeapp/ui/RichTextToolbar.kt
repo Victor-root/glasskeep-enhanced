@@ -84,13 +84,9 @@ import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichCommand
 import com.glasskeep.app.nativeapp.data.RichDoc
-import com.glasskeep.app.nativeapp.data.RichEdits
 import com.glasskeep.app.nativeapp.data.RichMarkType
-import com.glasskeep.app.nativeapp.data.RichPos
-import com.glasskeep.app.nativeapp.data.RichSelection
 import com.glasskeep.app.nativeapp.data.TypographyBlock
 import com.glasskeep.app.nativeapp.data.TypographyProfile
-import com.glasskeep.app.nativeapp.data.resolve
 
 /** editorToolbarMode: the user's saved choice between the phone default
  *  (one dense row of the most-used tools) and the full four-group bar. */
@@ -115,11 +111,6 @@ internal class RichToolbarColors(themeId: String?, dark: Boolean) {
 }
 
 private enum class RichPopoverKind { FONT, SIZE, UNDERLINE, COLOR, HIGHLIGHT, TASK, LINK }
-
-/** Where the link popover applies, fixed as it opens: the whole link the
- *  selection sits in (extendMarkRange), else the selection itself, and
- *  that link's address. */
-private class RichLinkTarget(val selection: RichSelection, val href: String?)
 
 /**
  * The formatting bar as the web draws it inside the mobile sheet
@@ -146,14 +137,10 @@ fun RichFormatToolbar(
     onTaskStrikeChange: (Boolean) -> Unit,
     typography: TypographyProfile,
 ) {
-    val editing = state.editing
-    val blocks = editing?.blocks.orEmpty()
-    val span = editing?.span
-    val enabled = span != null
+    val enabled = state.editing?.span != null
     val listKinds = state.listKinds()
     val colors = remember(themeId, dark) { RichToolbarColors(themeId, dark) }
     var openPopover by remember { mutableStateOf<RichPopoverKind?>(null) }
-    var linkTarget by remember { mutableStateOf<RichLinkTarget?>(null) }
 
     val toolbarLabel = stringResource(R.string.native_richtext_toolbar_label)
     Column(
@@ -301,7 +288,7 @@ fun RichFormatToolbar(
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { state.blockCommand(RichCommand.ClearFormatting) },
+                onClick = { state.command(RichCommand.ClearFormatting) },
             ) { tint -> ClearFormattingIcon(size = 20.dp, tint = tint) }
         }
         val colorButton: @Composable FlowRowScope.() -> Unit = {
@@ -368,7 +355,7 @@ fun RichFormatToolbar(
                 colors = colors,
                 titleColor = titleColor,
                 fixedTint = BulletListTint,
-                onClick = { state.blockCommand(RichCommand.ToggleList(RichBlockKind.BULLET_ITEM)) },
+                onClick = { state.command(RichCommand.ToggleList(RichBlockKind.BULLET_ITEM)) },
             ) { tint -> BulletListIcon(size = 20.dp, tint = tint) }
         }
         val numberedButton: @Composable FlowRowScope.() -> Unit = {
@@ -379,7 +366,7 @@ fun RichFormatToolbar(
                 colors = colors,
                 titleColor = titleColor,
                 fixedTint = NumberedListTint,
-                onClick = { state.blockCommand(RichCommand.ToggleList(RichBlockKind.NUMBERED_ITEM)) },
+                onClick = { state.command(RichCommand.ToggleList(RichBlockKind.NUMBERED_ITEM)) },
             ) { tint -> NumberedListIcon(size = 20.dp, tint = tint) }
         }
         val taskButton: @Composable FlowRowScope.() -> Unit = {
@@ -405,7 +392,7 @@ fun RichFormatToolbar(
                     fixedTint = if (dark) TaskListTintDark else TaskListTintLight,
                     contentDescription = stringResource(R.string.native_richtext_task_list),
                     chevronDescription = stringResource(R.string.native_richtext_task_list_options),
-                    onClick = { state.blockCommand(RichCommand.ToggleList(RichBlockKind.TASK_ITEM)) },
+                    onClick = { state.command(RichCommand.ToggleList(RichBlockKind.TASK_ITEM)) },
                     onChevron = { openPopover = if (open) null else RichPopoverKind.TASK },
                 ) { tint -> TaskListIcon(size = 20.dp, tint = tint) }
             }
@@ -417,7 +404,7 @@ fun RichFormatToolbar(
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { state.blockCommand(RichCommand.Align(RichAlign.LEFT)) },
+                onClick = { state.command(RichCommand.Align(RichAlign.LEFT)) },
             ) { tint -> AlignLeftIcon(size = 20.dp, tint = tint) }
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_align_center),
@@ -425,7 +412,7 @@ fun RichFormatToolbar(
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { state.blockCommand(RichCommand.Align(RichAlign.CENTER)) },
+                onClick = { state.command(RichCommand.Align(RichAlign.CENTER)) },
             ) { tint -> AlignCenterIcon(size = 20.dp, tint = tint) }
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_align_right),
@@ -433,7 +420,7 @@ fun RichFormatToolbar(
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { state.blockCommand(RichCommand.Align(RichAlign.RIGHT)) },
+                onClick = { state.command(RichCommand.Align(RichAlign.RIGHT)) },
             ) { tint -> AlignRightIcon(size = 20.dp, tint = tint) }
             if (withJustify) {
                 RichToolbarButton(
@@ -442,7 +429,7 @@ fun RichFormatToolbar(
                     enabled = enabled,
                     colors = colors,
                     titleColor = titleColor,
-                    onClick = { state.blockCommand(RichCommand.Align(RichAlign.JUSTIFY)) },
+                    onClick = { state.command(RichCommand.Align(RichAlign.JUSTIFY)) },
                 ) { tint -> AlignJustifyIcon(size = 20.dp, tint = tint) }
             }
         }
@@ -453,7 +440,7 @@ fun RichFormatToolbar(
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { state.blockCommand(RichCommand.Divider) },
+                onClick = { state.command(RichCommand.Divider) },
             ) { tint -> SeparatorIcon(size = 20.dp, tint = tint) }
         }
         val linkButton: @Composable FlowRowScope.() -> Unit = {
@@ -463,35 +450,23 @@ fun RichFormatToolbar(
                 dark = dark,
                 padding = 10.dp,
                 popover = {
-                    linkTarget?.let { target ->
-                        RichLinkPopover(
-                            existingHref = target.href,
-                            colors = colors,
-                            dark = dark,
-                            titleColor = titleColor,
-                            onApply = { raw ->
-                                val url = RichDoc.ensureSchemeUrl(raw)
-                                if (url.isNotEmpty()) {
-                                    // With nothing selected the link is armed
-                                    // for what is typed next, as setLink does.
-                                    if (target.selection.collapsed) {
-                                        state.setPending(RichMarkType.LINK, url)
-                                    } else {
-                                        state.markCommand { b, _ -> target.selection.resolve(b)?.let { RichEdits.setMark(b, it, RichMarkType.LINK, url) } ?: b }
-                                    }
-                                    openPopover = null
-                                }
-                            },
-                            onRemove = {
-                                if (target.selection.collapsed) {
-                                    state.clearPending(RichMarkType.LINK, activeAtCaret = false)
-                                } else {
-                                    state.markCommand { b, _ -> target.selection.resolve(b)?.let { RichEdits.clearMark(b, it, RichMarkType.LINK) } ?: b }
-                                }
+                    RichLinkPopover(
+                        existingHref = state.markValue(RichMarkType.LINK),
+                        colors = colors,
+                        dark = dark,
+                        titleColor = titleColor,
+                        onApply = { raw ->
+                            val url = RichDoc.ensureSchemeUrl(raw)
+                            if (url.isNotEmpty()) {
+                                state.command(RichCommand.SetLink(url))
                                 openPopover = null
-                            },
-                        )
-                    }
+                            }
+                        },
+                        onRemove = {
+                            state.command(RichCommand.UnsetLink)
+                            openPopover = null
+                        },
+                    )
                 },
             ) { open ->
                 RichLinkButton(
@@ -499,27 +474,7 @@ fun RichFormatToolbar(
                     enabled = enabled,
                     colors = colors,
                     titleColor = titleColor,
-                    onClick = {
-                        if (open) {
-                            openPopover = null
-                        } else {
-                            val current = editing ?: return@RichLinkButton
-                            val selected = span ?: return@RichLinkButton
-                            // extendMarkRange("link"): inside a link, the whole link.
-                            val block = blocks[selected.start]
-                            val link = if (selected.start == selected.end) {
-                                RichDoc.markAt(block.marks, RichMarkType.LINK, selected.startOffset, selected.endOffset)
-                            } else {
-                                null
-                            }
-                            val armed = state.pendingOf(RichMarkType.LINK)?.takeUnless { it.remove }?.value
-                            linkTarget = RichLinkTarget(
-                                if (link != null) RichSelection(RichPos(block.id, link.start), RichPos(block.id, link.end)) else current.selection,
-                                armed ?: link?.value ?: state.markOf(RichMarkType.LINK)?.value,
-                            )
-                            openPopover = RichPopoverKind.LINK
-                        }
-                    },
+                    onClick = { openPopover = if (open) null else RichPopoverKind.LINK },
                 )
             }
         }
@@ -613,7 +568,7 @@ fun RichFormatToolbar(
                         colors = colors,
                         titleColor = titleColor,
                         fixedTint = IndentTint,
-                        onClick = { state.blockCommand(RichCommand.Indent(1)) },
+                        onClick = { state.command(RichCommand.Indent(1)) },
                     ) { tint -> IndentIncreaseIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_outdent),
@@ -622,7 +577,7 @@ fun RichFormatToolbar(
                         colors = colors,
                         titleColor = titleColor,
                         fixedTint = OutdentTint,
-                        onClick = { state.blockCommand(RichCommand.Indent(-1)) },
+                        onClick = { state.command(RichCommand.Indent(-1)) },
                     ) { tint -> IndentDecreaseIcon(size = 20.dp, tint = tint) }
                 }
                 RichToolbarGroup(divider = colors.divider, last = false) {
@@ -632,7 +587,7 @@ fun RichFormatToolbar(
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
-                        onClick = { state.blockCommand(RichCommand.CodeBlock) },
+                        onClick = { state.command(RichCommand.CodeBlock) },
                     ) { tint -> CodeBlockIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_inline_code),
@@ -648,7 +603,7 @@ fun RichFormatToolbar(
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
-                        onClick = { state.blockCommand(RichCommand.Quote) },
+                        onClick = { state.command(RichCommand.Quote) },
                     ) { tint -> QuoteIcon(size = 20.dp, tint = tint) }
                     separatorButton()
                     linkButton()
@@ -671,7 +626,7 @@ fun RichFormatToolbar(
                         colors = colors,
                         dark = dark,
                         titleColor = titleColor,
-                    ) { state.blockCommand(RichCommand.SetStyle(RichBlockKind.PARAGRAPH)) }
+                    ) { state.command(RichCommand.SetStyle(RichBlockKind.PARAGRAPH)) }
                     for (level in 1..5) {
                         val kind = headingKindFor(level)
                         val label = String.format(stringResource(R.string.native_richtext_heading_level), level)
@@ -685,7 +640,7 @@ fun RichFormatToolbar(
                             colors = colors,
                             dark = dark,
                             titleColor = titleColor,
-                        ) { state.blockCommand(RichCommand.SetStyle(kind)) }
+                        ) { state.command(RichCommand.SetStyle(kind)) }
                     }
                 }
             }
@@ -1606,7 +1561,7 @@ private fun RichLinkPopover(
 ) {
     val uriHandler = LocalUriHandler.current
     val focusRequester = remember { FocusRequester() }
-    var href by remember { mutableStateOf(existingHref.orEmpty()) }
+    var href by remember(existingHref) { mutableStateOf(existingHref.orEmpty()) }
     var focused by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     val linked = !existingHref.isNullOrEmpty()

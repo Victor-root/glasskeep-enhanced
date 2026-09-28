@@ -10,6 +10,7 @@ import com.glasskeep.app.nativeapp.data.pm.PmSchema
 import com.glasskeep.app.nativeapp.data.pm.PmSlice
 import com.glasskeep.app.nativeapp.data.pm.PmTransform
 import com.glasskeep.app.nativeapp.data.pm.pmTextNear
+import com.glasskeep.app.nativeapp.data.pm.setMarkBetween
 
 /**
  * Copy and paste as the web editor does them, through its own document
@@ -235,18 +236,7 @@ object RichPaste {
         val to = maxOf(anchor, head)
         if (!canSetMark(doc, from, to, PmSchema.link)) return null
         val tr = PmTransform(doc)
-        val attrs = mapOf("href" to href)
-        doc.nodesBetween(from, to, { node, pos, _, _ ->
-            val trimmedFrom = maxOf(pos, from)
-            val trimmedTo = minOf(pos + node.nodeSize, to)
-            val links = node.marks.filter { it.type === PmSchema.link }
-            if (links.isEmpty()) {
-                tr.addMark(trimmedFrom, trimmedTo, PmSchema.link.create(attrs))
-            } else {
-                for (link in links) tr.addMark(trimmedFrom, trimmedTo, PmSchema.link.create(link.attrs + attrs))
-            }
-            true
-        })
+        setMarkBetween(tr, from, to, PmSchema.link, mapOf("href" to href))
         return pasted(tree, appended(doc, tr, pasteRules = false, anchor = anchor, head = head))
     }
 

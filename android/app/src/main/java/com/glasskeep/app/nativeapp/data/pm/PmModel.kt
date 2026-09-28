@@ -330,7 +330,7 @@ internal object PmSchema {
         return type.create(attrsFromJson(json["attrs"] as? JsonObject), PmFragment.fromArray(content), marks)
     }
 
-    private fun markFromJson(json: JsonObject): PmMark {
+    fun markFromJson(json: JsonObject): PmMark {
         val name = (json["type"] as JsonPrimitive).content
         return requireNotNull(marks[name]) { "Unknown mark type: $name" }.create(attrsFromJson(json["attrs"] as? JsonObject))
     }
@@ -531,6 +531,23 @@ internal open class PmNode(val type: PmNodeType, val attrs: PmAttrs, val content
         content.nodesBetween(from, to, f, startPos, this)
 
     fun descendants(f: (PmNode, Int, PmNode?, Int) -> Boolean) = nodesBetween(0, content.size, f)
+
+    /** A child and where it starts: the one at or after [pos] (childAfter),
+     *  or at or before it (childBefore). */
+    class Child(val node: PmNode?, val index: Int, val offset: Int)
+
+    fun childAfter(pos: Int): Child {
+        val found = content.findIndex(pos)
+        return Child(content.maybeChild(found.index), found.index, found.offset)
+    }
+
+    fun childBefore(pos: Int): Child {
+        if (pos == 0) return Child(null, 0, 0)
+        val found = content.findIndex(pos)
+        if (found.offset < pos) return Child(content.child(found.index), found.index, found.offset)
+        val node = content.child(found.index - 1)
+        return Child(node, found.index - 1, found.offset - node.nodeSize)
+    }
 
     /** Each child with the offset it starts at. */
     fun forEach(f: (PmNode, Int) -> Unit) {
@@ -744,6 +761,17 @@ internal class PmResolvedPos(
     fun sharedDepth(pos: Int): Int {
         for (d in depth downTo 1) if (start(d) <= pos && end(d) >= pos) return d
         return 0
+    }
+
+    /** The marks text typed here takes: those of the text node it is in,
+     *  else of the node before it, else of the node after it; none in an
+     *  empty parent. Every mark of the web's schema is inclusive, the link
+     *  too since autolink is on, so none is dropped at its end. */
+    fun marks(): List<PmMark> {
+        if (parent.content.size == 0) return emptyList()
+        val index = index()
+        if (textOffset > 0) return parent.child(index).marks
+        return (parent.maybeChild(index - 1) ?: parent.child(index)).marks
     }
 
     /** The range of blocks where this position and [other] part: the

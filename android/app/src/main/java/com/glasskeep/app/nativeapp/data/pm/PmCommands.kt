@@ -350,6 +350,108 @@ internal fun indent(tr: PmTransaction, direction: Int): Boolean {
     return changed
 }
 
+// ---------- Marks ----------
+
+/** setMark()'s work over `[from, to)`: each node there takes [type] with
+ *  [attributes], over the attributes of the mark of that type it has. */
+internal fun setMarkBetween(tr: PmTransform, from: Int, to: Int, type: PmMarkType, attributes: PmAttrs) {
+    tr.doc.nodesBetween(from, to, { node, pos, _, _ ->
+        val trimmedFrom = maxOf(pos, from)
+        val trimmedTo = minOf(pos + node.nodeSize, to)
+        val own = node.marks.filter { it.type === type }
+        if (own.isEmpty()) {
+            tr.addMark(trimmedFrom, trimmedTo, type.create(attributes))
+        } else {
+            for (mark in own) tr.addMark(trimmedFrom, trimmedTo, type.create(mark.attrs + attributes))
+        }
+        true
+    })
+}
+
+/** Tiptap's setMark(): at a caret, [type] with [attributes] over the
+ *  attributes of the one typing already takes (getMarkAttributes) joins
+ *  the stored marks; over a range, [setMarkBetween]. */
+internal fun setMark(tr: PmTransaction, type: PmMarkType, attributes: PmAttrs) {
+    val selection = tr.selection
+    if (selection.empty) {
+        val current = (tr.storedMarks.orEmpty() + selection.head.marks()).firstOrNull { it.type === type }?.attrs.orEmpty()
+        tr.addStoredMark(type.create(current + attributes))
+    } else {
+        setMarkBetween(tr, selection.from, selection.to, type, attributes)
+    }
+}
+
+/** Tiptap's unsetMark(): no [type] left on the selection, nor in the
+ *  stored marks. With [extendEmptyMarkRange], a caret takes it off the
+ *  whole stretch of it around ([markRange]). */
+internal fun unsetMark(tr: PmTransaction, type: PmMarkType, extendEmptyMarkRange: Boolean = false) {
+    val selection = tr.selection
+    val range = if (selection.empty && extendEmptyMarkRange) {
+        markRange(selection.rFrom, type, selection.rFrom.marks().firstOrNull { it.type === type }?.attrs)
+    } else {
+        null
+    }
+    tr.removeMark(range?.first ?: selection.from, range?.second ?: selection.to, type)
+    tr.removeStoredMark(type)
+}
+
+/** Tiptap's extendMarkRange(): the stretch of [type] at the selection's
+ *  start ([markRange]) becomes the selection, when it holds all of it. */
+internal fun extendMarkRange(tr: PmTransaction, type: PmMarkType) {
+    val selection = tr.selection
+    val (from, to) = markRange(selection.rFrom, type) ?: return
+    if (from <= selection.from && to >= selection.to) tr.selection = PmTextSelection.create(tr.doc, from, to)
+}
+
+/** Tiptap's getMarkRange(): where the stretch of [type] at [pos] starts
+ *  and ends in its parent, from the node after [pos] carrying one, else
+ *  the node before it, on over its neighbours carrying one with
+ *  [attributes] (that node's own when null). */
+private fun markRange(pos: PmResolvedPos, type: PmMarkType, attributes: PmAttrs? = null): Pair<Int, Int>? {
+    val parent = pos.parent
+    fun carries(node: PmNode?) = node != null && node.marks.any { it.type === type }
+    var start = parent.childAfter(pos.parentOffset)
+    if (!carries(start.node)) start = parent.childBefore(pos.parentOffset)
+    val node = start.node?.takeIf(::carries) ?: return null
+    val attrs = attributes ?: node.marks.first { it.type === type }.attrs
+    fun holds(child: PmNode) = child.marks.any { mark -> mark.type === type && attrs.all { (key, value) -> mark.attrs[key] == value } }
+    if (!holds(node)) return null
+    var startIndex = start.index
+    var from = pos.start() + start.offset
+    var endIndex = startIndex + 1
+    var to = from + node.nodeSize
+    while (startIndex > 0 && holds(parent.child(startIndex - 1))) {
+        startIndex--
+        from -= parent.child(startIndex).nodeSize
+    }
+    while (endIndex < parent.childCount && holds(parent.child(endIndex))) {
+        to += parent.child(endIndex).nodeSize
+        endIndex++
+    }
+    return from to to
+}
+
+/** TextStyle's removeEmptyTextStyle(): every node of the selection but a
+ *  textblock loses its textStyle unless it has one with a value. A list
+ *  or quote the selection is in has no mark of its own, so every colour,
+ *  font and size in all of it goes, as on the web. */
+internal fun removeEmptyTextStyle(tr: PmTransaction) {
+    val selection = tr.selection
+    tr.doc.nodesBetween(selection.from, selection.to, { node, pos, _, _ ->
+        if (!node.isTextblock && node.marks.none { it.type === PmSchema.textStyle && it.attrs.values.any(::truthy) }) {
+            tr.removeMark(pos, pos + node.nodeSize, PmSchema.textStyle)
+        }
+        true
+    })
+}
+
+/** JavaScript's truthiness, for an attribute's value. */
+private fun truthy(value: Any?): Boolean = when (value) {
+    null, false, "" -> false
+    is Number -> value.toDouble().let { it != 0.0 && !it.isNaN() }
+    else -> true
+}
+
 // ---------- Code blocks and rules ----------
 
 /**

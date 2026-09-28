@@ -9,10 +9,10 @@ data class RichEdit(val blocks: List<RichBlock>, val focusId: String? = null, va
 /**
  * The structural edits typing makes in the web editor (Tiptap/ProseMirror:
  * splitBlock, splitListItem, liftEmptyBlock, joinBackward, deleteSelection...),
- * ported onto the flat block model, with the formatting bar's mark commands
- * and what its buttons read; its block commands run on the web's own model
- * ([RichCommands]). Each takes the current blocks and returns what the web
- * would leave. Pure, so the screen only has to apply the result.
+ * ported onto the flat block model, with what the formatting bar's buttons
+ * read; its commands run on the web's own model ([RichCommands]). Each
+ * takes the current blocks and returns what the web would leave. Pure, so
+ * the screen only has to apply the result.
  */
 object RichEdits {
 
@@ -324,22 +324,6 @@ object RichEdits {
         return a.zip(b).takeWhile { (x, y) -> x == y }.mapNotNull { (it.first as? ListHolder)?.kind }.toSet()
     }
 
-    /** setMark over a selection: [type] on all the text it covers, but in a
-     *  code block, whose text takes no mark, and as [RichDoc.setMark] puts
-     *  it on around inline code. */
-    fun setMark(blocks: List<RichBlock>, span: RichSpan, type: RichMarkType, value: String? = null, color: String? = null): List<RichBlock> =
-        mapSelectedText(blocks, span) { marks, from, to -> RichDoc.setMark(marks, type, from, to, value, color) }
-
-    /** unsetMark over a selection; a null [type] clears every mark. */
-    fun clearMark(blocks: List<RichBlock>, span: RichSpan, type: RichMarkType?): List<RichBlock> =
-        mapSelectedText(blocks, span) { marks, from, to ->
-            if (type == null) RichDoc.clearAllMarks(marks, from, to) else RichDoc.clearMark(marks, type, from, to)
-        }
-
-    /** toggleMark over a selection: off when it reads active, else on. */
-    fun toggleMark(blocks: List<RichBlock>, span: RichSpan, type: RichMarkType): List<RichBlock> =
-        if (isMarkActive(blocks, span, type)) clearMark(blocks, span, type) else setMark(blocks, span, type)
-
     /**
      * Tiptap's isMarkActive over a selection: the selected text with [type]
      * (of a value and a colour [attrs] accepts), plus, once there is any,
@@ -505,18 +489,6 @@ object RichEdits {
         blocks.drop(index + 1).firstOrNull { it.kind.hasText }?.let { return RichEdit(blocks, it.id, 0) }
         blocks.take(index).lastOrNull { it.kind.hasText }?.let { return RichEdit(blocks, it.id, it.text.length) }
         return RichEdit(blocks)
-    }
-
-    /** [transform] applied to the marks of each block's selected text. */
-    private fun mapSelectedText(
-        blocks: List<RichBlock>,
-        span: RichSpan,
-        transform: (marks: List<RichMark>, from: Int, to: Int) -> List<RichMark>,
-    ): List<RichBlock> = blocks.mapIndexed { i, block ->
-        if (i !in span.start..span.end || !block.kind.hasText || block.kind == RichBlockKind.CODE_BLOCK) return@mapIndexed block
-        val from = span.fromIn(i)
-        val to = span.toIn(i, block.text.length)
-        if (from >= to) block else block.copy(marks = transform(block.marks, from, to))
     }
 
     /** Whether the list item [index] joins the item right above it
