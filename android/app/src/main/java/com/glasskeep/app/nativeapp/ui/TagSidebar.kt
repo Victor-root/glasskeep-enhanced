@@ -1,5 +1,11 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -68,10 +74,11 @@ internal const val SidebarTrashed = "TRASHED"
 
 /**
  * Notes drawer, ported from TagSidebar.jsx's own non-permanent (mobile)
- * mode: a 288dp panel over a plain scrim, both shown and hidden without
- * any transition (Tailwind v4's translate utilities are not covered by the
- * aside's transition list, so the web's drawer pops too), matching the
- * web's own tap-outside-to-close / no-swipe-to-close behaviour.
+ * mode: a 288dp panel over a plain scrim, matching the web's own
+ * tap-outside-to-close / no-swipe-to-close behaviour. The panel slides in
+ * and out with the aside's own `transition-[transform] duration-200`,
+ * which Tailwind v4's translate utilities escape on the web, where the
+ * drawer pops; the scrim fades alongside it.
  */
 @Composable
 fun TagSidebar(
@@ -90,19 +97,36 @@ fun TagSidebar(
     onSelectTrash: () -> Unit,
     onClose: () -> Unit,
 ) {
-    if (open) {
+    AnimatedVisibility(
+        visible = open,
+        modifier = Modifier.fillMaxSize(),
+        enter = fadeIn(tween(SidebarSlideMs, easing = GkStandardEasing)),
+        exit = fadeOut(tween(SidebarSlideMs, easing = GkStandardEasing)),
+    ) {
         Box(
             Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.3f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { onClose() },
+                // The web drops it at once: while it fades out, the page
+                // takes the touches again.
+                .then(
+                    if (open) {
+                        Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { onClose() }
+                    } else {
+                        Modifier
+                    },
+                ),
         )
     }
 
-    if (open) {
+    AnimatedVisibility(
+        visible = open,
+        enter = slideInHorizontally(tween(SidebarSlideMs, easing = GkStandardEasing)) { -it },
+        exit = slideOutHorizontally(tween(SidebarSlideMs, easing = GkStandardEasing)) { -it },
+    ) {
         val titleColor = if (dark) DarkTitleColor else LightTitleColor
         // Mobile web keeps this an opaque --gk-statusbar surface, rather
         // than the generic white card background.
@@ -119,6 +143,8 @@ fun TagSidebar(
             modifier = Modifier
                 .width(288.dp)
                 .fillMaxHeight()
+                // A tap on its bare parts stays there, off the scrim under it.
+                .blockTouchesBelow()
                 .background(panelBg),
         ) {
             Row(
@@ -407,3 +433,4 @@ private fun Modifier.sidebarBodyEdge(border: Color, shadow: Color): Modifier = d
 
 private val SidebarShadowDepth = 24.dp
 private const val SidebarShadowSteps = 12
+private const val SidebarSlideMs = 200
