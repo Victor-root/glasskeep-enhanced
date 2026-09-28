@@ -1,5 +1,7 @@
 package com.glasskeep.app.nativeapp.data
 
+import java.util.UUID
+
 /**
  * One structural edit's outcome: the new block list, and where the caret
  * goes next ([focusId] at [caret]), or null when it stays where it is.
@@ -45,6 +47,7 @@ object RichEdits {
             lineIndent = block.lineIndent,
             nestLevel = block.nestLevel,
             quotes = block.quotes,
+            listId = block.listId,
         )
         // A paragraph a list item holds after its own splits the item there
         // (splitListItem): what follows the caret opens a new item of the
@@ -57,6 +60,7 @@ object RichEdits {
                 indent = if (item.kind == RichBlockKind.TASK_ITEM) block.indent else item.indent,
                 lineIndent = if (item.kind == RichBlockKind.TASK_ITEM) 0 else block.indent,
                 nestLevel = item.nestLevel,
+                listId = item.listId,
             )
             return RichEdit(blocks.replaceAt(index, listOf(first, newItem)), newItem.id, 0)
         }
@@ -496,15 +500,10 @@ object RichEdits {
      *  item of the same item type (listItemHasSubList). */
     private fun joinsItemAbove(blocks: List<RichBlock>, index: Int): Boolean {
         val block = blocks[index]
-        var holdsItems = false
-        var j = index - 1
-        while (j >= 0 && blocks[j].sharesQuoteWith(block) && blocks[j].listDepth > block.nestLevel) {
-            val above = blocks[j]
-            if (above.kind.isListItem && above.nestLevel == block.nestLevel) return above.kind == block.kind && !holdsItems
-            if (above.kind.isListItem && (above.kind == RichBlockKind.TASK_ITEM) == (block.kind == RichBlockKind.TASK_ITEM)) holdsItems = true
-            j--
-        }
-        return false
+        val above = itemAbove(blocks, index) ?: return false
+        val task = block.kind == RichBlockKind.TASK_ITEM
+        val holdsItems = (above + 1 until index).any { blocks[it].kind.isListItem && (blocks[it].kind == RichBlockKind.TASK_ITEM) == task }
+        return block.continuesList(blocks[above]) && !holdsItems
     }
 
     /** Whether the list item holding block [index] (or, for a list item, the
@@ -553,24 +552,39 @@ object RichEdits {
      * liftListItem: the item at [index] moves one level up with everything
      * it holds: a nested item becomes an item of its parent's list, a
      * top-level item a plain paragraph in its quotes, what it held then
-     * standing on its own. The indent of a bullet or ordered item lives on
-     * its `<li>`, gone once out of the list; a task item's own indent is
-     * its paragraph's, which stays.
+     * standing on its own. The items after it in its list become a list of
+     * their own, with the list's attributes (liftOutOfList); after a nested
+     * item they go into it, joining the list it holds last when that is of
+     * their kind (liftToOuterList). The indent of a bullet or ordered item
+     * lives on its `<li>`, gone once out of the list; a task item's own
+     * indent is its paragraph's, which stays.
      */
     private fun liftItem(blocks: List<RichBlock>, index: Int): List<RichBlock> {
         val item = blocks[index]
         val lifted = if (item.nestLevel > 0) {
             val parent = holdingItem(blocks, index)?.let { blocks[it] }
-            item.copy(kind = parent?.kind ?: item.kind, nestLevel = item.nestLevel - 1)
+            item.copy(kind = parent?.kind ?: item.kind, nestLevel = item.nestLevel - 1, listId = parent?.listId ?: item.listId)
         } else {
             item.copy(kind = RichBlockKind.PARAGRAPH, indent = paragraphIndent(item), lineIndent = 0)
         }
         val end = subtreeEnd(blocks, index)
-        return blocks.mapIndexed { i, b ->
+        val moved = blocks.mapIndexed { i, b ->
             when (i) {
                 index -> lifted
                 in index + 1..end -> b.copy(nestLevel = b.nestLevel - 1)
                 else -> b
+            }
+        }
+        val listEnd = listRange(blocks, index).last
+        if (listEnd == end) return moved
+        val joined = itemAbove(moved, end + 1)?.let { moved[it] }?.takeIf { item.nestLevel > 0 && it.kind == item.kind }
+        val listId = joined?.listId ?: UUID.randomUUID().toString()
+        val listStart = if (joined == null) blocks[listItemsUpTo(blocks, index).first()].listStart else null
+        return moved.mapIndexed { i, b ->
+            when {
+                i !in end + 1..listEnd || b.nestLevel != item.nestLevel -> b
+                i == end + 1 -> b.copy(listId = listId, listStart = listStart)
+                else -> b.copy(listId = listId)
             }
         }
     }
@@ -637,7 +651,7 @@ object RichEdits {
     private fun listRange(blocks: List<RichBlock>, index: Int): IntRange {
         val block = blocks[index]
         fun inList(b: RichBlock) = b.sharesQuoteWith(block) &&
-            (b.nestLevel > block.nestLevel || b.nestLevel == block.nestLevel && b.kind == block.kind)
+            (b.nestLevel > block.nestLevel || b.nestLevel == block.nestLevel && b.continuesList(block))
         var first = index
         while (first > 0 && inList(blocks[first - 1])) first--
         var last = index

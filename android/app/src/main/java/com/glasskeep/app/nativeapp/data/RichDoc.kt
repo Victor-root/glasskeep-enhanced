@@ -79,6 +79,11 @@ data class RichQuote(val id: String = UUID.randomUUID().toString(), val indent: 
  * began with "3. "), carried by the item that heads the list: the web's
  * numbering is its own CSS counter and does not show it, but a copy
  * numbers the list's text from it and saving keeps it.
+ *
+ * [listId] is the list a list item belongs to, local only, never
+ * serialized: it tells apart two lists of one kind that follow each
+ * other, which the web keeps as two lists and numbers apart. The items of
+ * one list at one level share it.
  */
 data class RichBlock(
     val id: String,
@@ -93,6 +98,7 @@ data class RichBlock(
     val quotes: List<RichQuote> = emptyList(),
     val listStart: Int? = null,
     val lineIndent: Int = 0,
+    val listId: String? = null,
 )
 
 /**
@@ -212,6 +218,7 @@ object RichDoc {
         if (!attrsAreKnown(attrs, extraAllowedKeys = setOf("start"))) return null
         val start = (attrs?.get("start") as? JsonPrimitive)?.intOrNull?.takeIf { itemKind == RichBlockKind.NUMBERED_ITEM && it != 1 }
         val items = node["content"] as? JsonArray ?: return null
+        val listId = UUID.randomUUID().toString()
         val blocks = mutableListOf<RichBlock>()
         for (itemNode in items) {
             val itemObj = itemNode as? JsonObject ?: return null
@@ -225,7 +232,14 @@ object RichDoc {
             val block = parseTextBlock(paragraphNode, itemKind) ?: return null
             val head = start.takeIf { blocks.isEmpty() }
             blocks.add(
-                block.copy(indent = readIndent(itemAttrs), lineIndent = block.indent, nestLevel = nestingDepth, quotes = quotes, listStart = head),
+                block.copy(
+                    indent = readIndent(itemAttrs),
+                    lineIndent = block.indent,
+                    nestLevel = nestingDepth,
+                    quotes = quotes,
+                    listStart = head,
+                    listId = listId,
+                ),
             )
             for (child in itemContent.drop(1)) {
                 val childObj = child as? JsonObject ?: return null
@@ -242,6 +256,7 @@ object RichDoc {
     private fun parseTaskList(node: JsonObject, quotes: List<RichQuote>, nestingDepth: Int): List<RichBlock>? {
         if (!attrsAreKnown(node["attrs"] as? JsonObject)) return null
         val items = node["content"] as? JsonArray ?: return null
+        val listId = UUID.randomUUID().toString()
         val blocks = mutableListOf<RichBlock>()
         for (itemNode in items) {
             val itemObj = itemNode as? JsonObject ?: return null
@@ -260,6 +275,7 @@ object RichDoc {
                     indent = block.indent.takeIf { it > 0 } ?: readIndent(itemAttrs),
                     nestLevel = nestingDepth,
                     quotes = quotes,
+                    listId = listId,
                 ),
             )
             for (child in itemContent.drop(1)) {
@@ -444,7 +460,7 @@ object RichDoc {
 
     /** Serializes [blocks] back into the same envelope [parse] reads.
      *  Consecutive blocks of one quote are regrouped into their blockquote
-     *  and consecutive same-kind blocks into the one nested node Tiptap
+     *  and consecutive items of one list into the one nested node Tiptap
      *  expects (a list, a task list), list items and what they hold are
      *  nested back under their parent item by [RichBlock.nestLevel]; only
      *  the attrs this editor actually sets are emitted, everything else is
@@ -504,7 +520,7 @@ object RichDoc {
                 // One top-level list: its own items plus everything nested
                 // in them.
                 var end = i + 1
-                while (end < blocks.size && (blocks[end].nestLevel > 0 || blocks[end].kind == block.kind)) end++
+                while (end < blocks.size && (blocks[end].nestLevel > 0 || blocks[end].continuesList(block))) end++
                 nodes.add(encodeList(blocks.subList(i, end)))
                 i = end
             } else {
@@ -553,8 +569,8 @@ object RichDoc {
     }
 
     /** A list item and what it holds after its paragraph, in order: its
-     *  own blocks, and the lists nested in it, one per run of same-kind
-     *  children. A bullet or ordered item carries its indent on the `<li>`
+     *  own blocks, and the lists nested in it, one per run of the items of
+     *  one list. A bullet or ordered item carries its indent on the `<li>`
      *  so the marker and the text shift together (Indent.js:69-75), its
      *  paragraph its [RichBlock.lineIndent]; a task item has no indent
      *  attribute, its paragraph carries it. */
@@ -569,11 +585,7 @@ object RichDoc {
                 continue
             }
             var end = c + 1
-            while (end < children.size &&
-                (children[end].nestLevel > child.nestLevel || children[end].kind == child.kind)
-            ) {
-                end++
-            }
+            while (end < children.size && (children[end].nestLevel > child.nestLevel || children[end].continuesList(child))) end++
             nested.add(encodeList(children.subList(c, end)))
             c = end
         }
@@ -949,6 +961,28 @@ val RichBlockKind.hasText: Boolean
 val RichBlockKind.isListItem: Boolean
     get() = this == RichBlockKind.BULLET_ITEM || this == RichBlockKind.NUMBERED_ITEM ||
         this == RichBlockKind.TASK_ITEM
+
+/** Whether this block, at the level of the list item [item], is an item of
+ *  the same list. */
+fun RichBlock.continuesList(item: RichBlock): Boolean = kind == item.kind && listId == item.listId
+
+/** The list item right above block [index] at its level, in its quotes,
+ *  past what that item holds: the last item of a list ending there, or
+ *  null when none does. */
+internal fun itemAbove(blocks: List<RichBlock>, index: Int): Int? {
+    val block = blocks[index]
+    var j = index - 1
+    while (j >= 0 && blocks[j].sharesQuoteWith(block) && blocks[j].listDepth > block.nestLevel) {
+        if (blocks[j].nestLevel == block.nestLevel) return j
+        j--
+    }
+    return null
+}
+
+/** The items of list item [index]'s list, at its level, from the list's
+ *  first one to [index]. */
+internal fun listItemsUpTo(blocks: List<RichBlock>, index: Int): List<Int> =
+    generateSequence(index) { i -> itemAbove(blocks, i)?.takeIf { blocks[it].continuesList(blocks[i]) } }.toList().asReversed()
 
 /** Whether [other] sits in the same quotes as this block, or like it in
  *  none. */

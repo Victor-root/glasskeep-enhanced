@@ -46,6 +46,7 @@ class RichPasteCorpusTest {
 
     private fun show(blocks: List<RichBlock>): String {
         val quoteIds = HashMap<String, Int>()
+        val listIds = HashMap<String?, Int>()
         return blocks.joinToString("\n") { b ->
             val quotes = b.quotes.joinToString(",") { "q${quoteIds.getOrPut(it.id) { quoteIds.size }}:${it.indent}" }
             val marks = b.marks.sortedWith(compareBy({ it.start }, { it.end }, { it.type.ordinal })).joinToString(",") {
@@ -60,6 +61,7 @@ class RichPasteCorpusTest {
                 if (b.kind == RichBlockKind.CODE_BLOCK && b.language != null) append(" lang=").append(b.language)
                 if (b.nestLevel != 0) append(" nest=").append(b.nestLevel)
                 if (b.listStart != null) append(" start=").append(b.listStart)
+                if (b.kind.isListItem) append(" list=l").append(listIds.getOrPut(b.listId) { listIds.size })
                 if (quotes.isNotEmpty()) append(" quotes=").append(quotes)
             }
         }

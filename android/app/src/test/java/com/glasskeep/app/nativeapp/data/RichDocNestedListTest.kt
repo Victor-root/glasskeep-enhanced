@@ -44,7 +44,10 @@ class RichDocNestedListTest {
 
         assertEquals(1, blocks.single().indent)
         assertEquals(2, blocks.single().lineIndent)
-        assertEquals(blocks.map { it.copy(id = "") }, requireNotNull(RichDoc.parse(RichDoc.encode(blocks))).map { it.copy(id = "") })
+        assertEquals(
+            blocks.map { it.copy(id = "", listId = null) },
+            requireNotNull(RichDoc.parse(RichDoc.encode(blocks))).map { it.copy(id = "", listId = null) },
+        )
         // Enter passes it on to the next item, out of the list the
         // paragraph takes it back.
         assertEquals(listOf(2, 2), requireNotNull(RichEdits.split(blocks, blocks.single().id, 2)).blocks.map { it.lineIndent })

@@ -64,20 +64,9 @@ object RichClipboard {
     private fun marker(blocks: List<RichBlock>, span: RichSpan, index: Int): String {
         val item = blocks[index]
         if (item.kind != RichBlockKind.NUMBERED_ITEM) return "- "
-        var copiedBefore = 0
-        var head = index
-        var j = index - 1
-        while (j >= 0) {
-            val other = blocks[j]
-            if (!other.sharesQuoteWith(item) || other.listDepth <= item.nestLevel) break
-            if (other.nestLevel == item.nestLevel) {
-                if (other.kind != item.kind) break
-                head = j
-                if (j >= span.start) copiedBefore++
-            }
-            j--
-        }
-        val start = blocks[head].listStart?.takeIf { it > 0 } ?: 1
+        val items = listItemsUpTo(blocks, index)
+        val copiedBefore = items.count { it in span.start until index }
+        val start = blocks[items.first()].listStart?.takeIf { it > 0 } ?: 1
         return "${start + copiedBefore}. "
     }
 }

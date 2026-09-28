@@ -81,17 +81,18 @@ internal class RichTree(val blocks: List<RichBlock>) {
             return listOf(JsonObject(fields))
         }
 
+        /** [new], parsed afresh, keeping what [old] carries beyond the
+         *  document on the blocks left as they were at either end: their
+         *  ids, a checked state, language or list their kind does not show,
+         *  and their lists' ids, each list of [new] taking the one its first
+         *  such block had unless another list took it first. */
         private fun keepUnchanged(old: List<RichBlock>, new: List<RichBlock>): List<RichBlock> {
             fun comparable(block: RichBlock) = block.copy(
                 id = "",
                 quotes = block.quotes.map { it.copy(id = "") },
                 checked = block.checked.takeIf { block.kind == RichBlockKind.TASK_ITEM } ?: false,
                 language = block.language.takeIf { block.kind == RichBlockKind.CODE_BLOCK },
-            )
-            fun restored(fresh: RichBlock, previous: RichBlock) = fresh.copy(
-                id = previous.id,
-                checked = if (fresh.kind == RichBlockKind.TASK_ITEM) fresh.checked else previous.checked,
-                language = if (fresh.kind == RichBlockKind.CODE_BLOCK) fresh.language else previous.language,
+                listId = null,
             )
             var prefix = 0
             while (prefix < old.size && prefix < new.size && comparable(old[prefix]) == comparable(new[prefix])) prefix++
@@ -101,12 +102,28 @@ internal class RichTree(val blocks: List<RichBlock>) {
             ) {
                 suffix++
             }
-            return new.mapIndexed { i, block ->
+            val previous = new.indices.map { i ->
                 when {
-                    i < prefix -> restored(block, old[i])
-                    i >= new.size - suffix -> restored(block, old[old.size - (new.size - i)])
-                    else -> block
+                    i < prefix -> old[i]
+                    i >= new.size - suffix -> old[old.size - (new.size - i)]
+                    else -> null
                 }
+            }
+            val lists = HashMap<String, String?>()
+            new.forEachIndexed { i, block ->
+                val fresh = block.listId ?: return@forEachIndexed
+                val kept = previous[i]?.listId ?: return@forEachIndexed
+                if (fresh !in lists) lists[fresh] = kept.takeIf { it !in lists.values }
+            }
+            return new.mapIndexed { i, block ->
+                val listId = block.listId?.let { lists[it] ?: it }
+                val kept = previous[i] ?: return@mapIndexed block.copy(listId = listId)
+                block.copy(
+                    id = kept.id,
+                    checked = if (block.kind == RichBlockKind.TASK_ITEM) block.checked else kept.checked,
+                    language = if (block.kind == RichBlockKind.CODE_BLOCK) block.language else kept.language,
+                    listId = if (block.kind.isListItem) listId else kept.listId,
+                )
             }
         }
     }

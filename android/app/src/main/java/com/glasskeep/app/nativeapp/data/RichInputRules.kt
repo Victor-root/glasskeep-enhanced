@@ -1,5 +1,7 @@
 package com.glasskeep.app.nativeapp.data
 
+import java.util.UUID
+
 /** An input rule's edit, and the mark it takes off what is typed next
  *  (Tiptap's removeStoredMark once a mark rule has run). */
 data class RichInputResult(val edit: RichEdit, val disarm: RichMarkType? = null)
@@ -118,8 +120,7 @@ object RichInputRules {
         BlockRule(Regex("""^~~~([a-z]+)?[${RichDoc.JsSpace}\n]\z"""), ::codeBlock),
         MarkRule(Regex("""(?:^|$S)(~~(?!$S+~~)((?:[^~]+))~~(?!$S+~~))\z"""), RichMarkType.STRIKE),
         BlockRule(Regex("""^(\d+)\.$S\z""")) { blocks, index, match, cut ->
-            val start = match.groupValues[1].toIntOrNull() ?: Int.MAX_VALUE
-            wrap(blocks, index, cut, RichBlockKind.NUMBERED_ITEM, listStart = start.takeIf { it != 1 })
+            wrap(blocks, index, cut, RichBlockKind.NUMBERED_ITEM, number = match.groupValues[1].toIntOrNull() ?: Int.MAX_VALUE)
         },
         MarkRule(Regex("""(?:^|$S)(\*(?!$S+\*)((?:[^*]+))\*(?!$S+\*))\z"""), RichMarkType.ITALIC),
         MarkRule(Regex("""(?:^|$S)(_(?!$S+_)((?:[^_]+))_(?!$S+_))\z"""), RichMarkType.ITALIC),
@@ -148,25 +149,39 @@ object RichInputRules {
     private fun done(blocks: List<RichBlock>, index: Int, replacement: List<RichBlock>, focus: RichBlock): RichEdit =
         RichEdit(RichDoc.normalizeNesting(blocks.replaceAt(index, replacement)), focus.id, 0)
 
-    /** wrappingInputRule for a list: a paragraph goes into a list where it
-     *  stands (in its quotes, or nested in the list item holding it),
-     *  joining the list right above it, its attributes kept, the new item
-     *  taking none. An ordered list takes the number typed as its start. */
+    /**
+     * wrappingInputRule for a list: a paragraph goes into a new list where
+     * it stands (in its quotes, or nested in the list item holding it),
+     * which takes [number], the number typed for an ordered list, as its
+     * start. It joins a list of its kind ending right above it there, whose
+     * attributes stay, the item taking none: always a bullet list, an
+     * ordered list when [number] is the one its next item would have
+     * (joinPredicate: childCount + start), never a task list, whose rule
+     * wraps in a task item.
+     */
     private fun wrap(
         blocks: List<RichBlock>,
         index: Int,
         cut: Int,
         kind: RichBlockKind,
         checked: Boolean = false,
-        listStart: Int? = null,
+        number: Int? = null,
     ): RichEdit? {
         val block = blocks[index]
         if (block.kind != RichBlockKind.PARAGRAPH) return null
         val task = kind == RichBlockKind.TASK_ITEM
+        val joined = itemAbove(blocks, index)?.takeIf { above ->
+            blocks[above].kind == kind && when (kind) {
+                RichBlockKind.BULLET_ITEM -> true
+                RichBlockKind.NUMBERED_ITEM -> listItemsUpTo(blocks, above).let { it.size + (blocks[it.first()].listStart ?: 1) } == number
+                else -> false
+            }
+        }?.let { blocks[it] }
         val wrapped = rest(block, cut).copy(
             kind = kind,
             checked = checked,
-            listStart = listStart,
+            listStart = number?.takeIf { joined == null && it != 1 },
+            listId = joined?.listId ?: UUID.randomUUID().toString(),
             indent = if (task) block.indent else 0,
             lineIndent = if (task) 0 else block.indent,
         )

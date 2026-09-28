@@ -12,10 +12,10 @@ import com.glasskeep.app.nativeapp.data.RichTree
 import com.glasskeep.app.nativeapp.data.RichPos
 import com.glasskeep.app.nativeapp.data.RichSelection
 import com.glasskeep.app.nativeapp.data.RichTyping
+import com.glasskeep.app.nativeapp.data.isListItem
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.int
@@ -38,6 +38,7 @@ class RichCommandCorpusTest {
 
     private fun show(blocks: List<RichBlock>): String {
         val quoteIds = HashMap<String, Int>()
+        val listIds = HashMap<String?, Int>()
         return blocks.joinToString("\n") { b ->
             val quotes = b.quotes.joinToString(",") { "q${quoteIds.getOrPut(it.id) { quoteIds.size }}:${it.indent}" }
             val marks = b.marks.sortedWith(compareBy({ it.start }, { it.end }, { it.type.ordinal })).joinToString(",") {
@@ -53,6 +54,7 @@ class RichCommandCorpusTest {
                 if (b.kind == RichBlockKind.CODE_BLOCK && b.language != null) append(" lang=").append(b.language)
                 if (b.nestLevel != 0) append(" nest=").append(b.nestLevel)
                 if (b.listStart != null) append(" start=").append(b.listStart)
+                if (b.kind.isListItem) append(" list=l").append(listIds.getOrPut(b.listId) { listIds.size })
                 if (quotes.isNotEmpty()) append(" quotes=").append(quotes)
             }
         }

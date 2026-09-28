@@ -160,6 +160,7 @@ import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.TypographyProfile
+import com.glasskeep.app.nativeapp.data.continuesList
 import com.glasskeep.app.nativeapp.data.hasText
 import com.glasskeep.app.nativeapp.data.isHeading
 import com.glasskeep.app.nativeapp.data.isListItem
@@ -1334,11 +1335,11 @@ private class FlowBox(val id: Int, val top: Float, val bottom: Float)
  * only a task item's text. What an item holds after its paragraph sits in
  * its text column, inside its boxes. Ordered items count with the web's
  * `gk-ol` counter as Chrome scopes it: the reset a list gets after a
- * paragraph, heading, rule, quote or other list only reaches its own items,
- * so that list starts at 1, a nested one too; a list opening the note or a
- * quote, or following a code block, counts on with the one counter all such
- * lists share across the note. [itemEm] is a list item's font size, and the
- * em of a quote's indent.
+ * paragraph, heading, rule, quote, bullet or task list only reaches its own
+ * items, so that list starts at 1, a nested one too; a list opening the
+ * note or a quote, or following a code block or another ordered list,
+ * counts on with the one counter all such lists share across the note.
+ * [itemEm] is a list item's font size, and the em of a quote's indent.
  */
 private fun richFlow(blocks: List<RichBlock>, itemEm: Float): RichFlow {
     var noteCounter = 0
@@ -1346,7 +1347,7 @@ private fun richFlow(blocks: List<RichBlock>, itemEm: Float): RichFlow {
     /** The blocks `[from, to)`, all held by the same [depth] quotes. */
     fun flow(from: Int, to: Int, depth: Int): RichFlow {
         class Level(
-            val kind: RichBlockKind,
+            val first: RichBlock,
             val list: FlowBox,
             var item: FlowBox,
             var checked: Boolean,
@@ -1354,6 +1355,17 @@ private fun richFlow(blocks: List<RichBlock>, itemEm: Float): RichFlow {
             var counter: Int,
             var childStart: Float,
         )
+
+        /** Whether an ordered list opening at block [index] counts on with
+         *  the note's counter: nothing stands right before it in its quotes,
+         *  or a code block or another ordered list does, which reset none. */
+        fun countsOn(index: Int): Boolean {
+            if (index == from) return true
+            if (!blocks[index - 1].sharesQuoteWith(blocks[index])) return false
+            var top = index - 1
+            while (top > from && blocks[top].nestLevel > 0) top--
+            return blocks[top].kind == RichBlockKind.CODE_BLOCK || blocks[top].kind == RichBlockKind.NUMBERED_ITEM
+        }
 
         var nextId = 0
         val levels = mutableListOf<Level>()
@@ -1381,7 +1393,7 @@ private fun richFlow(blocks: List<RichBlock>, itemEm: Float): RichFlow {
                 val task = block.kind == RichBlockKind.TASK_ITEM
                 val itemBox = FlowBox(nextId++, if (task) 1.6f else 0f, if (task) 1.6f else 0f)
                 val current = levels.getOrNull(level)
-                if (current != null && current.kind == block.kind) {
+                if (current != null && block.continuesList(current.first)) {
                     current.item = itemBox
                     current.checked = block.isChecked
                 } else {
@@ -1391,19 +1403,15 @@ private fun richFlow(blocks: List<RichBlock>, itemEm: Float): RichFlow {
                         level > 0 -> 1.6f
                         else -> 0f
                     }
-                    val sharesCounter = level == 0 && (
-                        previous == null ||
-                            previous.kind == RichBlockKind.CODE_BLOCK && previous.nestLevel == 0 && previous.sharesQuoteWith(block)
-                        )
                     levels.add(
-                        Level(block.kind, FlowBox(nextId++, listMargin, if (task) 2.4f else 0f), itemBox, block.isChecked, sharesCounter, 0, 0f),
+                        Level(block, FlowBox(nextId++, listMargin, if (task) 2.4f else 0f), itemBox, block.isChecked, level == 0 && countsOn(i), 0, 0f),
                     )
                 }
                 val entry = levels[level]
                 val parentStart = if (level == 0) 0f else levels[level - 1].childStart
                 val padding = when {
                     level == 0 -> if (task) 0f else 17.6f
-                    task -> if (levels[level - 1].kind == RichBlockKind.TASK_ITEM) 20f else 0f
+                    task -> if (levels[level - 1].first.kind == RichBlockKind.TASK_ITEM) 20f else 0f
                     else -> 16f
                 }
                 val indent = block.indent * IndentStepEm * itemEm
