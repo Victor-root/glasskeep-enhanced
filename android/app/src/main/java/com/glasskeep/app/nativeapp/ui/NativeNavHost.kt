@@ -442,6 +442,7 @@ fun NativeNavHost(
     // and the same reason: the web keeps exactly one tooltip portal at its
     // own root (TooltipPortal.jsx).
     val tooltips = rememberTooltipController()
+    val popovers = remember { GkPopovers() }
     // "Edge-to-edge in landscape" off means the whole shell stays clear of
     // the left cutout, exactly what the web does by putting --safe-left
     // back on <body> (App.jsx:1703). Left only: the other three edges are
@@ -543,10 +544,11 @@ fun NativeNavHost(
         LocalGkToasts provides toasts,
         LocalGkAlerts provides alerts,
         LocalGkTooltips provides tooltips,
+        LocalGkPopovers provides popovers,
         LocalSignedOutReload provides signedOutReload,
         LocalUriHandler provides remember(context) { CustomTabUriHandler(context) },
     ) {
-        Box(Modifier.fillMaxSize().then(safeLeft)) {
+        Box(Modifier.fillMaxSize().then(safeLeft).gkPopoverTouches(popovers)) {
             if (showUnlockScreen) {
                 key(signedOutReloads) {
                     InstanceUnlockScreen(
@@ -797,6 +799,7 @@ fun NativeNavHost(
                 }
                 }
             }
+            GkPopoverHost(popovers)
             GkToastHost(
                 controller = toasts,
                 position = toastPositionOf(container.editorPrefs.toastPosition),

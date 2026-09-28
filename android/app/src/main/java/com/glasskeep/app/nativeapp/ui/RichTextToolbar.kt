@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,7 +53,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -77,16 +75,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
@@ -856,10 +847,11 @@ private fun RichAnchoredButton(
     popover: @Composable () -> Unit,
     button: @Composable (open: Boolean) -> Unit,
 ) {
-    Box {
+    val anchor = rememberGkPopoverAnchor()
+    Box(Modifier.gkPopoverAnchor(anchor)) {
         button(open)
         if (open) {
-            RichPopover(dark = dark, onDismiss = { onOpenChange(false) }, padding = padding) { popover() }
+            RichPopover(anchor, dark = dark, onDismiss = { onOpenChange(false) }, padding = padding) { popover() }
         }
     }
 }
@@ -1206,109 +1198,60 @@ internal fun headingKindFor(level: Int): RichBlockKind = when (level) {
 // ---------------------------------------------------------------------------
 // Popovers
 
-/** Room around the card for its shadow, which the Popup's window would
- *  otherwise cut (the same reason FooterPopover pads its own). */
-private val RichPopoverShadowRoom = 40.dp
-
 /**
  * `.rt-pop` (globalCSS.js:3565-3583, 4703): a card at least 220dp wide on
  * a phone and otherwise as wide as its content, [padding] inside its 1px
- * border, pinned 6dp under its button, flipped above it when there is no
- * room below (or kept 8dp off the bottom when there is none above either),
- * always 8dp inside the screen, exactly as usePopoverPosition does
- * (Popover.jsx:35-79). It fades in over 0.12s from 2px higher, and a tap
- * anywhere outside it closes it.
+ * border, opened from the control at [anchor] and placed as the web places
+ * it ([GkPopoverHost]). It fades in over 0.12s from 2px higher; a touch
+ * anywhere else closes it and still goes on to what it lands on.
  */
 @Composable
 internal fun RichPopover(
+    anchor: GkPopoverAnchor,
     dark: Boolean,
     onDismiss: () -> Unit,
     padding: Dp = 8.dp,
     content: @Composable () -> Unit,
 ) {
-    val density = LocalDensity.current
-    val positionProvider = remember(density) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: IntRect,
-                windowSize: IntSize,
-                layoutDirection: LayoutDirection,
-                popupContentSize: IntSize,
-            ): IntOffset {
-                val room = with(density) { RichPopoverShadowRoom.roundToPx() }
-                val margin = with(density) { 8.dp.roundToPx() }
-                val gap = with(density) { 6.dp.roundToPx() }
-                val width = popupContentSize.width - 2 * room
-                val height = popupContentSize.height - 2 * room
-                val left = anchorBounds.left
-                    .coerceAtMost(windowSize.width - width - margin)
-                    .coerceAtLeast(margin)
-                val below = anchorBounds.bottom + gap
-                val above = anchorBounds.top - gap - height
-                val top = when {
-                    below + height + margin <= windowSize.height -> below
-                    above >= margin -> above
-                    else -> maxOf(margin, windowSize.height - height - margin)
-                }
-                return IntOffset(left - room, top - room)
-            }
-        }
-    }
-    Popup(
-        popupPositionProvider = positionProvider,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
+    GkPopover(anchor, onDismiss) {
         val shape = RoundedCornerShape(10.dp)
         val appear = remember { Animatable(0f) }
         LaunchedEffect(Unit) { appear.animateTo(1f, tween(durationMillis = 120, easing = EaseOut)) }
-        Box(
-            Modifier
-                .pointerInput(Unit) {
-                    val room = RichPopoverShadowRoom.toPx()
-                    detectTapGestures { tap ->
-                        val onCard = tap.x >= room && tap.y >= room && tap.x <= size.width - room && tap.y <= size.height - room
-                        if (!onCard) onDismiss()
-                    }
+        Column(
+            modifier = Modifier
+                .graphicsLayer {
+                    alpha = appear.value
+                    translationY = (appear.value - 1f) * 2.dp.toPx()
                 }
-                .padding(RichPopoverShadowRoom),
+                .widthIn(min = 220.dp)
+                .width(IntrinsicSize.Max)
+                .dropShadow(
+                    shape,
+                    Shadow(
+                        radius = 32.dp,
+                        color = if (dark) Color.Black.copy(alpha = 0.7f) else Color(0xFF111827).copy(alpha = 0.28f),
+                        spread = (-6).dp,
+                        offset = DpOffset(0.dp, 12.dp),
+                    ),
+                )
+                .dropShadow(
+                    shape,
+                    Shadow(
+                        radius = 8.dp,
+                        color = if (dark) Color.Black.copy(alpha = 0.5f) else Color(0xFF111827).copy(alpha = 0.1f),
+                        offset = DpOffset(0.dp, 2.dp),
+                    ),
+                )
+                .clip(shape)
+                .background(if (dark) Color(0xFF1F2937) else Color.White)
+                .border(
+                    width = 1.dp,
+                    color = if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.1f),
+                    shape = shape,
+                )
+                .padding(padding + 1.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .graphicsLayer {
-                        alpha = appear.value
-                        translationY = (appear.value - 1f) * 2.dp.toPx()
-                    }
-                    .widthIn(min = 220.dp)
-                    .width(IntrinsicSize.Max)
-                    .dropShadow(
-                        shape,
-                        Shadow(
-                            radius = 32.dp,
-                            color = if (dark) Color.Black.copy(alpha = 0.7f) else Color(0xFF111827).copy(alpha = 0.28f),
-                            spread = (-6).dp,
-                            offset = DpOffset(0.dp, 12.dp),
-                        ),
-                    )
-                    .dropShadow(
-                        shape,
-                        Shadow(
-                            radius = 8.dp,
-                            color = if (dark) Color.Black.copy(alpha = 0.5f) else Color(0xFF111827).copy(alpha = 0.1f),
-                            offset = DpOffset(0.dp, 2.dp),
-                        ),
-                    )
-                    .clip(shape)
-                    .background(if (dark) Color(0xFF1F2937) else Color.White)
-                    .border(
-                        width = 1.dp,
-                        color = if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.1f),
-                        shape = shape,
-                    )
-                    .padding(padding + 1.dp),
-            ) {
-                content()
-            }
+            content()
         }
     }
 }
