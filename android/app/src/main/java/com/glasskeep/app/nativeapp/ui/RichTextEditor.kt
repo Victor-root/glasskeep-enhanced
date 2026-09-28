@@ -1576,6 +1576,10 @@ private fun RichQuoteCard(
             content = content,
         )
         DisableSelection {
+            // `::before` is absolute: it takes no room, and its 54.4 line box
+            // sits 3 above the card, the glyph's own height centred in it.
+            // Compose keeps a line at least as tall as its font, so the
+            // centring is done here.
             Text(
                 "“",
                 color = glyph,
@@ -1583,7 +1587,11 @@ private fun RichQuoteCard(
                 lineHeight = 54.4.sp,
                 fontFamily = FontFamily.Serif,
                 fontStyle = FontStyle.Normal,
-                modifier = Modifier.offset(x = 15.2.dp, y = (-3).dp),
+                modifier = Modifier.layout { measurable, _ ->
+                    val placeable = measurable.measure(Constraints())
+                    val top = (-3).dp.toPx() + (54.4.sp.toPx() - placeable.height) / 2f
+                    layout(0, 0) { placeable.place(15.2.dp.roundToPx(), top.roundToInt()) }
+                },
             )
         }
     }
