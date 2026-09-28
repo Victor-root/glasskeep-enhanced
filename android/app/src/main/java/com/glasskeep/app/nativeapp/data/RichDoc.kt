@@ -330,22 +330,17 @@ object RichDoc {
         val marks = mutableListOf<RichMark>()
         for (node in nodes) {
             val obj = node as? JsonObject ?: return null
+            val start = sb.length
             when (nodeType(obj)) {
-                "text" -> {
-                    val text = (obj["text"] as? JsonPrimitive)?.contentOrNull ?: return null
-                    val start = sb.length
-                    sb.append(text)
-                    val end = sb.length
-                    val markNodes = obj["marks"] as? JsonArray
-                    if (markNodes != null) {
-                        for (markNode in markNodes) {
-                            val markObj = markNode as? JsonObject ?: return null
-                            marks.addAll(parseMark(markObj, start, end) ?: return null)
-                        }
-                    }
-                }
+                "text" -> sb.append((obj["text"] as? JsonPrimitive)?.contentOrNull ?: return null)
+                // A hardBreak carries the marks of the text around it, as
+                // the text does.
                 "hardBreak" -> sb.append("\n")
                 else -> return null
+            }
+            for (markNode in obj["marks"] as? JsonArray ?: JsonArray(emptyList())) {
+                val markObj = markNode as? JsonObject ?: return null
+                marks.addAll(parseMark(markObj, start, sb.length) ?: return null)
             }
         }
         return sb.toString() to mergeAdjacent(marks)
@@ -386,7 +381,7 @@ object RichDoc {
 
     /** Tiptap splits a run of text at every attribute change, so one visually
      *  continuous mark arrives as several adjacent instances. Gluing them
-     *  back together keeps [isMarkActive] and the toolbar honest. */
+     *  back together keeps the toolbar honest. */
     private fun mergeAdjacent(marks: List<RichMark>): List<RichMark> {
         val sorted = marks.sortedWith(compareBy({ it.type.ordinal }, { it.start }))
         val out = mutableListOf<RichMark>()
@@ -643,7 +638,8 @@ object RichDoc {
     /** Splits `text` on "\n" into hardBreak-separated lines, then each line
      *  into the smallest runs whose active mark set doesn't change, so every
      *  emitted text node has one uniform marks array, matching how Tiptap's
-     *  own doc.toJSON() never mixes marks within a single text node. */
+     *  own doc.toJSON() never mixes marks within a single text node. Each
+     *  hardBreak keeps the marks over its "\n". */
     private fun encodeInline(text: String, marks: List<RichMark>): List<JsonObject> {
         if (text.isEmpty()) return emptyList()
         val result = mutableListOf<JsonObject>()
@@ -674,7 +670,15 @@ object RichDoc {
                 }
             }
             lineStart = lineEnd + 1
-            if (index < lines.lastIndex) result.add(buildJsonObject { put("type", "hardBreak") })
+            if (index < lines.lastIndex) {
+                val encoded = encodeMarks(marks.filter { it.start <= lineEnd && it.end >= lineStart })
+                result.add(
+                    buildJsonObject {
+                        put("type", "hardBreak")
+                        if (encoded.isNotEmpty()) put("marks", JsonArray(encoded))
+                    },
+                )
+            }
         }
         return result
     }
@@ -737,21 +741,6 @@ object RichDoc {
     fun newBlock(kind: RichBlockKind = RichBlockKind.PARAGRAPH): RichBlock =
         RichBlock(id = UUID.randomUUID().toString(), kind = kind, text = "", marks = emptyList())
 
-    /** True when [type] covers the whole `[start, end)` range, possibly via
-     *  more than one adjacent/overlapping mark instance of that type. Used
-     *  to show a toolbar toggle button as active, and to decide whether
-     *  toggling it should add or remove the mark. */
-    fun isMarkActive(marks: List<RichMark>, type: RichMarkType, start: Int, end: Int): Boolean {
-        if (start >= end) return false
-        var covered = start
-        for (m in marks.filter { it.type == type }.sortedBy { it.start }) {
-            if (m.start > covered) break
-            if (m.end > covered) covered = m.end
-            if (covered >= end) return true
-        }
-        return false
-    }
-
     /** The one mark instance of [type] covering the whole `[start, end)`
      *  range, or null when the range carries none, or more than one with
      *  different values (a selection spanning red and blue text). */
@@ -774,6 +763,7 @@ object RichDoc {
     /** Removes [type] from `[start, end)`, trimming any mark instance that
      *  only partly overlaps instead of dropping it outright. */
     fun clearMark(marks: List<RichMark>, type: RichMarkType, start: Int, end: Int): List<RichMark> {
+        if (start >= end) return marks
         val result = mutableListOf<RichMark>()
         for (m in marks) {
             if (m.type != type || m.end <= start || m.start >= end) {
@@ -791,9 +781,11 @@ object RichDoc {
     fun clearAllMarks(marks: List<RichMark>, start: Int, end: Int): List<RichMark> =
         RichMarkType.entries.fold(marks) { acc, type -> clearMark(acc, type, start, end) }
 
-    /** Applies [type] over `[start, end)`, first clearing any existing
-     *  same-type mark from that range so instances of one type never
-     *  overlap each other, and joining it to an identical one it touches. */
+    /** Applies [type] over `[start, end)` as ProseMirror's addMark does: a
+     *  same-type mark there gives way, so instances of one type never
+     *  overlap, and the new one joins an identical one it touches. Inline
+     *  code takes no other mark (`excludes: "_"`): set, it drops every
+     *  other one from the range; any other mark skips the code there. */
     fun setMark(
         marks: List<RichMark>,
         type: RichMarkType,
@@ -803,11 +795,16 @@ object RichDoc {
         color: String? = null,
     ): List<RichMark> {
         if (start >= end) return marks
-        return mergeAdjacent(clearMark(marks, type, start, end) + RichMark(start, end, type, value, color))
+        if (type == RichMarkType.CODE) return mergeAdjacent(clearAllMarks(marks, start, end) + RichMark(start, end, type))
+        val added = mutableListOf<RichMark>()
+        var at = start
+        for (code in marks.filter { it.type == RichMarkType.CODE && it.start < end && it.end > start }.sortedBy { it.start }) {
+            if (code.start > at) added += RichMark(at, code.start, type, value, color)
+            at = maxOf(at, code.end)
+        }
+        if (at < end) added += RichMark(at, end, type, value, color)
+        return mergeAdjacent(added.fold(marks) { acc, m -> clearMark(acc, type, m.start, m.end) } + added)
     }
-
-    fun toggleMark(marks: List<RichMark>, type: RichMarkType, start: Int, end: Int): List<RichMark> =
-        if (isMarkActive(marks, type, start, end)) clearMark(marks, type, start, end) else setMark(marks, type, start, end)
 
     /** Keeps only the marks (or the surviving part of a partially-overlapping
      *  one) inside `[from, to)`, re-based to start at 0. Used when a block's
@@ -927,6 +924,11 @@ object RichDoc {
     private const val EmailPattern = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
     private val ContactRegex = Regex("($PhonePattern)|($EmailPattern)")
 }
+
+/** A colour, font or size: the three attributes of one textStyle mark on
+ *  the web. */
+val RichMarkType.isTextStyle: Boolean
+    get() = this == RichMarkType.TEXT_COLOR || this == RichMarkType.FONT_FAMILY || this == RichMarkType.FONT_SIZE
 
 val RichBlockKind.isHeading: Boolean
     get() = this == RichBlockKind.HEADING_1 || this == RichBlockKind.HEADING_2 ||

@@ -259,12 +259,7 @@ object RichInputRules {
         }
         val markStart = from + startSpaces
         val markEnd = markStart + inner.length
-        marks = if (type == RichMarkType.CODE) {
-            RichDoc.setMark(RichDoc.clearAllMarks(marks, markStart, markEnd), type, markStart, markEnd)
-        } else {
-            RichDoc.setMark(marks, type, markStart, markEnd)
-        }
-        val marked = block.copy(text = text, marks = marks)
+        val marked = block.copy(text = text, marks = RichDoc.setMark(marks, type, markStart, markEnd))
         return RichInputResult(RichEdit(blocks.replaceAt(index, listOf(marked)), block.id, markEnd), disarm = type)
     }
 

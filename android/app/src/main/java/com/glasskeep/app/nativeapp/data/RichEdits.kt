@@ -620,7 +620,8 @@ object RichEdits {
     }
 
     /** setMark over a selection: [type] on all the text it covers, but in a
-     *  code block, whose text takes no mark. */
+     *  code block, whose text takes no mark, and as [RichDoc.setMark] puts
+     *  it on around inline code. */
     fun setMark(blocks: List<RichBlock>, span: RichSpan, type: RichMarkType, value: String? = null, color: String? = null): List<RichBlock> =
         mapSelectedText(blocks, span) { marks, from, to -> RichDoc.setMark(marks, type, from, to, value, color) }
 
@@ -630,35 +631,61 @@ object RichEdits {
             if (type == null) RichDoc.clearAllMarks(marks, from, to) else RichDoc.clearMark(marks, type, from, to)
         }
 
-    /** toggleMark over a selection: off when all its text has it, else on. */
+    /** toggleMark over a selection: off when it reads active, else on. */
     fun toggleMark(blocks: List<RichBlock>, span: RichSpan, type: RichMarkType): List<RichBlock> =
         if (isMarkActive(blocks, span, type)) clearMark(blocks, span, type) else setMark(blocks, span, type)
 
-    /** isMarkActive: [type] covers every selected character, a code
-     *  block's text included, which never has it. */
-    fun isMarkActive(blocks: List<RichBlock>, span: RichSpan, type: RichMarkType): Boolean {
-        var any = false
+    /**
+     * Tiptap's isMarkActive over a selection: the selected text with [type]
+     * (of a value and a colour [attrs] accepts), plus, once there is any,
+     * the inline code that excludes it, is all the selected text. A code
+     * block, whose text takes no mark, is left out, and so is a line break
+     * without marks, not being text.
+     */
+    fun isMarkActive(
+        blocks: List<RichBlock>,
+        span: RichSpan,
+        type: RichMarkType,
+        attrs: (value: String?, color: String?) -> Boolean = { _, _ -> true },
+    ): Boolean {
+        var selected = 0
+        var matched = 0
+        var excluded = 0
         for (i in span.start..span.end) {
             val block = blocks[i]
-            if (!block.kind.hasText) continue
+            if (!block.kind.hasText || block.kind == RichBlockKind.CODE_BLOCK) continue
             val from = span.fromIn(i)
             val to = span.toIn(i, block.text.length)
-            if (from >= to) continue
-            if (!RichDoc.isMarkActive(block.marks, type, from, to)) return false
-            any = true
+            val cuts = sortedSetOf(from, to)
+            for (m in block.marks) {
+                if (m.start in from..to) cuts += m.start
+                if (m.end in from..to) cuts += m.end
+            }
+            for ((start, end) in cuts.zipWithNext()) {
+                val over = block.marks.filter { it.start <= start && it.end >= end }
+                val length = if (over.isEmpty()) (start until end).count { block.text[it] != '\n' } else end - start
+                selected += length
+                if (over.any { it.type == type && attrs(it.value, it.color) }) matched += length
+                if (type != RichMarkType.CODE && over.any { it.type == RichMarkType.CODE }) excluded += length
+            }
         }
-        return any
+        return selected > 0 && matched > 0 && matched + excluded >= selected
     }
 
-    /** getAttributes: the first mark of [type] in the selected text, in
-     *  document order, which the toolbar shows (a colour, a size...). */
+    /** getAttributes over a selection: the first mark of [type] in the
+     *  selected text, in document order, which the toolbar shows (a colour,
+     *  a size...). A colour, a font and a size being one textStyle mark on
+     *  the web, theirs is read where the first text with any of them is. */
     fun markIn(blocks: List<RichBlock>, span: RichSpan, type: RichMarkType): RichMark? {
         for (i in span.start..span.end) {
             val block = blocks[i]
             if (!block.kind.hasText) continue
             val from = span.fromIn(i)
             val to = span.toIn(i, block.text.length)
-            block.marks.filter { it.type == type && it.start < to && it.end > from }.minByOrNull { it.start }?.let { return it }
+            val first = block.marks
+                .filter { (if (type.isTextStyle) it.type.isTextStyle else it.type == type) && it.start < to && it.end > from }
+                .minOfOrNull { maxOf(it.start, from) } ?: continue
+            return block.marks.firstOrNull { it.type == type && it.start <= first && it.end > first }
         }
         return null
     }

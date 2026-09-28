@@ -83,11 +83,9 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichBlockKind
-import com.glasskeep.app.nativeapp.data.PendingMark
 import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.RichEdit
 import com.glasskeep.app.nativeapp.data.RichEdits
-import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.RichPos
 import com.glasskeep.app.nativeapp.data.RichSelection
@@ -159,31 +157,6 @@ fun RichFormatToolbar(
     val colors = remember(themeId, dark) { RichToolbarColors(themeId, dark) }
     var openPopover by remember { mutableStateOf<RichPopoverKind?>(null) }
     var linkTarget by remember { mutableStateOf<RichLinkTarget?>(null) }
-    val caretMarks = span?.takeIf { it.collapsed }
-        ?.let { blocks[it.start].let { block -> RichDoc.marksAtCaret(block.marks, block.text.length, it.startOffset) } }
-        .orEmpty()
-
-    /** The mark of [type] the selection shows (getAttributes): at a
-     *  collapsed caret the one it types into, else the first one in the
-     *  selected text. */
-    fun markOf(type: RichMarkType): RichMark? {
-        val selected = span ?: return null
-        if (selected.collapsed) return caretMarks.firstOrNull { it.type == type }
-        return RichEdits.markIn(blocks, selected, type)
-    }
-
-    // At a collapsed caret, what is armed for the next keystroke wins over
-    // the marks around it (ProseMirror's stored marks, see RichEditorState).
-    fun pendingOf(type: RichMarkType): PendingMark? =
-        editing?.pendingMarks?.firstOrNull { it.type == type }
-
-    fun isActive(type: RichMarkType): Boolean {
-        val selected = span ?: return false
-        if (!selected.collapsed) return RichEdits.isMarkActive(blocks, selected, type)
-        pendingOf(type)?.let { return !it.remove }
-        return caretMarks.any { it.type == type }
-    }
-
     /** isActive for a block style over the selection ([RichEdits.nodeActive]). */
     fun nodeActive(test: (RichBlock) -> Boolean): Boolean = span != null && RichEdits.nodeActive(blocks, span, test)
 
@@ -191,52 +164,6 @@ fun RichFormatToolbar(
         nodeActive { it.kind.hasText && it.kind != RichBlockKind.CODE_BLOCK && it.align == align }
 
     fun command(change: (List<RichBlock>, RichSpan) -> RichEdit?) = state.command(change)
-
-    fun valueOf(type: RichMarkType): String? {
-        pendingOf(type)?.let { return if (it.remove) null else it.value }
-        return markOf(type)?.value
-    }
-
-    fun underlineColor(): String? {
-        pendingOf(RichMarkType.UNDERLINE)?.let { return if (it.remove) null else it.color }
-        return markOf(RichMarkType.UNDERLINE)?.color
-    }
-
-    fun toggle(type: RichMarkType) {
-        val selected = span ?: return
-        if (selected.collapsed) {
-            state.togglePending(type, activeAtCaret = caretMarks.any { it.type == type })
-        } else {
-            state.markCommand { b, s -> RichEdits.toggleMark(b, s, type) }
-        }
-    }
-
-    fun apply(type: RichMarkType, value: String?, color: String? = null) {
-        val selected = span ?: return
-        if (selected.collapsed) {
-            state.setPending(type, value, color)
-        } else {
-            state.markCommand { b, s -> RichEdits.setMark(b, s, type, value, color) }
-        }
-    }
-
-    fun clear(type: RichMarkType) {
-        val selected = span ?: return
-        if (selected.collapsed) {
-            state.clearPending(type, activeAtCaret = caretMarks.any { it.type == type })
-        } else {
-            state.markCommand { b, s -> RichEdits.clearMark(b, s, type) }
-        }
-    }
-
-    /** stepFontSize(editor, ±1) (RichTextToolbar.jsx:306-315): walks the
-     *  offered sizes from wherever the selection currently sits. */
-    fun stepFontSize(delta: Int) {
-        val current = valueOf(RichMarkType.FONT_SIZE) ?: RichDefaultFontSize
-        val index = RichFontSizes.indexOf(current).takeIf { it >= 0 } ?: RichFontSizes.indexOf(RichDefaultFontSize)
-        val next = RichFontSizes.getOrNull(index + delta) ?: return
-        if (next == RichDefaultFontSize) clear(RichMarkType.FONT_SIZE) else apply(RichMarkType.FONT_SIZE, next)
-    }
 
     val toolbarLabel = stringResource(R.string.native_richtext_toolbar_label)
     Column(
@@ -253,17 +180,17 @@ fun RichFormatToolbar(
                 padding = 4.dp,
                 popover = {
                     RichFontPopover(
-                        current = valueOf(RichMarkType.FONT_FAMILY),
+                        current = state.markValue(RichMarkType.FONT_FAMILY),
                         colors = colors,
                         titleColor = titleColor,
                         onPick = { value ->
-                            if (value.isEmpty()) clear(RichMarkType.FONT_FAMILY) else apply(RichMarkType.FONT_FAMILY, value)
+                            if (value.isEmpty()) state.clearMark(RichMarkType.FONT_FAMILY) else state.applyMark(RichMarkType.FONT_FAMILY, value)
                             openPopover = null
                         },
                     )
                 },
             ) { open ->
-                val font = richFontFor(valueOf(RichMarkType.FONT_FAMILY))
+                val font = richFontFor(state.markValue(RichMarkType.FONT_FAMILY))
                 RichMenuButton(
                     label = font?.label ?: RichFonts.first().label,
                     tooltip = stringResource(R.string.native_richtext_font_family),
@@ -285,21 +212,21 @@ fun RichFormatToolbar(
                 padding = 4.dp,
                 popover = {
                     RichSizePopover(
-                        current = valueOf(RichMarkType.FONT_SIZE),
+                        current = state.markValue(RichMarkType.FONT_SIZE),
                         colors = colors,
                         titleColor = titleColor,
                         onPick = { value ->
-                            if (value == RichDefaultFontSize) clear(RichMarkType.FONT_SIZE) else apply(RichMarkType.FONT_SIZE, value)
+                            if (value == RichDefaultFontSize) state.clearMark(RichMarkType.FONT_SIZE) else state.applyMark(RichMarkType.FONT_SIZE, value)
                             openPopover = null
                         },
                     )
                 },
             ) { open ->
                 RichMenuButton(
-                    label = (valueOf(RichMarkType.FONT_SIZE) ?: RichDefaultFontSize).removeSuffix("px"),
+                    label = (state.markValue(RichMarkType.FONT_SIZE) ?: RichDefaultFontSize).removeSuffix("px"),
                     tooltip = stringResource(R.string.native_richtext_font_size),
                     wide = false,
-                    active = valueOf(RichMarkType.FONT_SIZE) != null,
+                    active = state.markValue(RichMarkType.FONT_SIZE) != null,
                     enabled = enabled,
                     colors = colors,
                     titleColor = titleColor,
@@ -310,21 +237,21 @@ fun RichFormatToolbar(
         val boldButton: @Composable FlowRowScope.() -> Unit = {
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_bold),
-                active = isActive(RichMarkType.BOLD),
+                active = state.isMarkActive(RichMarkType.BOLD),
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { toggle(RichMarkType.BOLD) },
+                onClick = { state.toggleMark(RichMarkType.BOLD) },
             ) { tint -> BoldIcon(size = 20.dp, tint = tint) }
         }
         val italicButton: @Composable FlowRowScope.() -> Unit = {
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_italic),
-                active = isActive(RichMarkType.ITALIC),
+                active = state.isMarkActive(RichMarkType.ITALIC),
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { toggle(RichMarkType.ITALIC) },
+                onClick = { state.toggleMark(RichMarkType.ITALIC) },
             ) { tint -> ItalicIcon(size = 20.dp, tint = tint) }
         }
         val underlineButton: @Composable FlowRowScope.() -> Unit = {
@@ -334,19 +261,19 @@ fun RichFormatToolbar(
                 dark = dark,
                 popover = {
                     RichUnderlinePopover(
-                        style = valueOf(RichMarkType.UNDERLINE) ?: "simple",
-                        color = underlineColor(),
+                        style = state.markValue(RichMarkType.UNDERLINE) ?: "simple",
+                        color = state.underlineColor(),
                         colors = colors,
                         dark = dark,
                         titleColor = titleColor,
-                        onStyle = { apply(RichMarkType.UNDERLINE, it, underlineColor()) },
-                        onColor = { apply(RichMarkType.UNDERLINE, valueOf(RichMarkType.UNDERLINE) ?: "simple", it) },
-                        onRemove = { clear(RichMarkType.UNDERLINE); openPopover = null },
+                        onStyle = { state.applyMark(RichMarkType.UNDERLINE, it, state.underlineColor()) },
+                        onColor = { state.applyMark(RichMarkType.UNDERLINE, state.markValue(RichMarkType.UNDERLINE) ?: "simple", it) },
+                        onRemove = { state.clearMark(RichMarkType.UNDERLINE); openPopover = null },
                     )
                 },
             ) { open ->
                 RichSplitButton(
-                    active = isActive(RichMarkType.UNDERLINE),
+                    active = state.isMarkActive(RichMarkType.UNDERLINE),
                     chevronActive = open,
                     enabled = enabled,
                     colors = colors,
@@ -355,21 +282,14 @@ fun RichFormatToolbar(
                     chevronDescription = stringResource(R.string.native_richtext_underline_options),
                     // toggleUnderline: off when on, else in the style of an
                     // underline the selection already touches (getAttributes).
-                    onClick = {
-                        if (isActive(RichMarkType.UNDERLINE)) {
-                            clear(RichMarkType.UNDERLINE)
-                        } else {
-                            val touched = markOf(RichMarkType.UNDERLINE)
-                            apply(RichMarkType.UNDERLINE, touched?.value ?: "simple", touched?.color)
-                        }
-                    },
+                    onClick = { state.toggleUnderline() },
                     onChevron = { openPopover = if (open) null else RichPopoverKind.UNDERLINE },
                 ) { tint ->
                     UnderlineIcon(
                         size = 20.dp,
                         tint = tint,
-                        style = valueOf(RichMarkType.UNDERLINE),
-                        lineColor = richColorOf(underlineColor(), dark),
+                        style = state.markValue(RichMarkType.UNDERLINE),
+                        lineColor = richColorOf(state.underlineColor(), dark),
                     )
                 }
             }
@@ -377,11 +297,11 @@ fun RichFormatToolbar(
         val strikeButton: @Composable FlowRowScope.() -> Unit = {
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_strikethrough),
-                active = isActive(RichMarkType.STRIKE),
+                active = state.isMarkActive(RichMarkType.STRIKE),
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { toggle(RichMarkType.STRIKE) },
+                onClick = { state.toggleMark(RichMarkType.STRIKE) },
             ) { tint -> StrikeIcon(size = 20.dp, tint = tint) }
         }
         val clearButton: @Composable FlowRowScope.() -> Unit = {
@@ -405,18 +325,18 @@ fun RichFormatToolbar(
                 popover = {
                     RichSwatchPopover(
                         swatches = RichTextColors,
-                        current = valueOf(RichMarkType.TEXT_COLOR),
+                        current = state.markValue(RichMarkType.TEXT_COLOR),
                         colors = colors,
                         dark = dark,
-                        onPick = { apply(RichMarkType.TEXT_COLOR, it); openPopover = null },
-                        onClear = { clear(RichMarkType.TEXT_COLOR); openPopover = null },
+                        onPick = { state.applyMark(RichMarkType.TEXT_COLOR, it); openPopover = null },
+                        onClear = { state.clearMark(RichMarkType.TEXT_COLOR); openPopover = null },
                     )
                 },
             ) { open ->
                 RichSwatchButton(
                     contentDescription = stringResource(R.string.native_richtext_text_color),
-                    barColor = richColorOf(valueOf(RichMarkType.TEXT_COLOR), dark) ?: Color(0xFF111827),
-                    active = valueOf(RichMarkType.TEXT_COLOR) != null,
+                    barColor = richColorOf(state.markValue(RichMarkType.TEXT_COLOR), dark) ?: Color(0xFF111827),
+                    active = state.markValue(RichMarkType.TEXT_COLOR) != null,
                     enabled = enabled,
                     colors = colors,
                     dark = dark,
@@ -433,18 +353,18 @@ fun RichFormatToolbar(
                 popover = {
                     RichSwatchPopover(
                         swatches = RichHighlights,
-                        current = valueOf(RichMarkType.HIGHLIGHT),
+                        current = state.markValue(RichMarkType.HIGHLIGHT),
                         colors = colors,
                         dark = dark,
-                        onPick = { apply(RichMarkType.HIGHLIGHT, it); openPopover = null },
-                        onClear = { clear(RichMarkType.HIGHLIGHT); openPopover = null },
+                        onPick = { state.applyMark(RichMarkType.HIGHLIGHT, it); openPopover = null },
+                        onClear = { state.clearMark(RichMarkType.HIGHLIGHT); openPopover = null },
                     )
                 },
             ) { open ->
                 RichSwatchButton(
                     contentDescription = stringResource(R.string.native_richtext_highlight),
-                    barColor = richColorOf(valueOf(RichMarkType.HIGHLIGHT) ?: RichDoc.DefaultHighlight, dark) ?: Color.Transparent,
-                    active = valueOf(RichMarkType.HIGHLIGHT) != null,
+                    barColor = richColorOf(state.markValue(RichMarkType.HIGHLIGHT) ?: RichDoc.DefaultHighlight, dark) ?: Color.Transparent,
+                    active = state.markValue(RichMarkType.HIGHLIGHT) != null,
                     enabled = enabled,
                     colors = colors,
                     dark = dark,
@@ -590,7 +510,7 @@ fun RichFormatToolbar(
                 },
             ) { open ->
                 RichLinkButton(
-                    active = isActive(RichMarkType.LINK) || open,
+                    active = state.isMarkActive(RichMarkType.LINK) || open,
                     enabled = enabled,
                     colors = colors,
                     titleColor = titleColor,
@@ -607,10 +527,10 @@ fun RichFormatToolbar(
                             } else {
                                 null
                             }
-                            val armed = pendingOf(RichMarkType.LINK)?.takeUnless { it.remove }?.value
+                            val armed = state.pendingOf(RichMarkType.LINK)?.takeUnless { it.remove }?.value
                             linkTarget = RichLinkTarget(
                                 if (link != null) RichSelection(RichPos(block.id, link.start), RichPos(block.id, link.end)) else current.selection,
-                                armed ?: link?.value ?: markOf(RichMarkType.LINK)?.value,
+                                armed ?: link?.value ?: state.markOf(RichMarkType.LINK)?.value,
                             )
                             openPopover = RichPopoverKind.LINK
                         }
@@ -647,7 +567,7 @@ fun RichFormatToolbar(
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
-                        onClick = { stepFontSize(1) },
+                        onClick = { state.stepFontSize(1) },
                     ) { tint -> TextIncreaseIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_font_size_down),
@@ -655,7 +575,7 @@ fun RichFormatToolbar(
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
-                        onClick = { stepFontSize(-1) },
+                        onClick = { state.stepFontSize(-1) },
                     ) { tint -> TextDecreaseIcon(size = 20.dp, tint = tint) }
                     clearButton()
                     boldButton()
@@ -666,19 +586,19 @@ fun RichFormatToolbar(
                     highlightButton()
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_subscript),
-                        active = isActive(RichMarkType.SUBSCRIPT),
+                        active = state.isMarkActive(RichMarkType.SUBSCRIPT),
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
-                        onClick = { toggle(RichMarkType.SUBSCRIPT) },
+                        onClick = { state.toggleMark(RichMarkType.SUBSCRIPT) },
                     ) { tint -> SubscriptIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_superscript),
-                        active = isActive(RichMarkType.SUPERSCRIPT),
+                        active = state.isMarkActive(RichMarkType.SUPERSCRIPT),
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
-                        onClick = { toggle(RichMarkType.SUPERSCRIPT) },
+                        onClick = { state.toggleMark(RichMarkType.SUPERSCRIPT) },
                     ) { tint -> SuperscriptIcon(size = 20.dp, tint = tint) }
                 }
                 RichToolbarGroup(
@@ -731,11 +651,11 @@ fun RichFormatToolbar(
                     ) { tint -> CodeBlockIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_inline_code),
-                        active = isActive(RichMarkType.CODE),
+                        active = state.isMarkActive(RichMarkType.CODE),
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
-                        onClick = { toggle(RichMarkType.CODE) },
+                        onClick = { state.toggleMark(RichMarkType.CODE) },
                     ) { tint -> InlineCodeIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_quote),
