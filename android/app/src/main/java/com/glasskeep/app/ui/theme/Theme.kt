@@ -12,7 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextGeometricTransform
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 
@@ -36,6 +38,15 @@ private val DarkColorScheme = darkColorScheme(
  *  every line, the first and last included, where Compose would trim a
  *  text's outer lines to the font's own height. */
 val CssLineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None)
+
+/** CSS `font-style: italic` in the system font as the WebView draws it:
+ *  the upright letters slanted (Skia's synthetic italic), where Android
+ *  would take the font's own italic. */
+val WebSystemItalic = TextGeometricTransform(skewX = -0.25f)
+
+/** [this], an italic in the system font drawn as [WebSystemItalic]. */
+fun TextStyle.webItalic(): TextStyle =
+    if (fontStyle == FontStyle.Italic && fontFamily == null) copy(fontStyle = FontStyle.Normal, textGeometricTransform = WebSystemItalic) else this
 
 // The web's text never carries Material's letter spacing, and Tailwind's
 // preflight gives the whole page `line-height: 1.5`, which every element

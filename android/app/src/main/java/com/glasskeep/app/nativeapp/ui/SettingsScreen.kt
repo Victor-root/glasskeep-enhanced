@@ -46,6 +46,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -78,7 +79,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
@@ -114,6 +114,7 @@ import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightTitleColor
 import com.glasskeep.app.update.ReleaseInfo
 import com.glasskeep.app.update.UpdateManager
+import com.glasskeep.app.ui.theme.WebSystemItalic
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -2537,7 +2538,7 @@ private fun PasskeysCard(
                 color = mutedColor,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
-                fontStyle = FontStyle.Italic,
+                style = LocalTextStyle.current.copy(textGeometricTransform = WebSystemItalic),
             )
         } else {
             Spacer(Modifier.height(12.dp))
@@ -2649,7 +2650,7 @@ private fun PasskeyRow(
                 color = mutedColor,
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
-                fontStyle = FontStyle.Italic,
+                style = LocalTextStyle.current.copy(textGeometricTransform = WebSystemItalic),
                 modifier = Modifier.padding(top = 2.dp),
             )
         }

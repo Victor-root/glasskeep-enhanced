@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -53,7 +54,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +68,7 @@ import com.glasskeep.app.nativeapp.data.TypographyPresets
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightTitleColor
+import com.glasskeep.app.ui.theme.WebSystemItalic
 
 /**
  * TypographyModal.jsx, ported: the full-screen editor for the three
@@ -287,7 +288,7 @@ private fun TypographyBlockCard(
             fontSize = (block.size * 16f).sp,
             lineHeight = 1.2.em,
             fontWeight = FontWeight(block.weight),
-            fontStyle = if (block.italic) FontStyle.Italic else FontStyle.Normal,
+            style = LocalTextStyle.current.copy(textGeometricTransform = WebSystemItalic.takeIf { block.italic }),
             textDecoration = if (block.underline) TextDecoration.Underline else TextDecoration.None,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

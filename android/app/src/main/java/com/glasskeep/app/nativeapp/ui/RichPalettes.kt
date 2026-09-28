@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -125,6 +126,54 @@ val RichFonts = listOf(
 
 fun richFontFor(value: String?): RichFontOption? =
     value?.takeIf { it.isNotBlank() }?.let { v -> RichFonts.firstOrNull { it.value == v } }
+
+/**
+ * The family a CSS `font-family` list draws with, as the WebView picks it:
+ * the first of its families it has, one of [RichFonts] by name, else one
+ * the system has by that name (the generic ones included); none, the
+ * system font (null). A name the system answers with its own font can't be
+ * told from one it doesn't know, so it goes on to the next family, as an
+ * unknown one does.
+ */
+fun richFontFamilyOf(value: String?): FontFamily? {
+    for (name in cssFamilyNames(value ?: return null)) {
+        val key = name.lowercase()
+        WebFontFamilies[key]?.let { return it }
+        // The WebView's sans-serif and system-ui are the system font.
+        if (key == "sans-serif" || key == "system-ui") return null
+        val system = Typeface.create(key, Typeface.NORMAL)
+        if (system != Typeface.DEFAULT) return FontFamily(system)
+    }
+    return null
+}
+
+/** [RichFonts]' families by their lower-case CSS name, the @font-face
+ *  family the web loads each as. */
+private val WebFontFamilies: Map<String, FontFamily> by lazy {
+    RichFonts.mapNotNull { option -> cssFamilyNames(option.value).firstOrNull()?.let { it.lowercase() to option.family } }.toMap()
+}
+
+/** A CSS `font-family` list's names, unquoted, in order. */
+internal fun cssFamilyNames(value: String): List<String> {
+    val names = mutableListOf<String>()
+    val name = StringBuilder()
+    var quote: Char? = null
+    for (c in value) {
+        when {
+            quote != null -> if (c == quote) quote = null else name.append(c)
+            c == '"' || c == '\'' -> quote = c
+            c == ',' -> {
+                names += name.toString()
+                name.clear()
+            }
+            else -> name.append(c)
+        }
+    }
+    names += name.toString()
+    return names.map { it.trim().replace(CssWhitespace, " ") }.filter { it.isNotEmpty() }
+}
+
+private val CssWhitespace = Regex("""\s+""")
 
 /** A size in CSS px: "18px" -> 18f, and the other absolute units
  *  ("11pt" from Google Docs or Word) converted as CSS does. A size relative

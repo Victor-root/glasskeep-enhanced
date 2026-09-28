@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp.ui
 
 import android.content.ClipData
 import android.content.Context
+import android.graphics.Paint
 import android.view.KeyEvent
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
@@ -92,7 +93,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -109,6 +109,7 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -126,6 +127,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.resolveAsTypeface
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.style.BaselineShift
@@ -148,6 +150,8 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
 import com.glasskeep.app.ui.theme.CssLineHeightStyle
+import com.glasskeep.app.ui.theme.WebSystemItalic
+import com.glasskeep.app.ui.theme.webItalic
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
@@ -165,10 +169,8 @@ import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightTitleColor
-import kotlin.math.PI
 import kotlin.math.pow
 import kotlin.math.roundToInt
-import kotlin.math.sin
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
@@ -311,10 +313,11 @@ fun RichTextEditor(
                 Modifier.fillMaxWidth().padding(horizontal = 1.6.dp, vertical = 2.4.dp),
             ) {
                 @Composable
-                fun EditorText(block: RichBlock, style: TextStyle, modifier: Modifier) {
+                fun EditorText(block: RichBlock, look: RichRowLook, modifier: Modifier) {
                     RichEditorText(
                         block = block,
-                        style = style,
+                        style = look.style,
+                        lines = look.lines,
                         dark = dark,
                         state = state,
                         paint = paint,
@@ -355,7 +358,7 @@ fun RichTextEditor(
                                         onArm = { armed -> state.armedCodeBlock = if (armed) block.id else null },
                                         modifier = look.faded,
                                     ) {
-                                        EditorText(block, look.style, Modifier.fillMaxWidth())
+                                        EditorText(block, look, Modifier.fillMaxWidth())
                                     }
                                     else -> RichListRow(
                                         block = block,
@@ -366,7 +369,7 @@ fun RichTextEditor(
                                         onToggleChecked = { state.toggleChecked(block.id) },
                                         modifier = look.faded,
                                     ) { textModifier ->
-                                        EditorText(block, look.style, textModifier.fillMaxWidth().then(if (taskStrike && block.isChecked) Modifier.alpha(0.6f) else Modifier))
+                                        EditorText(block, look, textModifier.fillMaxWidth().then(if (taskStrike && block.isChecked) Modifier.alpha(0.6f) else Modifier))
                                     }
                                 }
                             }
@@ -420,13 +423,15 @@ private class RichSelectionPaint(
  * One block's text in the editor: its styled text with the selection
  * behind it (the selected line break as a space's width at the end of the
  * line, as Chrome paints it), the keyboard's composition underlined, and
- * the caret, 2dp in the text's colour, blinking. Registers its layout for
- * hit tests, the handles and the keyboard.
+ * the caret, 2dp in the text's colour, blinking; [lines] are its whole
+ * text's (see [richLinesOf]). Registers its layout for hit tests, the
+ * handles and the keyboard.
  */
 @Composable
 private fun RichEditorText(
     block: RichBlock,
     style: TextStyle,
+    lines: TextDecoration,
     dark: Boolean,
     state: RichEditorState,
     paint: State<RichSelectionPaint>,
@@ -437,12 +442,14 @@ private fun RichEditorText(
     modifier: Modifier,
 ) {
     val padded = remember(block, style, dark) { paddedTextFor(block, style, dark, RichSurface.EDITOR) }
+    val fonts = LocalFontFamilyResolver.current
+    val drawnLines = remember(block, style, lines, dark, fonts) { richLinesOf(block, style, lines, dark, RichSurface.EDITOR, fonts) }
     var layout by remember { mutableStateOf<PaddedLayout?>(null) }
     val uriHandler = LocalUriHandler.current
     DisposableEffect(block.id) { onDispose { state.layouts.remove(block.id) } }
     Box(modifier) {
         if (placeholder != null) {
-            Text(placeholder, style = style.copy(color = if (dark) Color(0xFF6B7280) else Color(0xFF9CA3AF)))
+            Text(placeholder, style = style.copy(color = if (dark) Color(0xFF6B7280) else Color(0xFF9CA3AF)).webItalic())
         }
         BasicText(
             text = padded.text,
@@ -479,10 +486,11 @@ private fun RichEditorText(
                             }
                         }
                     }
-                    drawRichDecorations(text, block, style, dark, RichSurface.EDITOR)
+                    drawRichDecorations(text, block, style, dark, RichSurface.EDITOR, drawnLines)
                 }
                 .drawWithContent {
                     drawContent()
+                    layout?.let { drawRichLines(it, drawnLines, through = true) }
                     val caret = paint.value.caret?.takeIf { it.blockId == block.id } ?: return@drawWithContent
                     if (!state.focused || caretAlpha.value == 0f) return@drawWithContent
                     val rect = (layout ?: return@drawWithContent).getCursorRect(caret.offset.coerceIn(0, block.text.length))
@@ -1194,6 +1202,7 @@ fun RichTextReader(
                         RichBlockKind.CODE_BLOCK -> RichReaderCodeBlock(
                             block = block,
                             style = look.style,
+                            lines = look.lines,
                             indent = look.indent,
                             dark = dark,
                             noteColor = noteColor,
@@ -1214,6 +1223,7 @@ fun RichTextReader(
                             ReaderText(
                                 block = block,
                                 style = look.style,
+                                lines = look.lines,
                                 dark = dark,
                                 surface = surface,
                                 noteColor = noteColor,
@@ -1482,11 +1492,7 @@ private fun RichListRow(
             }
             RichBlockKind.NUMBERED_ITEM -> Text(
                 "${list.number ?: 1}. ",
-                style = style.copy(
-                    textDecoration = TextDecoration.None,
-                    textAlign = TextAlign.Start,
-                    fontFeatureSettings = "tnum",
-                ),
+                style = style.copy(textAlign = TextAlign.Start, fontFeatureSettings = "tnum").webItalic(),
                 softWrap = false,
                 maxLines = 1,
                 modifier = Modifier.layout { measurable, _ ->
@@ -1636,6 +1642,7 @@ private fun RichEditorCodeBlock(
 private fun RichReaderCodeBlock(
     block: RichBlock,
     style: TextStyle,
+    lines: TextDecoration,
     indent: Dp,
     dark: Boolean,
     noteColor: String?,
@@ -1657,6 +1664,7 @@ private fun RichReaderCodeBlock(
         ReaderText(
             block = block,
             style = style,
+            lines = lines,
             dark = dark,
             surface = surface,
             noteColor = noteColor,
@@ -1726,14 +1734,16 @@ private fun CodeCopyButton(text: String, noteColor: String?, dark: Boolean, modi
 /**
  * A block's text in the view: its links open (the view also turns phone
  * numbers and e-mail addresses into links, linkifyContactsHTML), inline
- * code and highlights are painted behind it, styled underlines under it,
- * and a tap on inline code shows a copy chip right after it, as
+ * code, highlights and underlines are painted behind it, line-throughs
+ * over it ([lines] are its whole text's, see [richLinesOf]), and a tap on
+ * inline code shows a copy chip right after it, as
  * attachReadModeInlineCopy does.
  */
 @Composable
 private fun ReaderText(
     block: RichBlock,
     style: TextStyle,
+    lines: TextDecoration,
     dark: Boolean,
     surface: RichSurface,
     noteColor: String?,
@@ -1744,6 +1754,8 @@ private fun ReaderText(
         LinkInteractionListener { link -> (link as? LinkAnnotation.Url)?.let { uriHandler.openUri(it.url) } }
     }
     val padded = remember(block, style, dark, surface) { paddedTextFor(block, style, dark, surface, openLink) }
+    val fonts = LocalFontFamilyResolver.current
+    val drawnLines = remember(block, style, lines, dark, surface, fonts) { richLinesOf(block, style, lines, dark, surface, fonts) }
     var layout by remember { mutableStateOf<PaddedLayout?>(null) }
     val codeMarks = remember(block) { block.marks.filter { it.type == RichMarkType.CODE } }
     var armed by remember(block.id) { mutableStateOf<RichMark?>(null) }
@@ -1764,7 +1776,12 @@ private fun ReaderText(
             inlineContent = richPads(editor = false),
             modifier = Modifier
                 .fillMaxWidth()
-                .drawBehind { layout?.let { drawRichDecorations(it, block, style, dark, surface) } }
+                .drawWithContent {
+                    val text = layout
+                    if (text != null) drawRichDecorations(text, block, style, dark, surface, drawnLines)
+                    drawContent()
+                    if (text != null) drawRichLines(text, drawnLines, through = true)
+                }
                 .then(
                     if (armable) {
                         Modifier.pointerInput(codeMarks) {
@@ -1897,11 +1914,12 @@ private fun LinkTapPopover(bounds: Rect, dark: Boolean, onOpen: () -> Unit, onEd
 
 // ---------- Styles ----------
 
-/** A block row's text style, where it starts, and how much everything in
- *  it fades: `gk-strike-checked` strikes and fades all a checked task item
- *  holds, each checked item around it fading it once more; the item's own
- *  text is faded by its caller. */
-private class RichRowLook(val style: TextStyle, val indent: Dp, val faded: Modifier)
+/** A block row's text style, the lines its whole text takes (see
+ *  [richLinesOf]), where it starts, and how much everything in it fades:
+ *  `gk-strike-checked` strikes and fades all a checked task item holds,
+ *  each checked item around it fading it once more; the item's own text is
+ *  faded by its caller. */
+private class RichRowLook(val style: TextStyle, val lines: TextDecoration, val indent: Dp, val faded: Modifier)
 
 private fun richRowLook(
     row: RichBlockRow,
@@ -1913,9 +1931,15 @@ private fun richRowLook(
     surface: RichSurface,
 ): RichRowLook {
     val struck = taskStrike && (block.isChecked || row.heldByChecked > 0)
-    val style = richBlockTextStyle(block, typography, struck, dark, titleColor, surface)
+    val style = richBlockTextStyle(block, typography, dark, titleColor, surface)
     return RichRowLook(
         style = style,
+        lines = TextDecoration.combine(
+            listOfNotNull(
+                TextDecoration.Underline.takeIf { typography.forKind(block.kind).underline },
+                TextDecoration.LineThrough.takeIf { struck },
+            ),
+        ),
         indent = (row.start + block.indent * IndentStepEm * style.fontSize.value).dp,
         faded = if (taskStrike && row.heldByChecked > 0) Modifier.alpha(0.6f.pow(row.heldByChecked)) else Modifier,
     )
@@ -1924,7 +1948,8 @@ private fun richRowLook(
 /**
  * The block's own text style, straight from the user's typography profile
  * (typographyPresets.js's DEFAULT_PROFILE until they change it): size,
- * weight, colour, italic and underline all come from there.
+ * weight, colour and italic all come from there, its underline goes to
+ * [RichRowLook.lines].
  *
  * Line heights are the CSS ones: 1.5 for a paragraph in the view (the
  * page's own) but 1.55 in the editor (`.rt-editor-content`), 20px in a
@@ -1935,13 +1960,10 @@ private fun richRowLook(
  * and its italic, which everything in it takes but a heading, whose style
  * sets its own. A size mark bigger than the text grows every line of its
  * block, the closest Compose gets to CSS growing the lines that hold it.
- * [struck] is `gk-strike-checked`'s line through a checked task item's
- * text and everything it holds, which the caller also fades.
  */
 private fun richBlockTextStyle(
     block: RichBlock,
     typography: TypographyProfile,
-    struck: Boolean,
     dark: Boolean,
     titleColor: Color,
     surface: RichSurface,
@@ -1967,16 +1989,11 @@ private fun richBlockTextStyle(
     }
     val tallest = block.marks.filter { it.type == RichMarkType.FONT_SIZE }.mapNotNull { richFontSizeOf(it.value) }.maxOrNull()
     val lineBox = maxOf(fontSize, tallest ?: 0f)
-    val decorations = buildList {
-        if (preset.underline) add(TextDecoration.Underline)
-        if (struck) add(TextDecoration.LineThrough)
-    }
     return TextStyle(
         color = richColorOf(preset.color, dark) ?: titleColor,
         fontSize = fontSize.sp,
         fontWeight = FontWeight(preset.weight),
         fontStyle = if (preset.italic || quoted && !block.kind.isHeading) FontStyle.Italic else FontStyle.Normal,
-        textDecoration = if (decorations.isEmpty()) TextDecoration.None else TextDecoration.combine(decorations),
         fontFamily = if (code) FontFamily.Monospace else null,
         lineHeight = (if (code && surface == RichSurface.CARD) 18f else lineBox * lineHeightFactor).sp,
         // A style of its own replaces the theme's rather than adding to it.
@@ -1992,12 +2009,12 @@ private fun richBlockTextStyle(
 
 /**
  * Builds the styled text of a block. Bold, italic, colour, font and size
- * map onto a SpanStyle; underline, strike and link are combined by hand
- * into one TextDecoration per run. Inline code, highlights and styled or
- * coloured underlines are painted by [drawRichDecorations] instead, since
- * a span can give them neither padding, radius nor a line style. In the
- * view, links (and the phone numbers and e-mail addresses it linkifies)
- * are real links.
+ * map onto a SpanStyle. Inline code, highlights, underlines, links' lines
+ * and line-throughs are painted by [drawRichDecorations] instead, since a
+ * span can give them neither padding, radius nor the web's lines. Italic
+ * in the system font is drawn as the WebView draws it ([WebSystemItalic]),
+ * a font of the text's own keeps its italic. In the view, links (and the
+ * phone numbers and e-mail addresses it linkifies) are real links.
  *
  * `<strong>` is `font-weight: bolder`, relative to the block's own weight:
  * bold inside an 800-weight H1 comes out at 900.
@@ -2011,73 +2028,60 @@ private fun annotatedTextFor(
 ): AnnotatedString = buildAnnotatedString {
     val text = block.text
     append(text)
-    val links = if (surface == RichSurface.READER) RichDoc.contactLinks(text, block.marks) else emptyList()
-    val marks = block.marks + links
-    if (text.isEmpty() || marks.isEmpty()) return@buildAnnotatedString
-    val linkColor = if (dark) Color(0xFF93C5FD) else Color(0xFF2563EB)
-    val cuts = sortedSetOf(0, text.length)
-    for (m in marks) {
-        cuts.add(m.start.coerceIn(0, text.length))
-        cuts.add(m.end.coerceIn(0, text.length))
-    }
-    val points = cuts.toList()
+    if (text.isEmpty()) return@buildAnnotatedString
+    val marks = richMarksOf(block, surface)
+    val linkColor = richLinkColor(dark)
+    val points = richCutsOf(text, marks)
     for (i in 0 until points.size - 1) {
         val start = points[i]
         val end = points[i + 1]
         if (start >= end) continue
         val active = marks.filter { it.start <= start && it.end >= end }
-        if (active.isEmpty()) continue
 
         var bold = false
         var italic = false
-        var link: String? = null
-        var color: Color? = null
-        var fontFamily: FontFamily? = null
         var fontSize = style.fontSize.value
         var sizeSet = false
         var baseline: BaselineShift? = null
         var mono = false
-        var plainMark = false
-        val decorations = mutableListOf<TextDecoration>()
 
         for (m in active) when (m.type) {
             RichMarkType.BOLD -> bold = true
             RichMarkType.ITALIC -> italic = true
-            RichMarkType.UNDERLINE -> if (plainUnderline(m)) decorations.add(TextDecoration.Underline)
-            RichMarkType.STRIKE -> decorations.add(TextDecoration.LineThrough)
-            RichMarkType.LINK -> {
-                decorations.add(TextDecoration.Underline)
-                link = m.value
-            }
             RichMarkType.CODE -> mono = true
             // sub/sup: 75%, shifted 0.25em down / 0.5em up (preflight),
             // Compose's shift being a share of the font's ascent.
             RichMarkType.SUBSCRIPT -> baseline = BaselineShift(-0.27f)
             RichMarkType.SUPERSCRIPT -> baseline = BaselineShift(0.54f)
-            RichMarkType.TEXT_COLOR -> color = richColorOf(m.value, dark)
-            RichMarkType.HIGHLIGHT -> if (m.value == null) plainMark = true
-            RichMarkType.FONT_FAMILY -> fontFamily = richFontFor(m.value)?.family
             RichMarkType.FONT_SIZE -> richFontSizeOf(m.value)?.let {
                 fontSize = it
                 sizeSet = true
             }
+            // Colour and font: richTextColor and richFamilyOf; lines:
+            // drawRichDecorations.
+            RichMarkType.LINK, RichMarkType.TEXT_COLOR, RichMarkType.HIGHLIGHT, RichMarkType.FONT_FAMILY,
+            RichMarkType.UNDERLINE, RichMarkType.STRIKE -> Unit
         }
         if (mono) fontSize *= 0.9f
         if (baseline != null) fontSize *= 0.75f
+        val family = richFamilyOf(active)
+        // Its italic or its block's, in the system font.
+        val systemItalic = (italic || style.fontStyle == FontStyle.Italic) && (family ?: style.fontFamily) == null
+        if (active.isEmpty() && !systemItalic) continue
 
         addStyle(
             SpanStyle(
-                color = when {
-                    plainMark -> Color.Black
-                    link != null -> linkColor
-                    else -> color ?: Color.Unspecified
-                },
+                color = richTextColor(active, dark) ?: Color.Unspecified,
                 fontWeight = if (bold) bolderThan(style.fontWeight) else null,
-                fontStyle = if (italic) FontStyle.Italic else null,
-                fontFamily = fontFamily ?: if (mono) FontFamily.Monospace else null,
+                fontStyle = when {
+                    systemItalic -> FontStyle.Normal
+                    italic -> FontStyle.Italic
+                    else -> null
+                },
+                textGeometricTransform = if (systemItalic) WebSystemItalic else null,
+                fontFamily = family,
                 fontSize = if (sizeSet || mono || baseline != null) fontSize.sp else TextUnit.Unspecified,
                 baselineShift = baseline,
-                textDecoration = if (decorations.isEmpty()) null else TextDecoration.combine(decorations.distinct()),
             ),
             start,
             end,
@@ -2093,6 +2097,25 @@ private fun annotatedTextFor(
         }
     }
 }
+
+/** A block's marks, and in the view the links it makes of the phone
+ *  numbers and e-mail addresses in it (linkifyContactsHTML). */
+private fun richMarksOf(block: RichBlock, surface: RichSurface): List<RichMark> =
+    if (surface == RichSurface.READER) block.marks + RichDoc.contactLinks(block.text, block.marks) else block.marks
+
+/** Where [marks] start and end in [text], in order, its ends included: the
+ *  edges of the web's text fragments, each mark being an element. */
+private fun richCutsOf(text: String, marks: List<RichMark>): List<Int> {
+    val cuts = sortedSetOf(0, text.length)
+    for (m in marks) {
+        cuts.add(m.start.coerceIn(0, text.length))
+        cuts.add(m.end.coerceIn(0, text.length))
+    }
+    return cuts.toList()
+}
+
+/** `.note-content a`'s colour. */
+private fun richLinkColor(dark: Boolean): Color = if (dark) Color(0xFF93C5FD) else Color(0xFF2563EB)
 
 /** [annotatedTextFor] as it is laid out, the padding of its inline code,
  *  and of its highlights in the editor, taking room in its line
@@ -2135,10 +2158,6 @@ private fun richPads(editor: Boolean): Map<String, InlineTextContent> {
  *  (typed as `==text==`) gets: yellow, under black text. */
 private val PlainMarkBackground = Color(0xFFFFFF00)
 
-/** An underline Compose can draw itself: no line style, no colour. */
-private fun plainUnderline(mark: RichMark): Boolean =
-    (mark.value == null || mark.value == "simple" || mark.value == "solid") && mark.color == null
-
 /** CSS `font-weight: bolder`: 100-300 becomes 400, 400-500 becomes 700,
  *  anything heavier becomes 900. */
 private fun bolderThan(weight: FontWeight?): FontWeight = when (weight?.weight ?: 400) {
@@ -2147,16 +2166,121 @@ private fun bolderThan(weight: FontWeight?): FontWeight = when (weight?.weight ?
     else -> FontWeight.Black
 }
 
+/** The colour of text under the [active] marks: black on a highlight of
+ *  no colour of its own (Chrome's `mark`), a link's, a colour mark's. */
+private fun richTextColor(active: List<RichMark>, dark: Boolean): Color? = when {
+    active.any { it.type == RichMarkType.HIGHLIGHT && it.value == null } -> Color.Black
+    active.any { it.type == RichMarkType.LINK && it.value != null } -> richLinkColor(dark)
+    else -> active.lastOrNull { it.type == RichMarkType.TEXT_COLOR }?.let { richColorOf(it.value, dark) }
+}
+
+/** The font of text under the [active] marks: a font mark's, inline
+ *  code's. */
+private fun richFamilyOf(active: List<RichMark>): FontFamily? =
+    active.lastOrNull { it.type == RichMarkType.FONT_FAMILY }?.let { richFontFamilyOf(it.value) }
+        ?: FontFamily.Monospace.takeIf { active.any { it.type == RichMarkType.CODE } }
+
 /**
- * What a span cannot carry, painted from the text layout: inline code
- * chips (padding, 1px `--border-light` border, radius: 1.92/5.6 and 5.6 in
- * the view, 1.15/4.6 and 3 in the editor), highlights (the editor's
- * `mark` adds 2px each side and a 2px radius), and underlines with a line
- * style or a colour: double, dotted, dashed or wavy, in the mark's colour.
- * Boxes follow CSS inline boxes: the font's ascent and descent around the
- * baseline, not the whole line.
+ * A line along `[start, end)`, one of the web's text fragments: no mark
+ * starts or ends inside it, and a wave or dashes start over at each. It
+ * goes [through] the text or under it, in [style] and [color], as thick as
+ * a font of [em] makes it; a line-through a third of that font's [ascent],
+ * in em, over the baseline.
  */
-private fun DrawScope.drawRichDecorations(layout: PaddedLayout, block: RichBlock, style: TextStyle, dark: Boolean, surface: RichSurface) {
+private class RichLine(
+    val start: Int,
+    val end: Int,
+    val through: Boolean,
+    val style: DecorationStyle,
+    val color: Color,
+    val em: TextUnit,
+    val ascent: Float,
+)
+
+/** An underline mark's `text-decoration-style`. */
+private fun decorationStyleOf(value: String?): DecorationStyle = when (value) {
+    "double" -> DecorationStyle.DOUBLE
+    "dotted" -> DecorationStyle.DOTTED
+    "dashed" -> DecorationStyle.DASHED
+    "wavy" -> DecorationStyle.WAVY
+    else -> DecorationStyle.SOLID
+}
+
+/**
+ * The lines a block's text takes: [lines], its whole text's (the
+ * typography's underline, `gk-strike-checked`'s line-through), in its own
+ * colour and size, then its underline marks' (in their style, and colour
+ * when they have one), its links' and its strikes', each in the colour and
+ * size of the text it starts on.
+ */
+private fun richLinesOf(
+    block: RichBlock,
+    style: TextStyle,
+    lines: TextDecoration,
+    dark: Boolean,
+    surface: RichSurface,
+    fonts: FontFamily.Resolver,
+): List<RichLine> {
+    val text = block.text
+    if (text.isEmpty()) return emptyList()
+    val marks = richMarksOf(block, surface)
+    val cuts = richCutsOf(text, marks)
+    val found = mutableListOf<RichLine>()
+    fun add(start: Int, end: Int, through: Boolean, lineStyle: DecorationStyle, color: Color, em: TextUnit, family: FontFamily?) {
+        val ascent = if (through) ascentOf(fonts, family) else 0f
+        var from = start
+        for (cut in cuts) {
+            if (cut <= from || cut >= end) continue
+            found += RichLine(from, cut, through, lineStyle, color, em, ascent)
+            from = cut
+        }
+        found += RichLine(from, end, through, lineStyle, color, em, ascent)
+    }
+    fun colorAt(offset: Int) = richTextColor(marks.filter { it.start <= offset && it.end > offset }, dark) ?: style.color
+    if (TextDecoration.Underline in lines) add(0, text.length, false, DecorationStyle.SOLID, style.color, style.fontSize, null)
+    for (m in marks) {
+        val start = m.start.coerceIn(0, text.length)
+        val end = m.end.coerceIn(start, text.length)
+        if (start >= end) continue
+        val em = markFontSize(block, style, start)
+        when (m.type) {
+            RichMarkType.UNDERLINE -> add(start, end, false, decorationStyleOf(m.value), richColorOf(m.color, dark) ?: colorAt(start), em, null)
+            RichMarkType.LINK -> add(start, end, false, DecorationStyle.SOLID, richLinkColor(dark), em, null)
+            RichMarkType.STRIKE -> {
+                val family = richFamilyOf(marks.filter { it.start <= start && it.end > start }) ?: style.fontFamily
+                add(start, end, true, DecorationStyle.SOLID, colorAt(start), em, family)
+            }
+            else -> Unit
+        }
+    }
+    if (TextDecoration.LineThrough in lines) add(0, text.length, true, DecorationStyle.SOLID, style.color, style.fontSize, style.fontFamily)
+    return found
+}
+
+/** The ascent of [family]'s font, in em (its metrics scale with the size). */
+private fun ascentOf(fonts: FontFamily.Resolver, family: FontFamily?): Float {
+    val paint = Paint()
+    paint.typeface = fonts.resolveAsTypeface(family).value
+    paint.textSize = 100f
+    return -paint.fontMetrics.ascent / paint.textSize
+}
+
+/**
+ * What a span cannot carry, painted from the text layout behind the text:
+ * inline code chips (padding, 1px `--border-light` border, radius:
+ * 1.92/5.6 and 5.6 in the view, 1.15/4.6 and 3 in the editor), highlights
+ * (the editor's `mark` adds 2px each side and a 2px radius), then the
+ * underlines of [lines]. Boxes follow CSS inline boxes: the font's ascent
+ * and descent around the baseline, not the whole line.
+ */
+private fun DrawScope.drawRichDecorations(
+    layout: PaddedLayout,
+    block: RichBlock,
+    style: TextStyle,
+    dark: Boolean,
+    surface: RichSurface,
+    lines: List<RichLine>,
+) {
     val text = block.text
     if (text.isEmpty()) return
     val editor = surface == RichSurface.EDITOR
@@ -2195,45 +2319,26 @@ private fun DrawScope.drawRichDecorations(layout: PaddedLayout, block: RichBlock
                     border = null,
                 )
             }
-            RichMarkType.UNDERLINE -> {
-                if (plainUnderline(mark)) continue
-                val color = richColorOf(mark.color, dark) ?: markTextColor(block, style, start, dark)
-                val em = markFontSize(block, style, start).toPx()
-                val thickness = 1.dp.toPx()
-                val laid = layout.padded.range(start, end)
-                forEachLineSegment(layout.laidOut, laid.start, laid.end) { left, right, baseline ->
-                    val y = baseline + maxOf(thickness, 0.075f * em) + thickness / 2f
-                    when (mark.value) {
-                        "double" -> {
-                            drawLine(color, Offset(left, y), Offset(right, y), thickness)
-                            drawLine(color, Offset(left, y + 2 * thickness), Offset(right, y + 2 * thickness), thickness)
-                        }
-                        "dotted" -> drawLine(
-                            color, Offset(left, y), Offset(right, y), thickness,
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(thickness, thickness)),
-                        )
-                        "dashed" -> drawLine(
-                            color, Offset(left, y), Offset(right, y), thickness,
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * thickness, 3 * thickness)),
-                        )
-                        "wavy" -> {
-                            val amplitude = 1.5f * thickness
-                            val period = 6 * thickness
-                            val wave = Path().apply {
-                                moveTo(left, y + amplitude)
-                                var x = left
-                                while (x < right) {
-                                    x = minOf(right, x + thickness)
-                                    lineTo(x, y + amplitude + amplitude * sin(2 * PI.toFloat() * (x - left) / period))
-                                }
-                            }
-                            drawPath(wave, color, style = Stroke(thickness))
-                        }
-                        else -> drawLine(color, Offset(left, y), Offset(right, y), thickness)
-                    }
-                }
-            }
             else -> Unit
+        }
+    }
+    drawRichLines(layout, lines, through = false)
+}
+
+/** The underlines of [lines], or, [through], their line-throughs, which
+ *  go over the text; over the spaces a line wraps on too, which `pre-wrap`
+ *  text hangs there. */
+private fun DrawScope.drawRichLines(layout: PaddedLayout, lines: List<RichLine>, through: Boolean) {
+    for (line in lines) {
+        if (line.through != through) continue
+        val em = line.em.toPx()
+        val laid = layout.padded.range(line.start, line.end)
+        forEachLinePart(layout.laidOut, laid.start, laid.end, withTrailingSpaces = true) { from, to, left, right, baseline ->
+            if (through) {
+                drawLineThrough(left, right, baseline, em, line.ascent * em, line.color)
+            } else {
+                drawUnderline(line.style, left, right, baseline, em, line.color) { top, bottom -> layout.ink.across(from, to, top, bottom) }
+            }
         }
     }
 }
@@ -2259,7 +2364,9 @@ private fun DrawScope.drawInlineBox(
 ) {
     val stroke = 1.dp.toPx()
     val ltr = layout.getParagraphDirection(start) == ResolvedTextDirection.Ltr
-    forEachLinePart(layout, start, end, withTrailingSpaces = true) { left, right, baseline, opens, closes ->
+    forEachLinePart(layout, start, end, withTrailingSpaces = true) { from, to, left, right, baseline ->
+        val opens = from == start
+        val closes = to == end
         val leftEnd = if (ltr) opens else closes
         val rightEnd = if (ltr) closes else opens
         val part = Rect(
@@ -2293,21 +2400,20 @@ private fun DrawScope.drawInlineBox(
 /** Calls [draw] with the left edge, right edge and baseline of every line
  *  the text range `[start, end)` covers. */
 internal inline fun forEachLineSegment(layout: TextLayoutResult, start: Int, end: Int, draw: (Float, Float, Float) -> Unit) =
-    forEachLinePart(layout, start, end, withTrailingSpaces = false) { left, right, baseline, _, _ -> draw(left, right, baseline) }
+    forEachLinePart(layout, start, end, withTrailingSpaces = false) { _, _, left, right, baseline -> draw(left, right, baseline) }
 
 /**
  * Calls [draw] for every line the text range `[start, end)` covers, with
- * the left and right edges of its part on that line, the line's baseline,
- * and whether that part holds the range's start and its end. With
- * [withTrailingSpaces], a part the line wraps after takes in the spaces it
- * wraps on.
+ * its part on that line: its range, its left and right edges, and the
+ * line's baseline. With [withTrailingSpaces], a part the line wraps after
+ * takes in the spaces it wraps on.
  */
 internal inline fun forEachLinePart(
     layout: TextLayoutResult,
     start: Int,
     end: Int,
     withTrailingSpaces: Boolean,
-    draw: (left: Float, right: Float, baseline: Float, opens: Boolean, closes: Boolean) -> Unit,
+    draw: (from: Int, to: Int, left: Float, right: Float, baseline: Float) -> Unit,
 ) {
     val text = layout.layoutInput.text
     for (line in layout.getLineForOffset(start)..layout.getLineForOffset(end - 1)) {
@@ -2318,7 +2424,7 @@ internal inline fun forEachLinePart(
         if (from >= to) continue
         val begin = layout.getHorizontalPosition(from, usePrimaryDirection = true)
         val finish = if (wraps && to == lineEnd) layout.wrapEdge(line) else layout.getHorizontalPosition(to, usePrimaryDirection = true)
-        draw(minOf(begin, finish), maxOf(begin, finish), layout.getLineBaseline(line), from == start, to == end)
+        draw(from, to, minOf(begin, finish), maxOf(begin, finish), layout.getLineBaseline(line))
     }
 }
 
@@ -2339,11 +2445,6 @@ internal fun TextLayoutResult.wrapEdge(line: Int): Float {
 private fun markFontSize(block: RichBlock, style: TextStyle, offset: Int): TextUnit =
     block.marks.firstOrNull { it.type == RichMarkType.FONT_SIZE && it.start <= offset && it.end > offset }
         ?.let { richFontSizeOf(it.value)?.sp } ?: style.fontSize
-
-/** The text colour at [offset]: a colour mark, else the block's. */
-private fun markTextColor(block: RichBlock, style: TextStyle, offset: Int, dark: Boolean): Color =
-    block.marks.firstOrNull { it.type == RichMarkType.TEXT_COLOR && it.start <= offset && it.end > offset }
-        ?.let { richColorOf(it.value, dark) } ?: style.color
 
 /** --rt-divider (globalCSS.js:2854, 2880); the active pair follows the
  *  theme (WorkspaceTheme.rtActiveBg / rtActiveText). */

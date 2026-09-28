@@ -59,7 +59,6 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -80,6 +79,7 @@ import com.glasskeep.app.nativeapp.data.RichQuote
 import com.glasskeep.app.nativeapp.data.network.UserAiSettingsDto
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.LightBorderColor
+import com.glasskeep.app.ui.theme.WebSystemItalic
 import kotlinx.coroutines.launch
 import java.net.URI
 
@@ -451,7 +451,7 @@ private fun docTextOf(block: DocBlock, style: DocStyle, linkColor: Color): Padde
         if (start >= end) continue
         when (mark.type) {
             RichMarkType.BOLD -> builder.addStyle(SpanStyle(fontWeight = FontWeight.SemiBold), start, end)
-            RichMarkType.ITALIC -> builder.addStyle(SpanStyle(fontStyle = FontStyle.Italic), start, end)
+            RichMarkType.ITALIC -> builder.addStyle(SpanStyle(textGeometricTransform = WebSystemItalic), start, end)
             RichMarkType.STRIKE -> builder.addStyle(SpanStyle(textDecoration = TextDecoration.LineThrough), start, end)
             // The pads keep the surrounding size: only the code itself
             // shrinks to 0.85em.

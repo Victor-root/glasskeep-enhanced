@@ -29,6 +29,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -65,7 +66,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -87,6 +87,7 @@ import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.TypographyBlock
 import com.glasskeep.app.nativeapp.data.TypographyProfile
+import com.glasskeep.app.ui.theme.WebSystemItalic
 
 /** editorToolbarMode: the user's saved choice between the phone default
  *  (one dense row of the most-used tools) and the full four-group bar. */
@@ -167,16 +168,16 @@ fun RichFormatToolbar(
                     )
                 },
             ) { open ->
-                val font = richFontFor(state.markValue(RichMarkType.FONT_FAMILY))
+                val font = state.markValue(RichMarkType.FONT_FAMILY)
                 RichMenuButton(
-                    label = font?.label ?: RichFonts.first().label,
+                    label = richFontFor(font)?.label ?: RichFonts.first().label,
                     tooltip = stringResource(R.string.native_richtext_font_family),
                     wide = true,
                     active = true,
                     enabled = enabled,
                     colors = colors,
                     titleColor = titleColor,
-                    fontFamily = font?.family,
+                    fontFamily = richFontFamilyOf(font),
                     onClick = { openPopover = if (open) null else RichPopoverKind.FONT },
                 )
             }
@@ -1037,7 +1038,7 @@ private fun RichStyleButton(
             lineHeight = (fontSize * 1.3f).sp,
             letterSpacing = 0.sp,
             fontWeight = FontWeight(block.weight),
-            fontStyle = if (block.italic) FontStyle.Italic else FontStyle.Normal,
+            style = LocalTextStyle.current.copy(textGeometricTransform = WebSystemItalic.takeIf { block.italic }),
             textDecoration = if (block.underline) TextDecoration.Underline else TextDecoration.None,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

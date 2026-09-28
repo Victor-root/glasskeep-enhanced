@@ -130,7 +130,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -183,6 +182,7 @@ import com.glasskeep.app.ui.FloatingCardsBackground
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
+import com.glasskeep.app.ui.theme.WebSystemItalic
 import java.text.Collator
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -2129,7 +2129,7 @@ private fun AiThinkingLine() {
             color = Color(0xFF6A7282),
             fontSize = 14.sp,
             lineHeight = 20.sp,
-            fontStyle = FontStyle.Italic,
+            style = LocalTextStyle.current.copy(textGeometricTransform = WebSystemItalic),
         )
     }
 }
@@ -2838,7 +2838,7 @@ private fun AudioCardPreview(note: NoteEntity, dark: Boolean, titleColor: Color)
             color = subtle,
             fontSize = 12.sp,
             lineHeight = 16.sp,
-            fontStyle = FontStyle.Italic,
+            style = LocalTextStyle.current.copy(textGeometricTransform = WebSystemItalic),
         )
         return
     }

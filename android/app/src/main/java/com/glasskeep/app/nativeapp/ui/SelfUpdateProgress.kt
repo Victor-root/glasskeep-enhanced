@@ -26,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,6 +67,7 @@ import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightTitleColor
+import com.glasskeep.app.ui.theme.WebSystemItalic
 import kotlinx.coroutines.delay
 import java.util.Locale
 import kotlin.math.roundToLong
@@ -451,7 +453,7 @@ private fun SystemMonitor(update: ServerUpdateState, dark: Boolean) {
                 color = if (dark) Amber400 else Amber600,
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
-                fontStyle = FontStyle.Italic,
+                style = LocalTextStyle.current.copy(textGeometricTransform = WebSystemItalic),
             )
         }
         MemoryGauge(current.mem, R.string.native_update_ram, R.string.native_update_ram_saturated, elevatedAt = 75.0, dark = dark) {

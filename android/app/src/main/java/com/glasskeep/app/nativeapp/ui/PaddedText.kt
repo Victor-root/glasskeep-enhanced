@@ -101,10 +101,11 @@ internal class PaddedText private constructor(
 
 /** A text's layout with the [padded] text it laid out, taking and giving
  *  the text's own offsets; [laidOut] for line geometry and the laid-out
- *  offsets of [PaddedText]. */
+ *  offsets of [PaddedText], [ink] for where its glyphs cross underlines. */
 internal class PaddedLayout(val laidOut: TextLayoutResult, val padded: PaddedText) {
     val size get() = laidOut.size
     val lineCount get() = laidOut.lineCount
+    val ink = GlyphInk(laidOut)
 
     fun getOffsetForPosition(position: Offset): Int = padded.textOffset(laidOut.getOffsetForPosition(position))
 
