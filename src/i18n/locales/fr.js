@@ -729,8 +729,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   syncActionRestore: "Restauration",
   syncActionDelete: "Suppression",
   syncActionReorder: "Réorganisation",
-  undo: "Annuler (Ctrl+Z)",
-  redo: "Rétablir (Ctrl+Y)",
+  undoShortcut: "Annuler (Ctrl+Z)",
+  redoShortcut: "Rétablir (Ctrl+Y)",
   image: "Image",
 
   // Password change

@@ -571,7 +571,7 @@ export default function ModalFooter({
             <path d="M3 10l4-4" />
             <path d="M3 10l4 4" />
           </svg>
-          {isDesktop && <span>{t("undo")}</span>}
+          {isDesktop && <span>{t("undoShortcut")}</span>}
         </button>
         )}
 
@@ -588,7 +588,7 @@ export default function ModalFooter({
             <path d="M21 10l-4-4" />
             <path d="M21 10l-4 4" />
           </svg>
-          {isDesktop && <span>{t("redo")}</span>}
+          {isDesktop && <span>{t("redoShortcut")}</span>}
         </button>
         )}
 
