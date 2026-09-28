@@ -694,14 +694,16 @@ fun NativeNavHost(
                 }
                 // The list itself is drawn under the NavHost (above); what
                 // opens over it animates alone, and signing in or out swaps
-                // the page at once, like the web's hash route.
+                // the page at once, like the web's hash route. Screen-sized
+                // though empty: the NavHost otherwise animates its own size
+                // between this and what opens over it, from the top-left.
                 composable(
                     route = "notes",
                     enterTransition = { EnterTransition.None },
                     exitTransition = { ExitTransition.None },
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { ExitTransition.None },
-                ) {}
+                ) { Box(Modifier.fillMaxSize()) }
                 // The web's settings panel, a full-width sheet sliding in from
                 // the right.
                 composable(
