@@ -431,14 +431,12 @@ private fun markRange(pos: PmResolvedPos, type: PmMarkType, attributes: PmAttrs?
     return from to to
 }
 
-/** TextStyle's removeEmptyTextStyle(): every node of the selection but a
- *  textblock loses its textStyle unless it has one with a value. A list
- *  or quote the selection is in has no mark of its own, so every colour,
- *  font and size in all of it goes, as on the web. */
+/** TextStyle.js removeEmptyTextStyle(): every inline node of the selection
+ *  loses its textStyle unless it has one with a value. */
 internal fun removeEmptyTextStyle(tr: PmTransaction) {
     val selection = tr.selection
     tr.doc.nodesBetween(selection.from, selection.to, { node, pos, _, _ ->
-        if (!node.isTextblock && node.marks.none { it.type === PmSchema.textStyle && it.attrs.values.any(::truthy) }) {
+        if (node.isInline && node.marks.none { it.type === PmSchema.textStyle && it.attrs.values.any(::truthy) }) {
             tr.removeMark(pos, pos + node.nodeSize, PmSchema.textStyle)
         }
         true
