@@ -1,6 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { t } from "../../i18n";
+import { useSwallowClosingClick } from "../../hooks/useSwallowClosingClick.js";
 
 export function useDark() {
   const [dark, setDark] = React.useState(() => document.documentElement.classList.contains("dark"));
@@ -56,7 +57,7 @@ function ColorPicker({ colorKey, onChange, onClose, onOutsideClose, triggerRef }
       if (ref.current?.contains(e.target)) return;
       if (triggerRef?.current?.contains(e.target)) return;
       e.preventDefault();
-      onOutsideClose();
+      onOutsideClose(e);
     };
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
@@ -128,20 +129,7 @@ export default function SectionHeader({
   const confirmTimerRef = React.useRef(null);
   const enterPressedRef = React.useRef(false);
   const triggerBtnRef = React.useRef(null);
-  const suppressNextClickRef = React.useRef(false);
-
-  // Persistent click suppressor — stays active as long as SectionHeader is mounted,
-  // so it catches the click that fires after ColorPicker unmounts on outside-close.
-  React.useEffect(() => {
-    const handler = (e) => {
-      if (!suppressNextClickRef.current) return;
-      suppressNextClickRef.current = false;
-      e.stopPropagation();
-      e.preventDefault();
-    };
-    document.addEventListener("click", handler, true);
-    return () => document.removeEventListener("click", handler, true);
-  }, []);
+  const swallowClickOf = useSwallowClosingClick();
 
   const dark = useDark();
   const colorKey = section.color ?? "none";
@@ -251,7 +239,7 @@ export default function SectionHeader({
               colorKey={colorKey}
               onChange={onColorChange}
               onClose={() => setPickerOpen(false)}
-              onOutsideClose={() => { suppressNextClickRef.current = true; setPickerOpen(false); }}
+              onOutsideClose={(e) => { swallowClickOf(e); setPickerOpen(false); }}
               triggerRef={triggerBtnRef}
             />
           )}
