@@ -6,18 +6,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PaddedTextTest {
-    private val pad = CodePadChar
+    private val pad = PadChar
 
     @Test
     fun `a code run gets a pad on either side, in the laid-out text only`() {
-        val padded = PaddedText.of(AnnotatedString("ab cd e"), listOf(3 until 5))
+        val padded = PaddedText.of(AnnotatedString("ab cd e"), listOf(PaddedRun(3 until 5, CodePadId)))
         assertEquals("ab ${pad}cd$pad e", padded.text.text)
         assertEquals(7, padded.length)
     }
 
     @Test
     fun `offsets convert both ways around the pads`() {
-        val padded = PaddedText.of(AnnotatedString("ab cd e"), listOf(3 until 5))
+        val padded = PaddedText.of(AnnotatedString("ab cd e"), listOf(PaddedRun(3 until 5, CodePadId)))
         assertEquals(3, padded.caret(3))
         assertEquals(4, padded.char(3))
         assertEquals(7, padded.caret(5))
@@ -31,7 +31,7 @@ class PaddedTextTest {
 
     @Test
     fun `a run starting where another ends keeps each box to its own pads`() {
-        val padded = PaddedText.of(AnnotatedString("abcd"), listOf(0 until 2, 2 until 4))
+        val padded = PaddedText.of(AnnotatedString("abcd"), listOf(PaddedRun(0 until 2, CodePadId), PaddedRun(2 until 4, HighlightPadId)))
         assertEquals("${pad}ab$pad${pad}cd$pad", padded.text.text)
         assertEquals(TextRange(0, 4), padded.box(0, 2))
         assertEquals(TextRange(4, 8), padded.box(2, 4))

@@ -452,7 +452,7 @@ private fun RichEditorText(
                 layout = laid
                 state.layouts.setLayout(block.id, laid)
             },
-            inlineContent = codePads(editor = true),
+            inlineContent = richPads(editor = true),
             modifier = Modifier
                 .fillMaxWidth()
                 .onPlaced { state.layouts.setCoordinates(block.id, it) }
@@ -1263,7 +1263,7 @@ private class UnpaddedClipboard(private val clipboard: Clipboard) : Clipboard by
         if (data.itemCount == 0) return this
         val items = List(data.itemCount) { i ->
             val item = data.getItemAt(i)
-            item.text?.let { ClipData.Item(it.toString().replace(CodePadChar.toString(), "")) } ?: item
+            item.text?.let { ClipData.Item(it.toString().replace(PadChar.toString(), "")) } ?: item
         }
         return ClipEntry(ClipData(data.description, items.first()).apply { items.drop(1).forEach(::addItem) })
     }
@@ -1761,7 +1761,7 @@ private fun ReaderText(
             padded.text,
             style = style,
             onTextLayout = { layout = PaddedLayout(it, padded) },
-            inlineContent = codePads(editor = false),
+            inlineContent = richPads(editor = false),
             modifier = Modifier
                 .fillMaxWidth()
                 .drawBehind { layout?.let { drawRichDecorations(it, block, style, dark, surface) } }
@@ -2094,8 +2094,9 @@ private fun annotatedTextFor(
     }
 }
 
-/** [annotatedTextFor] as it is laid out, each inline code run's padding
- *  taking room in its line ([PaddedText]). */
+/** [annotatedTextFor] as it is laid out, the padding of its inline code,
+ *  and of its highlights in the editor, taking room in its line
+ *  ([PaddedText]). */
 private fun paddedTextFor(
     block: RichBlock,
     style: TextStyle,
@@ -2104,19 +2105,29 @@ private fun paddedTextFor(
     openLink: LinkInteractionListener? = null,
 ): PaddedText = PaddedText.of(
     annotatedTextFor(block, style, dark, surface, openLink),
-    block.marks.filter { it.type == RichMarkType.CODE }.map { it.start until it.end },
+    block.marks.mapNotNull { mark ->
+        when {
+            mark.type == RichMarkType.CODE -> PaddedRun(mark.start until mark.end, CodePadId)
+            mark.type == RichMarkType.HIGHLIGHT && surface == RichSurface.EDITOR -> PaddedRun(mark.start until mark.end, HighlightPadId)
+            else -> null
+        }
+    },
 )
 
 /** Inline code's padding and 1px border on either side, in dp: `.35rem`
  *  in the view, `.32em` of the code's 0.9em in the editor. */
 private fun codePadX(editor: Boolean): Float = (if (editor) 4.608f else 5.6f) + 1f
 
-/** The room [PaddedText] makes for inline code's padding. */
+/** The room [PaddedText] makes for inline code's padding, and in the
+ *  editor for a highlight's 2px (`.rt-editor-content mark`). */
 @Composable
-private fun codePads(editor: Boolean): Map<String, InlineTextContent> {
-    val width = with(LocalDensity.current) { codePadX(editor).dp.toSp() }
-    return remember(width) {
-        mapOf(CodePadId to InlineTextContent(Placeholder(width, 0.1.em, PlaceholderVerticalAlign.AboveBaseline)) {})
+private fun richPads(editor: Boolean): Map<String, InlineTextContent> {
+    val density = LocalDensity.current
+    return remember(density, editor) {
+        fun pad(width: Float) = InlineTextContent(
+            Placeholder(with(density) { width.dp.toSp() }, 0.1.em, PlaceholderVerticalAlign.AboveBaseline),
+        ) {}
+        mapOf(CodePadId to pad(codePadX(editor)), HighlightPadId to pad(2f))
     }
 }
 
@@ -2172,12 +2183,13 @@ private fun DrawScope.drawRichDecorations(layout: PaddedLayout, block: RichBlock
             RichMarkType.HIGHLIGHT -> {
                 val color = if (mark.value == null) PlainMarkBackground else richColorOf(mark.value, dark) ?: continue
                 val em = markFontSize(block, style, start).toPx()
-                val laid = layout.padded.range(start, end)
+                // The editor's 2px padding has its own room in the line.
+                val box = layout.padded.box(start, end)
                 drawInlineBox(
-                    layout.laidOut, laid.start, laid.end,
+                    layout.laidOut, box.start, box.end,
                     above = 0.93f * em,
                     below = 0.24f * em,
-                    padX = if (editor) 2.dp.toPx() else 0f,
+                    padX = 0f,
                     radius = if (editor) 2.dp.toPx() else 0f,
                     fill = color,
                     border = null,

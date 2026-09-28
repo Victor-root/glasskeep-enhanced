@@ -11,17 +11,24 @@ import androidx.compose.ui.text.TextRange
 /** The inline content id of an inline code run's padding. */
 internal const val CodePadId = "codePad"
 
+/** The inline content id of a highlight's padding, in the editor. */
+internal const val HighlightPadId = "highlightPad"
+
 /** What stands in the laid-out text for a pad (appendInlineContent's own
- *  default): a letter to the line breaker, so a pad keeps to its code. */
-internal const val CodePadChar = '�'
+ *  default): a letter to the line breaker, so a pad keeps to its run. */
+internal const val PadChar = '�'
+
+/** A run `[start, end)` of a text padded on either side by the inline
+ *  content [padId]. */
+internal class PaddedRun(val range: IntRange, val padId: String)
 
 /**
- * A text as it is laid out, its inline code padded the way the web pads
- * `code`: the padding takes room in its line and pushes the text around
- * it, which a span cannot do. A placeholder as wide as that padding
- * ([CodePadId]) sits on either side of each code run, in the laid-out text
- * only: offsets in and out of [caret], [char], [range], [box] and
- * [textOffset] are the text's own.
+ * A text as it is laid out, its padded inline boxes padded the way the web
+ * pads them (`code`, the editor's `mark`): the padding takes room in its
+ * line and pushes the text around it, which a span cannot do. A
+ * placeholder as wide as that padding sits on either side of each run, in
+ * the laid-out text only: offsets in and out of [caret], [char], [range],
+ * [box] and [textOffset] are the text's own.
  */
 internal class PaddedText private constructor(
     val text: AnnotatedString,
@@ -32,8 +39,8 @@ internal class PaddedText private constructor(
     private val carets: IntArray,
     private val pads: IntArray,
 ) {
-    /** Where a caret at [offset] is laid out: past the pads closing a code
-     *  run there, before those opening one. */
+    /** Where a caret at [offset] is laid out: past the pads closing a run
+     *  there, before those opening one. */
     fun caret(offset: Int): Int = carets[offset.coerceIn(0, length)]
 
     /** Where character [index] is laid out. */
@@ -43,7 +50,7 @@ internal class PaddedText private constructor(
     fun range(start: Int, end: Int): TextRange = TextRange(char(start), caret(end) - closes[end.coerceIn(0, length)])
 
     /** The laid-out range of `[start, end)` with the pads at its edges: a
-     *  code run's whole box. */
+     *  padded run's whole box. */
     fun box(start: Int, end: Int): TextRange = TextRange(caret(start), caret(end))
 
     /** The text's own offset at laid-out [offset]: the pads before it left out. */
@@ -53,22 +60,28 @@ internal class PaddedText private constructor(
     }
 
     companion object {
-        /** [text] with its code runs `[start, end)` from [codes] padded. */
-        fun of(text: AnnotatedString, codes: List<IntRange>): PaddedText {
+        /** [text] with its [runs] padded. */
+        fun of(text: AnnotatedString, runs: List<PaddedRun>): PaddedText {
             val length = text.length
-            val opens = IntArray(length + 1)
-            val closes = IntArray(length + 1)
-            for (code in codes) {
-                val start = code.first.coerceIn(0, length)
-                val end = (code.last + 1).coerceIn(start, length)
+            val opening = arrayOfNulls<MutableList<String>>(length + 1)
+            val closing = arrayOfNulls<MutableList<String>>(length + 1)
+            for (run in runs) {
+                val start = run.range.first.coerceIn(0, length)
+                val end = (run.range.last + 1).coerceIn(start, length)
                 if (start == end) continue
-                opens[start]++
-                closes[end]++
+                (opening[start] ?: mutableListOf<String>().also { opening[start] = it }) += run.padId
+                (closing[end] ?: mutableListOf<String>().also { closing[end] = it }) += run.padId
             }
+            val opens = IntArray(length + 1) { opening[it]?.size ?: 0 }
+            val closes = IntArray(length + 1) { closing[it]?.size ?: 0 }
             val carets = IntArray(length + 1)
             val pads = mutableListOf<Int>()
-            val builder = AnnotatedString.Builder(length + 2 * codes.size)
+            val builder = AnnotatedString.Builder(length + 2 * runs.size)
             var copied = 0
+            fun pad(id: String) {
+                pads += builder.length
+                builder.appendInlineContent(id, PadChar.toString())
+            }
             for (i in 0..length) {
                 if (opens[i] == 0 && closes[i] == 0) {
                     carets[i] = i + pads.size
@@ -76,15 +89,9 @@ internal class PaddedText private constructor(
                 }
                 builder.append(text.subSequence(copied, i))
                 copied = i
-                repeat(closes[i]) {
-                    pads += builder.length
-                    builder.appendInlineContent(CodePadId, CodePadChar.toString())
-                }
+                closing[i]?.forEach(::pad)
                 carets[i] = builder.length
-                repeat(opens[i]) {
-                    pads += builder.length
-                    builder.appendInlineContent(CodePadId, CodePadChar.toString())
-                }
+                opening[i]?.forEach(::pad)
             }
             builder.append(text.subSequence(copied, length))
             return PaddedText(builder.toAnnotatedString(), length, opens, closes, carets, pads.toIntArray())

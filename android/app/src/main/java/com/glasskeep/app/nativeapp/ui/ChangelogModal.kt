@@ -470,7 +470,7 @@ private fun docTextOf(block: DocBlock, style: DocStyle, linkColor: Color): Padde
             else -> Unit
         }
     }
-    return PaddedText.of(builder.toAnnotatedString(), block.codeRanges)
+    return PaddedText.of(builder.toAnnotatedString(), block.codeRanges.map { PaddedRun(it, CodePadId) })
 }
 
 private val DocBlock.codeRanges: List<IntRange>
