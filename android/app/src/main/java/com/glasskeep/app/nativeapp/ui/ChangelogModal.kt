@@ -379,16 +379,7 @@ private fun ChangelogDocument(markdown: String, dark: Boolean, borderColor: Colo
                             textAlign = TextAlign.End,
                         )
                     } else {
-                        // Chromium's outside disc for a 14px list item.
-                        Box(
-                            Modifier.drawBehind {
-                                drawCircle(
-                                    color = textColor,
-                                    radius = (0.15625f * 14).dp.toPx(),
-                                    center = Offset((start - (0.88f * 14).dp).toPx(), (21.7f / 2).dp.toPx()),
-                                )
-                            },
-                        )
+                        Box(Modifier.drawBehind { drawListDisc(textColor, 14f, start.value, 21.7f / 2) })
                     }
                     DocText(block, BodyStyle, textColor, dark, Modifier.padding(start = start))
                 }

@@ -93,6 +93,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollDispatcher
@@ -124,6 +125,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Constraints
@@ -1462,19 +1464,17 @@ private fun RichListRow(
                     }
                 },
             )
-            else -> Box(
-                Modifier.drawBehind {
-                    drawCircle(
-                        color = style.color,
-                        radius = (0.15625f * em).dp.toPx(),
-                        center = Offset((list.markerStart - 0.88f * em).dp.toPx(), (0.75f * em).dp.toPx()),
-                    )
-                },
-            )
+            else -> Box(Modifier.drawBehind { drawListDisc(style.color, em, list.markerStart, 0.75f * em) })
         }
         text(Modifier.padding(start = list.textStart.dp))
     }
 }
+
+/** The Android WebView's outside `disc` for a list item of [em] font size
+ *  starting at [itemStart]: a 0.15625em dot [centreY] down, its centre
+ *  0.61em left of the item, nearer than desktop Chrome puts it. In dp. */
+internal fun DrawScope.drawListDisc(color: Color, em: Float, itemStart: Float, centreY: Float) =
+    drawCircle(color, radius = (0.15625f * em).dp.toPx(), center = Offset((itemStart - 0.61f * em).dp.toPx(), centreY.dp.toPx()))
 
 /** `hr`: 1px, in [color], from [start] to the column's edge. */
 @Composable
@@ -2094,37 +2094,29 @@ private fun DrawScope.drawRichDecorations(layout: TextLayoutResult, block: RichB
         when (mark.type) {
             RichMarkType.CODE -> {
                 val em = style.fontSize.toPx() * 0.9f
-                val padX = (if (editor) 4.608f else 5.6f).dp.toPx() + 1.dp.toPx()
                 val padY = (if (editor) 1.152f else 1.92f).dp.toPx() + 1.dp.toPx()
-                val radius = (if (editor) 3f else 5.6f).dp.toPx()
-                val fill = if (editor && dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)
-                val border = if (dark) DarkBorderColor else LightBorderColor
-                forEachLineSegment(layout, start, end) { left, right, baseline ->
-                    val box = Rect(left - padX, baseline - 0.93f * em - padY, right + padX, baseline + 0.24f * em + padY)
-                    drawRoundRect(fill, box.topLeft, box.size, CornerRadius(radius))
-                    val line = 1.dp.toPx()
-                    drawRoundRect(
-                        border,
-                        Offset(box.left + line / 2f, box.top + line / 2f),
-                        Size(box.width - line, box.height - line),
-                        CornerRadius(radius - line / 2f),
-                        style = Stroke(line),
-                    )
-                }
+                drawInlineBox(
+                    layout, start, end,
+                    above = 0.93f * em + padY,
+                    below = 0.24f * em + padY,
+                    padX = (if (editor) 4.608f else 5.6f).dp.toPx() + 1.dp.toPx(),
+                    radius = (if (editor) 3f else 5.6f).dp.toPx(),
+                    fill = if (editor && dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f),
+                    border = if (dark) DarkBorderColor else LightBorderColor,
+                )
             }
             RichMarkType.HIGHLIGHT -> {
                 val color = if (mark.value == null) PlainMarkBackground else richColorOf(mark.value, dark) ?: continue
                 val em = markFontSize(block, style, start).toPx()
-                val padX = if (editor) 2.dp.toPx() else 0f
-                val radius = if (editor) 2.dp.toPx() else 0f
-                forEachLineSegment(layout, start, end) { left, right, baseline ->
-                    drawRoundRect(
-                        color,
-                        Offset(left - padX, baseline - 0.93f * em),
-                        Size(right - left + 2 * padX, 1.17f * em),
-                        CornerRadius(radius),
-                    )
-                }
+                drawInlineBox(
+                    layout, start, end,
+                    above = 0.93f * em,
+                    below = 0.24f * em,
+                    padX = if (editor) 2.dp.toPx() else 0f,
+                    radius = if (editor) 2.dp.toPx() else 0f,
+                    fill = color,
+                    border = null,
+                )
             }
             RichMarkType.UNDERLINE -> {
                 if (plainUnderline(mark)) continue
@@ -2168,19 +2160,101 @@ private fun DrawScope.drawRichDecorations(layout: TextLayoutResult, block: RichB
     }
 }
 
+/**
+ * A CSS inline box's background, and [border], behind `[start, end)`:
+ * [above] and [below] each line's baseline, [padX] wide sides, [radius]
+ * corners. Broken across lines the way the web breaks it
+ * (`box-decoration-break: slice`): each line's part is the box the text
+ * would have unbroken, cut there, so a side where it wraps has neither
+ * padding, corners nor border, and takes in the spaces it wraps on.
+ */
+private fun DrawScope.drawInlineBox(
+    layout: TextLayoutResult,
+    start: Int,
+    end: Int,
+    above: Float,
+    below: Float,
+    padX: Float,
+    radius: Float,
+    fill: Color,
+    border: Color?,
+) {
+    val stroke = 1.dp.toPx()
+    val ltr = layout.getParagraphDirection(start) == ResolvedTextDirection.Ltr
+    forEachLinePart(layout, start, end, withTrailingSpaces = true) { left, right, baseline, opens, closes ->
+        val leftEnd = if (ltr) opens else closes
+        val rightEnd = if (ltr) closes else opens
+        val part = Rect(
+            left - if (leftEnd) padX else 0f,
+            baseline - above,
+            right + if (rightEnd) padX else 0f,
+            baseline + below,
+        )
+        val cut = radius + stroke
+        val box = Rect(
+            if (leftEnd) part.left else part.left - cut,
+            part.top,
+            if (rightEnd) part.right else part.right + cut,
+            part.bottom,
+        )
+        clipRect(part.left, part.top, part.right, part.bottom) {
+            drawRoundRect(fill, box.topLeft, box.size, CornerRadius(radius))
+            if (border != null) {
+                drawRoundRect(
+                    border,
+                    Offset(box.left + stroke / 2f, box.top + stroke / 2f),
+                    Size(box.width - stroke, box.height - stroke),
+                    CornerRadius(radius - stroke / 2f),
+                    style = Stroke(stroke),
+                )
+            }
+        }
+    }
+}
+
 /** Calls [draw] with the left edge, right edge and baseline of every line
  *  the text range `[start, end)` covers. */
-internal inline fun forEachLineSegment(layout: TextLayoutResult, start: Int, end: Int, draw: (Float, Float, Float) -> Unit) {
-    val firstLine = layout.getLineForOffset(start)
-    val lastLine = layout.getLineForOffset(end - 1)
-    for (line in firstLine..lastLine) {
+internal inline fun forEachLineSegment(layout: TextLayoutResult, start: Int, end: Int, draw: (Float, Float, Float) -> Unit) =
+    forEachLinePart(layout, start, end, withTrailingSpaces = false) { left, right, baseline, _, _ -> draw(left, right, baseline) }
+
+/**
+ * Calls [draw] for every line the text range `[start, end)` covers, with
+ * the left and right edges of its part on that line, the line's baseline,
+ * and whether that part holds the range's start and its end. With
+ * [withTrailingSpaces], a part the line wraps after takes in the spaces it
+ * wraps on.
+ */
+internal inline fun forEachLinePart(
+    layout: TextLayoutResult,
+    start: Int,
+    end: Int,
+    withTrailingSpaces: Boolean,
+    draw: (left: Float, right: Float, baseline: Float, opens: Boolean, closes: Boolean) -> Unit,
+) {
+    val text = layout.layoutInput.text
+    for (line in layout.getLineForOffset(start)..layout.getLineForOffset(end - 1)) {
+        val lineEnd = layout.getLineEnd(line)
+        val wraps = line < layout.lineCount - 1 && text[lineEnd - 1] != '\n'
         val from = maxOf(start, layout.getLineStart(line))
-        val to = minOf(end, layout.getLineEnd(line, visibleEnd = true))
+        val to = minOf(end, if (withTrailingSpaces && wraps) lineEnd else layout.getLineEnd(line, visibleEnd = true))
         if (from >= to) continue
-        val left = layout.getHorizontalPosition(from, usePrimaryDirection = true)
-        val right = layout.getHorizontalPosition(to, usePrimaryDirection = true)
-        draw(minOf(left, right), maxOf(left, right), layout.getLineBaseline(line))
+        val begin = layout.getHorizontalPosition(from, usePrimaryDirection = true)
+        val finish = if (wraps && to == lineEnd) layout.wrapEdge(line) else layout.getHorizontalPosition(to, usePrimaryDirection = true)
+        draw(minOf(begin, finish), maxOf(begin, finish), layout.getLineBaseline(line), from == start, to == end)
     }
+}
+
+/**
+ * Where [line], which wraps, ends: its end offset belongs to the next line,
+ * and a horizontal position there is that line's start. The spaces it
+ * wraps on hang past its text (a line's width counts them, its right edge
+ * does not).
+ */
+internal fun TextLayoutResult.wrapEdge(line: Int): Float {
+    val left = getLineLeft(line)
+    val right = getLineRight(line)
+    val hanging = multiParagraph.getLineWidth(line) - (right - left)
+    return if (getParagraphDirection(getLineStart(line)) == ResolvedTextDirection.Ltr) right + hanging else left - hanging
 }
 
 /** The font size at [offset], a size mark included. */
