@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -239,6 +240,9 @@ fun NativeNotesListScreen(
     pendingNewNoteType: String? = null,
     onPendingNewNoteTypeConsumed: () -> Unit = {},
     onSignedOut: () -> Unit,
+    /** The cards already shown, held above this screen for the same
+     *  reason as [activeTagFilter]. */
+    cardsShown: NoteCardsShown,
 ) {
     val dark = LocalGkDark.current
     val themeId = container.themeState.themeId
@@ -957,13 +961,17 @@ fun NativeNotesListScreen(
                 Spacer(Modifier.height(with(density) { headerHeightPx.toDp() } + 24.dp))
                 if (selectionMode) Spacer(Modifier.height(SelectionShim))
                 val aiBoxShown = aiLoading || aiAnswer != null
+                // Under a finished answer only (NotesComposer.jsx:130).
+                val citedNotes = if (aiBoxShown && !aiLoading) shownNotes.filter { it.id in aiCitedNoteIds } else emptyList()
+                if (rawShown != null) SideEffect { cardsShown.update(NoteCardList.AI_CITED, listView = false, listOf(citedNotes)) }
                 if (aiBoxShown) {
                     AiAnswerCard(
                         answer = aiAnswer,
                         loading = aiLoading,
                         dark = dark,
                         titleColor = titleColor,
-                        citedNotes = shownNotes.filter { it.id in aiCitedNoteIds },
+                        citedNotes = citedNotes,
+                        fadesIn = { id -> cardsShown.isNew(NoteCardPlace(NoteCardList.AI_CITED, listView = false, column = 0), id) },
                         typography = container.editorPrefs.typography.activeProfile,
                         taskStrike = container.editorPrefs.taskStrike,
                         themeId = themeId,
@@ -981,6 +989,15 @@ fun NativeNotesListScreen(
                 val emptyTop = if (selectionMode && !aiBoxShown) 40.dp else 16.dp
                 val filtering = searchQuery.isNotEmpty() || activeTagFilter != null || activeTagFilters.isNotEmpty()
                 val reminderLens = activeTagFilter == SidebarReminders
+                val listView = container.shellPrefs.listView
+                val pinnedNotes = remember(filteredNotes) { filteredNotes.filter { it.pinned } }
+                val otherNotes = remember(filteredNotes) { filteredNotes.filter { !it.pinned } }
+                if (rawShown != null) {
+                    SideEffect {
+                        cardsShown.update(NoteCardList.PINNED, listView, masonryColumns(pinnedNotes, listView))
+                        cardsShown.update(NoteCardList.OTHERS, listView, masonryColumns(otherNotes, listView))
+                    }
+                }
                 // main.px-4.pb-12, over the body's own bottom inset.
                 Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 48.dp + navBarBottom)) {
                     when {
@@ -1025,11 +1042,10 @@ fun NativeNotesListScreen(
                                     )
                                 }
                             }
-                            val pinnedNotes = remember(filteredNotes) { filteredNotes.filter { it.pinned } }
-                            val otherNotes = remember(filteredNotes) { filteredNotes.filter { !it.pinned } }
-                            val renderNoteCard: @Composable (NoteEntity) -> Unit = { note ->
+                            val renderNoteCard: @Composable (NoteEntity, NoteCardPlace) -> Unit = { note, place ->
                                 ReorderableNoteCard(
                                     note = note,
+                                    fadeIn = cardsShown.isNew(place, note.id),
                                     dark = dark,
                                     titleColor = titleColor,
                                     onClick = { onOpenNote(note.id) },
@@ -1061,10 +1077,9 @@ fun NativeNotesListScreen(
                             // left column, 1/3/5 in the right). Compose's staggered
                             // grid instead picks the currently shortest lane, visibly
                             // reordering cards. Use the web's real column algorithm.
-                            val listView = container.shellPrefs.listView
                             if (pinnedNotes.isNotEmpty()) {
                                 SectionLabel(stringResource(R.string.native_notes_section_pinned), subtextColor)
-                                NotesMasonry(notes = pinnedNotes, listView = listView, renderNoteCard = renderNoteCard)
+                                NotesMasonry(pinnedNotes, listView, NoteCardList.PINNED, renderNoteCard)
                                 // The pinned section's mb-10.
                                 Spacer(Modifier.height(40.dp))
                             }
@@ -1072,7 +1087,7 @@ fun NativeNotesListScreen(
                                 if (pinnedNotes.isNotEmpty()) {
                                     SectionLabel(stringResource(R.string.native_notes_section_others), subtextColor)
                                 }
-                                NotesMasonry(notes = otherNotes, listView = listView, renderNoteCard = renderNoteCard)
+                                NotesMasonry(otherNotes, listView, NoteCardList.OTHERS, renderNoteCard)
                             }
                         }
                     }
@@ -1982,6 +1997,7 @@ private fun AiAnswerCard(
     dark: Boolean,
     titleColor: Color,
     citedNotes: List<NoteEntity>,
+    fadesIn: (String) -> Boolean,
     typography: TypographyProfile,
     taskStrike: Boolean,
     themeId: String,
@@ -2083,15 +2099,18 @@ private fun AiAnswerCard(
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 for (note in citedNotes) {
-                    NoteCard(
-                        note = note,
-                        dark = dark,
-                        titleColor = titleColor,
-                        onClick = { onOpenNote(note.id) },
-                        typography = typography,
-                        taskStrike = taskStrike,
-                        themeId = themeId,
-                    )
+                    key(note.id) {
+                        NoteCard(
+                            note = note,
+                            fadeIn = fadesIn(note.id),
+                            dark = dark,
+                            titleColor = titleColor,
+                            onClick = { onOpenNote(note.id) },
+                            typography = typography,
+                            taskStrike = taskStrike,
+                            themeId = themeId,
+                        )
+                    }
                 }
             }
         }
@@ -2321,19 +2340,26 @@ private fun SectionLabel(text: String, color: Color) {
 }
 
 /** Mobile branch of react-masonry-css's `items.map((item, index) =>
- * column[index % 2])`. Keeping the columns in one shared scroll surface
- * reproduces both its order and its independent vertical packing. In the
- * grid every card keeps its 12px bottom margin, the last one included;
- * the list's space-y-6 has none after the last card. */
+ * column[index % 2])`, or the list view's single column. */
+private fun masonryColumns(notes: List<NoteEntity>, listView: Boolean): List<List<NoteEntity>> =
+    if (listView) listOf(notes) else (0..1).map { column -> notes.filterIndexed { index, _ -> index % 2 == column } }
+
+/** The [masonryColumns] of [list]. Keeping the columns in one shared
+ * scroll surface reproduces both react-masonry-css's order and its
+ * independent vertical packing. In the grid every card keeps its 12px
+ * bottom margin, the last one included; the list's space-y-6 has none
+ * after the last card. */
 @Composable
 private fun NotesMasonry(
     notes: List<NoteEntity>,
     listView: Boolean,
-    renderNoteCard: @Composable (NoteEntity) -> Unit,
+    list: NoteCardList,
+    renderNoteCard: @Composable (NoteEntity, NoteCardPlace) -> Unit,
 ) {
+    val columns = masonryColumns(notes, listView)
     if (listView) {
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            for (note in notes) renderNoteCard(note)
+            for (note in columns.single()) key(note.id) { renderNoteCard(note, NoteCardPlace(list, listView, 0)) }
         }
         return
     }
@@ -2342,17 +2368,13 @@ private fun NotesMasonry(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            notes.forEachIndexed { index, note -> if (index % 2 == 0) renderNoteCard(note) }
-        }
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            notes.forEachIndexed { index, note -> if (index % 2 == 1) renderNoteCard(note) }
+        columns.forEachIndexed { column, cards ->
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                for (note in cards) key(note.id) { renderNoteCard(note, NoteCardPlace(list, listView, column)) }
+            }
         }
     }
 }
@@ -2390,6 +2412,7 @@ private val DropOutlineColor = Color(0xFF6366F1)
 @Composable
 private fun ReorderableNoteCard(
     note: NoteEntity,
+    fadeIn: Boolean,
     dark: Boolean,
     titleColor: Color,
     onClick: () -> Unit,
@@ -2476,6 +2499,7 @@ private fun ReorderableNoteCard(
     ) {
         NoteCard(
             note = note,
+            fadeIn = fadeIn,
             dark = dark,
             titleColor = titleColor,
             onClick = onClick,
@@ -2547,9 +2571,38 @@ private suspend fun AwaitPointerEventScope.consumeUntilUp(pointerId: PointerId) 
     }
 }
 
+/** The lists of note cards the screen shows. */
+internal enum class NoteCardList { PINNED, OTHERS, AI_CITED }
+
+/** Where the web mounts a note's card: in a list, in the grid's column
+ *  or the list view's. A card that changes place is mounted anew. */
+internal data class NoteCardPlace(val list: NoteCardList, val listView: Boolean, val column: Int)
+
+/**
+ * The cards each place shows, for `noteAppear` (globalCSS.js:540,
+ * 589-592): a card fades in where it was not shown yet, as the web's card
+ * does when it mounts, a new note shifting the others from one column to
+ * the other included. Held above the screen, which a note or a panel
+ * replaces where the web keeps its list mounted under them, so coming
+ * back fades nothing in.
+ */
+class NoteCardsShown {
+    private val shown = HashMap<NoteCardPlace, Set<String>>()
+
+    internal fun isNew(place: NoteCardPlace, id: String): Boolean = id !in shown[place].orEmpty()
+
+    /** [list] now shows [columns], laid out as the list view or the grid. */
+    internal fun update(list: NoteCardList, listView: Boolean, columns: List<List<NoteEntity>>) {
+        shown.keys.removeAll { it.list == list }
+        columns.forEachIndexed { column, notes -> shown[NoteCardPlace(list, listView, column)] = notes.mapTo(HashSet()) { it.id } }
+    }
+}
+
+/** One note's card; with [fadeIn] it fades in over 150ms. */
 @Composable
 private fun NoteCard(
     note: NoteEntity,
+    fadeIn: Boolean,
     dark: Boolean,
     titleColor: Color,
     onClick: () -> Unit,
@@ -2571,7 +2624,9 @@ private fun NoteCard(
     val collaborators = detail?.collaborators.orEmpty()
     val showCollaborators = detail != null && (collaborators.isNotEmpty() || detail?.access != "owner")
     val shape = RoundedCornerShape(12.dp)
-    Box(Modifier.fillMaxWidth()) {
+    val appear = remember { Animatable(if (fadeIn) 0f else 1f) }
+    LaunchedEffect(appear) { appear.animateTo(1f, tween(150, easing = EaseOut)) }
+    Box(Modifier.fillMaxWidth().graphicsLayer { alpha = appear.value }) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

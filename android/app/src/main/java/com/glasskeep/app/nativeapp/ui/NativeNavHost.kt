@@ -468,6 +468,7 @@ fun NativeNavHost(
     fun onNoteUnarchived() {
         if (notesView == SidebarArchived) notesView = null
     }
+    val noteCardsShown = remember(signedIn) { NoteCardsShown() }
     // Every sign-in or launch replays the rows still pending as a burst of
     // pills, oldest first, without acknowledging them: that is left to
     // the bell (useShareNotifications.js:451-578).
@@ -683,6 +684,7 @@ fun NativeNavHost(
                             onOpenSideBySide = { first, second -> navController.navigate("compare/$first/$second") },
                             pendingNewNoteType = pendingNewNoteType,
                             onPendingNewNoteTypeConsumed = onPendingNewNoteTypeConsumed,
+                            cardsShown = noteCardsShown,
                             onSignedOut = {
                                 realtimeClient.stop()
                                 navController.navigate("login") {
