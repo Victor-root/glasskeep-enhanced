@@ -1,7 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,6 +9,7 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.RepeatMode
@@ -90,8 +90,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.net.URI
 import java.util.concurrent.Executors
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 private enum class QrScanPhase { STARTING, SCANNING, WRONG_ORIGIN, FETCHING, CONFIRM, APPROVING, DONE, ERROR }
 
@@ -226,7 +224,7 @@ internal fun QrScannerModal(container: NativeAppContainer, serverUrl: String, on
         val view = previewView ?: return@LaunchedEffect
         if (!cameraGranted) return@LaunchedEffect
         try {
-            val provider = context.getCameraProvider()
+            val provider = ProcessCameraProvider.awaitInstance(context)
             cameraProvider = provider
             val preview = Preview.Builder().build().also { it.setSurfaceProvider(view.surfaceProvider) }
             val analysis = ImageAnalysis.Builder()
@@ -561,11 +559,6 @@ private class BarcodeAnalyzer(
                 imageProxy.close()
             }
     }
-}
-
-private suspend fun Context.getCameraProvider(): ProcessCameraProvider = suspendCoroutine { cont ->
-    val future = ProcessCameraProvider.getInstance(this)
-    future.addListener({ cont.resume(future.get()) }, ContextCompat.getMainExecutor(this))
 }
 
 private data class DeviceLinkTarget(val token: String, val origin: String)
