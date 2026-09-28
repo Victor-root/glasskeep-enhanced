@@ -94,6 +94,10 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollDispatcher
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
@@ -157,6 +161,7 @@ import kotlin.math.PI
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -230,7 +235,14 @@ fun RichTextEditor(
     val focusManager = LocalFocusManager.current
     val haptics = LocalHapticFeedback.current
     val bringIntoView = remember { BringIntoViewRequester() }
-    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val autoScrollDispatcher = remember { NestedScrollDispatcher() }
+    val autoScrollConnection = remember { object : NestedScrollConnection {} }
+    val autoScrollScope = rememberCoroutineScope()
+    val autoScroll = remember(state, autoScrollScope, density) {
+        with(density) { RichSelectionAutoScroll(state, autoScrollScope, autoScrollDispatcher, 40.dp.toPx(), 600.dp.toPx()) }
+    }
 
     // CursorAnimationState: 500ms on, 500ms off, solid again on every change.
     val editing = state.editing
@@ -278,7 +290,8 @@ fun RichTextEditor(
                 .onPlaced { state.layouts.root = it }
                 .onGloballyPositioned { actions.onMoved() }
                 .bringIntoViewRequester(bringIntoView)
-                .richEditorGestures(state, actions, magnifier, haptics, editExtras = !readModeEnabled) { focusManager.clearFocus() }
+                .nestedScroll(autoScrollConnection, autoScrollDispatcher)
+                .richEditorGestures(state, actions, magnifier, autoScroll, haptics, editExtras = !readModeEnabled) { focusManager.clearFocus() }
                 .richTextInput(state, actions::handleKey, actions::onMenuAction)
                 .focusRequester(state.focusRequester)
                 .focusTarget()
@@ -356,7 +369,7 @@ fun RichTextEditor(
 
                 Rows(flow)
             }
-            RichSelectionHandles(state, actions, magnifier, selectionColors.handleColor)
+            RichSelectionHandles(state, actions, magnifier, autoScroll, selectionColors.handleColor)
         }
     }
 }
@@ -590,6 +603,7 @@ private fun Modifier.richEditorGestures(
     state: RichEditorState,
     actions: RichTextActions,
     magnifier: MutableState<Offset>,
+    autoScroll: RichSelectionAutoScroll,
     haptics: HapticFeedback,
     editExtras: Boolean,
     clearFocus: () -> Unit,
@@ -625,13 +639,22 @@ private fun Modifier.richEditorGestures(
             if (!state.focused) state.requestFocus()
             actions.hideMenu()
             magnifier.value = state.magnifierCenter(down.position, at)
-            while (true) {
-                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                if (change.changedToUpIgnoreConsumed()) break
-                change.consume()
-                val here = state.positionAt(change.position) ?: continue
-                state.select(unionOf(state, word, state.wordAt(here)))
-                magnifier.value = state.magnifierCenter(change.position, here)
+            val track: (Offset) -> Unit = { finger ->
+                state.positionAt(finger)?.let { here ->
+                    state.select(unionOf(state, word, state.wordAt(here)))
+                    magnifier.value = state.magnifierCenter(finger, here)
+                }
+            }
+            try {
+                while (true) {
+                    val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                    if (change.changedToUpIgnoreConsumed()) break
+                    change.consume()
+                    track(change.position)
+                    state.layouts.root?.let { autoScroll.follow(it.localToScreen(change.position), track) }
+                }
+            } finally {
+                autoScroll.stop()
             }
             magnifier.value = Offset.Unspecified
             actions.showMenu()
@@ -701,6 +724,65 @@ private fun unionOf(state: RichEditorState, first: RichSelection, here: RichSele
     return if (hereStart < firstStart) RichSelection(first.head, here.anchor) else RichSelection(first.anchor, here.head)
 }
 
+/**
+ * The note scrolling under a selection being dragged, as Chrome scrolls a
+ * page: while the finger stays within [zone] of the top or the bottom of
+ * the editor's visible part, or past it, with text hidden beyond, the note
+ * scrolls that way, up to [maxSpeed] a second at the edge, through the
+ * nested scrolling the editor sits in, and the selection follows to the
+ * text coming under the finger.
+ */
+private class RichSelectionAutoScroll(
+    private val state: RichEditorState,
+    private val scope: CoroutineScope,
+    private val dispatcher: NestedScrollDispatcher,
+    private val zone: Float,
+    private val maxSpeed: Float,
+) {
+    private var job: Job? = null
+    private var finger = Offset.Unspecified
+    private var track: (Offset) -> Unit = {}
+
+    /** The finger, on screen, as it drags; [track] moves the selection to
+     *  it, given in the editor's frame. */
+    fun follow(fingerOnScreen: Offset, track: (Offset) -> Unit) {
+        finger = fingerOnScreen
+        this.track = track
+        if (job?.isActive == true || speed() == 0f) return
+        job = scope.launch {
+            var last = withFrameNanos { it }
+            while (true) {
+                val now = withFrameNanos { it }
+                val delta = speed() * (now - last) / 1e9f
+                last = now
+                if (delta == 0f) break
+                val consumed = dispatcher.dispatchPostScroll(Offset.Zero, Offset(0f, delta), NestedScrollSource.UserInput)
+                if (consumed.y == 0f) break
+                val root = state.layouts.root?.takeIf { it.isAttached } ?: break
+                this@RichSelectionAutoScroll.track(root.screenToLocal(finger))
+            }
+        }
+    }
+
+    fun stop() {
+        job?.cancel()
+        job = null
+    }
+
+    /** The scroll's speed: toward the edge the finger is near, when text
+     *  lies hidden past it, faster the nearer the finger. */
+    private fun speed(): Float {
+        val (whole, visible) = state.layouts.onScreen() ?: return 0f
+        return when {
+            visible.top > whole.top + 1f && finger.y < visible.top + zone ->
+                maxSpeed * ((visible.top + zone - finger.y) / zone).coerceAtMost(1f)
+            visible.bottom < whole.bottom - 1f && finger.y > visible.bottom - zone ->
+                -maxSpeed * ((finger.y - visible.bottom + zone) / zone).coerceAtMost(1f)
+            else -> 0f
+        }
+    }
+}
+
 // ---------- Handles ----------
 
 private enum class RichHandleKind { START, END, CURSOR }
@@ -708,16 +790,22 @@ private enum class RichHandleKind { START, END, CURSOR }
 /** The selection's handles, while the text has the focus: one at each end
  *  of a selection, one under the caret once it was placed by a tap. */
 @Composable
-private fun RichSelectionHandles(state: RichEditorState, actions: RichTextActions, magnifier: MutableState<Offset>, color: Color) {
+private fun RichSelectionHandles(
+    state: RichEditorState,
+    actions: RichTextActions,
+    magnifier: MutableState<Offset>,
+    autoScroll: RichSelectionAutoScroll,
+    color: Color,
+) {
     state.layouts.version
     val editing = state.editing ?: return
     if (!state.focused) return
     val span = editing.span ?: return
     if (span.collapsed) {
-        if (state.cursorHandle) RichHandle(state, actions, magnifier, color, RichHandleKind.CURSOR)
+        if (state.cursorHandle) RichHandle(state, actions, magnifier, autoScroll, color, RichHandleKind.CURSOR)
     } else {
-        RichHandle(state, actions, magnifier, color, RichHandleKind.START)
-        RichHandle(state, actions, magnifier, color, RichHandleKind.END)
+        RichHandle(state, actions, magnifier, autoScroll, color, RichHandleKind.START)
+        RichHandle(state, actions, magnifier, autoScroll, color, RichHandleKind.END)
     }
 }
 
@@ -729,7 +817,14 @@ private fun RichSelectionHandles(state: RichEditorState, actions: RichTextAction
  * magnifier over it; the menu comes back when it is let go.
  */
 @Composable
-private fun RichHandle(state: RichEditorState, actions: RichTextActions, magnifier: MutableState<Offset>, color: Color, kind: RichHandleKind) {
+private fun RichHandle(
+    state: RichEditorState,
+    actions: RichTextActions,
+    magnifier: MutableState<Offset>,
+    autoScroll: RichSelectionAutoScroll,
+    color: Color,
+    kind: RichHandleKind,
+) {
     val density = LocalDensity.current
     val size = with(density) { 25.dp.roundToPx() }
     val current = rememberUpdatedState(kind)
@@ -802,15 +897,25 @@ private fun RichHandle(state: RichEditorState, actions: RichTextActions, magnifi
                         val grab = anchor - root.screenToLocal(handle.localToScreen(down.position)) - Offset(0f, 1f)
                         actions.hideMenu()
                         var moved = false
-                        while (true) {
-                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                            if (change.changedToUpIgnoreConsumed()) break
-                            change.consume()
-                            val finger = root.screenToLocal(handle.localToScreen(change.position)) + grab
-                            val at = state.positionAt(finger) ?: continue
-                            moved = true
-                            state.select(if (fixed == null) RichSelection(at, at) else RichSelection(fixed, at))
-                            magnifier.value = state.magnifierCenter(finger, at)
+                        val track: (Offset) -> Unit = { point ->
+                            val finger = point + grab
+                            state.positionAt(finger)?.let { at ->
+                                moved = true
+                                state.select(if (fixed == null) RichSelection(at, at) else RichSelection(fixed, at))
+                                magnifier.value = state.magnifierCenter(finger, at)
+                            }
+                        }
+                        try {
+                            while (true) {
+                                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                if (change.changedToUpIgnoreConsumed()) break
+                                change.consume()
+                                val onScreen = handle.localToScreen(change.position)
+                                track(root.screenToLocal(onScreen))
+                                autoScroll.follow(onScreen, track)
+                            }
+                        } finally {
+                            autoScroll.stop()
                         }
                         magnifier.value = Offset.Unspecified
                         if (moved || current.value != RichHandleKind.CURSOR) actions.showMenu() else actions.toggleMenu()

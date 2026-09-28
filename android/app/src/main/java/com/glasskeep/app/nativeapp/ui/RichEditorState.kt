@@ -9,9 +9,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.toSize
 import com.glasskeep.app.nativeapp.data.PendingMark
 import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichClipboard
@@ -277,5 +279,13 @@ internal class RichTextLayouts {
     fun isVisible(point: Offset): Boolean {
         val editor = root?.takeIf { it.isAttached } ?: return false
         return editor.boundsInWindow().inflate(1f).contains(editor.localToWindow(point))
+    }
+
+    /** The editor on screen: where all of it lies, and the part of it not
+     *  scrolled away, in screen coordinates. */
+    fun onScreen(): Pair<Rect, Rect>? {
+        val editor = root?.takeIf { it.isAttached } ?: return null
+        val origin = editor.localToScreen(Offset.Zero)
+        return Rect(origin, editor.size.toSize()) to editor.boundsInWindow().translate(origin - editor.localToWindow(Offset.Zero))
     }
 }
