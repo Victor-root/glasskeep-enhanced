@@ -79,13 +79,13 @@ class NativeAppActivity : ComponentActivity() {
             // this scope to recompose. See the snapshotFlow below for that
             // case.
             SideEffect {
-                // NoteDetailScreen sets this while a note is open so the
+                // NoteDetailScreen claims this while a note is open so the
                 // bars match that note's own color; this just needs to
                 // respect whatever it currently is when dark/theme changes
                 // trigger this SideEffect for their own reasons - the
                 // snapshotFlow below is what reacts to the override itself
                 // changing.
-                val overrideArgb = container.statusBarOverride.value
+                val overrideArgb = container.statusBarOverride.argb
                 val baseColor = systemBarColor(signedIn, overrideArgb, themeId, container.branding.loginThemeId, dark)
                 (view.context as ComponentActivity).applyThemedSystemBars(dark, baseColor)
             }
@@ -99,7 +99,7 @@ class NativeAppActivity : ComponentActivity() {
             val currentThemeId = rememberUpdatedState(themeId)
             val currentSignedIn = rememberUpdatedState(signedIn)
             LaunchedEffect(view) {
-                snapshotFlow { container.statusBarOverride.value }
+                snapshotFlow { container.statusBarOverride.argb }
                     .collect { noteOverrideArgb ->
                         val baseColor = systemBarColor(currentSignedIn.value, noteOverrideArgb, currentThemeId.value, container.branding.loginThemeId, currentDark.value)
                         NativeDebug.d(

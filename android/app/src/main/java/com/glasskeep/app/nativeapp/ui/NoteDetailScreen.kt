@@ -137,6 +137,7 @@ import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NoteExporter
+import com.glasskeep.app.nativeapp.StatusBarOverride
 import com.glasskeep.app.nativeapp.data.AiClient
 import com.glasskeep.app.nativeapp.data.AiMessage
 import com.glasskeep.app.nativeapp.data.AiNoteDto
@@ -255,17 +256,18 @@ private fun Editability.rebaselined(
  *  of this user's notes, and how many. Mirrors App.jsx's tagsWithCounts. */
 private data class TagCount(val tag: String, val count: Int)
 
-/** The system bars in [color], once the note's screen covers the whole
- *  screen (LocalNoteCoversScreen), read here so that moment recomposes
- *  nothing else. Keyed on the pane too: the note left alone once the other
- *  pane of a side-by-side view closes takes the bars back after that one
- *  let go. */
+/** The system bars in [color] while the note is shown, once its screen
+ *  covers the whole screen (LocalNoteCoversScreen), read here so that
+ *  moment recomposes nothing else. */
 @Composable
-private fun NoteSystemBars(container: NativeAppContainer, color: Color, splitPane: SplitPane?) {
+private fun NoteSystemBars(container: NativeAppContainer, color: Color) {
     val coversScreen = LocalNoteCoversScreen.current
-    LaunchedEffect(color, splitPane, coversScreen) {
-        container.statusBarOverride.value = color.toArgb().takeIf { coversScreen }
+    val claim = remember { StatusBarOverride.Claim() }
+    DisposableEffect(Unit) {
+        container.statusBarOverride.add(claim)
+        onDispose { container.statusBarOverride.remove(claim) }
     }
+    SideEffect { claim.argb = color.toArgb().takeIf { coversScreen } }
 }
 
 /** The ids of the notes the server announces changed (note_updated), the
@@ -1845,8 +1847,7 @@ fun NoteDetailScreen(
     // rest of the screen does. The collaboration modal hands them its own
     // surface while it is open, and the note's colour back after.
     val systemBarColor = if (showCollaborators) collaboratorsSurface(dark) else modalBg
-    NoteSystemBars(container, systemBarColor, splitPane)
-    DisposableEffect(Unit) { onDispose { container.statusBarOverride.value = null } }
+    NoteSystemBars(container, systemBarColor)
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor

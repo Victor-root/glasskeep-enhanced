@@ -31,11 +31,10 @@ class NativeAppContainer(context: Context) {
     val branding = BrandingState(tokenStore)
     val noteAiStore = NoteAiStore(appContext)
 
-    // Set (as an ARGB Int) by NoteDetailScreen while a note is open, so the
-    // status/nav bars match that note's own background instead of staying
-    // on the workspace theme color underneath it. Null restores the normal
-    // theme color.
-    val statusBarOverride = mutableStateOf<Int?>(null)
+    // Claimed by NoteDetailScreen while a note is open, so the status/nav
+    // bars match that note's own background instead of staying on the
+    // workspace theme color underneath it.
+    val statusBarOverride = StatusBarOverride()
 
     /** The server refused the session in use ([expireSession]): true until
      *  NativeNavHost has taken the app back to the sign-in screen. */
