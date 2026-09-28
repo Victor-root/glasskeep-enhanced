@@ -78,9 +78,9 @@ internal fun AddImageMenu(
         minWidth = 220.dp,
         gap = 8.dp,
         cornerRadius = 8.dp,
-        elevation = 10.dp,
         background = if (dark) MenuBgDark else Color.White,
         borderColor = borderColor,
+        cardShadow = Modifier::tailwindShadowLg,
         onDismiss = onDismiss,
     ) {
         val imageTint = if (dark) MenuBlueDark else MenuBlueLight
@@ -132,6 +132,7 @@ internal fun LogoPickerPopover(
         background = if (dark) LogoPanelBgDark else Color.White,
         borderColor = if (dark) LogoPanelBorderDark else LogoPanelBorderLight,
         ringColor = if (dark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f),
+        cardShadow = Modifier::tailwindShadow2xl,
         onDismiss = onDismiss,
     ) {
         LogoPickerGrid(logos, selectedSrc, dark, onPick, onUploadNew, onDelete)

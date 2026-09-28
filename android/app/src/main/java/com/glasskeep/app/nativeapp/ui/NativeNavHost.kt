@@ -548,7 +548,7 @@ fun NativeNavHost(
         LocalSignedOutReload provides signedOutReload,
         LocalUriHandler provides remember(context) { CustomTabUriHandler(context) },
     ) {
-        Box(Modifier.fillMaxSize().then(safeLeft).gkPopoverTouches(popovers)) {
+        Box(Modifier.fillMaxSize().gkPopoverTouches(popovers).then(safeLeft)) {
             if (showUnlockScreen) {
                 key(signedOutReloads) {
                     InstanceUnlockScreen(

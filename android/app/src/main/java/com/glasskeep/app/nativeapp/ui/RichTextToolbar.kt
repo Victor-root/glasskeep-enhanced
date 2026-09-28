@@ -75,6 +75,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -837,7 +838,7 @@ private fun RichToolbarGroup(
     }
 }
 
-/** Wraps a button that owns a popover so the popup anchors to it. */
+/** Wraps a button that owns a popover so the popover opens from it. */
 @Composable
 private fun RichAnchoredButton(
     open: Boolean,
@@ -847,11 +848,10 @@ private fun RichAnchoredButton(
     popover: @Composable () -> Unit,
     button: @Composable (open: Boolean) -> Unit,
 ) {
-    val anchor = rememberGkPopoverAnchor()
-    Box(Modifier.gkPopoverAnchor(anchor)) {
+    Box {
         button(open)
         if (open) {
-            RichPopover(anchor, dark = dark, onDismiss = { onOpenChange(false) }, padding = padding) { popover() }
+            RichPopover(dark = dark, onDismiss = { onOpenChange(false) }, padding = padding) { popover() }
         }
     }
 }
@@ -1201,19 +1201,19 @@ internal fun headingKindFor(level: Int): RichBlockKind = when (level) {
 /**
  * `.rt-pop` (globalCSS.js:3565-3583, 4703): a card at least 220dp wide on
  * a phone and otherwise as wide as its content, [padding] inside its 1px
- * border, opened from the control at [anchor] and placed as the web places
- * it ([GkPopoverHost]). It fades in over 0.12s from 2px higher; a touch
- * anywhere else closes it and still goes on to what it lands on.
+ * border, opened from the control it is called in and placed as the web
+ * places it ([RichPopoverPlacement]). It fades in over 0.12s from 2px
+ * higher; a touch anywhere else closes it and still goes on to what it
+ * lands on.
  */
 @Composable
 internal fun RichPopover(
-    anchor: GkPopoverAnchor,
     dark: Boolean,
     onDismiss: () -> Unit,
     padding: Dp = 8.dp,
     content: @Composable () -> Unit,
 ) {
-    GkPopover(anchor, onDismiss) {
+    GkPopover(GkPopoverClose.Touch, onDismiss, RichPopoverPlacement) {
         val shape = RoundedCornerShape(10.dp)
         val appear = remember { Animatable(0f) }
         LaunchedEffect(Unit) { appear.animateTo(1f, tween(durationMillis = 120, easing = EaseOut)) }
@@ -1254,6 +1254,23 @@ internal fun RichPopover(
             content()
         }
     }
+}
+
+/** usePopoverPosition (Popover.jsx): 6dp under the control, flipped above
+ *  it when there is no room below (or kept 8dp off the bottom when there
+ *  is none above either), always 8dp inside the screen. */
+private val RichPopoverPlacement: GkPopoverPlacement = { anchor, screen, card ->
+    val margin = 8.dp.roundToPx()
+    val gap = 6.dp.roundToPx()
+    val left = anchor.left.coerceAtMost(screen.width - card.width - margin).coerceAtLeast(margin)
+    val below = anchor.bottom + gap
+    val above = anchor.top - gap - card.height
+    val top = when {
+        below + card.height + margin <= screen.height -> below
+        above >= margin -> above
+        else -> maxOf(margin, screen.height - card.height - margin)
+    }
+    IntOffset(left, top)
 }
 
 /** `.rt-pop-label`. */

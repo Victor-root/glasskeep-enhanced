@@ -119,18 +119,12 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
 import kotlin.math.abs
@@ -832,13 +826,13 @@ internal fun GkGradientButton(
 
 /**
  * The `Popover` list the panel opens under its pickers (`Popover.jsx` +
- * `SettingsPanel.jsx:1535-1568`): no animation, a 12px card as wide as its
- * widest option (and at least [minWidth]), whose left edge follows the
- * button, kept 8px from the screen's right edge, 6px under the button or
- * flipped above it when the screen ends first.
+ * `SettingsPanel.jsx:1535-1568`): no animation, a 12px `shadow-xl` card as
+ * wide as its widest option (and at least [minWidth]), whose left edge
+ * follows the button, kept 8px from the screen's right edge, 6px under the
+ * button or flipped above it when the screen ends first. A tap elsewhere
+ * closes it.
  *
- * Placed inside the button's own Box: Compose hands the position provider
- * that Box's window bounds, what the web reads from `getBoundingClientRect()`.
+ * Placed inside the button's own Box, the control it opens from.
  */
 @Composable
 internal fun SettingsPopover(
@@ -848,49 +842,37 @@ internal fun SettingsPopover(
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val density = LocalDensity.current
-    val positionProvider = remember(density) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: IntRect,
-                windowSize: IntSize,
-                layoutDirection: LayoutDirection,
-                popupContentSize: IntSize,
-            ): IntOffset {
-                val marginPx = with(density) { 8.dp.roundToPx() }
-                val gapPx = with(density) { 6.dp.roundToPx() }
-                val left = if (anchorBounds.left + popupContentSize.width + marginPx > windowSize.width) {
-                    (windowSize.width - popupContentSize.width - marginPx).coerceAtLeast(marginPx)
-                } else {
-                    anchorBounds.left
-                }
-                val below = anchorBounds.bottom + gapPx
-                val top = if (below + popupContentSize.height + marginPx > windowSize.height) {
-                    (anchorBounds.top - gapPx - popupContentSize.height).coerceAtLeast(marginPx)
-                } else {
-                    below
-                }
-                return IntOffset(left, top)
-            }
-        }
-    }
-    Popup(
-        popupPositionProvider = positionProvider,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
+    GkPopover(GkPopoverClose.Tap, onDismiss, SettingsPopoverPlacement) {
+        val shape = RoundedCornerShape(12.dp)
         Column(
             modifier = Modifier
                 .width(IntrinsicSize.Max)
                 .widthIn(min = minWidth)
-                .shadow(elevation = 12.dp, shape = RoundedCornerShape(12.dp))
-                .clip(RoundedCornerShape(12.dp))
+                .tailwindShadowXl(shape)
+                .clip(shape)
                 .background(if (dark) PopoverBgDark else Color.White)
-                .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+                .border(1.dp, borderColor, shape)
                 .padding(vertical = 6.dp),
             content = content,
         )
     }
+}
+
+private val SettingsPopoverPlacement: GkPopoverPlacement = { anchor, screen, card ->
+    val margin = 8.dp.roundToPx()
+    val gap = 6.dp.roundToPx()
+    val left = if (anchor.left + card.width + margin > screen.width) {
+        (screen.width - card.width - margin).coerceAtLeast(margin)
+    } else {
+        anchor.left
+    }
+    val below = anchor.bottom + gap
+    val top = if (below + card.height + margin > screen.height) {
+        (anchor.top - gap - card.height).coerceAtLeast(margin)
+    } else {
+        below
+    }
+    IntOffset(left, top)
 }
 
 /** One option of a [SettingsPopover]: `text-gray-800`/`gray-100` 14px,
@@ -1418,17 +1400,14 @@ private fun Modifier.browserFocusRing(focused: Boolean, cornerRadius: Dp): Modif
 
 private val ChromiumFocusRingColor = Color(0xFFE59700)
 
-/** The anchor button's window bounds and the window's width, as the popup
- *  reports them, and the side the panel opens on: everything
- *  [FooterPopover] needs to place and draw its panel. */
-private data class FooterPopoverAnchor(val bounds: IntRect, val windowWidth: Int, val opensBelow: Boolean)
-
-/** Where a footer popover's panel lands, in window pixels, once both its
- *  anchor and its own natural width are known. [arrowLeft] is the arrow
- *  square's CSS `left`, measured from the panel's padding edge. */
+/** Where a footer popover's panel lands on the screen, once both its
+ *  control and its own natural width are known, and the side it opens on.
+ *  [arrowLeft] is the arrow square's CSS `left`, measured from the panel's
+ *  padding edge. */
 private data class FooterPopoverPlacement(
     val left: Int,
-    val width: Int,
+    val top: Int,
+    val opensBelow: Boolean,
     val arrowLeft: Int,
     val squareBottomStart: Boolean,
     val squareBottomEnd: Boolean,
@@ -1442,10 +1421,11 @@ private val FooterPopoverArrowCorner = 4.dp
  * The note footer's popovers (`Popover.jsx`, `ColorPickerPanel.jsx` and
  * `ModalFooter.jsx:379-417`): a card that opens upwards from the tapped
  * footer button, [gap] above it, kept 8px from the screen edges, with the
- * web's rotated-square arrow pointing back down at the button. None of
- * them animates: the web only reveals them once they are positioned.
- * Popover.jsx's other users, the audio player's download menu and storage
- * details, open under their button instead ([below], [flip]).
+ * web's rotated-square arrow pointing back down at the button, under the
+ * Tailwind shadow [cardShadow]. None of them animates: the web only
+ * reveals them once they are positioned. Popover.jsx's other users, the
+ * audio player's download menu and storage details, open under their
+ * button instead ([below], [flip]). A tap elsewhere closes them.
  *
  * [width] fixes the card's width. Without it the card follows Popover.jsx:
  * measured where the button starts ([minWidth] at least), shifted left
@@ -1454,24 +1434,18 @@ private val FooterPopoverArrowCorner = 4.dp
  * arrow squares that bottom corner (32px in Popover.jsx, 36px in the
  * colour panel). Without [arrow] the card keeps all four corners round.
  *
- * The caller places this inside the button's own Box: Compose hands the
- * position provider that button's window bounds, which is exactly what
- * the web reads from `getBoundingClientRect()`.
+ * Placed inside the button's own Box, the control it opens from.
  */
 @Composable
 internal fun FooterPopover(
     gap: Dp,
     background: Color,
     borderColor: Color,
+    cardShadow: Modifier.(Shape) -> Modifier,
     onDismiss: () -> Unit,
     width: Dp? = null,
     minWidth: Dp = 0.dp,
     cornerRadius: Dp = 16.dp,
-    // Was 24.dp: much heavier than every other popover shadow in the app
-    // (SettingsPopover uses 12.dp) and, being inside a Popup with no
-    // buffer around it (see shadowPad below), had nowhere to blur into -
-    // together that read as one big, hard-edged, overly dark halo.
-    elevation: Dp = 12.dp,
     // The arrow's two outer edges are always drawn in `--border-light`,
     // whatever border the card itself has.
     arrowBorderColor: Color = borderColor,
@@ -1482,55 +1456,20 @@ internal fun FooterPopover(
     // top of the screen (the selection dock).
     below: Boolean = false,
     // With [below], Popover.jsx's own rule: when the card would run past
-    // the bottom of the window, it opens above instead, 8px from the top
+    // the bottom of the screen, it opens above instead, 8px from the top
     // at most.
     flip: Boolean = false,
     arrow: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val density = LocalDensity.current
-    // Compose's Popup sizes its window tightly around its content, with no
-    // allowance for a shadow's blur to bleed past that content's own laid
-    // out bounds - so Modifier.shadow() inside a Popup, unlike inside a
-    // normal layout, gets a hard, uneven cut wherever the blur would have
-    // extended past the window edge. Padding the whole popup content by
-    // more than the blur (or the arrow) can reach reserves that room; the
-    // position math below shifts the window itself back by the same
-    // amount so the visible panel still lands exactly where it should.
-    val shadowPad = 16.dp
-    var anchor by remember { mutableStateOf<FooterPopoverAnchor?>(null) }
-    var placement by remember { mutableStateOf<FooterPopoverPlacement?>(null) }
-    val positionProvider = remember(density, gap, placement, below, flip) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: IntRect,
-                windowSize: IntSize,
-                layoutDirection: LayoutDirection,
-                popupContentSize: IntSize,
-            ): IntOffset {
-                val shadowPadPx = with(density) { shadowPad.roundToPx() }
-                val gapPx = with(density) { gap.roundToPx() }
-                val marginPx = with(density) { 8.dp.roundToPx() }
-                val panelHeight = popupContentSize.height - 2 * shadowPadPx
-                val flipped = flip && anchorBounds.bottom + gapPx + panelHeight + marginPx > windowSize.height
-                val opensBelow = below && !flipped
-                anchor = FooterPopoverAnchor(anchorBounds, windowSize.width, opensBelow)
-                val top = when {
-                    opensBelow -> anchorBounds.bottom + gapPx
-                    flipped -> maxOf(marginPx, anchorBounds.top - gapPx - panelHeight)
-                    else -> anchorBounds.top - gapPx - panelHeight
-                }
-                return IntOffset((placement?.left ?: anchorBounds.left) - shadowPadPx, top - shadowPadPx)
-            }
-        }
-    }
-    Popup(
-        popupPositionProvider = positionProvider,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
-        val placed = placement
-        val opensBelow = anchor?.opensBelow ?: below
+    var current by remember { mutableStateOf<FooterPopoverPlacement?>(null) }
+    GkPopover(
+        close = GkPopoverClose.Tap,
+        onDismiss = onDismiss,
+        placement = { anchor, _, _ -> current?.let { IntOffset(it.left, it.top) } ?: anchor.topLeft },
+    ) { frame ->
+        val placed = current
+        val opensBelow = placed?.opensBelow ?: below
         val arrowStart = if (arrow && placed?.squareBottomStart == true) FooterPopoverArrowCorner else cornerRadius
         val arrowEnd = if (arrow && placed?.squareBottomEnd == true) FooterPopoverArrowCorner else cornerRadius
         val shape = if (opensBelow) {
@@ -1540,37 +1479,37 @@ internal fun FooterPopover(
         }
         Box(
             Modifier
-                .padding(shadowPad)
                 .layout { measurable, constraints ->
                     val fixedWidth = width?.roundToPx()
                     val minWidthPx = minWidth.roundToPx()
                     val natural = if (fixedWidth == null) measurable.maxIntrinsicWidth(constraints.maxHeight) else 0
-                    val current = anchor
-                    val panelWidth = if (current == null) {
-                        fixedWidth ?: maxOf(minWidthPx, minOf(natural, constraints.maxWidth))
-                    } else {
-                        val margin = 8.dp.roundToPx()
-                        val windowWidth = current.windowWidth
-                        val anchorLeft = current.bounds.left
-                        val firstWidth = fixedWidth ?: maxOf(minWidthPx, minOf(natural, windowWidth - anchorLeft))
-                        val left = (
-                            if (anchorLeft + firstWidth + margin > windowWidth) windowWidth - firstWidth - margin
-                            else anchorLeft
-                            ).coerceAtLeast(margin)
-                        val finalWidth = fixedWidth ?: maxOf(minWidthPx, minOf(natural, windowWidth - left))
-                        val arrowLeft = current.bounds.center.x - left - 6.dp.roundToPx()
+                    val anchor = frame.anchor
+                    val screenWidth = frame.screen.width
+                    val margin = 8.dp.roundToPx()
+                    val firstWidth = fixedWidth ?: maxOf(minWidthPx, minOf(natural, screenWidth - (anchor?.left ?: 0)))
+                    val left = anchor?.let {
+                        (if (it.left + firstWidth + margin > screenWidth) screenWidth - firstWidth - margin else it.left).coerceAtLeast(margin)
+                    }
+                    val panelWidth = (fixedWidth ?: maxOf(minWidthPx, minOf(natural, screenWidth - (left ?: 0)))).coerceAtMost(constraints.maxWidth)
+                    val placeable = measurable.measure(constraints.copy(minWidth = panelWidth, maxWidth = panelWidth))
+                    if (anchor != null && left != null) {
+                        val gapPx = gap.roundToPx()
+                        val flipped = flip && anchor.bottom + gapPx + placeable.height + margin > frame.screen.height
+                        val arrowLeft = anchor.center.x - left - 6.dp.roundToPx()
                         val next = FooterPopoverPlacement(
                             left = left,
-                            width = finalWidth,
+                            top = when {
+                                below && !flipped -> anchor.bottom + gapPx
+                                flipped -> maxOf(margin, anchor.top - gapPx - placeable.height)
+                                else -> anchor.top - gapPx - placeable.height
+                            },
+                            opensBelow = below && !flipped,
                             arrowLeft = arrowLeft,
                             squareBottomStart = arrowLeft < 20.dp.roundToPx(),
                             squareBottomEnd = arrowLeft > firstWidth - arrowEndInset.roundToPx(),
                         )
-                        if (next != placement) placement = next
-                        finalWidth
+                        if (next != current) current = next
                     }
-                    val clamped = panelWidth.coerceAtMost(constraints.maxWidth)
-                    val placeable = measurable.measure(constraints.copy(minWidth = clamped, maxWidth = clamped))
                     layout(placeable.width, placeable.height) { placeable.place(0, 0) }
                 }
                 .drawWithContent {
@@ -1582,7 +1521,7 @@ internal fun FooterPopover(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .shadow(elevation = elevation, shape = shape)
+                    .cardShadow(shape)
                     .then(if (ringColor != null) Modifier.outsideRing(ringColor, shape) else Modifier)
                     .clip(shape)
                     .background(background)
@@ -1809,8 +1748,9 @@ internal fun Modifier.dashedBorder(color: Color, shape: Shape, width: Dp = 1.dp,
  * ToolbarPopover (`DrawingToolbar.jsx:110-174`): a card as wide as its
  * content that opens 10px under its button, centred on it, kept 8px from
  * the screen edges and flipped above when the bottom runs out. 16px
- * radius, a 1px border with a ring just outside it, 12px of padding, and
- * no animation.
+ * radius, `shadow-2xl`, a 1px border with a ring just outside it, 12px of
+ * padding, and no animation. A touch elsewhere closes it; the canvas does
+ * not draw with it, a button still gets its tap.
  */
 @Composable
 internal fun ToolbarPopover(
@@ -1818,42 +1758,11 @@ internal fun ToolbarPopover(
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val density = LocalDensity.current
-    // Room inside the popup window for the shadow to blur into, as
-    // FooterPopover keeps; the window moves back by the same amount.
-    val shadowPad = 16.dp
-    val positionProvider = remember(density) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: IntRect,
-                windowSize: IntSize,
-                layoutDirection: LayoutDirection,
-                popupContentSize: IntSize,
-            ): IntOffset {
-                val pad = with(density) { shadowPad.roundToPx() }
-                val margin = with(density) { 8.dp.roundToPx() }
-                val gap = with(density) { 10.dp.roundToPx() }
-                val cardWidth = popupContentSize.width - 2 * pad
-                val cardHeight = popupContentSize.height - 2 * pad
-                var left = anchorBounds.center.x - cardWidth / 2
-                if (left + cardWidth + margin > windowSize.width) left = windowSize.width - cardWidth - margin
-                if (left < margin) left = margin
-                var top = anchorBounds.bottom + gap
-                if (top + cardHeight + margin > windowSize.height) top = anchorBounds.top - cardHeight - gap
-                return IntOffset(left - pad, top - pad)
-            }
-        }
-    }
-    Popup(
-        popupPositionProvider = positionProvider,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
+    GkPopover(GkPopoverClose.TouchStopped, onDismiss, ToolbarPopoverPlacement) {
         val shape = RoundedCornerShape(16.dp)
         Column(
             modifier = Modifier
-                .padding(shadowPad)
-                .shadow(elevation = 12.dp, shape = shape)
+                .tailwindShadow2xl(shape)
                 // ring-1 ring-black/5, white on dark.
                 .outsideRing(if (dark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f), shape)
                 .clip(shape)
@@ -1864,6 +1773,17 @@ internal fun ToolbarPopover(
             content = content,
         )
     }
+}
+
+private val ToolbarPopoverPlacement: GkPopoverPlacement = { anchor, screen, card ->
+    val margin = 8.dp.roundToPx()
+    val gap = 10.dp.roundToPx()
+    var left = anchor.center.x - card.width / 2
+    if (left + card.width + margin > screen.width) left = screen.width - card.width - margin
+    if (left < margin) left = margin
+    var top = anchor.bottom + gap
+    if (top + card.height + margin > screen.height) top = anchor.top - card.height - gap
+    IntOffset(left, top)
 }
 
 /** One entry of the note footer's kebab menu (`ModalFooter.jsx:700-815`)

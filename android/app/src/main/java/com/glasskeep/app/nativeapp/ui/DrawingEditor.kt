@@ -198,6 +198,7 @@ internal fun DrawingCanvasPane(
     var erasedPaths by remember { mutableStateOf<List<DrawingStrokeDto>?>(null) }
     val momentumScope = rememberCoroutineScope()
     val canvasCoordinates = remember { CoordinatesHolder() }
+    val popovers = LocalGkPopovers.current
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         val scale = constraints.maxWidth / canvasWidth
@@ -227,8 +228,13 @@ internal fun DrawingCanvasPane(
                         awaitEachGesture {
                             val first = awaitFirstDown(requireUnconsumed = false)
                             first.consume()
-                            momentum?.cancel()
-                            var pending: Offset? = first.position
+                            // The touch that closes a toolbar popover never reaches
+                            // the canvas's touchstart (DrawingToolbar's
+                            // stopPropagation()): it draws nothing and leaves a
+                            // coasting scroll alone.
+                            val stopped = popovers.stopped(first.id)
+                            if (!stopped) momentum?.cancel()
+                            var pending: Offset? = first.position.takeUnless { stopped }
                             var drawing = false
                             var scrolling = false
                             var lastY = 0f
@@ -308,6 +314,7 @@ internal fun DrawingCanvasPane(
                                         startAt(it)
                                         pending = null
                                     }
+                                    if (!drawing) continue
                                     if (finger.uptimeMillis - lastPointAt < 16) continue
                                     lastPointAt = finger.uptimeMillis
                                     if (tools.isEraser) eraseAt(finger.position) else livePoints = livePoints.orEmpty() + finger.position

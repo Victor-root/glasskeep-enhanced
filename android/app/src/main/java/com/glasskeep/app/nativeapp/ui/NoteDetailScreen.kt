@@ -2501,9 +2501,9 @@ fun NoteDetailScreen(
                                     gap = 8.dp,
                                     minWidth = 180.dp,
                                     cornerRadius = 8.dp,
-                                    elevation = 10.dp,
                                     background = if (dark) KebabBgDark else Color.White,
                                     borderColor = borderColor,
+                                    cardShadow = Modifier::tailwindShadowLg,
                                     onDismiss = { menuExpanded = false },
                                 ) {
                                     // ModalFooter.jsx's order: reminder, archive or
@@ -2912,6 +2912,7 @@ internal fun NoteColorPopover(
         background = if (dark) ColorPanelBgDark else ColorPanelBgLight,
         borderColor = if (dark) ColorPanelBorderDark else ColorPanelBorderLight,
         ringColor = if (dark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f),
+        cardShadow = Modifier::tailwindShadow2xl,
         onDismiss = onDismiss,
     ) {
         Column(
@@ -3048,6 +3049,8 @@ private fun NoteTagsPopover(
         // .gk-tag-popover overrides Tailwind's own border with the
         // workspace accent at 22% (globalCSS.js:6213-6215).
         borderColor = accent.copy(alpha = 0.22f),
+        ringColor = if (dark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f),
+        cardShadow = Modifier::tailwindShadow2xl,
         onDismiss = onDismiss,
     ) {
         Column(
