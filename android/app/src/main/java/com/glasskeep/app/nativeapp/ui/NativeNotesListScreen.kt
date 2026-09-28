@@ -243,8 +243,6 @@ fun NativeNotesListScreen(
      *  which stays composed under them as the web keeps its list mounted
      *  under its modals: back is then theirs. */
     covered: () -> Boolean,
-    /** Where the cards are, for a note opening out of its own. */
-    noteCards: NoteCards,
 ) {
     val dark = LocalGkDark.current
     val themeId = container.themeState.themeId
@@ -354,9 +352,9 @@ fun NativeNotesListScreen(
     // view still swaps inside the full pinned/others group below, and the
     // archive and the trash reorder their own list.
     // Unclipped window bounds per card (see ReorderableNoteCard), read by
-    // the drag to find the card under the finger and by a note opening out
-    // of its card - not State, nothing should recompose when they change.
-    val cardBounds = noteCards.bounds
+    // the drag to find the card under the finger - not State, nothing
+    // should recompose when they change.
+    val cardBounds = remember { mutableMapOf<String, Rect>() }
     var draggedNoteId by remember { mutableStateOf<String?>(null) }
     var dragOverNoteId by remember { mutableStateOf<String?>(null) }
     // The held finger's window Y, for the edge auto-scroll below.
@@ -1008,10 +1006,7 @@ fun NativeNotesListScreen(
                                     fadeIn = cardsShown.isNew(place, note.id),
                                     dark = dark,
                                     titleColor = titleColor,
-                                    onClick = {
-                                        noteCards.openedFromCard = note.id
-                                        onOpenNote(note.id)
-                                    },
+                                    onClick = { onOpenNote(note.id) },
                                     selectionMode = selectionMode,
                                     selected = note.id in selectedIds,
                                     onToggleSelect = {
@@ -2563,25 +2558,6 @@ internal enum class NoteCardList { PINNED, OTHERS, AI_CITED }
 /** Where the web mounts a note's card: in a list, in the grid's column
  *  or the list view's. A card that changes place is mounted anew. */
 internal data class NoteCardPlace(val list: NoteCardList, val listView: Boolean, val column: Int)
-
-/**
- * The list's note cards as a note opening over them needs them: opened
- * from its card, a note grows out of it and shrinks back into it on
- * closing (NativeNavHost's NoteOpening).
- */
-class NoteCards {
-    /** Each card's unclipped window bounds, kept current by the list. */
-    val bounds = mutableMapOf<String, Rect>()
-
-    /** The list's own window bounds: what is on screen. */
-    var screen = Rect.Zero
-
-    /** The note a tap on its card is opening, until its screen takes it. */
-    var openedFromCard: String? = null
-
-    /** [noteId]'s card, when it is on screen. */
-    fun onScreen(noteId: String): Rect? = bounds[noteId]?.takeIf { it.overlaps(screen) }
-}
 
 /**
  * The cards each place shows, for `noteAppear` (globalCSS.js:540,

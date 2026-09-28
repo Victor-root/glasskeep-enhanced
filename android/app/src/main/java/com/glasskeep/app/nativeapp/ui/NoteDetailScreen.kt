@@ -66,7 +66,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -256,29 +255,20 @@ private fun Editability.rebaselined(
  *  of this user's notes, and how many. Mirrors App.jsx's tagsWithCounts. */
 private data class TagCount(val tag: String, val count: Int)
 
-/** The system bars in [color] while the note is shown, once its screen
- *  covers the whole screen (LocalNoteCoversScreen), read here so that
- *  moment recomposes nothing else. */
+/** The system bars in [color] for as long as the note is shown. */
 @Composable
 private fun NoteSystemBars(container: NativeAppContainer, color: Color) {
-    val coversScreen = LocalNoteCoversScreen.current
     val claim = remember { StatusBarOverride.Claim() }
     DisposableEffect(Unit) {
         container.statusBarOverride.add(claim)
         onDispose { container.statusBarOverride.remove(claim) }
     }
-    SideEffect { claim.argb = color.toArgb().takeIf { coversScreen } }
+    SideEffect { claim.argb = color.toArgb() }
 }
 
 /** The ids of the notes the server announces changed (note_updated), the
  *  web's "note-updated" bus (App.jsx:3779-3792). */
 internal val LocalNoteUpdates = staticCompositionLocalOf<Flow<String>> { emptyFlow() }
-
-/** Whether the note's screen covers the whole screen, which it does but
- *  while growing out of its card or shrinking back into it
- *  (NativeNavHost's NoteOpening): until then the system bars keep the
- *  list's colour. */
-internal val LocalNoteCoversScreen = compositionLocalOf { true }
 
 /**
  * Milestone: opening and safely editing a single note, every note type the
@@ -306,7 +296,11 @@ fun NoteDetailScreen(
     onUnarchived: () -> Unit = {},
     /** Its pane in the side-by-side view, or null alone on screen. */
     splitPane: SplitPane? = null,
+    /** Its first render is ready: the note's cached copy, or the loading
+     *  state when it has none. */
+    onFirstRender: () -> Unit = {},
 ) {
+    val currentOnFirstRender by rememberUpdatedState(onFirstRender)
     val dark = LocalGkDark.current
     val context = LocalContext.current
     val toasts = LocalGkToasts.current
@@ -1474,6 +1468,7 @@ fun NoteDetailScreen(
                 .onSuccess { cacheBaseline = currentSnapshot() }
                 .onFailure { NativeDebug.e("NoteDetailScreen cached render failed id=$noteId", it) }
         }
+        currentOnFirstRender()
         try {
             val fetched = repository.fetchNoteDetail(noteId)
             val baseline = cacheBaseline

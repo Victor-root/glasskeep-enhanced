@@ -14,7 +14,6 @@ import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.AbsListView
 import android.widget.BaseAdapter
 import android.widget.FrameLayout
@@ -31,6 +30,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.core.view.AccessibilityDelegateCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.CollectionInfoCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.CollectionItemInfoCompat
 import com.glasskeep.app.R
 import kotlin.math.roundToInt
 
@@ -131,16 +135,19 @@ private class HtmlColorPickerContent(private val context: Context, initial: Int)
             verticalSpacing = dp(8f)
             gravity = Gravity.CENTER
             adapter = SuggestionsAdapter()
-            accessibilityDelegate = object : View.AccessibilityDelegate() {
-                override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
-                    super.onInitializeAccessibilityNodeInfo(host, info)
-                    info.collectionInfo = AccessibilityNodeInfo.CollectionInfo.obtain(
-                        Suggestions.size, 1, false, AccessibilityNodeInfo.CollectionInfo.SELECTION_MODE_SINGLE,
-                    )
-                    info.text = context.getString(R.string.native_color_picker_suggestions)
-                    info.className = ListView::class.java.name
-                }
-            }
+            ViewCompat.setAccessibilityDelegate(
+                this,
+                object : AccessibilityDelegateCompat() {
+                    override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
+                        super.onInitializeAccessibilityNodeInfo(host, info)
+                        info.setCollectionInfo(
+                            CollectionInfoCompat.obtain(Suggestions.size, 1, false, CollectionInfoCompat.SELECTION_MODE_SINGLE),
+                        )
+                        info.text = context.getString(R.string.native_color_picker_suggestions)
+                        info.className = ListView::class.java.name
+                    }
+                },
+            )
         }
         column.addView(suggestions, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
@@ -373,12 +380,15 @@ private class HtmlColorPickerContent(private val context: Context, initial: Int)
                 )
                 contentDescription = context.getString(label)
                 isSelected = position == selectedSuggestion
-                accessibilityDelegate = object : View.AccessibilityDelegate() {
-                    override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
-                        super.onInitializeAccessibilityNodeInfo(host, info)
-                        info.collectionItemInfo = AccessibilityNodeInfo.CollectionItemInfo.obtain(position, 1, 1, 1, false)
-                    }
-                }
+                ViewCompat.setAccessibilityDelegate(
+                    this,
+                    object : AccessibilityDelegateCompat() {
+                        override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
+                            super.onInitializeAccessibilityNodeInfo(host, info)
+                            info.setCollectionItemInfo(CollectionItemInfoCompat.obtain(position, 1, 1, 1, false, false))
+                        }
+                    },
+                )
                 setOnClickListener { pickSuggestion(position) }
             }
         }
