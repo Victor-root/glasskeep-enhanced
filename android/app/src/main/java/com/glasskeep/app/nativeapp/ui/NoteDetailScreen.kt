@@ -1495,12 +1495,16 @@ fun NoteDetailScreen(
         }
     }
 
+    // useModalHistory.js's `active`: the history covers a text note being
+    // edited and a checklist, nothing else (a drawing's caption included).
+    val historyActive = editability?.let { (it.isTextType && !viewMode) || it.isChecklistType } == true
+
     // One snapshot per second of quiet, so a burst of typing collapses
     // into a single undoable step (useModalHistory.js's own DEBOUNCE_MS).
     // Restarting this effect on every keystroke is the debounce: the
     // previous delay is cancelled with it.
     LaunchedEffect(titleText, bodyText, richBlocks, editability?.checklistItems) {
-        if (note == null) return@LaunchedEffect
+        if (note == null || !historyActive) return@LaunchedEffect
         if (history.restoring) {
             history.restoring = false
             return@LaunchedEffect
@@ -2374,8 +2378,8 @@ fun NoteDetailScreen(
                         // !viewMode` keeps undo/redo there regardless.
                         showHistoryButtons = (!edit.isDrawType || !drawingCanvasMode) &&
                             !edit.isAudioType && !isReadOnlyAccess && (edit.isChecklistType || !viewMode),
-                        canUndo = history.canUndo,
-                        canRedo = history.canRedo,
+                        canUndo = historyActive && history.canUndo,
+                        canRedo = historyActive && history.canRedo,
                         showFormatButton = (edit.isRichEditableType || (edit.isDrawType && !drawingCanvasMode)) &&
                             !isReadOnlyAccess && !viewMode,
                         formatOpen = showFormatSheet,
