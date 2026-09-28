@@ -729,8 +729,8 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   syncActionRestore: "Restore",
   syncActionDelete: "Delete",
   syncActionReorder: "Reorder",
-  undo: "Undo (Ctrl+Z)",
-  redo: "Redo (Ctrl+Y)",
+  undoShortcut: "Undo (Ctrl+Z)",
+  redoShortcut: "Redo (Ctrl+Y)",
   image: "Image",
 
   // Password change
