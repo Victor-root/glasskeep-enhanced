@@ -1213,7 +1213,7 @@ internal fun RichPopover(
     padding: Dp = 8.dp,
     content: @Composable () -> Unit,
 ) {
-    GkPopover(GkPopoverClose.Touch, onDismiss, RichPopoverPlacement) {
+    GkPopover(GkPopoverClose.Touch, onDismiss, RichPopoverPlacement, keepsFocus = true) {
         val shape = RoundedCornerShape(10.dp)
         val appear = remember { Animatable(0f) }
         LaunchedEffect(Unit) { appear.animateTo(1f, tween(durationMillis = 120, easing = EaseOut)) }

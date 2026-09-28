@@ -1,6 +1,8 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.content.Context
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -36,21 +38,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
@@ -347,8 +349,11 @@ private fun DockActionButton(action: BulkActionButton, dark: Boolean) {
     }
 }
 
-/** The dock's kebab and its menu (globalCSS.js:917-940): right-aligned
- *  under the button, 8dp below it. */
+/** The dock's kebab and its menu (globalCSS.js:917-953): right-aligned
+ *  under the button, 8dp below it, growing in over 160ms; a tap elsewhere
+ *  closes it. An action folded into it opens its own popover (the colour
+ *  or logo picker) from the kebab, where the web's anchor falls back to
+ *  once the menu and its row are gone. */
 @Composable
 private fun DockOverflowMenu(actions: List<BulkActionButton>, dark: Boolean) {
     var open by remember { mutableStateOf(false) }
@@ -371,19 +376,22 @@ private fun DockOverflowMenu(actions: List<BulkActionButton>, dark: Boolean) {
             KebabIcon(size = 20.dp, tint = kebabColor)
         }
         if (open) {
-            val density = LocalDensity.current
-            Popup(
-                alignment = Alignment.TopEnd,
-                offset = with(density) { IntOffset(0, (36.dp + 8.dp).roundToPx()) },
-                onDismissRequest = { open = false },
-                properties = PopupProperties(focusable = true),
-            ) {
+            GkPopover(GkPopoverClose.Tap, { open = false }, DockMenuPlacement) {
                 val shape = RoundedCornerShape(10.dp)
+                val appear = remember { Animatable(0f) }
+                LaunchedEffect(Unit) { appear.animateTo(1f, tween(durationMillis = 160, easing = EaseOut)) }
                 Column(
                     modifier = Modifier
+                        .graphicsLayer {
+                            val scale = 0.97f + 0.03f * appear.value
+                            alpha = appear.value
+                            translationY = (appear.value - 1f) * 6.dp.toPx()
+                            scaleX = scale
+                            scaleY = scale
+                        }
                         .widthIn(min = 200.dp)
                         .width(IntrinsicSize.Max)
-                        .shadow(16.dp, shape, ambientColor = Color(0x330F172A), spotColor = Color(0x330F172A))
+                        .dockMenuShadow(shape, dark)
                         .clip(shape)
                         .background(if (dark) Color(0xFF222222) else Color.White)
                         .border(1.dp, if (dark) Color.White.copy(alpha = 0.08f) else Color(0x4DD1D5DB), shape)
@@ -405,5 +413,18 @@ private fun DockOverflowMenu(actions: List<BulkActionButton>, dark: Boolean) {
                 }
             }
         }
+        actions.forEach { it.anchored?.invoke() }
     }
+}
+
+private val DockMenuPlacement: GkPopoverPlacement = { anchor, _, card ->
+    IntOffset(anchor.right - card.width, anchor.bottom + 8.dp.roundToPx())
+}
+
+/** The dock menu's own two-layer shadow, darker on dark. */
+private fun Modifier.dockMenuShadow(shape: Shape, dark: Boolean): Modifier {
+    val color = if (dark) Color.Black else Color(0xFF0F172A)
+    return this
+        .dropShadow(shape, Shadow(radius = 32.dp, color = color.copy(alpha = if (dark) 0.65f else 0.20f), spread = (-10).dp, offset = DpOffset(0.dp, 14.dp)))
+        .dropShadow(shape, Shadow(radius = 16.dp, color = color.copy(alpha = if (dark) 0.5f else 0.15f), spread = (-8).dp, offset = DpOffset(0.dp, 6.dp)))
 }

@@ -28,6 +28,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
@@ -190,7 +191,10 @@ private suspend fun AwaitPointerEventScope.awaitTap(down: PointerInputChange): P
  * [placement] off the control it opens from: the layout this is called
  * in, as for a Popup. A finger landing outside the card closes it as
  * [close] says, on the control too unless [sparesAnchor], whose own tap
- * then closes it; so does the back key.
+ * then closes it; so does the back key. Opening it takes the focus away,
+ * putting the keyboard away, as the web's button takes it when tapped,
+ * unless [keepsFocus] (the formatting bar's buttons, whose mousedown the
+ * web prevents).
  */
 @Composable
 internal fun GkPopover(
@@ -198,9 +202,11 @@ internal fun GkPopover(
     onDismiss: () -> Unit,
     placement: GkPopoverPlacement,
     sparesAnchor: Boolean = true,
+    keepsFocus: Boolean = false,
     content: @Composable (GkPopoverFrame) -> Unit,
 ) {
     val popovers = LocalGkPopovers.current
+    val focusManager = LocalFocusManager.current
     val currentDismiss by rememberUpdatedState(onDismiss)
     val currentPlacement by rememberUpdatedState(placement)
     val currentContent by rememberUpdatedState(content)
@@ -214,6 +220,7 @@ internal fun GkPopover(
         ) { currentContent(it) }
     }
     DisposableEffect(request) {
+        if (!keepsFocus) focusManager.clearFocus()
         popovers.show(request)
         onDispose { popovers.hide(request) }
     }
@@ -238,7 +245,7 @@ internal fun GkPopoverHost(popovers: GkPopovers) {
         content = {
             open.forEach { request ->
                 key(request) {
-                    Box(Modifier.layoutId(request).pointerInput(request) {}) { request.content(request) }
+                    Box(Modifier.layoutId(request).blockTouchesBelow()) { request.content(request) }
                 }
             }
         },

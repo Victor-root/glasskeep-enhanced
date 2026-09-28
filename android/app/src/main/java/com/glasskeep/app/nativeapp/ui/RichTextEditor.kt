@@ -1694,104 +1694,77 @@ private fun TextLayoutResult.charAt(position: Offset, textLength: Int): Int? {
     return listOf(offset - 1, offset).firstOrNull { it in 0 until textLength && getBoundingBox(it).contains(position) }
 }
 
-/** Room around the tap popover for its shadow (see RichPopover). */
-private val LinkTapShadowRoom = 28.dp
-
 /**
  * EditExtras' `.rt-link-popover`: tapping a link in the editor, with the
  * read-mode preference off, shows "Open" and "Edit" 8px above the link and
  * centred on it, under it when there is no room above, 8px inside the
- * screen; a touch anywhere else closes it. [bounds] is the link, in the
- * text's own coordinates.
+ * screen; a touch anywhere else, the link included, closes it and still
+ * goes on to what it lands on. [bounds] is the link, in the text's own
+ * coordinates.
  */
 @Composable
 private fun LinkTapPopover(bounds: Rect, dark: Boolean, onOpen: () -> Unit, onEdit: () -> Unit, onDismiss: () -> Unit) {
-    val density = LocalDensity.current
-    val positionProvider = remember(bounds, density) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: IntRect,
-                windowSize: IntSize,
-                layoutDirection: LayoutDirection,
-                popupContentSize: IntSize,
-            ): IntOffset {
-                val room = with(density) { LinkTapShadowRoom.roundToPx() }
-                val margin = with(density) { 8.dp.roundToPx() }
-                val width = popupContentSize.width - 2 * room
-                val height = popupContentSize.height - 2 * room
-                val above = anchorBounds.top + bounds.top.roundToInt() - height - margin
-                val top = if (above < margin) anchorBounds.top + bounds.bottom.roundToInt() + margin else above
-                val left = (anchorBounds.left + bounds.center.x.roundToInt() - width / 2)
-                    .coerceAtMost(windowSize.width - width - margin)
-                    .coerceAtLeast(margin)
-                return IntOffset(left - room, top - room)
-            }
-        }
-    }
-    Popup(
-        popupPositionProvider = positionProvider,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = false, dismissOnClickOutside = true),
+    GkPopover(
+        close = GkPopoverClose.Touch,
+        onDismiss = onDismiss,
+        placement = { text, screen, card ->
+            val margin = 8.dp.roundToPx()
+            val above = text.top + bounds.top.roundToInt() - card.height - margin
+            val top = if (above < margin) text.top + bounds.bottom.roundToInt() + margin else above
+            val left = (text.left + bounds.center.x.roundToInt() - card.width / 2)
+                .coerceAtLeast(margin)
+                .coerceAtMost(screen.width - card.width - margin)
+            IntOffset(left, top)
+        },
+        sparesAnchor = false,
     ) {
         val shape = RoundedCornerShape(10.dp)
         val buttonShape = RoundedCornerShape(7.dp)
         val textColor = if (dark) DarkTitleColor else LightTitleColor
-        Box(
-            Modifier
-                .pointerInput(Unit) {
-                    val room = LinkTapShadowRoom.toPx()
-                    detectTapGestures { tap ->
-                        val onCard = tap.x >= room && tap.y >= room && tap.x <= size.width - room && tap.y <= size.height - room
-                        if (!onCard) onDismiss()
-                    }
-                }
-                .padding(LinkTapShadowRoom),
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier
+                .dropShadow(
+                    shape,
+                    Shadow(radius = 28.dp, color = Color.Black.copy(alpha = if (dark) 0.55f else 0.22f), offset = DpOffset(0.dp, 8.dp)),
+                )
+                .then(
+                    if (dark) {
+                        Modifier
+                    } else {
+                        Modifier.dropShadow(shape, Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.12f), offset = DpOffset(0.dp, 2.dp)))
+                    },
+                )
+                .clip(shape)
+                .background(if (dark) Color(red = 30, green = 30, blue = 35).copy(alpha = 0.98f) else Color.White.copy(alpha = 0.98f))
+                .border(1.dp, if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f), shape)
+                .padding(7.dp),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Box(
                 modifier = Modifier
-                    .dropShadow(
-                        shape,
-                        Shadow(radius = 28.dp, color = Color.Black.copy(alpha = if (dark) 0.55f else 0.22f), offset = DpOffset(0.dp, 8.dp)),
-                    )
-                    .then(
-                        if (dark) {
-                            Modifier
-                        } else {
-                            Modifier.dropShadow(shape, Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.12f), offset = DpOffset(0.dp, 2.dp)))
-                        },
-                    )
-                    .clip(shape)
-                    .background(if (dark) Color(red = 30, green = 30, blue = 35).copy(alpha = 0.98f) else Color.White.copy(alpha = 0.98f))
-                    .border(1.dp, if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f), shape)
-                    .padding(7.dp),
+                    .clip(buttonShape)
+                    .background(cssAngleGradient(135f, listOf(Color(0xFF6366F1), Color(0xFF7C3AED))))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onOpen() }
+                    .padding(horizontal = 12.8.dp, vertical = 6.4.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .clip(buttonShape)
-                        .background(cssAngleGradient(135f, listOf(Color(0xFF6366F1), Color(0xFF7C3AED))))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onOpen() }
-                        .padding(horizontal = 12.8.dp, vertical = 6.4.dp),
-                ) {
-                    Text(stringResource(R.string.native_richtext_link_open), color = Color.White, fontSize = 13.12.sp, fontWeight = FontWeight.SemiBold)
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(buttonShape)
-                        .border(1.dp, if (dark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.12f), buttonShape)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onEdit() }
-                        .padding(horizontal = 12.8.dp, vertical = 6.4.dp),
-                ) {
-                    Text(stringResource(R.string.native_richtext_link_edit), color = textColor, fontSize = 13.12.sp, fontWeight = FontWeight.SemiBold)
-                }
+                Text(stringResource(R.string.native_richtext_link_open), color = Color.White, fontSize = 13.12.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Box(
+                modifier = Modifier
+                    .clip(buttonShape)
+                    .border(1.dp, if (dark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.12f), buttonShape)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onEdit() }
+                    .padding(horizontal = 12.8.dp, vertical = 6.4.dp),
+            ) {
+                Text(stringResource(R.string.native_richtext_link_edit), color = textColor, fontSize = 13.12.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }

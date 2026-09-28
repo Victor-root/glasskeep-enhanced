@@ -140,8 +140,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
 import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.R
@@ -2142,7 +2140,8 @@ private fun AiThinkingLine() {
  * right corner sits on the kebab's, it hugs its widest row, and scrolls
  * past 72% of the screen) and its own row shape (16sp label, 12dp gap, one
  * accent colour per action), including the admin-only entry. It appears
- * and goes without animation, and its rows give no press feedback.
+ * and goes without animation, and its rows give no press feedback. A
+ * touch elsewhere closes it, and a tap there then clicks nothing.
  */
 @Composable
 private fun HeaderMenu(
@@ -2165,11 +2164,7 @@ private fun HeaderMenu(
     if (!expanded) return
     val configuration = LocalConfiguration.current
     val shape = RoundedCornerShape(8.dp)
-    Popup(
-        alignment = Alignment.TopEnd,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
+    GkPopover(GkPopoverClose.Swallow, onDismiss, HeaderMenuPlacement) {
         Column(
             modifier = Modifier
                 // Hugs the widest row's own intrinsic width (NotesHeader.jsx's
@@ -2182,7 +2177,7 @@ private fun HeaderMenu(
                 // only a ceiling now, not the width itself.
                 .widthIn(max = minOf(298.dp, (configuration.screenWidthDp - 26).dp))
                 .heightIn(max = (configuration.screenHeightDp * 0.72f).dp)
-                .shadow(6.dp, shape, clip = false)
+                .tailwindShadowLg(shape)
                 .clip(shape)
                 .background(if (dark) Color(0xFF222222) else Color.White)
                 .border(1.dp, if (dark) DarkBorderColor else LightBorderColor, shape)
@@ -2273,6 +2268,9 @@ private fun HeaderMenu(
         }
     }
 }
+
+/** `absolute top-0 right-0`: its top right corner on the kebab's. */
+private val HeaderMenuPlacement: GkPopoverPlacement = { anchor, _, card -> IntOffset(anchor.right - card.width, anchor.top) }
 
 /** One row of [HeaderMenu]: px-4 py-3.5, 12dp gap, 16sp label. */
 @Composable

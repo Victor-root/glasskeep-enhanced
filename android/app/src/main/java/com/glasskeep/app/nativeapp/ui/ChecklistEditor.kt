@@ -97,14 +97,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.ChecklistBlock
@@ -1210,7 +1204,7 @@ private fun ChecklistSectionHeader(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             role = Role.Button,
-                        ) { pickerOpen = true },
+                        ) { pickerOpen = !pickerOpen },
                 )
                 if (pickerOpen) {
                     ChecklistSectionColorPicker(
@@ -1350,7 +1344,8 @@ private const val NoSectionColor = "none"
  * ColorPicker (SectionHeader.jsx:34-104): a 210dp panel 6dp under the
  * dot, its left edge on the dot's but kept 8dp inside the screen, shown
  * and hidden at once: five 32dp dots per row, "no colour" first, the
- * picked one ringed white then in its own colour, outside the dot.
+ * picked one ringed white then in its own colour, outside the dot. A
+ * touch elsewhere closes it, and a tap there then clicks nothing.
  */
 @Composable
 private fun ChecklistSectionColorPicker(
@@ -1359,30 +1354,10 @@ private fun ChecklistSectionColorPicker(
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val density = LocalDensity.current
-    val positionProvider = remember(density) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: IntRect,
-                windowSize: IntSize,
-                layoutDirection: LayoutDirection,
-                popupContentSize: IntSize,
-            ): IntOffset {
-                val margin = with(density) { 8.dp.roundToPx() }
-                val panelWidth = with(density) { 216.dp.roundToPx() }
-                val left = minOf(anchorBounds.left, windowSize.width - panelWidth - margin).coerceAtLeast(margin)
-                return IntOffset(left, anchorBounds.bottom + with(density) { 6.dp.roundToPx() })
-            }
-        }
-    }
     val shape = RoundedCornerShape(8.dp)
     // gray-400 / dark:gray-500, the crossed circle's stroke.
     val noneTint = if (dark) PlaceholderDark else HandleDotLight
-    Popup(
-        popupPositionProvider = positionProvider,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
+    GkPopover(GkPopoverClose.Swallow, onDismiss, SectionColorPickerPlacement) {
         Column(
             modifier = Modifier
                 .tailwindShadowXl(shape)
@@ -1426,6 +1401,12 @@ private fun ChecklistSectionColorPicker(
             }
         }
     }
+}
+
+private val SectionColorPickerPlacement: GkPopoverPlacement = { anchor, screen, _ ->
+    val margin = 8.dp.roundToPx()
+    val left = minOf(anchor.left, screen.width - 216.dp.roundToPx() - margin).coerceAtLeast(margin)
+    IntOffset(left, anchor.bottom + 6.dp.roundToPx())
 }
 
 /** red-500. */
