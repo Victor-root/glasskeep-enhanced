@@ -156,7 +156,7 @@ try {
     token: afterChange,
     body: { current_password: "pas-le-bon", new_password: "Passw0rd-encore" },
   });
-  t.check("un mauvais mot de passe actuel est refusé", wrong.status === 401, `http ${wrong.status}`);
+  t.check("un mauvais mot de passe actuel est refusé", wrong.status === 403, `http ${wrong.status}`);
   t.check("et ne coupe aucune session", await alive(afterChange));
 
   // ── F) Les jetons émis avant le mécanisme ──────────────────────────

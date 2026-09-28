@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { t } from "../../i18n";
 import { api } from "../../utils/api.js";
+import { localizeServerError } from "../../utils/serverErrors.js";
 
 /**
  * Full-screen modal that blocks the app when the user must change their password.
@@ -45,7 +46,7 @@ export default function ChangePasswordModal({ forced, token, dark, onSuccess, on
       });
       onSuccess?.(res);
     } catch (er) {
-      setErr(er.message || t("somethingWentWrong"));
+      setErr(localizeServerError(er.message, "somethingWentWrong"));
     } finally {
       setLoading(false);
     }

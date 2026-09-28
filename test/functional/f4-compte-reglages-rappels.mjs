@@ -525,7 +525,7 @@ try {
   const encoreValide = await inst.call("GET", "/api/user/me", { token: jetonAutreAppareil });
   t.check(
     "se tromper de mot de passe actuel ne change rien et ne déconnecte personne",
-    mauvaisActuel.status === 401 && encoreValide.status === 200,
+    mauvaisActuel.status === 403 && encoreValide.status === 200,
     `http ${mauvaisActuel.status}, autre appareil=${encoreValide.status}`,
   );
 

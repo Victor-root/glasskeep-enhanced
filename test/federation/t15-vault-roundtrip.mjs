@@ -139,6 +139,11 @@ try {
           (await call("GET", `/api/notes/${noteId}`, { token })).json?.content === SECRET_BODY);
 
   // Changer la phrase de passe: c'est un réemballage de la clé.
+  const wrongCurrent = await call("POST", "/api/instance/passphrase", {
+    token, body: { currentPassphrase: PASS2, newPassphrase: PASS2, confirmPassphrase: PASS2 },
+  });
+  t.check("une phrase de passe actuelle fausse est refusée sans passer pour une session expirée",
+          wrongCurrent.status === 403, `http ${wrongCurrent.status}`);
   const changed = await call("POST", "/api/instance/passphrase", {
     token, body: { currentPassphrase: PASS, newPassphrase: PASS2, confirmPassphrase: PASS2 },
   });

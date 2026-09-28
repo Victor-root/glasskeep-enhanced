@@ -2476,7 +2476,8 @@ app.post("/api/user/change-password", auth, (req, res) => {
   // If user must change password (first login with temp password), skip current password check
   if (!user.must_change_password) {
     if (!current_password || !bcrypt.compareSync(current_password, user.password_hash)) {
-      return res.status(401).json({ error: "Current password is incorrect." });
+      // 403, not 401: the session is valid, and clients end it on a 401.
+      return res.status(403).json({ error: "Current password is incorrect." });
     }
   }
 
