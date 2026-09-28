@@ -1264,8 +1264,9 @@ fun RichTextReader(
     }
 }
 
-/** The clipboard the view's selection copies to, which leaves out the
- *  pads [PaddedText] lays out: what it copies is the note's own text. */
+/** The clipboard the view's selection copies to, which leaves out what
+ *  [PaddedText] lays out beyond the text: what it copies is the note's own
+ *  text. */
 private class UnpaddedClipboard(private val clipboard: Clipboard) : Clipboard by clipboard {
     override suspend fun setClipEntry(clipEntry: ClipEntry?) = clipboard.setClipEntry(clipEntry?.withoutPads())
 
@@ -1274,7 +1275,7 @@ private class UnpaddedClipboard(private val clipboard: Clipboard) : Clipboard by
         if (data.itemCount == 0) return this
         val items = List(data.itemCount) { i ->
             val item = data.getItemAt(i)
-            item.text?.let { ClipData.Item(it.toString().replace(PadChar.toString(), "")) } ?: item
+            item.text?.let { ClipData.Item(PaddedText.unpadded(it)) } ?: item
         }
         return ClipEntry(ClipData(data.description, items.first()).apply { items.drop(1).forEach(::addItem) })
     }
