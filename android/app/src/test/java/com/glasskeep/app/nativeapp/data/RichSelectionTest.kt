@@ -204,36 +204,36 @@ class RichSelectionTest {
     fun alignIndentMarksAndEraserOverSeveralBlocks() {
         assertEquals(
             """paragraph{"textAlign":"center"}["aa11"] paragraph{"textAlign":"center"}["bb22"] paragraph["cc33"]""",
-            show(RichEdits.setAlign(d1, span(d1, "aa", "bb"), RichAlign.CENTER)!!.blocks),
+            show(pressed(d1, "aa", "bb", RichCommand.Align(RichAlign.CENTER))),
         )
         val styled = doc(h(1, "hh11"), p("pp22", align = "center"), code("co\nde"))
         assertEquals(
             """heading{"level":1,"textAlign":"center"}["hh11"] paragraph{"textAlign":"center"}["pp22"] codeBlock["co\nde"]""",
-            show(RichEdits.setAlign(styled, span(styled, "hh", "co"), RichAlign.CENTER)!!.blocks),
+            show(pressed(styled, "hh", "co", RichCommand.Align(RichAlign.CENTER))),
         )
         assertEquals(
             """paragraph{"indent":1}["aa11"] paragraph{"indent":1}["bb22"] paragraph["cc33"]""",
-            show(RichEdits.shiftIndent(d1, span(d1, "aa", "bb"), 1)!!.blocks),
+            show(pressed(d1, "aa", "bb", RichCommand.Indent(1))),
         )
         assertEquals(
             """bulletList[listItem{"indent":1}[paragraph["aa"],bulletList[listItem{"indent":1}[paragraph["bb"]],listItem{"indent":1}[paragraph["cc"]]]],listItem{"indent":1}[paragraph["dd"]]] paragraph["ee"]""",
-            show(RichEdits.shiftIndent(nested, span(nested, "bb", "dd"), 1)!!.blocks),
+            show(pressed(nested, "bb", "dd", RichCommand.Indent(1))),
         )
         val quote = doc(quote(p("aa"), p("bb")))
         assertEquals(
             """blockquote{"indent":1}[paragraph{"indent":1}["aa"],paragraph{"indent":1}["bb"]]""",
-            show(RichEdits.shiftIndent(quote, span(quote, "aa", "bb"), 1)!!.blocks),
+            show(pressed(quote, "aa", "bb", RichCommand.Indent(1))),
         )
         assertEquals("""paragraph["a","a11"{bold}] paragraph["b"{bold},"b22"] paragraph["cc33"]""", show(RichEdits.toggleMark(d1, span(d1, "a1", "b2"), RichMarkType.BOLD)))
         assertEquals(
             """paragraph["aa11"] paragraph["bb22"] bulletList[listItem[paragraph["cc33"]]] paragraph["dd44"]""",
-            show(RichEdits.clearFormatting(d2, span(d2, "a1", "b2"))!!.blocks),
+            show(pressed(d2, "a1", "b2", RichCommand.ClearFormatting)),
         )
         assertEquals(
             """paragraph["pp"] paragraph["aa"] paragraph["qq"]""",
-            show(RichEdits.clearFormatting(doc(quote(p("pp")), ul(li("aa")), h(2, "qq")), span(doc(quote(p("pp")), ul(li("aa")), h(2, "qq")), "pp", "qq"))!!.blocks),
+            show(pressed(doc(quote(p("pp")), ul(li("aa")), h(2, "qq")), "pp", "qq", RichCommand.ClearFormatting)),
         )
-        assertEquals("""paragraph["a"] horizontalRule paragraph["b22"] paragraph["cc33"]""", show(RichEdits.insertDivider(d1, span(d1, "a1", "b2"))!!.blocks))
+        assertEquals("""paragraph["a"] horizontalRule paragraph["b22"] paragraph["cc33"]""", show(pressed(d1, "a1", "b2", RichCommand.Divider)))
     }
 
     @Test
@@ -243,7 +243,7 @@ class RichSelectionTest {
         assertTrue(RichEdits.isMarkActive(bold, span(bold, "bold", "bold$"), RichMarkType.BOLD))
         val centered = doc(p("aa", align = "center"), p("bb", align = "center"))
         assertTrue(RichEdits.nodeActive(centered, span(centered, "aa", "bb$")) { it.align == RichAlign.CENTER })
-        val centeredItems = RichEdits.setAlign(doc(ul(li("aa"), li("bb"))), span(doc(ul(li("aa"), li("bb"))), "aa", "bb$"), RichAlign.CENTER)!!.blocks
+        val centeredItems = pressed(doc(ul(li("aa"), li("bb"))), "aa", "bb$", RichCommand.Align(RichAlign.CENTER))
         assertFalse(RichEdits.nodeActive(centeredItems, RichSpan(0, 0, 1, 2)) { it.align == RichAlign.CENTER })
         val list = doc(ul(li("aa"), li("bb")), p("cc"))
         assertEquals(setOf(RichBlockKind.BULLET_ITEM), RichEdits.listKindsIn(list, span(list, "aa", "bb$")))
@@ -394,13 +394,17 @@ class RichSelectionTest {
 
     private fun entered(blocks: List<RichBlock>, from: String, to: String) = show(RichEdits.splitSelection(blocks, span(blocks, from, to))!!.blocks)
 
+    /** The bar's [command] pressed over [from]..[to]: the blocks it
+     *  leaves, as they were when nothing changes. */
+    private fun pressed(blocks: List<RichBlock>, from: String, to: String, command: RichCommand): List<RichBlock> =
+        RichCommands.run(RichEditing(blocks, RichSelection(pos(blocks, from), pos(blocks, to))), command)?.blocks ?: blocks
+
     private fun kind(blocks: List<RichBlock>, from: String, to: String, kind: RichBlockKind) =
-        show(RichEdits.setKind(blocks, span(blocks, from, to), kind)!!.blocks)
+        show(pressed(blocks, from, to, if (kind.isListItem) RichCommand.ToggleList(kind) else RichCommand.SetStyle(kind)))
 
-    private fun quoted(blocks: List<RichBlock>, from: String, to: String) =
-        show(RichEdits.toggleQuote(blocks, span(blocks, from, to))?.blocks ?: blocks)
+    private fun quoted(blocks: List<RichBlock>, from: String, to: String) = show(pressed(blocks, from, to, RichCommand.Quote))
 
-    private fun coded(blocks: List<RichBlock>, from: String, to: String) = show(RichEdits.toggleCodeBlock(blocks, span(blocks, from, to))!!.blocks)
+    private fun coded(blocks: List<RichBlock>, from: String, to: String) = show(pressed(blocks, from, to, RichCommand.CodeBlock))
 
     private fun copied(blocks: List<RichBlock>, from: String, to: String) = RichClipboard.plainText(blocks, span(blocks, from, to))
 

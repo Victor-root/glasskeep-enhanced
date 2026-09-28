@@ -84,7 +84,7 @@ class RichPasteCorpusTest {
                 failures += "${case.name}: ${e.javaClass.simpleName} ${e.message}\n${e.stackTrace.take(6).joinToString("\n")}"
                 continue
             }
-            val expected = RichDoc.parseDocJson(RichPaste.flatModel(case.expected).single())
+            val expected = RichDoc.parseDocJson(RichTree.flatModel(case.expected).single())
                 ?: error("${case.name}: the web's result does not parse")
             val got = show(result.blocks)
             val want = show(expected)

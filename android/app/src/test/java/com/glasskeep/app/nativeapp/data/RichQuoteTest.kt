@@ -163,14 +163,14 @@ class RichQuoteTest {
     fun quoteButtonWrapsAHeadingAloneAndLiftsAQuotedItemOutOfItsList() {
         val heading = RichDoc.newBlock(RichBlockKind.HEADING_2).copy(text = "t")
         val quotes = listOf(RichQuote())
-        val wrapped = requireNotNull(RichEdits.toggleQuote(listOf(RichDoc.newBlock().copy(text = "a", quotes = quotes), heading), heading.id))
+        val wrapped = requireNotNull(press(listOf(RichDoc.newBlock().copy(text = "a", quotes = quotes), heading), RichCommand.Quote, RichPos(heading.id, 0)))
         assertEquals("blockquote[paragraph(a)] blockquote[heading(t)]", shape(RichDoc.encode(wrapped.blocks)))
 
         val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "i")
-        assertNull(RichEdits.toggleQuote(listOf(item), item.id))
+        assertNull(press(listOf(item), RichCommand.Quote, RichPos(item.id, 0)))
 
         val quotedItem = item.copy(quotes = quotes)
-        val lifted = requireNotNull(RichEdits.toggleQuote(listOf(quotedItem), quotedItem.id))
+        val lifted = requireNotNull(press(listOf(quotedItem), RichCommand.Quote, RichPos(quotedItem.id, 0)))
         assertEquals("blockquote[paragraph(i)]", shape(RichDoc.encode(lifted.blocks)))
     }
 
@@ -185,7 +185,7 @@ class RichQuoteTest {
             RichDoc.newBlock().copy(text = "d", quotes = quotes),
         )
 
-        val edit = requireNotNull(RichEdits.setKind(blocks, first.id, RichBlockKind.HEADING_2))
+        val edit = requireNotNull(press(blocks, RichCommand.SetStyle(RichBlockKind.HEADING_2), RichPos(first.id, 0)))
 
         assertEquals(
             "blockquote[paragraph(a)] heading(b) bulletList[listItem[paragraph(c)]] blockquote[paragraph(d)]",
@@ -197,10 +197,11 @@ class RichQuoteTest {
     fun paragraphStyleOnAQuotedParagraphTakesItOutOfTheQuote() {
         val paragraph = RichDoc.newBlock().copy(text = "a", quotes = listOf(RichQuote()))
 
-        val edit = requireNotNull(RichEdits.setKind(listOf(paragraph), paragraph.id, RichBlockKind.PARAGRAPH))
+        val edit = requireNotNull(press(listOf(paragraph), RichCommand.SetStyle(RichBlockKind.PARAGRAPH), RichPos(paragraph.id, 0)))
 
         assertEquals("paragraph(a)", shape(RichDoc.encode(edit.blocks)))
-        assertNull(RichEdits.setKind(edit.blocks, paragraph.id, RichBlockKind.PARAGRAPH))
+        val again = press(edit.blocks, RichCommand.SetStyle(RichBlockKind.PARAGRAPH), RichPos(edit.blocks[0].id, 0))
+        assertEquals(edit.blocks, again?.blocks ?: edit.blocks)
     }
 
     @Test
@@ -209,7 +210,7 @@ class RichQuoteTest {
         val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "b", quotes = listOf(quote))
         val blocks = listOf(RichDoc.newBlock().copy(text = "a", quotes = listOf(quote)), item)
 
-        val edit = requireNotNull(RichEdits.shiftIndent(blocks, item.id, 1))
+        val edit = requireNotNull(press(blocks, RichCommand.Indent(1), RichPos(item.id, 0)))
 
         assertEquals(
             "blockquote{indent=1}[paragraph(a),bulletList[listItem{indent=1}[paragraph(b)]]]",
@@ -229,7 +230,7 @@ class RichQuoteTest {
             RichDoc.newBlock().copy(text = "c", quotes = quotes),
         )
 
-        val edit = requireNotNull(RichEdits.clearFormatting(blocks, middle.id, 0, 1))
+        val edit = requireNotNull(press(blocks, RichCommand.ClearFormatting, RichPos(middle.id, 0), RichPos(middle.id, 1)))
 
         assertEquals(
             "blockquote[paragraph(a)] paragraph(b) blockquote[paragraph(c)]",
@@ -253,10 +254,10 @@ class RichQuoteTest {
         val paragraph = RichDoc.newBlock().copy(text = "a", quotes = listOf(RichQuote()))
         val blocks = listOf(paragraph, RichDoc.newBlock().copy(text = "z"))
 
-        val edit = requireNotNull(RichEdits.insertDivider(blocks, paragraph.id, 1, 1))
+        val edit = requireNotNull(press(blocks, RichCommand.Divider, RichPos(paragraph.id, 1)))
 
         assertEquals("blockquote[paragraph(a),horizontalRule,paragraph()] paragraph(z)", shape(RichDoc.encode(edit.blocks)))
-        assertEquals(edit.blocks[2].id, edit.focusId)
+        assertEquals(RichSelection.caret(edit.blocks[2].id, 0), edit.selection)
     }
 
     @Test
@@ -316,7 +317,7 @@ class RichQuoteTest {
             RichDoc.newBlock().copy(text = "m2", quotes = listOf(q1, q2)),
         )
 
-        val edit = requireNotNull(RichEdits.clearFormatting(blocks, line.id, 0, 0))
+        val edit = requireNotNull(press(blocks, RichCommand.ClearFormatting, RichPos(line.id, 0)))
 
         assertEquals(
             "blockquote[paragraph(o)] blockquote[paragraph(m)] paragraph(in) blockquote[paragraph(in2)] blockquote[paragraph(m2)]",
@@ -330,7 +331,7 @@ class RichQuoteTest {
         val line = RichDoc.newBlock().copy(text = "in", quotes = listOf(outer, RichQuote()))
         val blocks = listOf(line, RichDoc.newBlock().copy(text = "out", quotes = listOf(outer)))
 
-        val edit = requireNotNull(RichEdits.shiftIndent(blocks, line.id, 1))
+        val edit = requireNotNull(press(blocks, RichCommand.Indent(1), RichPos(line.id, 0)))
 
         assertEquals(
             "blockquote{indent=1}[blockquote{indent=1}[paragraph{indent=1}(in)],paragraph(out)]",
@@ -455,20 +456,20 @@ class RichQuoteTest {
         val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "aa")
         val blocks = listOf(item, RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "bb"))
 
-        val edit = requireNotNull(RichEdits.insertDivider(blocks, item.id, 2, 2))
+        val edit = requireNotNull(press(blocks, RichCommand.Divider, RichPos(item.id, 2)))
 
         assertEquals(
             "bulletList[listItem[paragraph(aa),horizontalRule,paragraph()],listItem[paragraph(bb)]]",
             shape(RichDoc.encode(edit.blocks)),
         )
-        assertEquals(edit.blocks[2].id, edit.focusId)
+        assertEquals(RichSelection.caret(edit.blocks[2].id, 0), edit.selection)
     }
 
     @Test
     fun codeCarvedOutOfAListItemStaysInIt() {
         val item = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "aa bb")
 
-        val edit = requireNotNull(RichEdits.toggleCodeBlock(listOf(item), item.id, 0, 2))
+        val edit = requireNotNull(press(listOf(item), RichCommand.CodeBlock, RichPos(item.id, 0), RichPos(item.id, 2)))
 
         assertEquals("bulletList[listItem[paragraph(),codeBlock(aa),paragraph( bb)]]", shape(RichDoc.encode(edit.blocks)))
     }
@@ -477,7 +478,7 @@ class RichQuoteTest {
     fun taskButtonOnALineAnItemHoldsNestsATaskList() {
         val blocks = requireNotNull(RichDoc.parse(ruleInItem()))
 
-        val edit = requireNotNull(RichEdits.setKind(blocks, blocks[2].id, RichBlockKind.TASK_ITEM))
+        val edit = requireNotNull(press(blocks, RichCommand.ToggleList(RichBlockKind.TASK_ITEM), RichPos(blocks[2].id, 0)))
 
         assertEquals(
             "bulletList[listItem[paragraph(aa),horizontalRule,taskList[taskItem[paragraph(xyz)]]],listItem[paragraph(bb)]]",
@@ -490,7 +491,7 @@ class RichQuoteTest {
         val nested = RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "bb", nestLevel = 1)
         val blocks = listOf(RichDoc.newBlock(RichBlockKind.BULLET_ITEM).copy(text = "aa"), nested)
 
-        val edit = requireNotNull(RichEdits.shiftIndent(blocks, nested.id, 1))
+        val edit = requireNotNull(press(blocks, RichCommand.Indent(1), RichPos(nested.id, 0)))
 
         assertEquals(
             "bulletList[listItem{indent=1}[paragraph(aa),bulletList[listItem{indent=1}[paragraph(bb)]]]]",
@@ -506,6 +507,11 @@ class RichQuoteTest {
 
         assertEquals("bulletList[listItem[paragraph(aay),paragraph(z)]]", shape(RichDoc.encode(edit.blocks)))
     }
+
+    /** The bar's [command] pressed with the selection from [from] to [to]:
+     *  what it leaves, or null when nothing changes. */
+    private fun press(blocks: List<RichBlock>, command: RichCommand, from: RichPos, to: RichPos = from): RichEditing? =
+        RichCommands.run(RichEditing(blocks, RichSelection(from, to)), command)
 
     /** A bullet list whose first item holds a rule and a line after its
      *  paragraph: what the web's separator button leaves in an item. */

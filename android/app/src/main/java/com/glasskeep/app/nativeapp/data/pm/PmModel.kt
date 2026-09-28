@@ -37,6 +37,7 @@ internal class PmNodeType(
 
     val isBlock = !(inlineSpec || name == "text")
     val isText = name == "text"
+    val whitespace = if (code) "pre" else "normal"
     val isInline get() = !isBlock
     val isTextblock get() = isBlock && inlineContent
     val isLeaf get() = contentMatch === PmContentMatch.Empty
@@ -283,6 +284,10 @@ internal object PmSchema {
     val subscript = PmMarkType("subscript", 8, emptyMap())
     val superscript = PmMarkType("superscript", 9, emptyMap())
 
+    /** What stands for a line break in a textblock that is not code (the
+     *  hardBreak's `linebreakReplacement`). */
+    val linebreakReplacement = hardBreak
+
     init {
         val nodeList = listOf(
             paragraph, blockquote, bulletList, doc, hardBreak, heading, horizontalRule,
@@ -527,6 +532,27 @@ internal open class PmNode(val type: PmNodeType, val attrs: PmAttrs, val content
 
     fun descendants(f: (PmNode, Int, PmNode?, Int) -> Boolean) = nodesBetween(0, content.size, f)
 
+    /** Each child with the offset it starts at. */
+    fun forEach(f: (PmNode, Int) -> Unit) {
+        var offset = 0
+        for (child in content.content) {
+            f(child, offset)
+            offset += child.nodeSize
+        }
+    }
+
+    /** The node right after [pos], or null. */
+    fun nodeAt(pos: Int): PmNode? {
+        var node: PmNode = this
+        var at = pos
+        while (true) {
+            val found = node.content.findIndex(at)
+            node = node.maybeChild(found.index) ?: return null
+            if (found.offset == at || node.isText) return node
+            at -= found.offset + 1
+        }
+    }
+
     open fun textBetween(from: Int, to: Int, blockSeparator: String? = null, leafText: String? = null) =
         content.textBetween(from, to, blockSeparator, leafText)
 
@@ -720,6 +746,19 @@ internal class PmResolvedPos(
         return 0
     }
 
+    /** The range of blocks where this position and [other] part: the
+     *  textblock both are in, or the blocks holding them in their deepest
+     *  shared ancestor that [pred] accepts. */
+    fun blockRange(other: PmResolvedPos = this, pred: ((PmNode) -> Boolean)? = null): PmNodeRange? {
+        if (other.pos < pos) return other.blockRange(this, pred)
+        for (d in depth - (if (parent.inlineContent || pos == other.pos) 1 else 0) downTo 0) {
+            if (other.pos <= end(d) && (pred == null || pred(node(d)))) return PmNodeRange(this, other, d)
+        }
+        return null
+    }
+
+    fun sameParent(other: PmResolvedPos) = pos - parentOffset == other.pos - other.parentOffset
+
     companion object {
         fun resolve(doc: PmNode, pos: Int): PmResolvedPos {
             if (pos < 0 || pos > doc.content.size) throw IndexOutOfBoundsException("Position $pos out of range")
@@ -744,6 +783,16 @@ internal class PmResolvedPos(
             return PmResolvedPos(pos, nodes, indices, offsets, parentOffset)
         }
     }
+}
+
+/** A flat range of the children of the node at [depth] (resolvedpos.ts
+ *  NodeRange). */
+internal class PmNodeRange(val from: PmResolvedPos, val to: PmResolvedPos, val depth: Int) {
+    val start get() = from.before(depth + 1)
+    val end get() = to.after(depth + 1)
+    val parent get() = from.node(depth)
+    val startIndex get() = from.index(depth)
+    val endIndex get() = to.indexAfter(depth)
 }
 
 /** replace.ts: a piece cut out of a document, open to [openStart] and

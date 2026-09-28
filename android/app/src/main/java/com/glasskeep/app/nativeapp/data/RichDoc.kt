@@ -626,7 +626,7 @@ object RichDoc {
         if (inline.isNotEmpty()) put("content", JsonArray(inline))
     }
 
-    private fun headingLevel(kind: RichBlockKind): Int? = when (kind) {
+    internal fun headingLevel(kind: RichBlockKind): Int? = when (kind) {
         RichBlockKind.HEADING_1 -> 1
         RichBlockKind.HEADING_2 -> 2
         RichBlockKind.HEADING_3 -> 3

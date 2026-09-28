@@ -2,10 +2,12 @@ package com.glasskeep.app.nativeapp.data.pm
 
 /*
  * The parts of prosemirror-transform 1.12 (map.ts, replace_step.ts,
- * mark_step.ts, mark.ts, replace.ts, structure.ts' insertPoint) and of
- * prosemirror-state's selection search that a paste goes through. No node
- * of this schema is isolating, so the original's isolating checks are left
- * out, and no mapping here is ever mirrored.
+ * mark_step.ts, mark.ts, replace.ts, structure.ts) that a paste and the
+ * formatting bar's commands go through. No node of this schema is
+ * isolating, so the original's isolating checks are left out, and no
+ * mapping here is ever mirrored. The steps' `structure` guard, which only
+ * refuses a step built wrongly, is left out too: every step here is built
+ * by the original's own algorithms.
  */
 
 /** How a step moves positions: `[start, oldSize, newSize]` triples, read
@@ -14,7 +16,11 @@ internal class PmStepMap(val ranges: IntArray, private val inverted: Boolean = f
     private val oldIndex = if (inverted) 2 else 1
     private val newIndex = if (inverted) 1 else 2
 
-    fun map(pos: Int, assoc: Int = 1): Int {
+    fun map(pos: Int, assoc: Int = 1): Int = mapResult(pos, assoc).first
+
+    /** Where [pos] goes, and whether the content on its [assoc] side was
+     *  deleted (MapResult's pos and deleted). */
+    fun mapResult(pos: Int, assoc: Int = 1): Pair<Int, Boolean> {
         var diff = 0
         var i = 0
         while (i < ranges.size) {
@@ -25,12 +31,12 @@ internal class PmStepMap(val ranges: IntArray, private val inverted: Boolean = f
             val end = start + oldSize
             if (pos <= end) {
                 val side = if (oldSize == 0) assoc else if (pos == start) -1 else if (pos == end) 1 else assoc
-                return start + diff + if (side < 0) 0 else newSize
+                return start + diff + (if (side < 0) 0 else newSize) to (if (assoc < 0) pos != start else pos != end)
             }
             diff += newSize - oldSize
             i += 3
         }
-        return pos + diff
+        return pos + diff to false
     }
 
     fun forEach(f: (oldStart: Int, oldEnd: Int, newStart: Int, newEnd: Int) -> Unit) {
@@ -57,6 +63,9 @@ internal class PmStepMap(val ranges: IntArray, private val inverted: Boolean = f
 
 internal class PmMapping(private val maps: List<PmStepMap>) {
     fun map(pos: Int, assoc: Int = 1): Int = maps.fold(pos) { p, map -> map.map(p, assoc) }
+
+    fun mapResult(pos: Int, assoc: Int = 1): Pair<Int, Boolean> =
+        maps.fold(pos to false) { (p, deleted), map -> map.mapResult(p, assoc).let { it.first to (deleted || it.second) } }
 
     /** The maps from [from] on. */
     fun slice(from: Int) = PmMapping(maps.subList(from, maps.size))
@@ -131,8 +140,8 @@ private fun mapFragment(fragment: PmFragment, parent: PmNode, f: (PmNode, PmNode
     return PmFragment.fromArray(mapped)
 }
 
-/** transform.ts, for the steps a paste makes. */
-internal class PmTransform(var doc: PmNode) {
+/** transform.ts, for the steps a paste and the bar's commands make. */
+internal open class PmTransform(var doc: PmNode) {
     val steps = mutableListOf<PmStep>()
     private val maps = mutableListOf<PmStepMap>()
 
@@ -308,6 +317,333 @@ internal class PmTransform(var doc: PmNode) {
         }
         return delete(f, t)
     }
+
+    fun replaceWith(from: Int, to: Int, content: PmFragment) = replace(from, to, PmSlice(content, 0, 0))
+
+    fun insert(pos: Int, content: PmFragment) = replaceWith(pos, pos, content)
+
+    /** mark.ts removeMark(): [mark], or every mark when null, off the inline
+     *  nodes of `[from, to)`, one step per mark and run of nodes. */
+    fun removeMark(from: Int, to: Int, mark: PmMark? = null) {
+        class Matched(val style: PmMark, val from: Int, var to: Int, var step: Int)
+        val matched = mutableListOf<Matched>()
+        var stepIndex = 0
+        doc.nodesBetween(from, to, { node, pos, _, _ ->
+            if (!node.isInline) return@nodesBetween true
+            stepIndex++
+            val toRemove = if (mark == null) node.marks else listOfNotNull(mark.takeIf { it.isInSet(node.marks) })
+            val end = minOf(pos + node.nodeSize, to)
+            for (style in toRemove) {
+                val found = matched.lastOrNull { it.step == stepIndex - 1 && style.eq(it.style) }
+                if (found != null) {
+                    found.to = end
+                    found.step = stepIndex
+                } else {
+                    matched += Matched(style, maxOf(pos, from), end, stepIndex)
+                }
+            }
+            true
+        })
+        matched.forEach { step(PmRemoveMarkStep(it.from, it.to, it.style)) }
+    }
+
+    /** structure.ts lift(): the content of [range] moves out of its parents
+     *  up to depth [target], which are split around it. */
+    fun lift(range: PmNodeRange, target: Int) {
+        val rFrom = range.from
+        val rTo = range.to
+        val depth = range.depth
+        val gapStart = rFrom.before(depth + 1)
+        val gapEnd = rTo.after(depth + 1)
+        var start = gapStart
+        var end = gapEnd
+        var before = PmFragment.Empty
+        var openStart = 0
+        var splitting = false
+        for (d in depth downTo target + 1) {
+            if (splitting || rFrom.index(d) > 0) {
+                splitting = true
+                before = PmFragment.from(rFrom.node(d).copy(before))
+                openStart++
+            } else {
+                start--
+            }
+        }
+        var after = PmFragment.Empty
+        var openEnd = 0
+        splitting = false
+        for (d in depth downTo target + 1) {
+            if (splitting || rTo.after(d + 1) < rTo.end(d)) {
+                splitting = true
+                after = PmFragment.from(rTo.node(d).copy(after))
+                openEnd++
+            } else {
+                end++
+            }
+        }
+        step(PmReplaceAroundStep(start, end, gapStart, gapEnd, PmSlice(before.append(after), openStart, openEnd), before.size - openStart))
+    }
+
+    /** structure.ts wrap(): [range] wrapped in [wrappers], outermost first. */
+    fun wrap(range: PmNodeRange, wrappers: List<PmWrapper>) {
+        var content = PmFragment.Empty
+        for (i in wrappers.indices.reversed()) {
+            if (content.size > 0) {
+                val match = wrappers[i].type.contentMatch.matchFragment(content)
+                if (match == null || !match.validEnd) {
+                    throw PmReplaceError("Wrapper type given to Transform.wrap does not form valid content of its parent wrapper")
+                }
+            }
+            content = PmFragment.from(wrappers[i].type.create(wrappers[i].attrs, content))
+        }
+        val start = range.start
+        val end = range.end
+        step(PmReplaceAroundStep(start, end, start, end, PmSlice(content, 0, 0), wrappers.size))
+    }
+
+    /** structure.ts setBlockType(): every textblock in `[from, to)` that
+     *  can becomes a [type] with [attrs], what it holds made to fit (line
+     *  breaks turning into newlines in code, and back). */
+    fun setBlockType(from: Int, to: Int, type: PmNodeType, attrs: PmAttrs?) {
+        check(type.isTextblock) { "Type given to setBlockType should be a textblock" }
+        val mapFrom = steps.size
+        doc.nodesBetween(from, to, { node, pos, _, _ ->
+            if (!node.isTextblock || node.hasMarkup(type, attrs) || !canChangeType(doc, mapping.slice(mapFrom).map(pos), type)) {
+                return@nodesBetween true
+            }
+            val pre = type.whitespace == "pre"
+            val supportLinebreak = type.contentMatch.matchType(PmSchema.linebreakReplacement) != null
+            val convertNewlines = when {
+                pre && !supportLinebreak -> false
+                !pre && supportLinebreak -> true
+                else -> null
+            }
+            if (convertNewlines == false) replaceLinebreaks(node, pos, mapFrom)
+            clearIncompatible(mapping.slice(mapFrom).map(pos, 1), type, clearNewlines = convertNewlines == null)
+            val mapped = mapping.slice(mapFrom)
+            val startM = mapped.map(pos, 1)
+            val endM = mapped.map(pos + node.nodeSize, 1)
+            step(PmReplaceAroundStep(startM, endM, startM + 1, endM - 1, PmSlice(PmFragment.from(type.create(attrs, null, node.marks)), 0, 0), 1))
+            if (convertNewlines == true) replaceNewlines(node, pos, mapFrom)
+            false
+        })
+    }
+
+    private fun replaceNewlines(node: PmNode, pos: Int, mapFrom: Int) {
+        node.forEach { child, offset ->
+            if (child.isText) {
+                for (newline in Newline.findAll(child.text!!)) {
+                    val start = mapping.slice(mapFrom).map(pos + 1 + offset + newline.range.first)
+                    replaceWith(start, start + 1, PmFragment.from(PmSchema.linebreakReplacement.create()))
+                }
+            }
+        }
+    }
+
+    private fun replaceLinebreaks(node: PmNode, pos: Int, mapFrom: Int) {
+        node.forEach { child, offset ->
+            if (child.type === PmSchema.linebreakReplacement) {
+                val start = mapping.slice(mapFrom).map(pos + 1 + offset)
+                replaceWith(start, start + 1, PmFragment.from(PmSchema.text("\n")))
+            }
+        }
+    }
+
+    /** structure.ts clearIncompatible(): what the node at [pos] holds that a
+     *  [parentType] cannot goes, and newlines become spaces outside code. */
+    fun clearIncompatible(pos: Int, parentType: PmNodeType, match: PmContentMatch = parentType.contentMatch, clearNewlines: Boolean = true) {
+        val node = requireNotNull(doc.nodeAt(pos))
+        val replaced = mutableListOf<PmReplaceStep>()
+        var cur = pos + 1
+        var current = match
+        for (i in 0 until node.childCount) {
+            val child = node.child(i)
+            val end = cur + child.nodeSize
+            val allowed = current.matchType(child.type)
+            if (allowed == null) {
+                replaced += PmReplaceStep(cur, end, PmSlice.Empty)
+            } else {
+                current = allowed
+                for (mark in child.marks) if (!parentType.allowsMarkType(mark.type)) step(PmRemoveMarkStep(cur, end, mark))
+                if (clearNewlines && child.isText && parentType.whitespace != "pre") {
+                    var slice: PmSlice? = null
+                    for (newline in Newline.findAll(child.text!!)) {
+                        val space = slice ?: PmSlice(PmFragment.from(PmSchema.text(" ", parentType.allowedMarks(child.marks))), 0, 0)
+                        slice = space
+                        replaced += PmReplaceStep(cur + newline.range.first, cur + newline.range.first + newline.value.length, space)
+                    }
+                }
+            }
+            cur = end
+        }
+        if (!current.validEnd) replace(cur, cur, PmSlice(requireNotNull(current.fillBefore(PmFragment.Empty, true)), 0, 0))
+        for (i in replaced.indices.reversed()) step(replaced[i])
+    }
+
+    /** structure.ts setNodeMarkup(): the node at [pos] takes [type] (its own
+     *  when null), [attrs] (the defaults when null) and [marks]. */
+    fun setNodeMarkup(pos: Int, type: PmNodeType? = null, attrs: PmAttrs? = null, marks: List<PmMark>? = null) {
+        val node = doc.nodeAt(pos) ?: throw PmReplaceError("No node at given position")
+        val newType = type ?: node.type
+        val newNode = newType.create(attrs, null, marks ?: node.marks)
+        if (node.isLeaf) {
+            replaceWith(pos, pos + node.nodeSize, PmFragment.from(newNode))
+            return
+        }
+        if (!newType.validContent(node.content)) throw PmReplaceError("Invalid content for node type ${newType.name}")
+        step(PmReplaceAroundStep(pos, pos + node.nodeSize, pos + 1, pos + node.nodeSize - 1, PmSlice(PmFragment.from(newNode), 0, 0), 1))
+    }
+
+    /** structure.ts split(): the nodes around [pos] split there, [depth]
+     *  levels deep, the halves after it taking [typesAfter] where given. */
+    fun split(pos: Int, depth: Int = 1, typesAfter: List<PmWrapper?>? = null) {
+        val rPos = doc.resolve(pos)
+        var before = PmFragment.Empty
+        var after = PmFragment.Empty
+        var d = rPos.depth
+        var i = depth - 1
+        while (d > rPos.depth - depth) {
+            before = PmFragment.from(rPos.node(d).copy(before))
+            val typeAfter = typesAfter?.getOrNull(i)
+            after = PmFragment.from(typeAfter?.type?.create(typeAfter.attrs, after) ?: rPos.node(d).copy(after))
+            d--
+            i--
+        }
+        step(PmReplaceStep(pos, pos, PmSlice(before.append(after), depth, depth)))
+    }
+
+    /** structure.ts join(): the nodes on both sides of [pos] become one,
+     *  [depth] levels deep. */
+    fun join(pos: Int, depth: Int = 1) {
+        val before = doc.resolve(pos - depth)
+        val beforeType = before.node().type
+        val convertNewlines = if (beforeType.inlineContent) {
+            val pre = beforeType.whitespace == "pre"
+            val supportLinebreak = beforeType.contentMatch.matchType(PmSchema.linebreakReplacement) != null
+            when {
+                pre && !supportLinebreak -> false
+                !pre && supportLinebreak -> true
+                else -> null
+            }
+        } else {
+            null
+        }
+        val mapFrom = steps.size
+        if (convertNewlines == false) {
+            val after = doc.resolve(pos + depth)
+            replaceLinebreaks(after.node(), after.before(), mapFrom)
+        }
+        if (beforeType.inlineContent) {
+            clearIncompatible(pos + depth - 1, beforeType, before.node().contentMatchAt(before.index()), convertNewlines == null)
+        }
+        val mapped = mapping.slice(mapFrom)
+        val start = mapped.map(pos - depth)
+        step(PmReplaceStep(start, mapped.map(pos + depth, -1), PmSlice.Empty))
+        if (convertNewlines == true) {
+            val full = doc.resolve(start)
+            replaceNewlines(full.node(), full.before(), steps.size)
+        }
+    }
+}
+
+private val Newline = Regex("\r?\n|\r")
+
+/** A node type, and its attributes, that a wrapping or a split puts
+ *  somewhere (findWrapping's and split's `{type, attrs}`). */
+internal class PmWrapper(val type: PmNodeType, val attrs: PmAttrs? = null)
+
+private fun canCut(node: PmNode, start: Int, end: Int) =
+    (start == 0 || node.canReplace(start, node.childCount)) && (end == node.childCount || node.canReplace(0, end))
+
+/** structure.ts liftTarget(): the depth [range]'s content can move up to,
+ *  or null. */
+internal fun liftTarget(range: PmNodeRange): Int? {
+    val content = range.parent.content.cutByIndex(range.startIndex, range.endIndex)
+    var depth = range.depth
+    var contentBefore = 0
+    var contentAfter = 0
+    while (true) {
+        val node = range.from.node(depth)
+        val index = range.from.index(depth) + contentBefore
+        val endIndex = range.to.indexAfter(depth) - contentAfter
+        if (depth < range.depth && node.canReplace(index, endIndex, content)) return depth
+        if (depth == 0 || !canCut(node, index, endIndex)) return null
+        if (index > 0) contentBefore = 1
+        if (endIndex < node.childCount) contentAfter = 1
+        depth--
+    }
+}
+
+/** structure.ts findWrapping(): the nodes to wrap [range] in for it to sit
+ *  in a [type] (with [attrs]), outermost first, or null. */
+internal fun findWrapping(range: PmNodeRange, type: PmNodeType, attrs: PmAttrs? = null, innerRange: PmNodeRange = range): List<PmWrapper>? {
+    val around = findWrappingOutside(range, type) ?: return null
+    val inner = findWrappingInside(innerRange, type) ?: return null
+    return around.map { PmWrapper(it) } + PmWrapper(type, attrs) + inner.map { PmWrapper(it) }
+}
+
+private fun findWrappingOutside(range: PmNodeRange, type: PmNodeType): List<PmNodeType>? {
+    val around = range.parent.contentMatchAt(range.startIndex).findWrapping(type) ?: return null
+    return around.takeIf { range.parent.canReplaceWith(range.startIndex, range.endIndex, around.firstOrNull() ?: type) }
+}
+
+private fun findWrappingInside(range: PmNodeRange, type: PmNodeType): List<PmNodeType>? {
+    val parent = range.parent
+    val inside = type.contentMatch.findWrapping(parent.child(range.startIndex).type) ?: return null
+    var innerMatch: PmContentMatch? = (inside.lastOrNull() ?: type).contentMatch
+    var i = range.startIndex
+    while (innerMatch != null && i < range.endIndex) innerMatch = innerMatch.matchType(parent.child(i++).type)
+    return inside.takeIf { innerMatch?.validEnd == true }
+}
+
+internal fun canChangeType(doc: PmNode, pos: Int, type: PmNodeType): Boolean {
+    val rPos = doc.resolve(pos)
+    val index = rPos.index()
+    return rPos.parent.canReplaceWith(index, index + 1, type)
+}
+
+/** structure.ts canSplit(). */
+internal fun canSplit(doc: PmNode, pos: Int, depth: Int = 1, typesAfter: List<PmWrapper?>? = null): Boolean {
+    val rPos = doc.resolve(pos)
+    val base = rPos.depth - depth
+    val innerType = typesAfter?.lastOrNull()?.type ?: rPos.parent.type
+    if (base < 0 || !rPos.parent.canReplace(rPos.index(), rPos.parent.childCount) ||
+        !innerType.validContent(rPos.parent.content.cutByIndex(rPos.index(), rPos.parent.childCount))
+    ) {
+        return false
+    }
+    var d = rPos.depth - 1
+    var i = depth - 2
+    while (d > base) {
+        val node = rPos.node(d)
+        val index = rPos.index(d)
+        var rest = node.content.cutByIndex(index, node.childCount)
+        typesAfter?.getOrNull(i + 1)?.let { rest = rest.replaceChild(0, it.type.create(it.attrs)) }
+        val after = typesAfter?.getOrNull(i)?.type ?: node.type
+        if (!node.canReplace(index + 1, node.childCount) || !after.validContent(rest)) return false
+        d--
+        i--
+    }
+    val index = rPos.indexAfter(base)
+    return rPos.node(base).canReplaceWith(index, index, typesAfter?.getOrNull(0)?.type ?: rPos.node(base + 1).type)
+}
+
+/** structure.ts canJoin(): whether the nodes around [pos] can become one. */
+internal fun canJoin(doc: PmNode, pos: Int): Boolean {
+    val rPos = doc.resolve(pos)
+    val index = rPos.index()
+    return joinable(rPos.nodeBefore, rPos.nodeAfter) && rPos.parent.canReplace(index, index + 1)
+}
+
+internal fun joinable(a: PmNode?, b: PmNode?): Boolean {
+    if (a == null || b == null || a.isLeaf) return false
+    var match = a.contentMatchAt(a.childCount)
+    for (i in 0 until b.childCount) {
+        val child = b.child(i)
+        match = match.matchType(if (child.type === PmSchema.linebreakReplacement) PmSchema.text else child.type) ?: return false
+        if (!a.type.allowsMarks(child.marks)) return false
+    }
+    return match.validEnd
 }
 
 private fun replaceStep(doc: PmNode, from: Int, to: Int, slice: PmSlice): PmStep? {
@@ -633,44 +969,6 @@ private fun insertPoint(doc: PmNode, pos: Int, nodeType: PmNodeType): Int? {
             if (rPos.node(d).canReplaceWith(index, index, nodeType)) return rPos.after(d + 1)
             if (index < rPos.node(d).childCount) return null
         }
-    }
-    return null
-}
-
-/**
- * Selection.near() from prosemirror-state, for a text position only: the
- * native editor never selects a node, so a rule the original would select
- * is stepped over to the nearest text on the same side, as findFrom()'s
- * `textOnly` does. Returns the position the caret goes to.
- */
-internal fun pmTextNear(pos: PmResolvedPos, bias: Int): Int =
-    pmFindTextFrom(pos, bias) ?: pmFindTextFrom(pos, -bias) ?: 0
-
-private fun pmFindTextFrom(pos: PmResolvedPos, dir: Int): Int? {
-    if (pos.parent.inlineContent) return pos.pos
-    findTextIn(pos.parent, pos.pos, pos.index(), dir)?.let { return it }
-    for (depth in pos.depth - 1 downTo 0) {
-        val found = if (dir < 0) {
-            findTextIn(pos.node(depth), pos.before(depth + 1), pos.index(depth), dir)
-        } else {
-            findTextIn(pos.node(depth), pos.after(depth + 1), pos.index(depth) + 1, dir)
-        }
-        if (found != null) return found
-    }
-    return null
-}
-
-private fun findTextIn(node: PmNode, start: Int, index: Int, dir: Int): Int? {
-    if (node.inlineContent) return start
-    var pos = start
-    var i = index - if (dir > 0) 0 else 1
-    while (if (dir > 0) i < node.childCount else i >= 0) {
-        val child = node.child(i)
-        if (!child.isAtom) {
-            findTextIn(child, pos + dir, if (dir < 0) child.childCount else 0, dir)?.let { return it }
-        }
-        pos += child.nodeSize * dir
-        i += dir
     }
     return null
 }

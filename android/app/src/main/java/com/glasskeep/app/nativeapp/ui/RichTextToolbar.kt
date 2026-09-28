@@ -83,13 +83,12 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichBlockKind
+import com.glasskeep.app.nativeapp.data.RichCommand
 import com.glasskeep.app.nativeapp.data.RichDoc
-import com.glasskeep.app.nativeapp.data.RichEdit
 import com.glasskeep.app.nativeapp.data.RichEdits
 import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.RichPos
 import com.glasskeep.app.nativeapp.data.RichSelection
-import com.glasskeep.app.nativeapp.data.RichSpan
 import com.glasskeep.app.nativeapp.data.TypographyBlock
 import com.glasskeep.app.nativeapp.data.TypographyProfile
 import com.glasskeep.app.nativeapp.data.hasText
@@ -162,8 +161,6 @@ fun RichFormatToolbar(
 
     fun alignActive(align: RichAlign): Boolean =
         nodeActive { it.kind.hasText && it.kind != RichBlockKind.CODE_BLOCK && it.align == align }
-
-    fun command(change: (List<RichBlock>, RichSpan) -> RichEdit?) = state.command(change)
 
     val toolbarLabel = stringResource(R.string.native_richtext_toolbar_label)
     Column(
@@ -311,10 +308,7 @@ fun RichFormatToolbar(
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = {
-                    state.clearAllPending()
-                    command { b, s -> RichEdits.clearFormatting(b, s) }
-                },
+                onClick = { state.blockCommand(RichCommand.ClearFormatting) },
             ) { tint -> ClearFormattingIcon(size = 20.dp, tint = tint) }
         }
         val colorButton: @Composable FlowRowScope.() -> Unit = {
@@ -381,7 +375,7 @@ fun RichFormatToolbar(
                 colors = colors,
                 titleColor = titleColor,
                 fixedTint = BulletListTint,
-                onClick = { command { b, s -> RichEdits.setKind(b, s, RichBlockKind.BULLET_ITEM) } },
+                onClick = { state.blockCommand(RichCommand.ToggleList(RichBlockKind.BULLET_ITEM)) },
             ) { tint -> BulletListIcon(size = 20.dp, tint = tint) }
         }
         val numberedButton: @Composable FlowRowScope.() -> Unit = {
@@ -392,7 +386,7 @@ fun RichFormatToolbar(
                 colors = colors,
                 titleColor = titleColor,
                 fixedTint = NumberedListTint,
-                onClick = { command { b, s -> RichEdits.setKind(b, s, RichBlockKind.NUMBERED_ITEM) } },
+                onClick = { state.blockCommand(RichCommand.ToggleList(RichBlockKind.NUMBERED_ITEM)) },
             ) { tint -> NumberedListIcon(size = 20.dp, tint = tint) }
         }
         val taskButton: @Composable FlowRowScope.() -> Unit = {
@@ -418,7 +412,7 @@ fun RichFormatToolbar(
                     fixedTint = if (dark) TaskListTintDark else TaskListTintLight,
                     contentDescription = stringResource(R.string.native_richtext_task_list),
                     chevronDescription = stringResource(R.string.native_richtext_task_list_options),
-                    onClick = { command { b, s -> RichEdits.setKind(b, s, RichBlockKind.TASK_ITEM) } },
+                    onClick = { state.blockCommand(RichCommand.ToggleList(RichBlockKind.TASK_ITEM)) },
                     onChevron = { openPopover = if (open) null else RichPopoverKind.TASK },
                 ) { tint -> TaskListIcon(size = 20.dp, tint = tint) }
             }
@@ -432,7 +426,7 @@ fun RichFormatToolbar(
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { command { b, s -> RichEdits.setAlign(b, s, RichAlign.LEFT) } },
+                onClick = { state.blockCommand(RichCommand.Align(RichAlign.LEFT)) },
             ) { tint -> AlignLeftIcon(size = 20.dp, tint = tint) }
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_align_center),
@@ -440,7 +434,7 @@ fun RichFormatToolbar(
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { command { b, s -> RichEdits.setAlign(b, s, RichAlign.CENTER) } },
+                onClick = { state.blockCommand(RichCommand.Align(RichAlign.CENTER)) },
             ) { tint -> AlignCenterIcon(size = 20.dp, tint = tint) }
             RichToolbarButton(
                 contentDescription = stringResource(R.string.native_richtext_align_right),
@@ -448,7 +442,7 @@ fun RichFormatToolbar(
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { command { b, s -> RichEdits.setAlign(b, s, RichAlign.RIGHT) } },
+                onClick = { state.blockCommand(RichCommand.Align(RichAlign.RIGHT)) },
             ) { tint -> AlignRightIcon(size = 20.dp, tint = tint) }
             if (withJustify) {
                 RichToolbarButton(
@@ -457,7 +451,7 @@ fun RichFormatToolbar(
                     enabled = enabled,
                     colors = colors,
                     titleColor = titleColor,
-                    onClick = { command { b, s -> RichEdits.setAlign(b, s, RichAlign.JUSTIFY) } },
+                    onClick = { state.blockCommand(RichCommand.Align(RichAlign.JUSTIFY)) },
                 ) { tint -> AlignJustifyIcon(size = 20.dp, tint = tint) }
             }
         }
@@ -468,7 +462,7 @@ fun RichFormatToolbar(
                 enabled = enabled,
                 colors = colors,
                 titleColor = titleColor,
-                onClick = { command { b, s -> RichEdits.insertDivider(b, s) } },
+                onClick = { state.blockCommand(RichCommand.Divider) },
             ) { tint -> SeparatorIcon(size = 20.dp, tint = tint) }
         }
         val linkButton: @Composable FlowRowScope.() -> Unit = {
@@ -628,7 +622,7 @@ fun RichFormatToolbar(
                         colors = colors,
                         titleColor = titleColor,
                         fixedTint = IndentTint,
-                        onClick = { command { b, s -> RichEdits.shiftIndent(b, s, 1) } },
+                        onClick = { state.blockCommand(RichCommand.Indent(1)) },
                     ) { tint -> IndentIncreaseIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_outdent),
@@ -637,7 +631,7 @@ fun RichFormatToolbar(
                         colors = colors,
                         titleColor = titleColor,
                         fixedTint = OutdentTint,
-                        onClick = { command { b, s -> RichEdits.shiftIndent(b, s, -1) } },
+                        onClick = { state.blockCommand(RichCommand.Indent(-1)) },
                     ) { tint -> IndentDecreaseIcon(size = 20.dp, tint = tint) }
                 }
                 RichToolbarGroup(divider = colors.divider, last = false) {
@@ -647,7 +641,7 @@ fun RichFormatToolbar(
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
-                        onClick = { command { b, s -> RichEdits.toggleCodeBlock(b, s) } },
+                        onClick = { state.blockCommand(RichCommand.CodeBlock) },
                     ) { tint -> CodeBlockIcon(size = 20.dp, tint = tint) }
                     RichToolbarButton(
                         contentDescription = stringResource(R.string.native_richtext_inline_code),
@@ -663,7 +657,7 @@ fun RichFormatToolbar(
                         enabled = enabled,
                         colors = colors,
                         titleColor = titleColor,
-                        onClick = { command { b, s -> RichEdits.toggleQuote(b, s) } },
+                        onClick = { state.blockCommand(RichCommand.Quote) },
                     ) { tint -> QuoteIcon(size = 20.dp, tint = tint) }
                     separatorButton()
                     linkButton()
@@ -686,7 +680,7 @@ fun RichFormatToolbar(
                         colors = colors,
                         dark = dark,
                         titleColor = titleColor,
-                    ) { command { b, s -> RichEdits.setKind(b, s, RichBlockKind.PARAGRAPH) } }
+                    ) { state.blockCommand(RichCommand.SetStyle(RichBlockKind.PARAGRAPH)) }
                     for (level in 1..5) {
                         val kind = headingKindFor(level)
                         val label = String.format(stringResource(R.string.native_richtext_heading_level), level)
@@ -700,7 +694,7 @@ fun RichFormatToolbar(
                             colors = colors,
                             dark = dark,
                             titleColor = titleColor,
-                        ) { command { b, s -> RichEdits.setKind(b, s, kind) } }
+                        ) { state.blockCommand(RichCommand.SetStyle(kind)) }
                     }
                 }
             }

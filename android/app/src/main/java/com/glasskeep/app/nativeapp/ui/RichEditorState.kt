@@ -17,8 +17,9 @@ import androidx.compose.ui.unit.toSize
 import com.glasskeep.app.nativeapp.data.PendingMark
 import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichClipboard
+import com.glasskeep.app.nativeapp.data.RichCommand
+import com.glasskeep.app.nativeapp.data.RichCommands
 import com.glasskeep.app.nativeapp.data.RichDoc
-import com.glasskeep.app.nativeapp.data.RichEdit
 import com.glasskeep.app.nativeapp.data.RichEdits
 import com.glasskeep.app.nativeapp.data.RichEditing
 import com.glasskeep.app.nativeapp.data.RichFlat
@@ -140,25 +141,24 @@ class RichEditorState {
         runCatching { focusRequester.requestFocus() }
     }
 
-    /**
-     * One of the bar's commands applied to the selection: [change] gets
-     * the blocks and the selection in document order, its result becomes
-     * the document and the caret goes where it says. The text keeps the
-     * focus, every command of the web's bar starting with focus().
-     */
-    fun command(change: (List<RichBlock>, RichSpan) -> RichEdit?) {
+    /** One of the bar's block commands, run as the web runs it
+     *  ([RichCommands]). The text keeps the focus, every command of the
+     *  web's bar starting with focus(). */
+    fun blockCommand(command: RichCommand) {
         val current = editing ?: return
-        val span = current.span ?: return
-        val edit = change(current.blocks, span) ?: return
-        val selection = edit.focusId?.let { RichSelection.caret(it, edit.caret) }
-            ?: current.selection.takeIf { it.resolve(edit.blocks) != null }
-            ?: firstCaret(edit.blocks)
-        replace(RichEditing(edit.blocks, selection, pendingMarks = if (selection == current.selection) current.pendingMarks else emptyList()))
+        RichCommands.run(current, command)?.let(::replace)
         requestFocus()
     }
 
-    /** A mark command over the selected text; its blocks only change. */
-    fun markCommand(change: (List<RichBlock>, RichSpan) -> List<RichBlock>) = command { blocks, span -> RichEdit(change(blocks, span)) }
+    /** A mark command over the selected text: [change] gets the blocks and
+     *  the selection in document order, and only the blocks change. The
+     *  text keeps the focus. */
+    fun markCommand(change: (List<RichBlock>, RichSpan) -> List<RichBlock>) {
+        val current = editing ?: return
+        val span = current.span ?: return
+        replace(RichEditing(change(current.blocks, span), current.selection, pendingMarks = current.pendingMarks))
+        requestFocus()
+    }
 
     fun setPending(type: RichMarkType, value: String?, color: String? = null) = updatePending { pending ->
         pending.filterNot { it.type == type } + PendingMark(type, value, color)
@@ -167,8 +167,6 @@ class RichEditorState {
     fun clearPending(type: RichMarkType, activeAtCaret: Boolean) = updatePending { pending ->
         pending.filterNot { it.type == type } + if (activeAtCaret) listOf(PendingMark(type, remove = true)) else emptyList()
     }
-
-    fun clearAllPending() = updatePending { emptyList() }
 
     private fun updatePending(change: (List<PendingMark>) -> List<PendingMark>) {
         val current = editing ?: return
