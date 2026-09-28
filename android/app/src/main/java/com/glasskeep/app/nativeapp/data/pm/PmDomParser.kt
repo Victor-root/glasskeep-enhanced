@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.data.pm
 
+import com.glasskeep.app.nativeapp.data.RichLinks
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -56,16 +57,6 @@ internal enum class PmWs { COLLAPSE, PRESERVE, FULL }
 internal object PmParseRules {
     private val Alignments = setOf("left", "center", "right", "justify")
     private val UnderlineStyles = setOf("simple", "double", "dotted", "dashed", "wavy")
-    private val AllowedProtocols = listOf("http", "https", "ftp", "ftps", "mailto", "tel", "callto", "sms", "cid", "xmpp")
-    private val UnicodeWhitespace = Regex("[\\u0000- \\u00a0\\u1680\\u180e\\u2000-\\u2029\\u205f\\u3000]")
-    private val AllowedUri = Regex(
-        "^(?:(?:${AllowedProtocols.joinToString("|")}):|[^a-z]|[a-z0-9+.-]+(?:[^a-z+.\\-:]|$))",
-        RegexOption.IGNORE_CASE,
-    )
-
-    /** Link's isAllowedUri(): a known scheme, or no scheme at all. */
-    fun isAllowedUri(uri: String?): Boolean =
-        uri.isNullOrEmpty() || AllowedUri.containsMatchIn(uri.replace(UnicodeWhitespace, ""))
 
     private fun indent(el: HtmlElement): Int = parseIntJs(el.getAttribute("data-indent") ?: "0")?.takeIf { it > 0 } ?: 0
 
@@ -122,7 +113,7 @@ internal object PmParseRules {
         },
         PmTagRule("a", "href", mark = PmSchema.link) { el ->
             val href = el.getAttribute("href")
-            if (href.isNullOrEmpty() || !isAllowedUri(href)) {
+            if (href.isNullOrEmpty() || !RichLinks.isAllowedUri(href)) {
                 null
             } else {
                 buildMap {

@@ -148,6 +148,50 @@ class RichImeSessionTest {
         assertEquals(listOf(RichMark(0, 4, RichMarkType.BOLD)), h.state.blocks[0].marks)
     }
 
+    /** Typed key by key on the web editor, which words became links. */
+    @Test
+    fun aSpaceAfterAnAddressLinksItAsTheWebDoes() {
+        fun link(start: Int, end: Int, href: String) = RichMark(start, end, RichMarkType.LINK, href)
+        val cases = listOf(
+            "see example.com " to listOf(link(4, 15, "http://example.com")),
+            "(x.io) " to listOf(link(1, 5, "http://x.io")),
+            "[x.io] " to listOf(link(1, 5, "http://x.io")),
+            "example.com, " to emptyList(),
+            "192.168.0.1 " to emptyList(),
+            "localhost " to emptyList(),
+            "https://localhost " to listOf(link(0, 17, "https://localhost")),
+            "me@example.org " to listOf(link(0, 14, "mailto:me@example.org")),
+            "mailto:a@b.co " to listOf(link(0, 13, "mailto:a@b.co")),
+            "file.txt " to emptyList(),
+            "readme.md " to listOf(link(0, 9, "http://readme.md")),
+            "www.Example.COM/a?b=1 " to emptyList(),
+            "x.io/a " to emptyList(),
+            "https://x.io/a " to listOf(link(0, 14, "https://x.io/a")),
+            "http://x.io/a) " to emptyList(),
+            "x.io a/ " to listOf(link(0, 4, "http://x.io")),
+            "x.io  " to listOf(link(0, 4, "http://x.io")),
+            "`x.io` " to listOf(RichMark(0, 4, RichMarkType.CODE)),
+            "**x.io** " to listOf(RichMark(0, 4, RichMarkType.BOLD), link(0, 4, "http://x.io")),
+        )
+        for ((typed, marks) in cases) {
+            val blocks = listOf(p(""))
+            val h = Harness(blocks, at(blocks, 0, 0))
+            for (c in typed) h.session.commitText(c.toString(), 1)
+            val sorted = h.state.blocks.single().marks.sortedWith(compareBy({ it.start }, { it.type.ordinal }))
+            assertEquals(typed, marks.sortedWith(compareBy({ it.start }, { it.type.ordinal })), sorted)
+        }
+    }
+
+    @Test
+    fun enterAfterAnAddressLinksIt() {
+        val blocks = listOf(p(""))
+        val h = Harness(blocks, at(blocks, 0, 0))
+        for (c in "example.com") h.session.commitText(c.toString(), 1)
+        h.session.commitText("\n", 1)
+        assertEquals(listOf(RichMark(0, 11, RichMarkType.LINK, "http://example.com")), h.state.blocks[0].marks)
+        assertEquals(2, h.state.blocks.size)
+    }
+
     @Test
     fun armedBoldStylesTheComposedWord() {
         val blocks = listOf(p("a "))

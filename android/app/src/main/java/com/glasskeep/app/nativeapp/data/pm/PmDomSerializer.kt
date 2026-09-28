@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.data.pm
 
+import com.glasskeep.app.nativeapp.data.RichLinks
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -129,7 +130,7 @@ internal object PmDomSerializer {
                         "target" to attrs["target"]?.toString(),
                         "rel" to attrs["rel"]?.toString(),
                         "class" to attrs["class"]?.toString(),
-                        "href" to if (PmParseRules.isAllowedUri(href)) href else "",
+                        "href" to if (RichLinks.isAllowedUri(href)) href else "",
                         "title" to attrs["title"]?.toString(),
                     ),
                 )

@@ -1,7 +1,5 @@
 package com.glasskeep.app.nativeapp.data
 
-import android.util.Patterns
-
 /** An input rule's edit, and the mark it takes off what is typed next
  *  (Tiptap's removeStoredMark once a mark rule has run). */
 data class RichInputResult(val edit: RichEdit, val disarm: RichMarkType? = null)
@@ -53,7 +51,7 @@ object RichInputRules {
                 if (result != null) return result
             }
         }
-        if (inserted.lastOrNull()?.let { LinkSpace.matches(it.toString()) } == true) {
+        if (RichLinks.endsWithWhitespace(inserted)) {
             val linked = autolink(block, caret) ?: return null
             return RichInputResult(RichEdit(typedBlocks.replaceAt(index, listOf(linked)), id, caret))
         }
@@ -281,53 +279,18 @@ object RichInputRules {
 
     /**
      * The Link extension's autolink: the last word before [end], alone or
-     * in parentheses or brackets, becomes a link when it is a web or e-mail
-     * address and not already in a link or inline code. Android's own
-     * address patterns stand in for linkifyjs; the addresses the web leaves
-     * alone (an IP address or a bare host name without a scheme) are left
-     * alone here too.
+     * in parentheses or brackets, becomes a link when linkify finds an
+     * address there ([RichLinks.lastWordLinks]) not already in a link or
+     * in inline code.
      */
     private fun autolink(block: RichBlock, end: Int): RichBlock? {
-        val before = block.text.substring(0, end)
-        val word = before.split(LinkSpace).lastOrNull { it.isNotEmpty() } ?: return null
-        val wrapped = word.length > 2 &&
-            (word.first() == '(' && word.last() == ')' || word.first() == '[' && word.last() == ']')
-        val value = if (wrapped) word.substring(1, word.length - 1) else word
-        // Every address linkify takes has a dot, an @ or a scheme's colon.
-        if (value.none { it == '.' || it == '@' || it == ':' }) return null
-        val href = linkHref(value) ?: return null
-        if (!shouldAutoLink(value)) return null
-        val from = before.lastIndexOf(word) + if (wrapped) 1 else 0
-        val to = from + value.length
-        val taken = block.marks.any {
-            (it.type == RichMarkType.LINK || it.type == RichMarkType.CODE) && it.start < to && it.end > from
+        var marks = block.marks
+        for (link in RichLinks.lastWordLinks(block.text.substring(0, end))) {
+            val taken = block.marks.any {
+                (it.type == RichMarkType.LINK || it.type == RichMarkType.CODE) && it.start < link.end && it.end > link.start
+            }
+            if (!taken) marks = RichDoc.setMark(marks, RichMarkType.LINK, link.start, link.end, link.href)
         }
-        if (taken) return null
-        return block.copy(marks = RichDoc.setMark(block.marks, RichMarkType.LINK, from, to, href))
+        return if (marks === block.marks) null else block.copy(marks = marks)
     }
-
-    /** linkify's href: an address with a scheme as typed, an e-mail
-     *  address as a mailto: link, anything else over http. */
-    private fun linkHref(value: String): String? = when {
-        Patterns.EMAIL_ADDRESS.matcher(value).matches() -> "mailto:$value"
-        value.startsWith("mailto:", ignoreCase = true) &&
-            Patterns.EMAIL_ADDRESS.matcher(value.substring("mailto:".length)).matches() -> value
-        Patterns.WEB_URL.matcher(value).matches() -> if (SchemeRegex.containsMatchIn(value)) value else "http://$value"
-        else -> null
-    }
-
-    /** The Link extension's default shouldAutoLink. */
-    private fun shouldAutoLink(url: String): Boolean {
-        if (SchemeRegex.containsMatchIn(url) || MaybeSchemeRegex.containsMatchIn(url) && '@' !in url) return true
-        val hostname = url.substringAfterLast('@').split(HostEndRegex).first()
-        if (Ipv4Regex.matches(hostname)) return false
-        return '.' in hostname
-    }
-
-    /** The whitespace autolink splits words on (DOMPurify's list). */
-    private val LinkSpace = Regex("[\\u0000-\\u0020\\u00a0\\u1680\\u180e\\u2000-\\u2029\\u205f\\u3000]")
-    private val SchemeRegex = Regex("^[a-z][a-z0-9+.-]*://", RegexOption.IGNORE_CASE)
-    private val MaybeSchemeRegex = Regex("^[a-z][a-z0-9+.-]*:", RegexOption.IGNORE_CASE)
-    private val HostEndRegex = Regex("[/?#:]")
-    private val Ipv4Regex = Regex("""\d{1,3}(\.\d{1,3}){3}""")
 }
