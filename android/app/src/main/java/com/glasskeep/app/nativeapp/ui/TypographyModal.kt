@@ -9,8 +9,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,7 +29,6 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,20 +44,15 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.shadow.Shadow
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -572,15 +564,10 @@ private fun TypographyColorRow(
         )
     }
     if (pickerOpen) {
-        ColorPickerDialog(
+        PlatformColorChooser(
             initial = current ?: "#111827",
-            themeId = themeId,
-            dark = dark,
-            borderColor = divider,
-            titleColor = titleColor,
-            subtextColor = titleColor.copy(alpha = 0.7f),
+            onChoose = { onPick(it); pickerOpen = false },
             onDismiss = { pickerOpen = false },
-            onConfirm = { onPick(it); pickerOpen = false },
         )
     }
 }
@@ -681,157 +668,6 @@ private fun TypographyToggle(
         Text(label, color = tint, fontSize = 12.48.sp, fontWeight = FontWeight.Medium)
     }
 }
-
-/**
- * The free-form colour picker Android has no built-in equivalent of: a
- * saturation/value square over a hue rail, plus the hex the web's own
- * `<input type="color">` would have produced. Kept here rather than in
- * GkControls because this is the only place the web offers one.
- */
-@Composable
-private fun ColorPickerDialog(
-    initial: String,
-    themeId: String?,
-    dark: Boolean,
-    borderColor: Color,
-    titleColor: Color,
-    subtextColor: Color,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-) {
-    val startHsv = remember(initial) { hsvOf(richColorOf(initial, dark) ?: Color(0xFF111827)) }
-    var hue by remember(initial) { mutableStateOf(startHsv[0]) }
-    var saturation by remember(initial) { mutableStateOf(startHsv[1]) }
-    var value by remember(initial) { mutableStateOf(startHsv[2]) }
-    var hexText by remember(initial) { mutableStateOf(hexOf(colorOfHsv(startHsv[0], startHsv[1], startHsv[2]))) }
-    val current = colorOfHsv(hue, saturation, value)
-
-    fun updateFromWheel() {
-        hexText = hexOf(colorOfHsv(hue, saturation, value))
-    }
-
-    GkDialog(onDismissRequest = onDismiss, dark = dark, borderColor = borderColor) {
-        Text(
-            stringResource(R.string.native_typography_custom_color),
-            color = titleColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(14.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(160.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Brush.horizontalGradient(listOf(Color.White, Color.hsv(hue, 1f, 1f))))
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black)))
-                .pointerInput(hue) {
-                    fun pick(offset: Offset) {
-                        saturation = (offset.x / size.width).coerceIn(0f, 1f)
-                        value = 1f - (offset.y / size.height).coerceIn(0f, 1f)
-                        updateFromWheel()
-                    }
-                    detectTapGestures { pick(it) }
-                }
-                .pointerInput(hue) {
-                    detectDragGestures { change, _ ->
-                        change.consume()
-                        saturation = (change.position.x / size.width).coerceIn(0f, 1f)
-                        value = 1f - (change.position.y / size.height).coerceIn(0f, 1f)
-                        updateFromWheel()
-                    }
-                },
-        )
-        Spacer(Modifier.height(12.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(24.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(
-                    Brush.horizontalGradient(
-                        (0..6).map { Color.hsv(it * 60f, 1f, 1f) },
-                    ),
-                )
-                .pointerInput(Unit) {
-                    fun pick(x: Float) {
-                        hue = (x / size.width).coerceIn(0f, 1f) * 360f
-                        updateFromWheel()
-                    }
-                    detectTapGestures { pick(it.x) }
-                }
-                .pointerInput(Unit) {
-                    detectDragGestures { change, _ ->
-                        change.consume()
-                        hue = (change.position.x / size.width).coerceIn(0f, 1f) * 360f
-                        updateFromWheel()
-                    }
-                },
-        )
-        Spacer(Modifier.height(14.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(
-                Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(current)
-                    .border(1.dp, if (dark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.15f), RoundedCornerShape(6.dp)),
-            )
-            BasicTextField(
-                value = hexText,
-                onValueChange = { raw ->
-                    hexText = raw
-                    val parsed = richColorOf(if (raw.startsWith("#")) raw else "#$raw", dark)
-                    if (parsed != null) {
-                        val hsv = hsvOf(parsed)
-                        hue = hsv[0]
-                        saturation = hsv[1]
-                        value = hsv[2]
-                    }
-                },
-                singleLine = true,
-                textStyle = TextStyle(color = titleColor, fontSize = 14.sp),
-                cursorBrush = SolidColor(Indigo),
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(6.dp))
-                    .border(1.dp, if (dark) RtDividerDark else RtDividerLight, RoundedCornerShape(6.dp))
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            Spacer(Modifier.weight(1f))
-            GkSecondaryButton(
-                label = stringResource(R.string.native_note_detail_trash_confirm_cancel),
-                borderColor = borderColor,
-                textColor = subtextColor,
-                onClick = onDismiss,
-            )
-            GkGradientButton(
-                label = stringResource(R.string.native_richtext_link_apply),
-                themeId = themeId,
-                onClick = { onConfirm(hexOf(current)) },
-            )
-        }
-    }
-}
-
-private fun hsvOf(color: Color): FloatArray {
-    val hsv = FloatArray(3)
-    android.graphics.Color.colorToHSV(color.toArgb(), hsv)
-    return hsv
-}
-
-private fun colorOfHsv(hue: Float, saturation: Float, value: Float): Color =
-    Color.hsv(hue.coerceIn(0f, 360f), saturation.coerceIn(0f, 1f), value.coerceIn(0f, 1f))
-
-private fun hexOf(color: Color): String = String.format(
-    "#%02x%02x%02x",
-    (color.red * 255).toInt(),
-    (color.green * 255).toInt(),
-    (color.blue * 255).toInt(),
-)
 
 /** "1.75rem" is written "28" in the picker, the same px number the web's
  *  own TYPOGRAPHY_SIZE_PRESETS labels use. */

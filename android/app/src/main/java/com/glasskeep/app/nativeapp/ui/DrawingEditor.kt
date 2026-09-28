@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -57,7 +56,6 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -76,10 +74,6 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.DrawingDimensionsDto
 import com.glasskeep.app.nativeapp.data.DrawingPointDto
 import com.glasskeep.app.nativeapp.data.DrawingStrokeDto
-import com.glasskeep.app.ui.DarkBorderColor
-import com.glasskeep.app.ui.DarkTitleColor
-import com.glasskeep.app.ui.LightBorderColor
-import com.glasskeep.app.ui.LightTitleColor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -527,10 +521,9 @@ internal fun DrawingToolbar(
                                 tools.color = picked
                                 open = null
                             },
-                            onCustom = {
-                                open = null
-                                choosingColor = true
-                            },
+                            // The popover stays under the system's colour
+                            // dialog, and goes once a colour is chosen there.
+                            onCustom = { choosingColor = true },
                         )
                     }
                 }
@@ -592,11 +585,11 @@ internal fun DrawingToolbar(
     }
 
     if (choosingColor) {
-        DrawingColorChooser(
+        PlatformColorChooser(
             initial = tools.color.takeUnless { QUICK_COLORS.contains(it) } ?: "#000000",
-            dark = dark,
-            onPick = { picked ->
+            onChoose = { picked ->
                 tools.color = picked
+                open = null
                 choosingColor = false
             },
             onDismiss = { choosingColor = false },
@@ -1026,118 +1019,5 @@ private fun DrawingActionTile(
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
         )
-    }
-}
-
-/**
- * What the web's `<input type="color">` hands to the system: a colour
- * chosen freely, here in the app's own dialog shell, as the WebView's
- * dialogs are: a saturation and brightness square over a hue strip, the
- * result shown beside its hex code, then Cancel and OK.
- */
-@Composable
-private fun DrawingColorChooser(initial: String, dark: Boolean, onPick: (String) -> Unit, onDismiss: () -> Unit) {
-    val start = remember(initial) {
-        FloatArray(3).also { android.graphics.Color.colorToHSV(parseHexColor(initial).toArgb(), it) }
-    }
-    var hue by remember(initial) { mutableFloatStateOf(start[0]) }
-    var saturation by remember(initial) { mutableFloatStateOf(start[1]) }
-    var brightness by remember(initial) { mutableFloatStateOf(start[2]) }
-    val picked = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, brightness)))
-    // `<input type="color">` hands back lowercase hex.
-    val hex = String.format("#%06x", picked.toArgb() and 0xFFFFFF)
-    val borderColor = if (dark) DarkBorderColor else LightBorderColor
-    val textColor = if (dark) DarkTitleColor else LightTitleColor
-    GkDialog(onDismissRequest = onDismiss, dark = dark, borderColor = borderColor, maxWidth = 384.dp) {
-        Text(
-            stringResource(R.string.native_drawing_custom_color),
-            color = textColor,
-            fontSize = 18.sp,
-            lineHeight = 28.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(Modifier.height(16.dp))
-        val hueColor = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f)))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(160.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Brush.horizontalGradient(listOf(Color.White, hueColor)))
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black)))
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        var change = awaitFirstDown()
-                        while (true) {
-                            change.consume()
-                            saturation = (change.position.x / size.width).coerceIn(0f, 1f)
-                            brightness = 1f - (change.position.y / size.height).coerceIn(0f, 1f)
-                            change = awaitPointerEvent().changes.firstOrNull { it.id == change.id && it.pressed } ?: break
-                        }
-                    }
-                },
-        ) {
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                val marker = Offset(saturation * constraints.maxWidth, (1f - brightness) * constraints.maxHeight)
-                Canvas(Modifier.fillMaxSize()) {
-                    drawCircle(Color.White, radius = 8.dp.toPx(), center = marker, style = Stroke(width = 2.dp.toPx()))
-                    drawCircle(Color.Black.copy(alpha = 0.3f), radius = 9.dp.toPx(), center = marker, style = Stroke(width = 1.dp.toPx()))
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(16.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Brush.horizontalGradient((0..6).map { Color(android.graphics.Color.HSVToColor(floatArrayOf(it * 60f, 1f, 1f))) }))
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        var change = awaitFirstDown()
-                        while (true) {
-                            change.consume()
-                            hue = (change.position.x / size.width).coerceIn(0f, 1f) * 360f
-                            change = awaitPointerEvent().changes.firstOrNull { it.id == change.id && it.pressed } ?: break
-                        }
-                    }
-                },
-        ) {
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                val x = hue / 360f * constraints.maxWidth
-                Canvas(Modifier.fillMaxSize()) {
-                    drawCircle(Color.White, radius = 7.dp.toPx(), center = Offset(x, size.height / 2f), style = Stroke(width = 2.dp.toPx()))
-                }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(
-                Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(picked)
-                    .border(1.dp, borderColor, CircleShape),
-            )
-            Text(hex, color = textColor, fontSize = 14.sp, lineHeight = 20.sp)
-        }
-        Spacer(Modifier.height(20.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            GkSecondaryButton(
-                label = stringResource(R.string.native_dialog_cancel),
-                borderColor = borderColor,
-                textColor = textColor,
-                onClick = onDismiss,
-            )
-            GkGradientButton(
-                label = stringResource(R.string.native_dialog_ok),
-                themeId = null,
-                onClick = { onPick(hex) },
-            )
-        }
     }
 }
