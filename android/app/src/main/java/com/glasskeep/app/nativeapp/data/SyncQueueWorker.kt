@@ -86,8 +86,10 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
             // 423 has nothing to redirect. The queue's own retry already
             // does the right thing (the items stay pending until the
             // instance is unlocked), and NativeNavHost reads the lock state
-            // fresh whenever the app comes back to the foreground.
-            ApiClientFactory.create(serverUrl, tokenStore, onInstanceLocked = {}),
+            // fresh whenever the app comes back to the foreground. A
+            // refused session likewise waits for the app, whose first
+            // request finds out.
+            ApiClientFactory.create(serverUrl, tokenStore, onInstanceLocked = {}, onSessionExpired = {}),
             AppDatabase.get(applicationContext).noteDao(),
             queueDao,
         )

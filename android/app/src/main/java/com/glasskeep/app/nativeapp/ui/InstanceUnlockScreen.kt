@@ -59,7 +59,6 @@ import com.glasskeep.app.nativeapp.PasskeyCeremonyResult
 import com.glasskeep.app.nativeapp.data.network.UnlockPasskeyVerifyRequest
 import com.glasskeep.app.nativeapp.data.network.UnlockPassphraseRequest
 import com.glasskeep.app.nativeapp.data.network.UnlockRecoveryRequest
-import com.glasskeep.app.nativeapp.data.network.UnlockResponse
 import com.glasskeep.app.nativeapp.data.refusal
 import com.glasskeep.app.nativeapp.prfOutputOf
 import kotlinx.coroutines.launch
@@ -130,10 +129,9 @@ fun InstanceUnlockScreen(
     val scope = rememberCoroutineScope()
     val activity = LocalView.current.context as Activity
 
-    fun installSession(body: UnlockResponse) {
-        container.tokenStore.serverUrl = serverUrl
-        container.tokenStore.token = body.token
-        onUnlockedWithSession(body.mustChangePassword)
+    suspend fun installSession(token: String, mustChangePassword: Boolean) {
+        container.startSession(serverUrl, token)
+        onUnlockedWithSession(mustChangePassword)
     }
 
     fun submitSecret() {
@@ -206,7 +204,7 @@ fun InstanceUnlockScreen(
                         if (!verify.isSuccessful || session == null) throw verify.refusal("POST /api/instance/unlock-passkey/verify")
                         when {
                             session.alreadyUnlocked -> onUnlocked()
-                            session.token != null && session.user != null -> installSession(session)
+                            session.token != null && session.user != null -> installSession(session.token, session.mustChangePassword)
                             else -> error = context.localizedServerError("Verification failed", R.string.native_unlock_failed)
                         }
                     }

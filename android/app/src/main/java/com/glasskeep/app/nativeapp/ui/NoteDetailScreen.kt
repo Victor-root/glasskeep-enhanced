@@ -386,7 +386,7 @@ fun NoteDetailScreen(
     // the note already has a kept conversation, until the panel's X.
     var noteAiHasBeenOpened by remember { mutableStateOf(false) }
     var noteAiJob by remember { mutableStateOf<Job?>(null) }
-    val aiClient = remember(serverUrl) { AiClient(serverUrl, container.tokenStore) }
+    val aiClient = remember(serverUrl) { AiClient(serverUrl, container.tokenStore, container.lockState::markLocked, container::expireSession) }
 
     // Drawing notes: autosaved (debounced, see scheduleDrawingAutosave)
     // rather than through the shared title/body Save button, matching the

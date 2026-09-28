@@ -314,6 +314,12 @@ internal class SettingsActions(
         if (!passwordChangeForced) changePasswordOpen = false
     }
 
+    /** The session is gone: its password dialog goes with it, forced or not. */
+    fun endSession() {
+        passwordChangeForced = false
+        changePasswordOpen = false
+    }
+
     fun clearPasswordError() {
         passwordError = null
     }
@@ -337,7 +343,7 @@ internal class SettingsActions(
         passwordSaving = true
         scope.launch {
             try {
-                container.tokenStore.token = repository.changePassword(current.takeUnless { passwordChangeForced }, new)
+                container.swapSession { repository.changePassword(current.takeUnless { passwordChangeForced }, new) }
                 changePasswordOpen = false
                 passwordChangeForced = false
                 toasts.success(context.getString(R.string.native_settings_password_success), "key")

@@ -71,6 +71,7 @@ class RealtimeClient(
     private val tokenStore: TokenStore,
     private val onRefreshNeeded: suspend () -> Unit,
     private val onInstanceLocked: () -> Unit,
+    private val onSessionExpired: (String) -> Unit,
     private val onInstanceUnlocked: () -> Unit,
     private val onLiveNotification: (NotificationDto) -> Unit,
     /** Settings/branding/admin events invalidate native secondary state.
@@ -130,7 +131,7 @@ class RealtimeClient(
         // interceptors (auth, logging) and only overrides this one
         // setting - generous enough to tolerate a missed ping or two,
         // not so long that a truly dead connection goes undetected.
-        val client = ApiClientFactory.okHttpClient(tokenStore, onInstanceLocked).newBuilder()
+        val client = ApiClientFactory.okHttpClient(tokenStore, onInstanceLocked, onSessionExpired).newBuilder()
             .readTimeout(60, TimeUnit.SECONDS)
             .build()
         val normalizedBaseUrl = if (serverUrl.endsWith("/")) serverUrl else "$serverUrl/"

@@ -1,11 +1,14 @@
 package com.glasskeep.app.nativeapp.data
 
 import android.content.Context
+import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Session storage for the native rewrite: server URL + JWT, encrypted at
@@ -274,6 +277,31 @@ class TokenStore(context: Context) {
         prefs.edit().remove(KEY_TOKEN).remove(KEY_PROFILE).apply()
     }
 
+    /** The account whose offline edits a session the server refused left
+     *  in the queue ([expireSession]), empty when its token did not say.
+     *  The next sign-in keeps them for that same account only. */
+    var queueOwner: String?
+        get() = prefs.getString(KEY_QUEUE_OWNER, null)
+        set(value) {
+            prefs.edit().putString(KEY_QUEUE_OWNER, value).apply()
+        }
+
+    /**
+     * The server refused [presented]: when it is still the session in use,
+     * the session goes as on signing out, except that App.jsx's
+     * cleanupClientSession keeps the queued offline edits for a sign-in to
+     * replay, so [queueOwner] notes whose they are. False for a token a
+     * sign-in has since replaced.
+     */
+    @Synchronized
+    fun expireSession(presented: String): Boolean {
+        if (token != presented) return false
+        NativeDebug.d("TokenStore.expireSession")
+        queueOwner = sessionTokenUserId(presented).orEmpty()
+        clearSession()
+        return true
+    }
+
     companion object {
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_TOKEN = "token"
@@ -288,6 +316,7 @@ class TokenStore(context: Context) {
         private const val KEY_SIDEBAR_BREAKPOINT = "sidebar_breakpoint"
         private const val KEY_PASTE_MODE = "paste_mode"
         private const val KEY_PROFILE = "profile"
+        private const val KEY_QUEUE_OWNER = "queue_owner"
         private const val KEY_AI_ASSISTANT = "ai_assistant_enabled"
         private const val KEY_EDGE_TO_EDGE_LANDSCAPE = "edge_to_edge_landscape"
         private const val KEY_FLOATING_CARDS = "floating_cards_enabled"
@@ -313,3 +342,22 @@ class TokenStore(context: Context) {
         private val profileJson = Json { ignoreUnknownKeys = true }
     }
 }
+
+private val claimsJson = Json { ignoreUnknownKeys = true }
+
+/** The claims of a session token, a JWT's middle segment; null when they
+ *  can't be read. */
+internal fun sessionTokenClaims(token: String): JsonObject? {
+    val payload = token.split(".").getOrNull(1) ?: return null
+    return try {
+        val decoded = Base64.decode(payload, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+        claimsJson.parseToJsonElement(decoded.decodeToString()) as? JsonObject
+    } catch (t: Throwable) {
+        null
+    }
+}
+
+/** The account a session token was issued to, the `uid` server/index.js's
+ *  signToken puts in it. */
+internal fun sessionTokenUserId(token: String): String? =
+    (sessionTokenClaims(token)?.get("uid") as? JsonPrimitive)?.content

@@ -248,6 +248,13 @@ class NotesRepository(
         noteDao.deleteAll()
     }
 
+    /** The notes cache alone: a session the server refused leaves its
+     *  queued edits for the next sign-in (App.jsx's cleanupClientSession). */
+    suspend fun clearCachedNotes() {
+        NativeDebug.d("NotesRepository.clearCachedNotes")
+        noteDao.deleteAll()
+    }
+
     /**
      * Pulls the current note list from the server and replaces the local
      * cache. Throws on failure; the caller decides how to surface that
@@ -1389,10 +1396,9 @@ class NotesRepository(
 
     /** On success the server issues a fresh token and invalidates every
      *  other session (see server/index.js's token_version bump): the
-     *  caller must store the returned token (mirrors NativeLoginScreen's
-     *  own container.tokenStore.token = ... at its call site) or every
-     *  request after this one fails as unauthorized. A refusal is thrown
-     *  with the server's own `error` text. */
+     *  caller must store the returned token (NativeAppContainer.swapSession)
+     *  or every request after this one fails as unauthorized. A refusal is
+     *  thrown with the server's own `error` text. */
     suspend fun changePassword(currentPassword: String?, newPassword: String): String {
         NativeDebug.d("NotesRepository.changePassword")
         val response = api.changePassword(ChangePasswordRequest(currentPassword, newPassword))

@@ -2,13 +2,13 @@ package com.glasskeep.app.nativeapp.data
 
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
+import com.glasskeep.app.nativeapp.data.network.ApiClientFactory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
@@ -69,15 +69,21 @@ private data class AiStreamFrame(
  * arrives in piece by piece, which Retrofit's suspend functions cannot express, and the
  * search-bar question can take a model over a minute to answer, well
  * past the shared client's own timeouts. Same reasoning, and the same
- * hand-rolled SSE reader, as RealtimeClient.kt.
+ * hand-rolled SSE reader, as RealtimeClient.kt, and like it the shared
+ * client's session and lock handling with timeouts of its own.
  */
-class AiClient(private val serverUrl: String, private val tokenStore: TokenStore) {
+class AiClient(
+    private val serverUrl: String,
+    tokenStore: TokenStore,
+    onInstanceLocked: () -> Unit,
+    onSessionExpired: (String) -> Unit,
+) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     /** The web asks for up to 2 minutes on the search-bar question
      *  (ai.js:112-114); the stream gets no read timeout at all, since
      *  quiet stretches between chunks are normal. */
-    private val client = OkHttpClient.Builder()
+    private val client = ApiClientFactory.okHttpClient(tokenStore, onInstanceLocked, onSessionExpired).newBuilder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -195,7 +201,6 @@ class AiClient(private val serverUrl: String, private val tokenStore: TokenStore
             .url(serverUrl.trimEnd('/') + "/" + path)
             .post(body.toRequestBody("application/json".toMediaType()))
             .header("Accept", if (stream) "text/event-stream" else "application/json")
-            .apply { tokenStore.token?.let { header("Authorization", "Bearer $it") } }
             .build()
 
     private fun errorOf(body: String): String? = runCatching {

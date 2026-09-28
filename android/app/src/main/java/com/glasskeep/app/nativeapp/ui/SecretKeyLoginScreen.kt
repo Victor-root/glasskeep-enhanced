@@ -47,8 +47,7 @@ fun SecretKeyLoginScreen(
                 val body = response.body()
                 if (!response.isSuccessful || body == null) throw response.refusal("POST /api/login/secret")
                 NativeDebug.d("Secret-key login OK for uid=${body.user.id}")
-                container.tokenStore.serverUrl = serverUrl
-                container.tokenStore.token = body.token
+                container.startSession(serverUrl, body.token)
                 onLoggedIn(body.mustChangePassword)
             } catch (t: Throwable) {
                 error = context.localizedServerError(context.requestErrorText(t), R.string.native_login_failed)

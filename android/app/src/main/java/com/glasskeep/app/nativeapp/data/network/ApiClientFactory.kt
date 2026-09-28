@@ -11,21 +11,30 @@ import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
 
+/** The header a service method sets on the requests whose 401 refuses the
+ *  secret just typed, never the session: the sign-ins and the instance
+ *  unlocks, which the web sends with no session at all. [AuthInterceptor]
+ *  sends them without the token too, and takes the header off. */
+internal const val ANONYMOUS_REQUEST_HEADER = "X-GlassKeep-Anonymous"
+
 /**
  * Attaches `Authorization: Bearer <token>` to every request once the user
- * is signed in. ReminderSyncWorker.kt already does the same thing for one
- * endpoint, from a background thread with no WebView involved. This is
- * the same pattern, now used for the whole app.
+ * is signed in, but the [ANONYMOUS_REQUEST_HEADER] ones. ReminderSyncWorker.kt
+ * already does the same thing for one endpoint, from a background thread
+ * with no WebView involved. This is the same pattern, now used for the
+ * whole app.
  */
 private class AuthInterceptor(private val tokenStore: TokenStore) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val token = tokenStore.token
-        val request = if (token != null) {
-            chain.request().newBuilder()
-                .addHeader("Authorization", "Bearer $token")
-                .build()
-        } else {
-            chain.request()
+        val request = when {
+            chain.request().header(ANONYMOUS_REQUEST_HEADER) != null ->
+                chain.request().newBuilder().removeHeader(ANONYMOUS_REQUEST_HEADER).build()
+            token != null ->
+                chain.request().newBuilder()
+                    .addHeader("Authorization", "Bearer $token")
+                    .build()
+            else -> chain.request()
         }
         return chain.proceed(request)
     }
@@ -77,6 +86,28 @@ private class InstanceLockInterceptor(private val onInstanceLocked: () -> Unit) 
 }
 
 /**
+ * Notices the 401 the server answers once the session is over: a password
+ * changed or reset, the account removed, a token past its age. api.js's own
+ * rule: only a request that presented the session says so, and only of the
+ * token it presented, which [onSessionExpired] gets.
+ */
+private class SessionExpiryInterceptor(private val onSessionExpired: (String) -> Unit) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val response = chain.proceed(chain.request())
+        if (response.code == HTTP_UNAUTHORIZED) {
+            val presented = chain.request().header("Authorization")?.removePrefix("Bearer ")
+            NativeDebug.d("HTTP 401 on ${chain.request().url.encodedPath}, session presented=${presented != null}")
+            presented?.let(onSessionExpired)
+        }
+        return response
+    }
+
+    private companion object {
+        const val HTTP_UNAUTHORIZED = 401
+    }
+}
+
+/**
  * Builds a Retrofit client for one server. The native rewrite lets the
  * user point at any self-hosted GlassKeep server, same as the WebView
  * setup screen, so this is built fresh per server URL rather than kept as
@@ -93,24 +124,30 @@ object ApiClientFactory {
      *  SSE stream Retrofit's @GET/suspend-fun interface pattern can't
      *  model) - kept in one place so the two never drift apart on
      *  auth/logging setup. */
-    fun okHttpClient(tokenStore: TokenStore, onInstanceLocked: () -> Unit): OkHttpClient {
+    fun okHttpClient(tokenStore: TokenStore, onInstanceLocked: () -> Unit, onSessionExpired: (String) -> Unit): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(AuthInterceptor(tokenStore))
             .addInterceptor(RequestTimeoutInterceptor())
             .addInterceptor(InstanceLockInterceptor(onInstanceLocked))
+            .addInterceptor(SessionExpiryInterceptor(onSessionExpired))
             // A no-op in release, see NetworkLogging.kt's two versions.
             .addNetworkLogging()
             .build()
     }
 
-    fun create(baseUrl: String, tokenStore: TokenStore, onInstanceLocked: () -> Unit): GlassKeepApi {
+    fun create(
+        baseUrl: String,
+        tokenStore: TokenStore,
+        onInstanceLocked: () -> Unit,
+        onSessionExpired: (String) -> Unit,
+    ): GlassKeepApi {
         val normalizedBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
         NativeDebug.d("ApiClientFactory.create baseUrl=$normalizedBaseUrl")
 
         val contentType = "application/json".toMediaType()
         val retrofit = Retrofit.Builder()
             .baseUrl(normalizedBaseUrl)
-            .client(okHttpClient(tokenStore, onInstanceLocked))
+            .client(okHttpClient(tokenStore, onInstanceLocked, onSessionExpired))
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()
 

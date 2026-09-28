@@ -1245,9 +1245,11 @@ interface GlassKeepApi {
     @GET("api/admin/allow-registration")
     suspend fun allowRegistration(): Response<AllowRegistrationResponse>
 
+    @Headers("$ANONYMOUS_REQUEST_HEADER: true")
     @POST("api/login")
     suspend fun login(@Body body: LoginRequest): Response<LoginResponse>
 
+    @Headers("$ANONYMOUS_REQUEST_HEADER: true")
     @POST("api/login")
     suspend fun loginById(@Body body: LoginByIdRequest): Response<LoginResponse>
 
@@ -1259,6 +1261,7 @@ interface GlassKeepApi {
     // Pre-login, same as passkeyLoginOptions/Verify below: called directly
     // from NativeLoginScreen/SecretKeyLoginScreen, not through
     // NotesRepository (no session exists yet to route it through).
+    @Headers("$ANONYMOUS_REQUEST_HEADER: true")
     @POST("api/login/secret")
     suspend fun loginWithSecretKey(@Body body: SecretKeyLoginRequest): Response<LoginResponse>
 
@@ -1668,6 +1671,7 @@ interface GlassKeepApi {
     // extra "ok" field that route's response carries is silently dropped
     // by ignoreUnknownKeys (see ApiClientFactory) since nothing here needs
     // it beyond the HTTP status this call already checks.
+    @Headers("$ANONYMOUS_REQUEST_HEADER: true")
     @POST("api/passkeys/login/verify")
     suspend fun passkeyLoginVerify(@Body body: PasskeyLoginVerifyRequest): Response<LoginResponse>
 
@@ -1700,15 +1704,18 @@ interface GlassKeepApi {
     @GET("api/instance/status")
     suspend fun instanceStatus(): Response<InstanceStatusResponse>
 
+    @Headers("$ANONYMOUS_REQUEST_HEADER: true")
     @POST("api/instance/unlock")
     suspend fun unlockInstance(@Body body: UnlockPassphraseRequest): Response<UnlockResponse>
 
+    @Headers("$ANONYMOUS_REQUEST_HEADER: true")
     @POST("api/instance/unlock-recovery")
     suspend fun unlockInstanceWithRecoveryKey(@Body body: UnlockRecoveryRequest): Response<UnlockResponse>
 
     @POST("api/instance/unlock-passkey/options")
     suspend fun unlockPasskeyOptions(): Response<UnlockPasskeyOptionsResponse>
 
+    @Headers("$ANONYMOUS_REQUEST_HEADER: true")
     @POST("api/instance/unlock-passkey/verify")
     suspend fun unlockPasskeyVerify(@Body body: UnlockPasskeyVerifyRequest): Response<UnlockResponse>
 

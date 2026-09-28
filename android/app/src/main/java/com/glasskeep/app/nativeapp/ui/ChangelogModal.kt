@@ -103,7 +103,7 @@ internal fun ChangelogModal(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val aiClient = remember(serverUrl) { AiClient(serverUrl, container.tokenStore) }
+    val aiClient = remember(serverUrl) { AiClient(serverUrl, container.tokenStore, container.lockState::markLocked, container::expireSession) }
     val source = remember { context.assets.open(ChangelogAsset).bufferedReader().use { it.readText() } }
     val aiAvailable by produceState(false, serverUrl) {
         value = container.notesRepository(serverUrl).fetchUserAiSettings()?.translatesChangelog() == true

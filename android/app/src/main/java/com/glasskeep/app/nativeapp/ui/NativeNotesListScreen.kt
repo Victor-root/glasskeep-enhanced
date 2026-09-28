@@ -341,7 +341,7 @@ fun NativeNotesListScreen(
     var aiAnswer by rememberSaveable { mutableStateOf<String?>(null) }
     var aiCitedNoteIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var aiLoading by remember { mutableStateOf(false) }
-    val aiClient = remember(serverUrl) { AiClient(serverUrl, container.tokenStore) }
+    val aiClient = remember(serverUrl) { AiClient(serverUrl, container.tokenStore, container.lockState::markLocked, container::expireSession) }
     val aiErrorMessage = stringResource(R.string.native_notes_ai_error)
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current

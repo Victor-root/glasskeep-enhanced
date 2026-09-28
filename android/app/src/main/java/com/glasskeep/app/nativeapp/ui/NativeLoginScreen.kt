@@ -96,9 +96,8 @@ fun NativeLoginScreen(
         registrationAllowed = runCatching { api.allowRegistration().body()?.allowNewAccounts == true }.getOrDefault(false)
     }
 
-    fun completeLogin(token: String, mustChangePassword: Boolean) {
-        container.tokenStore.serverUrl = serverUrl
-        container.tokenStore.token = token
+    suspend fun completeLogin(token: String, mustChangePassword: Boolean) {
+        container.startSession(serverUrl, token)
         onLoggedIn(mustChangePassword)
     }
 
@@ -344,7 +343,7 @@ private fun SignInShortcuts(
     colors: AuthShellColors,
     qrOpen: Boolean,
     onToggleQr: (Boolean) -> Unit,
-    onLoggedIn: (token: String, mustChangePassword: Boolean) -> Unit,
+    onLoggedIn: suspend (token: String, mustChangePassword: Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val activity = LocalView.current.context as Activity

@@ -1,17 +1,12 @@
 package com.glasskeep.app.nativeapp.data
 
-import android.util.Base64
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
 /** App.jsx:191's own threshold: a token younger than this is left alone. */
 private const val RenewAfterMs = 24L * 60L * 60L * 1000L
-
-private val claimsJson = Json { ignoreUnknownKeys = true }
 
 /**
  * Trades an ageing session token for a fresh one, the same way the web
@@ -42,19 +37,11 @@ suspend fun renewSessionTokenIfStale(api: GlassKeepApi, tokenStore: TokenStore) 
 }
 
 /**
- * Reads the `iat` claim out of a JWT's middle segment. True when the token
- * is older than [ageMs], and true as well whenever the claim can't be read
- * at all: the web renews in that case too rather than risk sitting on a
- * token it can't date.
+ * Reads the token's `iat` claim. True when the token is older than [ageMs],
+ * and true as well whenever the claim can't be read at all: the web renews
+ * in that case too rather than risk sitting on a token it can't date.
  */
 private fun isTokenOlderThan(token: String, ageMs: Long): Boolean {
-    val payload = token.split(".").getOrNull(1) ?: return true
-    val issuedAtSeconds = try {
-        val decoded = Base64.decode(payload, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
-        val claims = claimsJson.parseToJsonElement(decoded.decodeToString()) as? JsonObject
-        (claims?.get("iat") as? JsonPrimitive)?.longOrNull
-    } catch (t: Throwable) {
-        null
-    } ?: return true
+    val issuedAtSeconds = (sessionTokenClaims(token)?.get("iat") as? JsonPrimitive)?.longOrNull ?: return true
     return System.currentTimeMillis() - issuedAtSeconds * 1000L >= ageMs
 }

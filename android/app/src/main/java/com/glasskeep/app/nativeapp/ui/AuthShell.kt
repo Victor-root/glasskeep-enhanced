@@ -465,7 +465,7 @@ internal fun rememberLoginBackground(container: NativeAppContainer, ref: String)
                     decodeDataUrl(ref)
                 } else {
                     val absolute = URI(container.tokenStore.serverUrl.orEmpty()).resolve(ref).toString()
-                    val client = ApiClientFactory.okHttpClient(container.tokenStore) { container.lockState.markLocked() }
+                    val client = ApiClientFactory.okHttpClient(container.tokenStore, container.lockState::markLocked, container::expireSession)
                     client.newCall(Request.Builder().url(absolute).build()).execute().use { response ->
                         if (!response.isSuccessful) {
                             null

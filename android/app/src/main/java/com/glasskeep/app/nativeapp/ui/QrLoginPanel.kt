@@ -77,7 +77,7 @@ internal fun QrLoginPanel(
     container: NativeAppContainer,
     serverUrl: String,
     colors: AuthShellColors,
-    onApproved: (token: String, mustChangePassword: Boolean) -> Unit,
+    onApproved: suspend (token: String, mustChangePassword: Boolean) -> Unit,
     onCancel: () -> Unit,
 ) {
     val dark = LocalGkDark.current

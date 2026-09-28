@@ -171,6 +171,7 @@ fun NativeNavHost(
             tokenStore = container.tokenStore,
             onRefreshNeeded = { repository.refresh() },
             onInstanceLocked = { container.lockState.markLocked() },
+            onSessionExpired = container::expireSession,
             onInstanceUnlocked = { lockPokes++ },
             onLiveNotification = { liveNotification = it },
             onAuxiliaryEvent = { type ->
@@ -387,6 +388,14 @@ fun NativeNavHost(
             onPendingOpenNoteIdConsumed()
         }
     }
+    // Signing out, or a session the server refused: the sign-in screen,
+    // with nothing of the session's own screens left behind it.
+    fun goToSignIn() {
+        realtimeClient.stop()
+        navController.navigate("login") {
+            popUpTo(navController.graph.id) { inclusive = true }
+        }
+    }
     LaunchedEffect(unlockedIntoForcedPasswordChange) {
         if (unlockedIntoForcedPasswordChange) {
             settingsActions.openForcedPasswordChange()
@@ -472,6 +481,20 @@ fun NativeNavHost(
         if (notesView == SidebarArchived) notesView = null
     }
     val noteCardsShown = remember(signedIn) { NoteCardsShown() }
+    // api.js's auth-expired (App.jsx's cleanupClientSession, which keeps
+    // the queue): back to sign-in from wherever the app is, over nothing
+    // the session opened, the cached notes dropped. Waits for the screens
+    // when the unlock screen stands in for them.
+    val sessionExpired by container.sessionExpired
+    LaunchedEffect(sessionExpired, currentEntry != null) {
+        if (!sessionExpired || currentEntry == null) return@LaunchedEffect
+        NativeDebug.d("Session refused by the server: back to sign-in")
+        qrScannerOpen = false
+        settingsActions.endSession()
+        goToSignIn()
+        repository.clearCachedNotes()
+        container.sessionExpired.value = false
+    }
     // Every sign-in or launch replays the rows still pending as a burst of
     // pills, oldest first, without acknowledging them: that is left to
     // the bell (useShareNotifications.js:451-578).
@@ -689,12 +712,7 @@ fun NativeNavHost(
                             pendingNewNoteType = pendingNewNoteType,
                             onPendingNewNoteTypeConsumed = onPendingNewNoteTypeConsumed,
                             cardsShown = noteCardsShown,
-                            onSignedOut = {
-                                realtimeClient.stop()
-                                navController.navigate("login") {
-                                    popUpTo(navController.graph.id) { inclusive = true }
-                                }
-                            },
+                            onSignedOut = ::goToSignIn,
                         )
                         if (coveredByPanel) {
                             Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f)))
