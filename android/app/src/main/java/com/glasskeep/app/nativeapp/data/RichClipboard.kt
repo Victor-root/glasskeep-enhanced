@@ -60,21 +60,24 @@ object RichClipboard {
     private fun indentOf(level: Int): String = "  ".repeat(level.coerceAtLeast(0))
 
     /** "- ", or for an ordered item its number among the items of its list
-     *  copied with it. */
+     *  copied with it, counted from the list's start. */
     private fun marker(blocks: List<RichBlock>, span: RichSpan, index: Int): String {
         val item = blocks[index]
         if (item.kind != RichBlockKind.NUMBERED_ITEM) return "- "
-        var number = 1
+        var copiedBefore = 0
+        var head = index
         var j = index - 1
-        while (j >= span.start) {
+        while (j >= 0) {
             val other = blocks[j]
             if (!other.sharesQuoteWith(item) || other.listDepth <= item.nestLevel) break
             if (other.nestLevel == item.nestLevel) {
                 if (other.kind != item.kind) break
-                number++
+                head = j
+                if (j >= span.start) copiedBefore++
             }
             j--
         }
-        return "$number. "
+        val start = blocks[head].listStart?.takeIf { it > 0 } ?: 1
+        return "${start + copiedBefore}. "
     }
 }

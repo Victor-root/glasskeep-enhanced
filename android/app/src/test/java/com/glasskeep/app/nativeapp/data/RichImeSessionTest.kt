@@ -123,6 +123,19 @@ class RichImeSessionTest {
     }
 
     @Test
+    fun aNumberAndADotStartAnOrderedListThere() {
+        val blocks = listOf(p(""))
+        val h = Harness(blocks, at(blocks, 0, 0))
+        for (c in "3. ") h.session.commitText(c.toString(), 1)
+        val item = h.state.blocks.single()
+        assertEquals(RichBlockKind.NUMBERED_ITEM, item.kind)
+        assertEquals(3, item.listStart)
+        val encoded = RichDoc.encode(h.state.blocks)
+        assertEquals(true, "\"type\":\"orderedList\",\"attrs\":{\"start\":3}" in encoded)
+        assertEquals(3, RichDoc.parse(encoded)?.single()?.listStart)
+    }
+
+    @Test
     fun starsMakeBoldAndDisarmItForWhatFollows() {
         val blocks = listOf(p(""))
         val h = Harness(blocks, at(blocks, 0, 0))

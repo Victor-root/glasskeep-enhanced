@@ -15,9 +15,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Pastes recorded in the web editor (rich-paste/web-*.json): the note, the
- * selection, the clipboard, and what the web left. Each is replayed here
- * and must leave the same blocks, with the caret in the same place.
+ * Pastes and copies recorded in the web editor (rich-paste/web-*.json).
+ * A paste: the note, the selection, the clipboard, and what the web left;
+ * replayed here, it must leave the same blocks with the caret in the same
+ * place. A copy: the note, the selection, and the clipboard's markup and
+ * text, which the app's copy must match.
  */
 class RichPasteCorpusTest {
     private class Case(json: JsonObject, val plain: Boolean) {
@@ -54,6 +56,7 @@ class RichPasteCorpusTest {
                 if (b.kind == RichBlockKind.TASK_ITEM) append(" checked=").append(b.checked)
                 if (b.kind == RichBlockKind.CODE_BLOCK && b.language != null) append(" lang=").append(b.language)
                 if (b.nestLevel != 0) append(" nest=").append(b.nestLevel)
+                if (b.listStart != null) append(" start=").append(b.listStart)
                 if (quotes.isNotEmpty()) append(" quotes=").append(quotes)
             }
         }
@@ -94,8 +97,12 @@ class RichPasteCorpusTest {
         assertEquals(emptyList<String>(), failures.map { it.lineSequence().first() })
     }
 
+    /** The web's text walker glues a task list's items on one line; the app
+     *  copies them one per line (RichClipboard.plainText). */
+    private val GluedTaskItems = setOf("C07_tasks")
+
     @Test
-    fun copiesTheWebEditorsMarkup() {
+    fun copiesTheWebEditorsMarkupAndText() {
         val text = requireNotNull(javaClass.classLoader!!.getResource("rich-paste/web-copy.json")).readText()
         val failures = mutableListOf<String>()
         for (element in Json.parseToJsonElement(text) as JsonArray) {
@@ -104,9 +111,11 @@ class RichPasteCorpusTest {
             val blocks = RichDoc.parseDocJson(case.getValue("doc").jsonObject) ?: error("$name: the note does not parse")
             val (from, fromOffset) = case.getValue("from").jsonArray.map { it.jsonPrimitive.int }
             val (to, toOffset) = case.getValue("to").jsonArray.map { it.jsonPrimitive.int }
-            val html = RichClipboard.copy(blocks, RichSpan(from, fromOffset, to, toOffset)).html
+            val clip = RichClipboard.copy(blocks, RichSpan(from, fromOffset, to, toOffset))
             val want = case.getValue("html").jsonPrimitive.content
-            if (html != want) failures += "$name\n--- web:\n$want\n--- app:\n$html"
+            if (clip.html != want) failures += "$name\n--- web:\n$want\n--- app:\n${clip.html}"
+            val wantText = case.getValue("text").jsonPrimitive.content
+            if (clip.text != wantText && name !in GluedTaskItems) failures += "$name text\n--- web:\n$wantText\n--- app:\n${clip.text}"
         }
         if (failures.isNotEmpty()) System.err.println(failures.joinToString("\n\n"))
         assertEquals(emptyList<String>(), failures.map { it.lineSequence().first() })

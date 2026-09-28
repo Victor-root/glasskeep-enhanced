@@ -25,7 +25,7 @@ object MarkdownDoc {
     private val QUOTE = Regex("^\\s*>\\s?(.*)$")
     private val TASK_ITEM = Regex("^(\\s*)[-*+]\\s+\\[([ xX])]\\s+(.*)$")
     private val BULLET_ITEM = Regex("^(\\s*)[-*+]\\s+(.*)$")
-    private val NUMBERED_ITEM = Regex("^(\\s*)\\d+[.)]\\s+(.*)$")
+    private val NUMBERED_ITEM = Regex("^(\\s*)(\\d+)[.)]\\s+(.*)$")
 
     /**
      * Plain text, never Markdown: `plainTextToRichDoc`. A blank line
@@ -154,9 +154,12 @@ object MarkdownDoc {
             val numbered = NUMBERED_ITEM.matchEntire(line)
             if (numbered != null) {
                 flushParagraph()
+                // marked gives a list its first item's number as its start.
+                val start = numbered.groupValues[2].toIntOrNull() ?: Int.MAX_VALUE
+                val opensList = blocks.lastOrNull()?.kind != RichBlockKind.NUMBERED_ITEM
                 blocks.add(
-                    inlineBlock(RichBlockKind.NUMBERED_ITEM, numbered.groupValues[2])
-                        .copy(indent = indentOf(numbered.groupValues[1])),
+                    inlineBlock(RichBlockKind.NUMBERED_ITEM, numbered.groupValues[3])
+                        .copy(indent = indentOf(numbered.groupValues[1]), listStart = start.takeIf { opensList && it != 1 }),
                 )
                 index++
                 continue

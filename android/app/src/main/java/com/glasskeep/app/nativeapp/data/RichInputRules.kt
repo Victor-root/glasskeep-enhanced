@@ -119,8 +119,9 @@ object RichInputRules {
         BlockRule(Regex("""^```([a-z]+)?[${RichDoc.JsSpace}\n]\z"""), ::codeBlock),
         BlockRule(Regex("""^~~~([a-z]+)?[${RichDoc.JsSpace}\n]\z"""), ::codeBlock),
         MarkRule(Regex("""(?:^|$S)(~~(?!$S+~~)((?:[^~]+))~~(?!$S+~~))\z"""), RichMarkType.STRIKE),
-        BlockRule(Regex("""^(\d+)\.$S\z""")) { blocks, index, _, cut ->
-            wrap(blocks, index, cut, RichBlockKind.NUMBERED_ITEM)
+        BlockRule(Regex("""^(\d+)\.$S\z""")) { blocks, index, match, cut ->
+            val start = match.groupValues[1].toIntOrNull() ?: Int.MAX_VALUE
+            wrap(blocks, index, cut, RichBlockKind.NUMBERED_ITEM, listStart = start.takeIf { it != 1 })
         },
         MarkRule(Regex("""(?:^|$S)(\*(?!$S+\*)((?:[^*]+))\*(?!$S+\*))\z"""), RichMarkType.ITALIC),
         MarkRule(Regex("""(?:^|$S)(_(?!$S+_)((?:[^_]+))_(?!$S+_))\z"""), RichMarkType.ITALIC),
@@ -151,11 +152,19 @@ object RichInputRules {
 
     /** wrappingInputRule for a list: a paragraph goes into a list where it
      *  stands (in its quotes, or nested in the list item holding it),
-     *  joining the list right above it. */
-    private fun wrap(blocks: List<RichBlock>, index: Int, cut: Int, kind: RichBlockKind, checked: Boolean = false): RichEdit? {
+     *  joining the list right above it. An ordered list takes the number
+     *  typed as its start. */
+    private fun wrap(
+        blocks: List<RichBlock>,
+        index: Int,
+        cut: Int,
+        kind: RichBlockKind,
+        checked: Boolean = false,
+        listStart: Int? = null,
+    ): RichEdit? {
         val block = blocks[index]
         if (block.kind != RichBlockKind.PARAGRAPH) return null
-        val wrapped = rest(block, cut).copy(kind = kind, checked = checked)
+        val wrapped = rest(block, cut).copy(kind = kind, checked = checked, listStart = listStart)
         return done(blocks, index, listOf(wrapped), wrapped)
     }
 

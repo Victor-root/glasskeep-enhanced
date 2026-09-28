@@ -71,6 +71,11 @@ data class RichQuote(val id: String = UUID.randomUUID().toString(), val indent: 
  * [language] only on a [RichBlockKind.CODE_BLOCK]; both are carried
  * unchanged through a round-trip on every other kind so switching a block
  * back and forth doesn't lose them.
+ *
+ * [listStart] is an ordered list's `start` other than 1 (a list the web
+ * began with "3. "), carried by the item that heads the list: the web's
+ * numbering is its own CSS counter and does not show it, but a copy
+ * numbers the list's text from it and saving keeps it.
  */
 data class RichBlock(
     val id: String,
@@ -83,6 +88,7 @@ data class RichBlock(
     val language: String? = null,
     val nestLevel: Int = 0,
     val quotes: List<RichQuote> = emptyList(),
+    val listStart: Int? = null,
 )
 
 /**
@@ -198,7 +204,9 @@ object RichDoc {
         quotes: List<RichQuote>,
         nestingDepth: Int,
     ): List<RichBlock>? {
-        if (!attrsAreKnown(node["attrs"] as? JsonObject, extraAllowedKeys = setOf("start"))) return null
+        val attrs = node["attrs"] as? JsonObject
+        if (!attrsAreKnown(attrs, extraAllowedKeys = setOf("start"))) return null
+        val start = (attrs?.get("start") as? JsonPrimitive)?.intOrNull?.takeIf { itemKind == RichBlockKind.NUMBERED_ITEM && it != 1 }
         val items = node["content"] as? JsonArray ?: return null
         val blocks = mutableListOf<RichBlock>()
         for (itemNode in items) {
@@ -211,7 +219,8 @@ object RichDoc {
             val paragraphNode = itemContent[0] as? JsonObject ?: return null
             if (nodeType(paragraphNode) != "paragraph") return null
             val block = parseTextBlock(paragraphNode, itemKind) ?: return null
-            blocks.add(block.copy(indent = readIndent(itemAttrs), nestLevel = nestingDepth, quotes = quotes))
+            val head = start.takeIf { blocks.isEmpty() }
+            blocks.add(block.copy(indent = readIndent(itemAttrs), nestLevel = nestingDepth, quotes = quotes, listStart = head))
             for (child in itemContent.drop(1)) {
                 val childObj = child as? JsonObject ?: return null
                 blocks.addAll(parseNode(childObj, quotes, nestingDepth + 1) ?: return null)
@@ -535,6 +544,9 @@ object RichDoc {
                     else -> "taskList"
                 },
             )
+            items.first().listStart?.takeIf { kind == RichBlockKind.NUMBERED_ITEM }?.let { start ->
+                put("attrs", buildJsonObject { put("start", start) })
+            }
             put("content", JsonArray(encoded))
         }
     }
