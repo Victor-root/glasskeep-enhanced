@@ -3335,22 +3335,34 @@ private fun NoteAiHeaderToggle(dark: Boolean, hasMessages: Boolean, onClick: () 
             .padding(horizontal = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            MessageSearchIcon(size = 26.dp, tint = tint)
-            ChevronRightIcon(size = 22.dp, tint = tint, modifier = Modifier.offset(x = (-4).dp))
+        // `.modal-icon-btn--ai`'s drop-shadow(0 0 2px), black 18% (45% in
+        // the dark), where the platform can blur.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val shadow = Color.Black.copy(alpha = if (dark) 0.45f else 0.18f)
+            NoteAiHeaderToggleFace(shadow, shadow, shadow, hasMessages, Modifier.blur(cssBlur(2.dp), BlurredEdgeTreatment.Unbounded))
         }
-        if (hasMessages) {
-            Box(
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 2.dp, y = (-2).dp)
-                    .border(1.5.dp, if (dark) Color(0xFF1E2939) else Color.White, CircleShape)
-                    .padding(1.5.dp)
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF615FFF)),
-            )
-        }
+        NoteAiHeaderToggleFace(tint, Color(0xFF615FFF), if (dark) Color(0xFF1E2939) else Color.White, hasMessages)
+    }
+}
+
+/** The AI toggle's glyphs, and its dot in a [ring] when [hasMessages]. */
+@Composable
+private fun BoxScope.NoteAiHeaderToggleFace(glyph: Color, dot: Color, ring: Color, hasMessages: Boolean, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        MessageSearchIcon(size = 26.dp, tint = glyph)
+        ChevronRightIcon(size = 22.dp, tint = glyph, modifier = Modifier.offset(x = (-4).dp))
+    }
+    if (hasMessages) {
+        Box(
+            modifier
+                .align(Alignment.TopEnd)
+                .offset(x = 2.dp, y = (-2).dp)
+                .border(1.5.dp, ring, CircleShape)
+                .padding(1.5.dp)
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(dot),
+        )
     }
 }
 
