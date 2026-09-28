@@ -150,8 +150,8 @@ object RichInputRules {
 
     /** wrappingInputRule for a list: a paragraph goes into a list where it
      *  stands (in its quotes, or nested in the list item holding it),
-     *  joining the list right above it. An ordered list takes the number
-     *  typed as its start. */
+     *  joining the list right above it, its attributes kept, the new item
+     *  taking none. An ordered list takes the number typed as its start. */
     private fun wrap(
         blocks: List<RichBlock>,
         index: Int,
@@ -162,7 +162,14 @@ object RichInputRules {
     ): RichEdit? {
         val block = blocks[index]
         if (block.kind != RichBlockKind.PARAGRAPH) return null
-        val wrapped = rest(block, cut).copy(kind = kind, checked = checked, listStart = listStart)
+        val task = kind == RichBlockKind.TASK_ITEM
+        val wrapped = rest(block, cut).copy(
+            kind = kind,
+            checked = checked,
+            listStart = listStart,
+            indent = if (task) block.indent else 0,
+            lineIndent = if (task) 0 else block.indent,
+        )
         return done(blocks, index, listOf(wrapped), wrapped)
     }
 

@@ -1171,8 +1171,9 @@ private class RichQuoteRow(val inner: RichFlow, val indent: Float, override val 
 
 /** A list item's columns, from the note's left edge: its text, and where
  *  its marker belongs (the checkbox's left edge; the bullet and the number
- *  sit left of [textStart]); [number] for an ordered item. */
-private class RichListPlacement(val textStart: Float, val checkboxStart: Float, val number: Int?)
+ *  sit left of [markerStart], the item's start, which its paragraph's own
+ *  indent leaves behind); [number] for an ordered item. */
+private class RichListPlacement(val textStart: Float, val markerStart: Float, val number: Int?)
 
 private class RichFlow(val rows: List<RichRow>, val gapAfter: Float)
 
@@ -1284,7 +1285,7 @@ private fun richFlow(blocks: List<RichBlock>, itemEm: Float): RichFlow {
                 } else {
                     val item = parentStart + padding + indent
                     entry.childStart = item
-                    RichListPlacement(item, item, number)
+                    RichListPlacement(item + block.lineIndent * IndentStepEm * itemEm, item, number)
                 }
                 heldByChecked = levels.take(level).count { it.checked }
                 chain = levels.flatMap { listOf(it.list, it.item) }
@@ -1321,10 +1322,10 @@ private fun richFlow(blocks: List<RichBlock>, itemEm: Float): RichFlow {
 
 /**
  * A paragraph, heading or list item: its text column at [RichListPlacement.textStart]
- * (or the block's own [indent]) and, for a list item, its marker: Chrome's
- * disc, the `gk-ol` number ending where the text starts (wider numbers
- * reach further left, like an outside `::marker`), or the WebView's own
- * checkbox 0.18em down, in the theme's `--rt-accent`.
+ * (or the block's own [indent]) and, for a list item, its marker at
+ * [RichListPlacement.markerStart]: Chrome's disc, the `gk-ol` number ending
+ * there (wider numbers reach further left, like an outside `::marker`), or
+ * the WebView's own checkbox 0.18em down, in the theme's `--rt-accent`.
  */
 @Composable
 private fun RichListRow(
@@ -1351,7 +1352,7 @@ private fun RichListRow(
                     onCheckedChange = onToggleChecked?.let { toggle -> { _: Boolean -> toggle() } },
                     accent = accent,
                     modifier = Modifier
-                        .offset(x = list.checkboxStart.dp, y = (0.18f * em).dp)
+                        .offset(x = list.markerStart.dp, y = (0.18f * em).dp)
                         .semantics { contentDescription = label },
                 )
             }
@@ -1367,7 +1368,7 @@ private fun RichListRow(
                 modifier = Modifier.layout { measurable, _ ->
                     val placeable = measurable.measure(Constraints())
                     layout(0, placeable.height) {
-                        placeable.place(list.textStart.dp.roundToPx() - placeable.width, 0)
+                        placeable.place(list.markerStart.dp.roundToPx() - placeable.width, 0)
                     }
                 },
             )
@@ -1376,7 +1377,7 @@ private fun RichListRow(
                     drawCircle(
                         color = style.color,
                         radius = (0.15625f * em).dp.toPx(),
-                        center = Offset((list.textStart - 0.88f * em).dp.toPx(), (0.75f * em).dp.toPx()),
+                        center = Offset((list.markerStart - 0.88f * em).dp.toPx(), (0.75f * em).dp.toPx()),
                     )
                 },
             )

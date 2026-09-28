@@ -42,17 +42,20 @@ object RichEdits {
             marks = RichDoc.clipMarks(block.marks, at, block.text.length),
             align = block.align,
             indent = block.indent,
+            lineIndent = block.lineIndent,
             nestLevel = block.nestLevel,
             quotes = block.quotes,
         )
         // A paragraph a list item holds after its own splits the item there
         // (splitListItem): what follows the caret opens a new item of the
-        // same list, which takes everything the item held after it.
+        // same list, which takes everything the item held after it, the
+        // item's attributes and the paragraph's.
         val item = if (block.kind == RichBlockKind.PARAGRAPH) holdingItem(blocks, index)?.let { blocks[it] } else null
         if (item != null) {
             val newItem = rest.copy(
                 kind = item.kind,
                 indent = if (item.kind == RichBlockKind.TASK_ITEM) block.indent else item.indent,
+                lineIndent = if (item.kind == RichBlockKind.TASK_ITEM) 0 else block.indent,
                 nestLevel = item.nestLevel,
             )
             return RichEdit(blocks.replaceAt(index, listOf(first, newItem)), newItem.id, 0)
@@ -570,8 +573,9 @@ object RichEdits {
     }
 
     /** The indent the paragraph of [block] carries: a bullet or ordered
-     *  item's own lives on its `<li>`, not on its paragraph. */
-    private fun paragraphIndent(block: RichBlock): Int = if (block.kind.isOrderedOrBullet) 0 else block.indent
+     *  item's is its [RichBlock.lineIndent], the item's own lives on its
+     *  `<li>`. */
+    private fun paragraphIndent(block: RichBlock): Int = if (block.kind.isOrderedOrBullet) block.lineIndent else block.indent
 
     /**
      * liftListItem: the item at [index] moves one level up with everything
@@ -587,7 +591,7 @@ object RichEdits {
             val parent = holdingItem(blocks, index)?.let { blocks[it] }
             item.copy(kind = parent?.kind ?: item.kind, nestLevel = item.nestLevel - 1)
         } else {
-            item.copy(kind = RichBlockKind.PARAGRAPH, indent = paragraphIndent(item))
+            item.copy(kind = RichBlockKind.PARAGRAPH, indent = paragraphIndent(item), lineIndent = 0)
         }
         val end = subtreeEnd(blocks, index)
         return blocks.mapIndexed { i, b ->
@@ -637,7 +641,7 @@ object RichEdits {
         val list = if (block.listDepth > 0 && block.quotes.isNotEmpty()) wholeList(blocks, index) else IntRange.EMPTY
         return blocks.mapIndexed { i, b ->
             when (i) {
-                index -> b.copy(kind = RichBlockKind.PARAGRAPH, align = RichAlign.LEFT, indent = 0, nestLevel = 0, quotes = emptyList())
+                index -> b.copy(kind = RichBlockKind.PARAGRAPH, align = RichAlign.LEFT, indent = 0, lineIndent = 0, nestLevel = 0, quotes = emptyList())
                 in list -> b.copy(quotes = emptyList())
                 else -> {
                     val lifted = runs.indexOfLast { i in it } + 1

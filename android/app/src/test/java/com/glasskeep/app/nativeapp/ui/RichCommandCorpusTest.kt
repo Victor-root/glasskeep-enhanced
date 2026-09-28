@@ -49,6 +49,7 @@ class RichCommandCorpusTest {
                 if (marks.isNotEmpty()) append(" {").append(marks).append('}')
                 if (b.align != RichAlign.LEFT) append(" align=").append(b.align)
                 if (b.indent != 0) append(" indent=").append(b.indent)
+                if (b.lineIndent != 0) append(" lineIndent=").append(b.lineIndent)
                 if (b.kind == RichBlockKind.TASK_ITEM) append(" checked=").append(b.checked)
                 if (b.kind == RichBlockKind.CODE_BLOCK && b.language != null) append(" lang=").append(b.language)
                 if (b.nestLevel != 0) append(" nest=").append(b.nestLevel)

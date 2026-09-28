@@ -55,7 +55,10 @@ data class RichQuote(val id: String = UUID.randomUUID().toString(), val indent: 
  *
  * [indent] is the Indent extension's attribute: on the `<li>` of a bullet
  * or ordered item, on the paragraph of a task item (Indent.js skips only
- * listItem paragraphs), on the node itself everywhere else. [nestLevel] is
+ * listItem paragraphs), on the node itself everywhere else. [lineIndent]
+ * is a bullet or ordered item's paragraph's own: Indent.js never moves it,
+ * but a paragraph put in a list keeps its indent there, and Enter passes
+ * it on; it shifts the item's text, not its marker. [nestLevel] is
  * how many list items hold the block: for a list item, 0 in a top-level
  * list, 1 in a list nested inside another item (Tab / sinkListItem on the
  * web), and so on; for anything else, 0 outside any list, 1 for a
@@ -89,6 +92,7 @@ data class RichBlock(
     val nestLevel: Int = 0,
     val quotes: List<RichQuote> = emptyList(),
     val listStart: Int? = null,
+    val lineIndent: Int = 0,
 )
 
 /**
@@ -220,7 +224,9 @@ object RichDoc {
             if (nodeType(paragraphNode) != "paragraph") return null
             val block = parseTextBlock(paragraphNode, itemKind) ?: return null
             val head = start.takeIf { blocks.isEmpty() }
-            blocks.add(block.copy(indent = readIndent(itemAttrs), nestLevel = nestingDepth, quotes = quotes, listStart = head))
+            blocks.add(
+                block.copy(indent = readIndent(itemAttrs), lineIndent = block.indent, nestLevel = nestingDepth, quotes = quotes, listStart = head),
+            )
             for (child in itemContent.drop(1)) {
                 val childObj = child as? JsonObject ?: return null
                 blocks.addAll(parseNode(childObj, quotes, nestingDepth + 1) ?: return null)
@@ -549,8 +555,9 @@ object RichDoc {
     /** A list item and what it holds after its paragraph, in order: its
      *  own blocks, and the lists nested in it, one per run of same-kind
      *  children. A bullet or ordered item carries its indent on the `<li>`
-     *  so the marker and the text shift together (Indent.js:69-75); a task
-     *  item has no indent attribute, its paragraph carries it. */
+     *  so the marker and the text shift together (Indent.js:69-75), its
+     *  paragraph its [RichBlock.lineIndent]; a task item has no indent
+     *  attribute, its paragraph carries it. */
     private fun encodeListItem(item: RichBlock, children: List<RichBlock>): JsonObject {
         val nested = mutableListOf<JsonObject>()
         var c = 0
@@ -578,7 +585,7 @@ object RichDoc {
             } else if (item.indent > 0) {
                 put("attrs", buildJsonObject { put("indent", item.indent) })
             }
-            put("content", JsonArray(listOf(encodeTextBlock(item, withIndent = task)) + nested))
+            put("content", JsonArray(listOf(encodeTextBlock(item, indent = if (task) item.indent else item.lineIndent)) + nested))
         }
     }
 
@@ -613,13 +620,13 @@ object RichDoc {
         }
     }
 
-    private fun encodeTextBlock(block: RichBlock, withIndent: Boolean = true): JsonObject = buildJsonObject {
+    private fun encodeTextBlock(block: RichBlock, indent: Int = block.indent): JsonObject = buildJsonObject {
         val level = headingLevel(block.kind)
         put("type", if (level != null) "heading" else "paragraph")
         val attrs = buildJsonObject {
             if (level != null) put("level", level)
             if (block.align != RichAlign.LEFT) put("textAlign", block.align.name.lowercase())
-            if (withIndent && block.indent > 0) put("indent", block.indent)
+            if (indent > 0) put("indent", indent)
         }
         if (attrs.isNotEmpty()) put("attrs", attrs)
         val inline = encodeInline(block.text, block.marks)

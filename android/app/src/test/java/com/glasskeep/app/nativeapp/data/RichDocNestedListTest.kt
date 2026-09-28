@@ -29,6 +29,34 @@ class RichDocNestedListTest {
     }
 
     @Test
+    fun aListItemsParagraphKeepsItsOwnIndent() {
+        // An item holding a paragraph indented twice, what the web leaves
+        // once an indented paragraph goes into a list.
+        val content = envelope(
+            """{"type":"bulletList","content":[
+                {"type":"listItem","attrs":{"indent":1},"content":[
+                    {"type":"paragraph","attrs":{"indent":2},"content":[{"type":"text","text":"moved"}]}
+                ]}
+            ]}""",
+        )
+
+        val blocks = requireNotNull(RichDoc.parse(content))
+
+        assertEquals(1, blocks.single().indent)
+        assertEquals(2, blocks.single().lineIndent)
+        assertEquals(blocks.map { it.copy(id = "") }, requireNotNull(RichDoc.parse(RichDoc.encode(blocks))).map { it.copy(id = "") })
+        // Enter passes it on to the next item, out of the list the
+        // paragraph takes it back.
+        assertEquals(listOf(2, 2), requireNotNull(RichEdits.split(blocks, blocks.single().id, 2)).blocks.map { it.lineIndent })
+        val lifted = requireNotNull(RichEdits.joinBackward(blocks, blocks.single().id)).blocks.single()
+        assertEquals(RichBlockKind.PARAGRAPH to 2, lifted.kind to lifted.indent)
+        // "- " typed in an indented paragraph: the item takes no indent.
+        val paragraph = RichDoc.newBlock().copy(text = "- x", indent = 2)
+        val wrapped = requireNotNull(RichInputRules.typed(listOf(paragraph), paragraph.id, "- x", emptyList(), 2, " ")).edit.blocks.single()
+        assertEquals(listOf(RichBlockKind.BULLET_ITEM, 0, 2), listOf(wrapped.kind, wrapped.indent, wrapped.lineIndent))
+    }
+
+    @Test
     fun nestedTaskListKeepsCheckedStateAndDepth() {
         val content = envelope(
             """{"type":"taskList","content":[
