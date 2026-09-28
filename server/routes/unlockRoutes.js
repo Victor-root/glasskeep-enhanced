@@ -564,7 +564,8 @@ function attachUnlockRoutes(app, deps) {
     try {
       probeDek = vault.unlockWithPassphrase(db, passphrase);
     } catch {
-      return res.status(401).json({ error: "Current passphrase is incorrect" });
+      // 403, not 401: the session is valid, and clients end it on a 401.
+      return res.status(403).json({ error: "Current passphrase is incorrect" });
     } finally {
       // We don't need a second DEK in memory.
       try { probeDek && probeDek.fill(0); } catch {}
@@ -704,7 +705,8 @@ function attachUnlockRoutes(app, deps) {
     try {
       dek = vault.unlockWithPassphrase(db, currentPassphrase);
     } catch {
-      return res.status(401).json({ error: "Current passphrase is incorrect" });
+      // 403, not 401: the session is valid, and clients end it on a 401.
+      return res.status(403).json({ error: "Current passphrase is incorrect" });
     }
     try {
       vault.rewrapWithNewPassphrase(db, dek, newPassphrase);
