@@ -32,16 +32,19 @@ private val DarkColorScheme = darkColorScheme(
     background = Color(0xFF121212)
 )
 
+/** CSS line boxes: the line height's leading split evenly above and under
+ *  every line, the first and last included, where Compose would trim a
+ *  text's outer lines to the font's own height. */
+val CssLineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None)
+
 // The web's text never carries Material's letter spacing, and Tailwind's
 // preflight gives the whole page `line-height: 1.5`, which every element
 // without its own line height inherits as a factor of its font size.
 // Material 3 would otherwise hand every Text that only sets a size its
-// bodyLarge 0.5sp tracking and fixed 24sp line, and Compose would trim a
-// single line's box to the font's own height where CSS keeps the full,
-// centred line height.
+// bodyLarge 0.5sp tracking and fixed 24sp line.
 private fun TextStyle.web() = copy(
     letterSpacing = 0.sp,
-    lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
+    lineHeightStyle = CssLineHeightStyle,
 )
 
 private val WebTypography = Typography().run {

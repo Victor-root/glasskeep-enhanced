@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.InlineTextContent
-import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -427,8 +426,9 @@ private fun DocText(block: DocBlock, style: DocStyle, color: Color, dark: Boolea
             val result = layout ?: return@drawBehind
             val em = (style.size * CodeScale).sp.toPx()
             val padY = CodePadY.dp.toPx()
-            for (range in doc.codeRanges) {
-                forEachLineSegment(result, range.first, range.last + 1) { left, right, baseline ->
+            for (range in block.codeRanges) {
+                val box = doc.box(range.first, range.last + 1)
+                forEachLineSegment(result, box.start, box.end) { left, right, baseline ->
                     drawRoundRect(
                         codeWash,
                         Offset(left, baseline - 0.93f * em - padY),
@@ -441,40 +441,24 @@ private fun DocText(block: DocBlock, style: DocStyle, color: Color, dark: Boolea
     )
 }
 
-private class DocTextLayout(val text: AnnotatedString, val codeRanges: List<IntRange>)
-
-private fun docTextOf(block: DocBlock, style: DocStyle, linkColor: Color): DocTextLayout {
+private fun docTextOf(block: DocBlock, style: DocStyle, linkColor: Color): PaddedText {
     val source = if (style.uppercase) block.text.map { it.uppercaseChar() }.joinToString("") else block.text
     val length = source.length
-    val codes = block.marks.filter { it.type == RichMarkType.CODE && it.start < it.end }
-    val opens = IntArray(length + 1)
-    val closes = IntArray(length + 1)
-    codes.forEach {
-        opens[it.start.coerceIn(0, length)]++
-        closes[it.end.coerceIn(0, length)]++
-    }
-    val positions = IntArray(length + 1)
-    val builder = AnnotatedString.Builder()
-    for (i in 0..length) {
-        repeat(closes[i]) { builder.appendInlineContent(CodePadId) }
-        positions[i] = builder.length
-        repeat(opens[i]) { builder.appendInlineContent(CodePadId) }
-        if (i < length) builder.append(source[i])
-    }
+    val builder = AnnotatedString.Builder(source)
     for (mark in block.marks) {
-        val start = positions[mark.start.coerceIn(0, length)]
-        val end = positions[mark.end.coerceIn(0, length)]
+        val start = mark.start.coerceIn(0, length)
+        val end = mark.end.coerceIn(start, length)
         if (start >= end) continue
         when (mark.type) {
             RichMarkType.BOLD -> builder.addStyle(SpanStyle(fontWeight = FontWeight.SemiBold), start, end)
             RichMarkType.ITALIC -> builder.addStyle(SpanStyle(fontStyle = FontStyle.Italic), start, end)
             RichMarkType.STRIKE -> builder.addStyle(SpanStyle(textDecoration = TextDecoration.LineThrough), start, end)
-            // The placeholders keep the surrounding size: only the code
-            // itself shrinks to 0.85em.
+            // The pads keep the surrounding size: only the code itself
+            // shrinks to 0.85em.
             RichMarkType.CODE -> builder.addStyle(
                 SpanStyle(fontFamily = FontFamily.Monospace, fontSize = (style.size * CodeScale).sp),
-                start + 1,
-                end - 1,
+                start,
+                end,
             )
             RichMarkType.LINK -> changelogHref(mark.value)?.let { href ->
                 builder.addLink(
@@ -486,8 +470,11 @@ private fun docTextOf(block: DocBlock, style: DocStyle, linkColor: Color): DocTe
             else -> Unit
         }
     }
-    return DocTextLayout(builder.toAnnotatedString(), codes.map { positions[it.start.coerceIn(0, length)] until positions[it.end.coerceIn(0, length)] })
+    return PaddedText.of(builder.toAnnotatedString(), block.codeRanges)
 }
+
+private val DocBlock.codeRanges: List<IntRange>
+    get() = marks.filter { it.type == RichMarkType.CODE }.map { it.start until it.end }
 
 /** A relative link points into the repository, as GitHub shows it; an
  *  anchor stays put. */
@@ -582,8 +569,6 @@ private const val ChangelogAsset = "CHANGELOG.md"
 private const val RepoUrl = "https://github.com/Victor-root/glasskeep-enhanced"
 private const val RepoBlobBase = "https://github.com/Victor-root/glasskeep-enhanced/blob/main/"
 private val AbsoluteUrl = Regex("^[a-z][a-z0-9+.-]*:", RegexOption.IGNORE_CASE)
-
-private const val CodePadId = "codePad"
 
 /** Inline code: 0.85em, padded 0.1rem by 0.35rem, 0.3rem corners. */
 private const val CodeScale = 0.85f

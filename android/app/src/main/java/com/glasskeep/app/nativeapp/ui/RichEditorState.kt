@@ -12,7 +12,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.toSize
 import com.glasskeep.app.nativeapp.data.PendingMark
 import com.glasskeep.app.nativeapp.data.RichAlign
@@ -358,7 +357,7 @@ fun rememberRichEditorState(): RichEditorState = remember { RichEditorState() }
  *  caret, the handles and the keyboard. [version] moves whenever one of
  *  them does, for what follows them (the handles). */
 internal class RichTextLayouts {
-    private val layouts = HashMap<String, TextLayoutResult>()
+    private val layouts = HashMap<String, PaddedLayout>()
     private val coordinates = HashMap<String, LayoutCoordinates>()
 
     /** The editor's own frame, which every position here is relative to. */
@@ -367,7 +366,7 @@ internal class RichTextLayouts {
     var version by mutableIntStateOf(0)
         private set
 
-    fun setLayout(id: String, layout: TextLayoutResult) {
+    fun setLayout(id: String, layout: PaddedLayout) {
         layouts[id] = layout
         version++
     }
@@ -382,10 +381,10 @@ internal class RichTextLayouts {
         coordinates.remove(id)
     }
 
-    fun layout(id: String): TextLayoutResult? = layouts[id]
+    fun layout(id: String): PaddedLayout? = layouts[id]
 
     /** Block [id]'s text layout, and its top-left corner in the editor. */
-    fun placed(id: String): Pair<TextLayoutResult, Offset>? {
+    fun placed(id: String): Pair<PaddedLayout, Offset>? {
         val layout = layouts[id] ?: return null
         val frame = coordinates[id]?.takeIf { it.isAttached } ?: return null
         val editor = root?.takeIf { it.isAttached } ?: return null

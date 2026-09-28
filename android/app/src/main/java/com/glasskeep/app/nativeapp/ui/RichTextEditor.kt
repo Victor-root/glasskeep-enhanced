@@ -10,6 +10,7 @@ import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
@@ -71,6 +72,7 @@ import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -124,6 +126,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.text.style.TextAlign
@@ -137,11 +141,13 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
+import com.glasskeep.app.ui.theme.CssLineHeightStyle
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
@@ -430,8 +436,8 @@ private fun RichEditorText(
     noteColor: String?,
     modifier: Modifier,
 ) {
-    val annotated = remember(block, style, dark) { annotatedTextFor(block, style, dark, RichSurface.EDITOR) }
-    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val padded = remember(block, style, dark) { paddedTextFor(block, style, dark, RichSurface.EDITOR) }
+    var layout by remember { mutableStateOf<PaddedLayout?>(null) }
     val uriHandler = LocalUriHandler.current
     DisposableEffect(block.id) { onDispose { state.layouts.remove(block.id) } }
     Box(modifier) {
@@ -439,12 +445,14 @@ private fun RichEditorText(
             Text(placeholder, style = style.copy(color = if (dark) Color(0xFF6B7280) else Color(0xFF9CA3AF)))
         }
         BasicText(
-            text = annotated,
+            text = padded.text,
             style = style,
             onTextLayout = {
-                layout = it
-                state.layouts.setLayout(block.id, it)
+                val laid = PaddedLayout(it, padded)
+                layout = laid
+                state.layouts.setLayout(block.id, laid)
             },
+            inlineContent = codePads(editor = true),
             modifier = Modifier
                 .fillMaxWidth()
                 .onPlaced { state.layouts.setCoordinates(block.id, it) }
@@ -464,7 +472,8 @@ private fun RichEditorText(
                         val (from, to) = range
                         if (from < to) {
                             val thickness = 1.dp.toPx()
-                            forEachLineSegment(text, from, to) { left, right, baseline ->
+                            val laid = text.padded.range(from, to)
+                            forEachLineSegment(text.laidOut, laid.start, laid.end) { left, right, baseline ->
                                 val y = baseline + maxOf(thickness, 0.075f * style.fontSize.toPx()) + thickness / 2f
                                 drawLine(style.color, Offset(left, y), Offset(right, y), thickness)
                             }
@@ -517,7 +526,7 @@ private fun RichEditorText(
  */
 private fun RichEditorState.positionAt(point: Offset): RichPos? {
     val blocks = editing?.blocks ?: return null
-    var best: Triple<RichBlock, TextLayoutResult, Offset>? = null
+    var best: Triple<RichBlock, PaddedLayout, Offset>? = null
     var bestDistance = Float.MAX_VALUE
     var lowest = Float.NEGATIVE_INFINITY
     for (block in blocks) {
@@ -553,14 +562,14 @@ private fun RichEditorState.characterAt(point: Offset): Pair<RichBlock, Int>? {
 /** The word at [pos] (getWordBoundary), or the caret there between words. */
 private fun RichEditorState.wordAt(pos: RichPos): RichSelection {
     val layout = layouts.layout(pos.blockId) ?: return RichSelection(pos, pos)
-    val word = layout.getWordBoundary(pos.offset.coerceIn(0, layout.layoutInput.text.length))
+    val word = layout.getWordBoundary(pos.offset.coerceIn(0, layout.padded.length))
     return if (word.collapsed) RichSelection(pos, pos) else RichSelection(pos.copy(offset = word.start), pos.copy(offset = word.end))
 }
 
 /** [pos]'s caret rectangle, in the editor's frame. */
 private fun RichEditorState.caretRectAt(pos: RichPos): Rect? {
     val (layout, origin) = layouts.placed(pos.blockId) ?: return null
-    return layout.getCursorRect(pos.offset.coerceIn(0, layout.layoutInput.text.length)).translate(origin)
+    return layout.getCursorRect(pos.offset.coerceIn(0, layout.padded.length)).translate(origin)
 }
 
 /** Where the caret (the selection's moving end) is, in the editor's frame. */
@@ -569,16 +578,16 @@ private fun RichEditorState.caretRect(): Rect? = editing?.selection?.head?.let {
 /** A handle's anchor for [pos]: the bottom of its line, at the caret. */
 private fun RichEditorState.handleAnchor(pos: RichPos): Offset? {
     val (layout, origin) = layouts.placed(pos.blockId) ?: return null
-    val offset = pos.offset.coerceIn(0, layout.layoutInput.text.length)
+    val offset = pos.offset.coerceIn(0, layout.padded.length)
     val line = layout.getLineForOffset(offset)
-    return Offset(layout.getHorizontalPosition(offset, usePrimaryDirection = true), layout.getLineBottom(line)) + origin
+    return Offset(layout.getHorizontalPosition(offset), layout.getLineBottom(line)) + origin
 }
 
 /** The magnifier's centre for a finger at [finger] over [pos]: on the
  *  middle of that line, the finger's x kept within the line. */
 private fun RichEditorState.magnifierCenter(finger: Offset, pos: RichPos): Offset {
     val (layout, origin) = layouts.placed(pos.blockId) ?: return Offset.Unspecified
-    val offset = pos.offset.coerceIn(0, layout.layoutInput.text.length)
+    val offset = pos.offset.coerceIn(0, layout.padded.length)
     val line = layout.getLineForOffset(offset)
     val x = (finger.x - origin.x).coerceIn(layout.getLineLeft(line), layout.getLineRight(line))
     return Offset(x, (layout.getLineTop(line) + layout.getLineBottom(line)) / 2f) + origin
@@ -1072,9 +1081,9 @@ private class RichTextActions(
         val head = editing.selection.head
         val index = editing.blocks.indexOfFirst { it.id == head.blockId }
         val (layout, origin) = state.layouts.placed(head.blockId) ?: return
-        val offset = head.offset.coerceIn(0, layout.layoutInput.text.length)
+        val offset = head.offset.coerceIn(0, layout.padded.length)
         val x = verticalGoal?.takeIf { it.first == editing.selection }?.second
-            ?: (origin.x + layout.getHorizontalPosition(offset, usePrimaryDirection = true))
+            ?: (origin.x + layout.getHorizontalPosition(offset))
         val target = lineAfter(editing.blocks, index, layout.getLineForOffset(offset), down, x) ?: return
         state.select(if (extend) RichSelection(editing.selection.anchor, target) else RichSelection(target, target))
         verticalGoal = state.editing?.selection?.let { it to x }
@@ -1100,7 +1109,7 @@ private class RichTextActions(
         return positionOnLine(block, blockLayout, blockOrigin, if (down) 0 else blockLayout.lineCount - 1, x)
     }
 
-    private fun positionOnLine(block: RichBlock, layout: TextLayoutResult, origin: Offset, line: Int, x: Float): RichPos {
+    private fun positionOnLine(block: RichBlock, layout: PaddedLayout, origin: Offset, line: Int, x: Float): RichPos {
         val y = (layout.getLineTop(line) + layout.getLineBottom(line)) / 2f
         return RichPos(block.id, layout.getOffsetForPosition(Offset(x - origin.x, y)).coerceAtMost(block.textLength))
     }
@@ -1118,7 +1127,7 @@ private class RichTextActions(
         } else {
             val block = editing.blocks.firstOrNull { it.id == head.blockId } ?: return
             val layout = state.layouts.layout(block.id) ?: return
-            val line = layout.getLineForOffset(head.offset.coerceIn(0, layout.layoutInput.text.length))
+            val line = layout.getLineForOffset(head.offset.coerceIn(0, layout.padded.length))
             val offset = when {
                 !end -> layout.getLineStart(line)
                 line == layout.lineCount - 1 -> block.textLength
@@ -1234,7 +1243,30 @@ fun RichTextReader(
         }
     }
 
-    if (compact) Body() else SelectionContainer { Body() }
+    if (compact) {
+        Body()
+    } else {
+        val clipboard = LocalClipboard.current
+        CompositionLocalProvider(LocalClipboard provides remember(clipboard) { UnpaddedClipboard(clipboard) }) {
+            SelectionContainer { Body() }
+        }
+    }
+}
+
+/** The clipboard the view's selection copies to, which leaves out the
+ *  pads [PaddedText] lays out: what it copies is the note's own text. */
+private class UnpaddedClipboard(private val clipboard: Clipboard) : Clipboard by clipboard {
+    override suspend fun setClipEntry(clipEntry: ClipEntry?) = clipboard.setClipEntry(clipEntry?.withoutPads())
+
+    private fun ClipEntry.withoutPads(): ClipEntry {
+        val data = clipData
+        if (data.itemCount == 0) return this
+        val items = List(data.itemCount) { i ->
+            val item = data.getItemAt(i)
+            item.text?.let { ClipData.Item(it.toString().replace(CodePadChar.toString(), "")) } ?: item
+        }
+        return ClipEntry(ClipData(data.description, items.first()).apply { items.drop(1).forEach(::addItem) })
+    }
 }
 
 private val RichBlock.isChecked: Boolean get() = kind == RichBlockKind.TASK_ITEM && checked
@@ -1711,8 +1743,8 @@ private fun ReaderText(
     val openLink = remember(uriHandler) {
         LinkInteractionListener { link -> (link as? LinkAnnotation.Url)?.let { uriHandler.openUri(it.url) } }
     }
-    val annotated = remember(block, style, dark, surface) { annotatedTextFor(block, style, dark, surface, openLink) }
-    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val padded = remember(block, style, dark, surface) { paddedTextFor(block, style, dark, surface, openLink) }
+    var layout by remember { mutableStateOf<PaddedLayout?>(null) }
     val codeMarks = remember(block) { block.marks.filter { it.type == RichMarkType.CODE } }
     var armed by remember(block.id) { mutableStateOf<RichMark?>(null) }
     // EditExtras.js's MOBILE_ARM_AUTO_HIDE_MS: the chip clears itself after
@@ -1726,9 +1758,10 @@ private fun ReaderText(
     val armable = surface == RichSurface.READER && codeMarks.isNotEmpty()
     Box(modifier) {
         Text(
-            annotated,
+            padded.text,
             style = style,
-            onTextLayout = { layout = it },
+            onTextLayout = { layout = PaddedLayout(it, padded) },
+            inlineContent = codePads(editor = false),
             modifier = Modifier
                 .fillMaxWidth()
                 .drawBehind { layout?.let { drawRichDecorations(it, block, style, dark, surface) } }
@@ -1761,11 +1794,12 @@ private fun ReaderText(
  * right, pushing what follows down the way the web's spacer does.
  */
 @Composable
-private fun InlineCodeCopy(mark: RichMark, text: String, layout: TextLayoutResult, noteColor: String?, dark: Boolean) {
+private fun InlineCodeCopy(mark: RichMark, text: String, layout: PaddedLayout, noteColor: String?, dark: Boolean) {
     val start = mark.start.coerceIn(0, text.length)
     val end = mark.end.coerceIn(start, text.length)
     if (end <= start) return
-    val box = layout.getBoundingBox(end - 1)
+    // The box's end: past its padding.
+    val box = layout.laidOut.getBoundingBox(layout.padded.box(start, end).end - 1)
     Layout(content = { CodeCopyButton(text = text.substring(start, end), noteColor = noteColor, dark = dark) }) { measurables, _ ->
         val chip = measurables.first().measure(Constraints())
         val gap = 4.dp.roundToPx()
@@ -1780,7 +1814,7 @@ private fun InlineCodeCopy(mark: RichMark, text: String, layout: TextLayoutResul
 }
 
 /** The character under [position], or null past the end of its line. */
-private fun TextLayoutResult.charAt(position: Offset, textLength: Int): Int? {
+private fun PaddedLayout.charAt(position: Offset, textLength: Int): Int? {
     val offset = getOffsetForPosition(position)
     return listOf(offset - 1, offset).firstOrNull { it in 0 until textLength && getBoundingBox(it).contains(position) }
 }
@@ -1945,6 +1979,8 @@ private fun richBlockTextStyle(
         textDecoration = if (decorations.isEmpty()) TextDecoration.None else TextDecoration.combine(decorations),
         fontFamily = if (code) FontFamily.Monospace else null,
         lineHeight = (if (code && surface == RichSurface.CARD) 18f else lineBox * lineHeightFactor).sp,
+        // A style of its own replaces the theme's rather than adding to it.
+        lineHeightStyle = CssLineHeightStyle,
         textAlign = when (block.align) {
             RichAlign.LEFT -> TextAlign.Start
             RichAlign.CENTER -> TextAlign.Center
@@ -2058,6 +2094,32 @@ private fun annotatedTextFor(
     }
 }
 
+/** [annotatedTextFor] as it is laid out, each inline code run's padding
+ *  taking room in its line ([PaddedText]). */
+private fun paddedTextFor(
+    block: RichBlock,
+    style: TextStyle,
+    dark: Boolean,
+    surface: RichSurface,
+    openLink: LinkInteractionListener? = null,
+): PaddedText = PaddedText.of(
+    annotatedTextFor(block, style, dark, surface, openLink),
+    block.marks.filter { it.type == RichMarkType.CODE }.map { it.start until it.end },
+)
+
+/** Inline code's padding and 1px border on either side, in dp: `.35rem`
+ *  in the view, `.32em` of the code's 0.9em in the editor. */
+private fun codePadX(editor: Boolean): Float = (if (editor) 4.608f else 5.6f) + 1f
+
+/** The room [PaddedText] makes for inline code's padding. */
+@Composable
+private fun codePads(editor: Boolean): Map<String, InlineTextContent> {
+    val width = with(LocalDensity.current) { codePadX(editor).dp.toSp() }
+    return remember(width) {
+        mapOf(CodePadId to InlineTextContent(Placeholder(width, 0.1.em, PlaceholderVerticalAlign.AboveBaseline)) {})
+    }
+}
+
 /** Chrome's own `mark` style, which a highlight with no colour of its own
  *  (typed as `==text==`) gets: yellow, under black text. */
 private val PlainMarkBackground = Color(0xFFFFFF00)
@@ -2083,7 +2145,7 @@ private fun bolderThan(weight: FontWeight?): FontWeight = when (weight?.weight ?
  * Boxes follow CSS inline boxes: the font's ascent and descent around the
  * baseline, not the whole line.
  */
-private fun DrawScope.drawRichDecorations(layout: TextLayoutResult, block: RichBlock, style: TextStyle, dark: Boolean, surface: RichSurface) {
+private fun DrawScope.drawRichDecorations(layout: PaddedLayout, block: RichBlock, style: TextStyle, dark: Boolean, surface: RichSurface) {
     val text = block.text
     if (text.isEmpty()) return
     val editor = surface == RichSurface.EDITOR
@@ -2095,11 +2157,13 @@ private fun DrawScope.drawRichDecorations(layout: TextLayoutResult, block: RichB
             RichMarkType.CODE -> {
                 val em = style.fontSize.toPx() * 0.9f
                 val padY = (if (editor) 1.152f else 1.92f).dp.toPx() + 1.dp.toPx()
+                // Its padding's own room in the line, on either side.
+                val box = layout.padded.box(start, end)
                 drawInlineBox(
-                    layout, start, end,
+                    layout.laidOut, box.start, box.end,
                     above = 0.93f * em + padY,
                     below = 0.24f * em + padY,
-                    padX = (if (editor) 4.608f else 5.6f).dp.toPx() + 1.dp.toPx(),
+                    padX = 0f,
                     radius = (if (editor) 3f else 5.6f).dp.toPx(),
                     fill = if (editor && dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f),
                     border = if (dark) DarkBorderColor else LightBorderColor,
@@ -2108,8 +2172,9 @@ private fun DrawScope.drawRichDecorations(layout: TextLayoutResult, block: RichB
             RichMarkType.HIGHLIGHT -> {
                 val color = if (mark.value == null) PlainMarkBackground else richColorOf(mark.value, dark) ?: continue
                 val em = markFontSize(block, style, start).toPx()
+                val laid = layout.padded.range(start, end)
                 drawInlineBox(
-                    layout, start, end,
+                    layout.laidOut, laid.start, laid.end,
                     above = 0.93f * em,
                     below = 0.24f * em,
                     padX = if (editor) 2.dp.toPx() else 0f,
@@ -2123,7 +2188,8 @@ private fun DrawScope.drawRichDecorations(layout: TextLayoutResult, block: RichB
                 val color = richColorOf(mark.color, dark) ?: markTextColor(block, style, start, dark)
                 val em = markFontSize(block, style, start).toPx()
                 val thickness = 1.dp.toPx()
-                forEachLineSegment(layout, start, end) { left, right, baseline ->
+                val laid = layout.padded.range(start, end)
+                forEachLineSegment(layout.laidOut, laid.start, laid.end) { left, right, baseline ->
                     val y = baseline + maxOf(thickness, 0.075f * em) + thickness / 2f
                     when (mark.value) {
                         "double" -> {
