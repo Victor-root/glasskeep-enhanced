@@ -5,13 +5,15 @@ import java.text.BreakIterator
 /**
  * The editor while it is edited: the document, the selection, the
  * keyboard's composing range (the word it is still working on, in document
- * order) and the marks armed for what is typed next.
+ * order), the marks armed for what is typed next, and the input rule
+ * Backspace can still undo.
  */
 data class RichEditing(
     val blocks: List<RichBlock>,
     val selection: RichSelection,
     val composition: RichSelection? = null,
     val pendingMarks: List<PendingMark> = emptyList(),
+    val ruleUndo: RichRuleUndo? = null,
 ) {
     /** The document as the keyboard sees it. */
     val flat: RichFlat by lazy { RichFlat(blocks) }
@@ -19,6 +21,12 @@ data class RichEditing(
     /** The selection in document order. */
     val span: RichSpan? get() = selection.resolve(blocks)
 }
+
+/** Tiptap's undoInputRule state: the input rule that left [blocks], the
+ *  selection at [selection], turned [typed] (the document as typed) into
+ *  them. It holds while the document and the selection stay as it left
+ *  them. */
+data class RichRuleUndo(val blocks: List<RichBlock>, val selection: RichSelection, val typed: RichEditing)
 
 /**
  * What typing does to the document: the edits a keyboard asks for
@@ -112,15 +120,18 @@ object RichTyping {
             val code = block.copy(text = block.text.dropLast(2))
             return RichEditing(blocks.replaceAt(span.start, listOf(code, paragraph)), RichSelection.caret(paragraph.id, 0))
         }
-        RichInputRules.enter(blocks, block.id, at)?.let { return applied(state, it) }
+        RichInputRules.enter(blocks, block.id, at)?.let { return undoable(applied(state, it), typeInBlock(state, span, "\n", 1, composing = false)) }
         val split = applied(state, RichEdits.split(RichInputRules.linkBeforeBreak(blocks, block.id, at), block.id, at))
         return keepMarks(state, block, at, split)
     }
 
-    /** Backspace: a selection goes, at a line's start the line joins the
-     *  one above ([RichEdits.joinBackward]), elsewhere the character
-     *  before the caret goes, a whole emoji or accented letter at once. */
+    /** Backspace: right after an input rule, the text as typed comes back
+     *  ([undoRule]); otherwise a selection goes, at a line's start the line
+     *  joins the one above ([RichEdits.joinBackward]), elsewhere the
+     *  character before the caret goes, a whole emoji or accented letter at
+     *  once. */
     fun backspace(state: RichEditing): RichEditing {
+        undoRule(state)?.let { return it }
         val current = state.copy(composition = null)
         val span = current.span ?: return state
         if (!span.collapsed) return applied(current, RichEdits.deleteSelection(current.blocks, span))
@@ -148,14 +159,15 @@ object RichTyping {
     /**
      * deleteSurroundingText: [before] characters before the selection and
      * [after] after it go, the selection itself staying. Exactly the line
-     * break before or after a line joins the two lines; more than one line
-     * is deleted as a selection would be.
+     * break before or after a line joins the two lines, the one before as
+     * Backspace does (an input rule just applied is undone instead); more
+     * than one line is deleted as a selection would be.
      */
     fun deleteSurrounding(state: RichEditing, before: Int, after: Int): RichEditing {
         val (start, end) = flatRange(state, state.selection) ?: return state
         var next = state
         if (after > 0) next = deleteFlat(next, end, minOf(next.flat.text.length, end + after))
-        if (before > 0) next = deleteFlat(next, maxOf(0, start - before), start)
+        if (before > 0) next = deleteFlat(next, maxOf(0, start - before), start, beforeCaret = true)
         return next
     }
 
@@ -167,8 +179,29 @@ object RichTyping {
         val block = state.blocks[span.start]
         val result = RichInputRules.typed(state.blocks, block.id, block.text, block.marks, span.startOffset, inserted) ?: return null
         val disarmed = result.disarm?.let { type -> state.pendingMarks.filterNot { it.type == type } + PendingMark(type, remove = true) }
-        return applied(state, result.edit).copy(pendingMarks = disarmed.orEmpty())
+        return undoable(applied(state, result.edit).copy(pendingMarks = disarmed.orEmpty()), state)
     }
+
+    /**
+     * undoInputRule, which Backspace tries first: right after an input
+     * rule, the document and the selection as it left them, the text comes
+     * back as typed ([RichRuleUndo]). The code block's own Backspace runs
+     * before it on the web: an empty code block, or one opening the note,
+     * is cleared instead.
+     */
+    fun undoRule(state: RichEditing): RichEditing? {
+        val undo = state.ruleUndo ?: return null
+        if (state.blocks !== undo.blocks || state.selection != undo.selection) return null
+        val span = state.span?.takeIf { it.collapsed } ?: return null
+        val block = state.blocks[span.start]
+        val clearsCode = block.kind == RichBlockKind.CODE_BLOCK &&
+            (block.text.isEmpty() || span.start == 0 && span.startOffset == 0 && block.quotes.isEmpty())
+        return if (clearsCode) null else undo.typed
+    }
+
+    /** [ruled], what an input rule made of [typed], with the rule undoable. */
+    private fun undoable(ruled: RichEditing, typed: RichEditing) =
+        ruled.copy(ruleUndo = RichRuleUndo(ruled.blocks, ruled.selection, typed.copy(ruleUndo = null)))
 
     /** The selection's (or composition's) ends in the keyboard's text. */
     fun flatRange(state: RichEditing, selection: RichSelection): Pair<Int, Int>? {
@@ -241,12 +274,16 @@ object RichTyping {
         return replaced.copy(marks = marks)
     }
 
-    /** `[from, to)` of the keyboard's text deleted. */
-    private fun deleteFlat(state: RichEditing, from: Int, to: Int): RichEditing {
+    /** `[from, to)` of the keyboard's text deleted; [beforeCaret] when it
+     *  is what Backspace would take. */
+    private fun deleteFlat(state: RichEditing, from: Int, to: Int, beforeCaret: Boolean = false): RichEditing {
         if (from >= to) return state
         val span = state.flat.spanOf(from, to)
         if (span.start == span.end) return deleteInBlock(state, span.start, span.startOffset, span.endOffset)
-        if (to - from == 1) return applied(state, RichEdits.joinBackward(state.blocks, state.blocks[span.end].id))
+        if (to - from == 1) {
+            val undone = if (beforeCaret) undoRule(state) else null
+            return undone ?: applied(state, RichEdits.joinBackward(state.blocks, state.blocks[span.end].id))
+        }
         return applied(state, RichEdits.deleteSelection(state.blocks, span))
     }
 
@@ -436,7 +473,11 @@ class RichImeSession(
             val marks = RichDoc.pruneMarks(block.marks)
             if (marks === block.marks) block else block.copy(marks = marks)
         }
-        if (pruned != state.blocks) state = state.copy(blocks = pruned)
+        if (pruned != state.blocks) {
+            // Tidying the marks is part of the same edit: a rule's undo holds.
+            val undo = state.ruleUndo?.takeIf { it.blocks === state.blocks }?.copy(blocks = pruned)
+            state = state.copy(blocks = pruned, ruleUndo = undo)
+        }
         write(state)
         val inSync = !diverged
         typed = null

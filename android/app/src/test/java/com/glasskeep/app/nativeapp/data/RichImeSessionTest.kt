@@ -192,6 +192,71 @@ class RichImeSessionTest {
         assertEquals(2, h.state.blocks.size)
     }
 
+    /** Typed on the web editor above a line, then Backspace: the rule is
+     *  undone and the text comes back as typed, but an empty code block is
+     *  cleared first. */
+    @Test
+    fun backspaceRightAfterAnInputRuleUndoesItAsTheWebDoes() {
+        val cases = listOf(
+            "- " to ("- " to 2),
+            "1. " to ("1. " to 3),
+            "3. " to ("3. " to 3),
+            "[x] " to ("[x] " to 4),
+            "> " to ("> " to 2),
+            "# " to ("# " to 2),
+            "### " to ("### " to 4),
+            "```js " to ("" to 0),
+            "---" to ("---" to 3),
+            "**bold**" to ("**bold**" to 8),
+            "- \u0008\u0008" to ("-" to 1),
+            "-\n" to ("-\n" to 2),
+        )
+        for ((keys, expected) in cases) {
+            val blocks = listOf(p(""), p("after"))
+            val h = Harness(blocks, at(blocks, 0, 0))
+            for (c in keys) {
+                when (c) {
+                    '\n' -> h.session.enter()
+                    '\u0008' -> h.session.backspace()
+                    else -> h.session.commitText(c.toString(), 1)
+                }
+            }
+            if ('\u0008' !in keys) h.session.backspace()
+            val (text, caret) = expected
+            assertEquals(keys, listOf(RichBlockKind.PARAGRAPH to text, RichBlockKind.PARAGRAPH to "after"), h.state.blocks.map { it.kind to it.text })
+            assertEquals(keys, emptyList<RichMark>(), h.state.blocks[0].marks)
+            assertEquals(keys, RichSelection.caret(h.state.blocks[0].id, caret), h.state.selection)
+        }
+    }
+
+    @Test
+    fun theUndoLapsesOnceSomethingElseIsTyped() {
+        val blocks = listOf(p(""), p("after"))
+        val h = Harness(blocks, at(blocks, 0, 0))
+        for (c in "- x") h.session.commitText(c.toString(), 1)
+        h.session.backspace()
+        assertEquals(listOf(RichBlockKind.BULLET_ITEM to "", RichBlockKind.PARAGRAPH to "after"), h.state.blocks.map { it.kind to it.text })
+    }
+
+    /** The keyboard deleting the line break before the caret is Backspace
+     *  at a line's start; deleting a character inside a line is not. */
+    @Test
+    fun theKeyboardsLineJoinUndoesTooButNotADeletionInALine() {
+        val list = listOf(p("before"), p(""), p("after"))
+        val h = Harness(list, at(list, 1, 0))
+        for (c in "- ") h.session.commitText(c.toString(), 1)
+        h.session.deleteSurroundingText(1, 0)
+        assertEquals(listOf("before", "- ", "after"), h.state.blocks.map { it.text })
+        assertEquals(RichBlockKind.PARAGRAPH, h.state.blocks[1].kind)
+
+        val bold = listOf(p(""), p("after"))
+        val g = Harness(bold, at(bold, 0, 0))
+        for (c in "**bold**") g.session.commitText(c.toString(), 1)
+        g.session.deleteSurroundingText(1, 0)
+        assertEquals("bol", g.state.blocks[0].text)
+        assertEquals(listOf(RichMark(0, 3, RichMarkType.BOLD)), g.state.blocks[0].marks)
+    }
+
     @Test
     fun armedBoldStylesTheComposedWord() {
         val blocks = listOf(p("a "))
