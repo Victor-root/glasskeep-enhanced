@@ -4933,6 +4933,28 @@ export default function App() {
     collaboratorInputRef,
   });
 
+  // Side-by-side: open two selected notes simultaneously. The PRIMARY (left)
+  // pane is the existing App-hosted modal driven by useModalState/openModal:
+  // it keeps every feature wired through App. The SECONDARY (right) pane is
+  // a self-contained SecondaryNoteInstance that owns its own modal state,
+  // autosave, AI chat, and collaboration handlers. Both panes are real,
+  // independently editable note modals; closing one animates it out and the
+  // survivor recenters.
+  const [sbsSecondaryId, setSbsSecondaryId] = useState(null);
+  const [sbsClosingSide, setSbsClosingSide] = useState(null); // "left" | "right" | null
+  const [sbsBothClosing, setSbsBothClosing] = useState(false);
+  // Cuts CSS transitions on the primary modal during the final left-close
+  // handoff frame. Without it, the primary keeps its closing transform
+  // (translateX(-50%-36px) opacity:0) and would visibly transition back to
+  // centre when the SBS rules drop, a left→right kick. Only transition is
+  // suppressed; animation: noteModalIn must remain so it doesn't restart
+  // when the class is removed.
+  const [sbsHandoffNoTransition, setSbsHandoffNoTransition] = useState(false);
+  // After right-pane close cleanup, mobile survivor's animation rule drops and
+  // the base .note-modal-anim { animation: noteModalIn } would re-fire on the
+  // primary, producing a tiny close/reopen flash. Suppress for two frames.
+  const [sbsSuppressOpenReplay, setSbsSuppressOpenReplay] = useState(false);
+
   // Android back button: push a history entry each time an overlay opens,
   // pop entries when overlays close. Uses history.go(-n) for batch cleanup
   // instead of looping history.back() which can navigate out of the SPA.
@@ -4945,7 +4967,7 @@ export default function App() {
     modalKebabOpen, reminderPopOpen, modalTagFocused, notifCenterOpen, syncDropdownOpen, mobileSearchOpen,
     showColorPop, showComposerFmt, headerMenuOpen, multiMode,
     typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
-    noteAiOpen, changelogOpen, qrScannerOpen,
+    noteAiOpen, changelogOpen, qrScannerOpen, sbsSecondaryId,
   ].filter(Boolean).length;
   const prevOverlayCountRef = useRef(0);
 
@@ -5490,27 +5512,6 @@ export default function App() {
     return () => { delete window.__glasskeepOpenNote; };
   }, [notes]);
 
-  // Side-by-side: open two selected notes simultaneously. The PRIMARY (left)
-  // pane is the existing App-hosted modal driven by useModalState/openModal —
-  // it keeps every feature wired through App. The SECONDARY (right) pane is
-  // a self-contained SecondaryNoteInstance that owns its own modal state,
-  // autosave, AI chat, and collaboration handlers. Both panes are real,
-  // independently editable note modals; closing one animates it out and the
-  // survivor recenters.
-  const [sbsSecondaryId, setSbsSecondaryId] = useState(null);
-  const [sbsClosingSide, setSbsClosingSide] = useState(null); // "left" | "right" | null
-  const [sbsBothClosing, setSbsBothClosing] = useState(false);
-  // Cuts CSS transitions on the primary modal during the final left-close
-  // handoff frame. Without it, the primary keeps its closing transform
-  // (translateX(-50%-36px) opacity:0) and would visibly transition back to
-  // centre when the SBS rules drop — a left→right kick. Only transition is
-  // suppressed; animation: noteModalIn must remain so it doesn't restart
-  // when the class is removed.
-  const [sbsHandoffNoTransition, setSbsHandoffNoTransition] = useState(false);
-  // After right-pane close cleanup, mobile survivor's animation rule drops and
-  // the base .note-modal-anim { animation: noteModalIn } would re-fire on the
-  // primary, producing a tiny close/reopen flash. Suppress for two frames.
-  const [sbsSuppressOpenReplay, setSbsSuppressOpenReplay] = useState(false);
   // SBS AI coordination — when one note opens its AI panel in SBS mode,
   // the AI panel takes over the OPPOSITE pane's slot and the opposite
   // note is hidden (kept mounted). Cleared on close/hide and on SBS exit.
@@ -6221,7 +6222,6 @@ export default function App() {
     // Sequential close: if the AI panel is open, it animates out first.
     startModalExitAnimation();
   };
-  closeModalRef.current = closeModal;
 
   const saveModal = async () => {
     if (activeId == null) return;
@@ -7179,7 +7179,9 @@ export default function App() {
   // In SBS mode the left pane's X / scrim click no longer tears down the
   // primary modal — it just animates the left half out and hands B to
   // the centre slot. Outside SBS, fall back to the regular closeModal.
+  // Back and Escape close it the same way.
   const primaryCloseModal = sbsActive ? requestCloseLeftPaneSBS : closeModal;
+  closeModalRef.current = primaryCloseModal;
 
   const modal = (
     <NoteModal
