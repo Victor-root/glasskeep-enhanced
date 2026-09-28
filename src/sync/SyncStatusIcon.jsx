@@ -4,6 +4,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { t } from "../i18n";
+import { useSwallowClosingClick } from "../hooks/useSwallowClosingClick.js";
 
 // ─── SVG Icons ───
 
@@ -176,8 +177,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
   // backdrop to the header rect, leaving the rest of the screen open.
   // So we use a document-level pointerdown listener instead, then swallow
   // the follow-up click to stop it reaching note cards behind the panel.
-  const swallowNextClickRef = useRef(false);
-  const swallowClearTimerRef = useRef(null);
+  const swallowClickOf = useSwallowClosingClick();
 
   // Force re-render every 10s so "time ago" stays fresh
   const [, setTick] = useState(0);
@@ -186,28 +186,6 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
     const id = setInterval(() => setTick((v) => v + 1), 10000);
     return () => clearInterval(id);
   }, [open]);
-
-  // Permanent click swallower — mounted once, never torn down.
-  useEffect(() => {
-    const onClick = (e) => {
-      if (!swallowNextClickRef.current) return;
-      swallowNextClickRef.current = false;
-      if (swallowClearTimerRef.current) {
-        clearTimeout(swallowClearTimerRef.current);
-        swallowClearTimerRef.current = null;
-      }
-      e.stopPropagation();
-      e.preventDefault();
-    };
-    document.addEventListener("click", onClick, true);
-    return () => {
-      document.removeEventListener("click", onClick, true);
-      if (swallowClearTimerRef.current) {
-        clearTimeout(swallowClearTimerRef.current);
-        swallowClearTimerRef.current = null;
-      }
-    };
-  }, []);
 
   // Close on outside tap/click — pointerdown + flag prevents the follow-up
   // click from reaching elements behind the panel on mobile.
@@ -225,17 +203,12 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
       if (btnRef.current && btnRef.current.contains(e.target)) return;
       e.preventDefault();
       e.stopPropagation();
-      swallowNextClickRef.current = true;
-      if (swallowClearTimerRef.current) clearTimeout(swallowClearTimerRef.current);
-      swallowClearTimerRef.current = setTimeout(() => {
-        swallowNextClickRef.current = false;
-        swallowClearTimerRef.current = null;
-      }, 500);
+      swallowClickOf(e);
       setOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
-  }, [open, setOpen]);
+  }, [open, setOpen, swallowClickOf]);
 
   // Slide the phone sheet in: flip .is-open one frame after mount so the
   // transform transition has a from-state (translateY(-100%)) to animate from.

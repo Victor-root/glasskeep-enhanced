@@ -4,6 +4,7 @@ import { t } from "../../i18n";
 import { Hamburger, SearchIcon, CloseIcon, GridIcon, ListIcon, SunIcon, MoonIcon, CheckSquareIcon, SettingsIcon, ShieldIcon, LogOutIcon, LockIcon, Kebab } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import SyncStatusIcon from "../../sync/SyncStatusIcon.jsx";
+import { useSwallowClosingClick } from "../../hooks/useSwallowClosingClick.js";
 import UserAvatar from "../common/UserAvatar.jsx";
 import { useBranding, DEFAULT_APP_NAME } from "../../branding/BrandingContext.jsx";
 
@@ -126,22 +127,9 @@ export default function NotesHeader({
   // `click` as a sequence. If we close the menu on `pointerdown` and
   // then drop our listeners (via useEffect cleanup), the subsequent
   // `click` fires with NO listener attached and the underlying note
-  // card opens. To avoid that race we:
-  //   1. Keep a PERMANENT click-capture listener that just consumes
-  //      any click marked by the ref flag below. It's attached on
-  //      mount and never torn down, so it's always there when the
-  //      click arrives — even after the menu has been state-closed.
-  //   2. On `pointerdown` while the menu is open, flip the flag,
-  //      stopPropagation + preventDefault, then close the menu.
-  //   3. The permanent click listener catches the click, swallows
-  //      it (stopPropagation + preventDefault), and clears the flag.
-  //
-  // A 500 ms safety timer clears the flag too — covers the rare case
-  // where pointerdown fires but the browser never produces a click
-  // (long-press, drag-cancel, etc.) so the flag doesn't leak into
-  // the next legitimate click.
-  const swallowNextClickRef = React.useRef(false);
-  const swallowClearTimerRef = React.useRef(null);
+  // card opens. So the closing `pointerdown` also hands its gesture to
+  // useSwallowClosingClick, whose listeners outlive the menu.
+  const swallowClickOf = useSwallowClosingClick();
 
   // Publish the header's exact rendered height as --gk-header-h. TagSidebar
   // sizes its own header row to this same value, so its body nav's
@@ -170,27 +158,6 @@ export default function NotesHeader({
   }, []);
 
   React.useEffect(() => {
-    const onClick = (e) => {
-      if (!swallowNextClickRef.current) return;
-      swallowNextClickRef.current = false;
-      if (swallowClearTimerRef.current) {
-        clearTimeout(swallowClearTimerRef.current);
-        swallowClearTimerRef.current = null;
-      }
-      e.stopPropagation();
-      e.preventDefault();
-    };
-    document.addEventListener("click", onClick, true);
-    return () => {
-      document.removeEventListener("click", onClick, true);
-      if (swallowClearTimerRef.current) {
-        clearTimeout(swallowClearTimerRef.current);
-        swallowClearTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  React.useEffect(() => {
     if (!headerMenuOpen) return undefined;
     const onPointerDown = (e) => {
       const target = e.target;
@@ -198,19 +165,12 @@ export default function NotesHeader({
       if (headerBtnRef?.current?.contains(target)) return;
       e.preventDefault();
       e.stopPropagation();
-      swallowNextClickRef.current = true;
-      if (swallowClearTimerRef.current) {
-        clearTimeout(swallowClearTimerRef.current);
-      }
-      swallowClearTimerRef.current = setTimeout(() => {
-        swallowNextClickRef.current = false;
-        swallowClearTimerRef.current = null;
-      }, 500);
+      swallowClickOf(e);
       setHeaderMenuOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
-  }, [headerMenuOpen, setHeaderMenuOpen, headerMenuRef, headerBtnRef]);
+  }, [headerMenuOpen, setHeaderMenuOpen, headerMenuRef, headerBtnRef, swallowClickOf]);
 
   // In landscape mobile, force mobile layout regardless of sm: breakpoint
   const mobileOnly = isLandscapeMobile ? "" : "sm:hidden";

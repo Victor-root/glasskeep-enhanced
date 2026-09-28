@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 import { useBranding } from "../../branding/BrandingContext.jsx";
 import { useNotifications } from "./NotificationProvider.jsx";
 import NotificationCard from "./NotificationCard.jsx";
+import { useSwallowClosingClick } from "../../hooks/useSwallowClosingClick.js";
 import { t } from "../../i18n";
 
 const SHEET_BREAKPOINT_PX = 640;
@@ -42,15 +43,12 @@ export default function NotificationCenter({
   const { branding } = useBranding();
   const handleClearAll = onClearAll || clear;
   const panelRef = useRef(null);
-  // Used by the pointerdown handler below — same pattern as NotesHeader's
+  // Used by the pointerdown handler below, same pattern as NotesHeader's
   // header kebab menu. A single tap fires pointerdown → pointerup → click.
   // Closing on pointerdown would remove the listener before the click fires,
-  // letting the click fall through to whatever is behind the panel. Instead
-  // we preventDefault + stopPropagation on pointerdown, set the flag, and
-  // keep a permanent click listener that swallows the follow-up event even
-  // after the panel state has already changed to closed.
-  const swallowNextClickRef = useRef(false);
-  const swallowClearTimerRef = useRef(null);
+  // letting the click fall through to whatever is behind the panel, so the
+  // closing pointerdown hands its gesture to useSwallowClosingClick.
+  const swallowClickOf = useSwallowClosingClick();
 
   // Deferred unmount so the mobile slide-down close animation has time
   // to play out before the DOM goes away. Two flags so the open class
@@ -121,28 +119,6 @@ export default function NotificationCenter({
     return undefined;
   }, [open]);
 
-  // Permanent click swallower — mounted once, never torn down.
-  useEffect(() => {
-    const onClick = (e) => {
-      if (!swallowNextClickRef.current) return;
-      swallowNextClickRef.current = false;
-      if (swallowClearTimerRef.current) {
-        clearTimeout(swallowClearTimerRef.current);
-        swallowClearTimerRef.current = null;
-      }
-      e.stopPropagation();
-      e.preventDefault();
-    };
-    document.addEventListener("click", onClick, true);
-    return () => {
-      document.removeEventListener("click", onClick, true);
-      if (swallowClearTimerRef.current) {
-        clearTimeout(swallowClearTimerRef.current);
-        swallowClearTimerRef.current = null;
-      }
-    };
-  }, []);
-
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => {
@@ -157,12 +133,7 @@ export default function NotificationCenter({
       if (anchor && anchor.contains(e.target)) return;
       e.preventDefault();
       e.stopPropagation();
-      swallowNextClickRef.current = true;
-      if (swallowClearTimerRef.current) clearTimeout(swallowClearTimerRef.current);
-      swallowClearTimerRef.current = setTimeout(() => {
-        swallowNextClickRef.current = false;
-        swallowClearTimerRef.current = null;
-      }, 500);
+      swallowClickOf(e);
       onClose && onClose();
     };
     document.addEventListener("keydown", onKey);
@@ -171,7 +142,7 @@ export default function NotificationCenter({
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onPointerDown, true);
     };
-  }, [open, onClose, anchor]);
+  }, [open, onClose, anchor, swallowClickOf]);
 
   // No body-scroll lock on purpose: setting overflow:hidden on html/body
   // shifted the page (and could leave it stuck). The sheet just overlays the
