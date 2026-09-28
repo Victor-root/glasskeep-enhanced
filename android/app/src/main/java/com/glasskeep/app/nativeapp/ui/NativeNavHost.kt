@@ -163,6 +163,8 @@ fun NativeNavHost(
     val adminEvents = remember { MutableSharedFlow<String>(extraBufferCapacity = 16) }
     // The same federation frames whole, for the pairing notices.
     val federationEvents = remember { MutableSharedFlow<FederationEvent>(extraBufferCapacity = 16) }
+    // The notes the server says changed, for the open one's roster.
+    val noteUpdates = remember { MutableSharedFlow<String>(extraBufferCapacity = 16) }
     val realtimeClient = remember(serverUrl) {
         RealtimeClient(
             serverUrl = serverUrl,
@@ -186,6 +188,7 @@ fun NativeNavHost(
                 adminEvents.tryEmit(event.type)
                 federationEvents.tryEmit(event)
             },
+            onNoteUpdated = { noteUpdates.tryEmit(it) },
         )
     }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -546,6 +549,7 @@ fun NativeNavHost(
         LocalGkAlerts provides alerts,
         LocalGkTooltips provides tooltips,
         LocalGkPopovers provides popovers,
+        LocalNoteUpdates provides noteUpdates,
         LocalSignedOutReload provides signedOutReload,
         LocalUriHandler provides remember(context) { CustomTabUriHandler(context) },
     ) {

@@ -37,7 +37,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -97,15 +96,22 @@ private data class ShareCandidate(
     val username: String,
 )
 
-/** useCollaboration.js's participantsMutationRef / pendingMutationsRef: a
- *  roster change bumps [seq] when it starts and again when it ends, and
- *  counts in [pending] while it travels, so a reload that overlapped one
- *  can tell its answer may predate it. Main thread only. */
-private class RosterMutations {
-    var seq = 0
-        private set
-    var pending = 0
-        private set
+/**
+ * The open note's roster, useCollaboration.js's addModalCollaborators:
+ * everyone on the note, owner first, read as the note and the
+ * collaboration modal open, after each change made there and whenever the
+ * server announces one. A change counts once when it starts and again when
+ * it ends, and as pending while it travels (participantsMutationRef,
+ * pendingMutationsRef), so a reload that overlapped one can tell its
+ * answer may predate it. Main thread only.
+ */
+internal class NoteRoster(
+    private val fetch: suspend () -> List<CollaboratorDto>,
+    /** Shows a roster, the server's or one changed ahead of it. */
+    val show: (List<CollaboratorDto>) -> Unit,
+) {
+    private var seq = 0
+    private var pending = 0
 
     fun begin() {
         seq++
@@ -115,6 +121,22 @@ private class RosterMutations {
     fun end() {
         pending--
         seq++
+    }
+
+    /** loadCollaboratorsForAddModal. [force] is for the reload a change
+     *  asks for once the server confirmed it; any other drops its answer
+     *  when a change started, ended or was still travelling meanwhile,
+     *  since it could put the previous roster back. */
+    suspend fun reload(force: Boolean = false) {
+        val started = seq
+        val fresh = try {
+            fetch()
+        } catch (t: Throwable) {
+            NativeDebug.e("NoteRoster reload failed", t)
+            return
+        }
+        if (!force && (seq != started || pending > 0)) return
+        show(fresh)
     }
 }
 
@@ -126,22 +148,22 @@ private class RosterMutations {
  * candidates) and a fixed footer (the access to grant, then Cancel and
  * Add). A non-owner sees only the roster and a Close button.
  *
- * The roster belongs to the note ([collaborators], the web's
- * addModalCollaborators): this reloads it on open and after each change,
- * and flips an access at once, before the server answers. The picker
+ * The roster belongs to the note ([collaborators], kept by [roster]): this
+ * reloads it on open and after each change, and flips an access at once,
+ * before the server answers. The picker
  * merges local accounts with real users advertised by paired federation
  * peers; the opaque ref@host value is only sent to the API and never
  * shown in place of the friendly name/server badge.
  */
 @Composable
-fun CollaboratorsScreen(
+internal fun CollaboratorsScreen(
     container: NativeAppContainer,
     serverUrl: String,
     noteId: String,
     isOwner: Boolean,
     currentUserId: Int?,
     collaborators: List<CollaboratorDto>,
-    onCollaboratorsChange: (List<CollaboratorDto>) -> Unit,
+    roster: NoteRoster,
     onClose: () -> Unit,
 ) {
     val dark = LocalGkDark.current
@@ -150,7 +172,6 @@ fun CollaboratorsScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val toasts = LocalGkToasts.current
-    val applyCollaborators by rememberUpdatedState(onCollaboratorsChange)
 
     var pendingRemoval by remember { mutableStateOf<CollaboratorDto?>(null) }
     var candidates by remember { mutableStateOf<List<ShareCandidate>>(emptyList()) }
@@ -160,7 +181,6 @@ fun CollaboratorsScreen(
     var selected by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var newAccess by remember { mutableStateOf("write") }
     var adding by remember { mutableStateOf(false) }
-    val mutations = remember { RosterMutations() }
 
     val textColor = if (dark) DarkTitleColor else LightTitleColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
@@ -168,28 +188,12 @@ fun CollaboratorsScreen(
     val mutedColor = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282)
     val accent = WorkspaceTheme.accent(themeId, dark)
 
-    /** loadCollaboratorsForAddModal. [force] is for the reload a change
-     *  asks for once the server confirmed it; any other drops its answer
-     *  when a change started, ended or was still travelling meanwhile,
-     *  since it could put the previous roster back. */
-    suspend fun reload(force: Boolean = false) {
-        val seq = mutations.seq
-        val fresh = try {
-            repository.fetchNoteCollaborators(noteId)
-        } catch (t: Throwable) {
-            NativeDebug.e("CollaboratorsScreen reload failed", t)
-            return
-        }
-        if (!force && (mutations.seq != seq || mutations.pending > 0)) return
-        applyCollaborators(fresh)
-    }
-
     /** The row flips at once; a refusal says why and puts the server's
      *  own answer back. */
     fun changeAccess(collaborator: CollaboratorDto, access: String) {
-        mutations.begin()
+        roster.begin()
         val canWrite = if (access == "write") 1 else 0
-        onCollaboratorsChange(collaborators.map { if (it.id == collaborator.id) it.copy(canWrite = canWrite) else it })
+        roster.show(collaborators.map { if (it.id == collaborator.id) it.copy(canWrite = canWrite) else it })
         scope.launch {
             try {
                 val refusal = try {
@@ -204,10 +208,10 @@ fun CollaboratorsScreen(
                 }
                 if (refusal != null) {
                     toasts.error(refusal)
-                    reload(force = true)
+                    roster.reload(force = true)
                 }
             } finally {
-                mutations.end()
+                roster.end()
             }
         }
     }
@@ -215,11 +219,11 @@ fun CollaboratorsScreen(
     /** No toast on success: the server's own notification reaches both
      *  sides, as on the web. */
     fun removeCollaborator(collaborator: CollaboratorDto, keepCopy: Boolean) {
-        mutations.begin()
+        roster.begin()
         scope.launch {
             try {
                 when (val result = repository.removeCollaborator(noteId, collaborator.id, keepCopy)) {
-                    is RemoveCollaboratorResult.Removed -> reload(force = true)
+                    is RemoveCollaboratorResult.Removed -> roster.reload(force = true)
                     is RemoveCollaboratorResult.Rejected ->
                         toasts.error(context.localizedServerError(result.error, R.string.native_collaborators_remove_failed))
                 }
@@ -227,7 +231,7 @@ fun CollaboratorsScreen(
                 NativeDebug.e("CollaboratorsScreen removeCollaborator failed", t)
                 toasts.error(context.getString(R.string.native_collaborators_remove_failed))
             } finally {
-                mutations.end()
+                roster.end()
             }
         }
     }
@@ -277,7 +281,7 @@ fun CollaboratorsScreen(
         if (selectedUsers.isEmpty() || adding) return
         adding = true
         val items = selectedUsers.map { it to (selected[it.key] ?: newAccess) }
-        mutations.begin()
+        roster.begin()
         scope.launch {
             try {
                 var added = 0
@@ -306,10 +310,10 @@ fun CollaboratorsScreen(
                         },
                         icon = "share",
                     )
-                    reload(force = true)
+                    roster.reload(force = true)
                 }
             } finally {
-                mutations.end()
+                roster.end()
             }
             selected = emptyMap()
             query = ""
@@ -318,7 +322,7 @@ fun CollaboratorsScreen(
         }
     }
 
-    LaunchedEffect(Unit) { reload() }
+    LaunchedEffect(Unit) { roster.reload() }
 
     // Everyone the owner could share with: local accounts first, at once,
     // then the real users of paired peers appended when they answer, so a

@@ -79,6 +79,10 @@ class RealtimeClient(
     /** Every federation_* frame, which App.jsx forwards whole to the
      *  admin's federation panel and pairing notices. */
     private val onFederationEvent: (FederationEvent) -> Unit,
+    /** The id of a note_updated frame's note, which App.jsx forwards on
+     *  its "note-updated" bus: the server announces a change of who the
+     *  note is shared with this way too. */
+    private val onNoteUpdated: (String) -> Unit,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -190,6 +194,10 @@ class RealtimeClient(
         )
     }.getOrNull()
 
+    private fun noteIdOf(data: String): String? = runCatching {
+        ((json.parseToJsonElement(data) as? JsonObject)?.get("noteId") as? JsonPrimitive)?.contentOrNull
+    }.getOrNull()
+
     private fun federationEventOf(type: String, data: String): FederationEvent? = runCatching {
         val root = json.parseToJsonElement(data) as? JsonObject ?: return null
         fun str(key: String) = (root[key] as? JsonPrimitive)?.contentOrNull
@@ -248,6 +256,7 @@ class RealtimeClient(
                 NativeDebug.d("RealtimeClient auxiliary event type=$payloadType")
                 onAuxiliaryEvent(payloadType)
             }
+            if (payloadType == "note_updated") noteIdOf(data)?.let(onNoteUpdated)
             if (payloadType != null && payloadType.startsWith("federation_")) {
                 NativeDebug.d("RealtimeClient federation event type=$payloadType")
                 federationEventOf(payloadType, data)?.let(onFederationEvent)

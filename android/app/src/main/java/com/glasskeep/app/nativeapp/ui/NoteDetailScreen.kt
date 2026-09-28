@@ -74,6 +74,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -180,6 +181,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -248,6 +253,10 @@ private fun Editability.rebaselined(
 /** One entry in the tag suggestion list: a tag already used on at least one
  *  of this user's notes, and how many. Mirrors App.jsx's tagsWithCounts. */
 private data class TagCount(val tag: String, val count: Int)
+
+/** The ids of the notes the server announces changed (note_updated), the
+ *  web's "note-updated" bus (App.jsx:3779-3792). */
+internal val LocalNoteUpdates = staticCompositionLocalOf<Flow<String>> { emptyFlow() }
 
 /**
  * Milestone: opening and safely editing a single note, every note type the
@@ -449,6 +458,8 @@ fun NoteDetailScreen(
             )
         }
     }
+    val noteRoster = remember(noteId) { NoteRoster(fetch = { repository.fetchNoteCollaborators(noteId) }, show = { applyRoster(it) }) }
+    val noteUpdates = LocalNoteUpdates.current
 
     /** Tapping away from the note puts its keyboard away on the web; here
      *  the editor would otherwise keep the focus under the modal. */
@@ -1471,14 +1482,16 @@ fun NoteDetailScreen(
         loadSettled = true
     }
 
-    // useCollaboration.js reads the roster as soon as a note opens; the
-    // collaboration modal, while open, keeps its own.
-    LaunchedEffect(noteId) {
-        try {
-            val fresh = repository.fetchNoteCollaborators(noteId)
-            if (!showCollaborators) applyRoster(fresh)
-        } catch (t: Throwable) {
-            NativeDebug.e("NoteDetailScreen roster load failed id=$noteId", t)
+    // useCollaboration.js reads the roster as soon as a note opens, then
+    // whenever the server announces a change to the note: it announces a
+    // change of who the note is shared with that way, as it does every
+    // content edit, so a burst gets one reload 600ms after its last
+    // announcement (useCollaboration.js:467-490).
+    LaunchedEffect(noteRoster) {
+        launch { noteRoster.reload() }
+        noteUpdates.filter { it == noteId }.collectLatest {
+            delay(600)
+            noteRoster.reload()
         }
     }
 
@@ -2800,7 +2813,7 @@ fun NoteDetailScreen(
                 isOwner = isOwnerAccess,
                 currentUserId = currentUserId,
                 collaborators = roster.orEmpty(),
-                onCollaboratorsChange = { applyRoster(it) },
+                roster = noteRoster,
                 onClose = { showCollaborators = false },
             )
         }
