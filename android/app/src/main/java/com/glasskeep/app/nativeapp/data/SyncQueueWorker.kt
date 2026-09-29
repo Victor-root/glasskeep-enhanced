@@ -25,6 +25,7 @@ import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
 import com.glasskeep.app.nativeapp.data.network.ConvertNoteTypeRequest
 import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
+import com.glasskeep.app.nativeapp.data.network.NotesHttpCache
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ReorderNotesRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
@@ -179,6 +180,7 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 return@withLock false
             }
 
+            val httpCache = NotesHttpCache.get(context)
             val repository = NotesRepository(
                 // No lock-state callback: this runs with no UI on screen, so a
                 // 423 has nothing to redirect. The queue's own retry already
@@ -187,9 +189,10 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 // fresh whenever the app comes back to the foreground. A
                 // refused session likewise waits for the app, whose first
                 // request finds out.
-                ApiClientFactory.create(serverUrl, tokenStore, onInstanceLocked = {}, onSessionExpired = {}),
+                ApiClientFactory.create(serverUrl, tokenStore, httpCache, onInstanceLocked = {}, onSessionExpired = {}),
                 AppDatabase.get(context).noteDao(),
                 queueDao,
+                httpCache,
             )
 
             var anyOutstanding = false

@@ -3,9 +3,13 @@ package com.glasskeep.app.nativeapp.data.network
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.TokenStore
 import kotlinx.serialization.json.Json
+import okhttp3.Cache
+import okhttp3.CacheControl
+import okhttp3.Call
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.Response
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -37,6 +41,33 @@ private class AuthInterceptor(private val tokenStore: TokenStore) : Interceptor 
             else -> chain.request()
         }
         return chain.proceed(request)
+    }
+}
+
+/** The header a service method sets on the reads whose answer is kept on
+ *  the phone and asked about again each time, whole notes and the logo
+ *  among them; [RevalidatingCallFactory] applies it and takes it off. */
+internal const val REVALIDATED_REQUEST_HEADER = "X-GlassKeep-Revalidated"
+
+/**
+ * What the WebView's browser cache did for the reads [REVALIDATED_REQUEST_HEADER]
+ * marks: the answer is kept on disk and, whatever freshness the server or a
+ * proxy gives it, the server is asked each time whether it still holds
+ * (`If-None-Match`). It answers 304 with no body while nothing changed, so
+ * a start with the same notes as the last one downloads none of them.
+ * Every other request goes through [plain], which keeps nothing.
+ */
+internal class RevalidatingCallFactory(private val plain: OkHttpClient, cache: Cache) : Call.Factory {
+    private val revalidating = plain.newBuilder().cache(cache).build()
+
+    override fun newCall(request: Request): Call {
+        if (request.header(REVALIDATED_REQUEST_HEADER) == null) return plain.newCall(request)
+        return revalidating.newCall(
+            request.newBuilder()
+                .removeHeader(REVALIDATED_REQUEST_HEADER)
+                .cacheControl(CacheControl.Builder().maxAge(0, TimeUnit.SECONDS).build())
+                .build(),
+        )
     }
 }
 
@@ -138,6 +169,7 @@ object ApiClientFactory {
     fun create(
         baseUrl: String,
         tokenStore: TokenStore,
+        cache: Cache,
         onInstanceLocked: () -> Unit,
         onSessionExpired: (String) -> Unit,
     ): GlassKeepApi {
@@ -147,7 +179,7 @@ object ApiClientFactory {
         val contentType = "application/json".toMediaType()
         val retrofit = Retrofit.Builder()
             .baseUrl(normalizedBaseUrl)
-            .client(okHttpClient(tokenStore, onInstanceLocked, onSessionExpired))
+            .callFactory(RevalidatingCallFactory(okHttpClient(tokenStore, onInstanceLocked, onSessionExpired), cache))
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()
 

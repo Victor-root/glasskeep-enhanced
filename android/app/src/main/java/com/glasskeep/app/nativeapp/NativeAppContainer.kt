@@ -12,6 +12,7 @@ import com.glasskeep.app.nativeapp.data.local.AppDatabase
 import com.glasskeep.app.nativeapp.data.local.SyncQueueDatabase
 import com.glasskeep.app.nativeapp.data.network.ApiClientFactory
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
+import com.glasskeep.app.nativeapp.data.network.NotesHttpCache
 import com.glasskeep.app.reminders.ReminderScheduler
 import com.glasskeep.app.reminders.ReminderSyncWorker
 
@@ -41,6 +42,7 @@ class NativeAppContainer(context: Context) {
     val sessionExpired = mutableStateOf(false)
     private val db = AppDatabase.get(appContext)
     private val syncQueueDb = SyncQueueDatabase.get(appContext)
+    private val httpCache = NotesHttpCache.get(appContext)
 
     private var cachedApi: GlassKeepApi? = null
     private var cachedApiServerUrl: String? = null
@@ -54,13 +56,13 @@ class NativeAppContainer(context: Context) {
         val existing = cachedApi
         if (existing != null && cachedApiServerUrl == serverUrl) return existing
         NativeDebug.d("NativeAppContainer.api: (re)building client for $serverUrl")
-        val fresh = ApiClientFactory.create(serverUrl, tokenStore, lockState::markLocked, ::expireSession)
+        val fresh = ApiClientFactory.create(serverUrl, tokenStore, httpCache, lockState::markLocked, ::expireSession)
         cachedApi = fresh
         cachedApiServerUrl = serverUrl
         return fresh
     }
 
-    fun notesRepository(serverUrl: String) = NotesRepository(api(serverUrl), db.noteDao(), syncQueueDb.syncQueueDao())
+    fun notesRepository(serverUrl: String) = NotesRepository(api(serverUrl), db.noteDao(), syncQueueDb.syncQueueDao(), httpCache)
 
     @Volatile private var sessionSwapping = false
 
@@ -83,6 +85,14 @@ class NativeAppContainer(context: Context) {
         }
     }
 
+    /** The notes and the queue this phone holds, answers kept from the
+     *  server included, for an account or a server no longer in use. */
+    private suspend fun wipeLocalNotes() {
+        syncQueueDb.syncQueueDao().deleteAll()
+        db.noteDao().deleteAll()
+        NotesHttpCache.clear(httpCache)
+    }
+
     /**
      * Installs the session a sign-in handed over. The offline edits a
      * refused session left in the queue are replayed for that same
@@ -92,8 +102,7 @@ class NativeAppContainer(context: Context) {
         val owner = tokenStore.queueOwner
         if (owner != null && owner != sessionTokenUserId(token)) {
             NativeDebug.d("startSession: another account signed in, the expired session's queue is dropped")
-            syncQueueDb.syncQueueDao().deleteAll()
-            db.noteDao().deleteAll()
+            wipeLocalNotes()
         }
         tokenStore.queueOwner = null
         tokenStore.serverUrl = serverUrl
@@ -111,8 +120,7 @@ class NativeAppContainer(context: Context) {
         // Stop both native queue drains first; a new login schedules them again.
         SyncQueueWorker.cancelAll(appContext)
 
-        syncQueueDb.syncQueueDao().deleteAll()
-        db.noteDao().deleteAll()
+        wipeLocalNotes()
         check(noteAiStore.clearAll()) { "Could not clear saved note AI conversations" }
         ReminderScheduler.syncAll(appContext, emptyList())
 

@@ -25,6 +25,7 @@ import com.glasskeep.app.nativeapp.data.network.InstanceStatusResponse
 import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.NoteIconDto
+import com.glasskeep.app.nativeapp.data.network.NotesHttpCache
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.network.NotificationIdsRequest
 import com.glasskeep.app.nativeapp.data.network.NotificationRemoveRequest
@@ -88,6 +89,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import okhttp3.Cache
 import retrofit2.Response
 import java.util.UUID
 
@@ -198,6 +200,8 @@ class NotesRepository(
     private val api: GlassKeepApi,
     private val noteDao: NoteDao,
     private val syncQueueDao: SyncQueueDao,
+    /** The answers of [api] kept on the phone, notes among them. */
+    private val httpCache: Cache,
 ) {
     /**
      * The list screen observes this directly: it always reads the local
@@ -260,14 +264,16 @@ class NotesRepository(
     suspend fun clearLocalSessionData() {
         NativeDebug.d("NotesRepository.clearLocalSessionData")
         syncQueueDao.deleteAll()
-        noteDao.deleteAll()
+        clearCachedNotes()
     }
 
-    /** The notes cache alone: a session the server refused leaves its
-     *  queued edits for the next sign-in (App.jsx's cleanupClientSession). */
+    /** The notes cache alone, the answers kept from the server included: a
+     *  session the server refused leaves its queued edits for the next
+     *  sign-in (App.jsx's cleanupClientSession). */
     suspend fun clearCachedNotes() {
         NativeDebug.d("NotesRepository.clearCachedNotes")
         noteDao.deleteAll()
+        NotesHttpCache.clear(httpCache)
     }
 
     /**
@@ -286,6 +292,7 @@ class NotesRepository(
         }
         val notes = response.body().orEmpty()
         val readAt = System.nanoTime()
+        val fromNetwork = response.raw().networkResponse
         // See NoteDao.replaceAll's own doc comment: a note with a queued,
         // not-yet-confirmed archive/trash/restore/pin (see the *Queued
         // methods below) must not have this refresh's now-stale server
@@ -293,8 +300,9 @@ class NotesRepository(
         val (rows, details) = rowsOf(notes)
         noteDao.replaceAll(rows, details, getProtectedNoteIds())
         NativeDebug.d(
-            "NotesRepository.refresh: ${notes.size} note(s), read in ${(readAt - startedAt) / 1_000_000} ms, " +
-                "cached in ${(System.nanoTime() - readAt) / 1_000_000} ms",
+            "NotesRepository.refresh: ${notes.size} note(s) " +
+                "(${fromNetwork?.let { "server answered HTTP ${it.code}" } ?: "no request needed"}), " +
+                "read in ${(readAt - startedAt) / 1_000_000} ms, cached in ${(System.nanoTime() - readAt) / 1_000_000} ms",
         )
     }
 

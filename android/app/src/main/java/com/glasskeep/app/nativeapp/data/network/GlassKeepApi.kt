@@ -1267,6 +1267,7 @@ interface GlassKeepApi {
 
     // Public, no session needed, same as the profile list above: the
     // sign-in screen reads it before anyone has signed in.
+    @Headers("$REVALIDATED_REQUEST_HEADER: true")
     @GET("api/branding")
     suspend fun getBranding(): Response<BrandingDto>
 
@@ -1431,6 +1432,7 @@ interface GlassKeepApi {
     @POST("api/secret-key")
     suspend fun generateSecretKey(): Response<SecretKeyResponse>
 
+    @Headers("$REVALIDATED_REQUEST_HEADER: true")
     @GET("api/notes")
     suspend fun getNotes(): Response<List<NoteDto>>
 
@@ -1454,15 +1456,18 @@ interface GlassKeepApi {
     @POST("api/user/ai/test")
     suspend fun testUserAi(@Body body: UserAiTestRequest): Response<UserAiTestResponse>
 
+    @Headers("$REVALIDATED_REQUEST_HEADER: true")
     @GET("api/notes/archived")
     suspend fun getArchivedNotes(): Response<List<NoteDto>>
 
+    @Headers("$REVALIDATED_REQUEST_HEADER: true")
     @GET("api/notes/trashed")
     suspend fun getTrashedNotes(): Response<List<NoteDto>>
 
     @POST("api/notes")
     suspend fun createNote(@Body body: CreateNoteRequest): Response<NoteDto>
 
+    @Headers("$REVALIDATED_REQUEST_HEADER: true")
     @GET("api/notes/{id}")
     suspend fun getNote(@Path("id") id: String): Response<NoteDto>
 
