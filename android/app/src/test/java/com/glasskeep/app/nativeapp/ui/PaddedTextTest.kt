@@ -14,35 +14,48 @@ import org.junit.Test
 
 class PaddedTextTest {
     private val pad = PadChar
+    private val join = WebLineBreaks.Join
 
     @Test
     fun `a code run gets a pad on either side, in the laid-out text only`() {
         val padded = PaddedText.of(AnnotatedString("ab cd e"), listOf(PaddedRun(3 until 5, CodePadId)))
-        assertEquals("ab ${pad}cd$pad e", padded.text.text)
+        assertEquals("ab $pad${join}cd$join$pad e", padded.text.text)
         assertEquals(7, padded.length)
+    }
+
+    @Test
+    fun `a pad is kept to its run by a joiner, and to the word touching the run`() {
+        val padded = PaddedText.of(AnnotatedString("abc"), listOf(PaddedRun(1 until 2, CodePadId)))
+        assertEquals("a$join$pad${join}b$join$pad${join}c", padded.text.text)
+    }
+
+    @Test
+    fun `a no-break space keeps to a run as a letter does`() {
+        val padded = PaddedText.of(AnnotatedString("a\u00A0bc"), listOf(PaddedRun(2 until 4, CodePadId)))
+        assertEquals("a\u00A0$join$pad${join}bc$join$pad", padded.text.text)
     }
 
     @Test
     fun `offsets convert both ways around the pads`() {
         val padded = PaddedText.of(AnnotatedString("ab cd e"), listOf(PaddedRun(3 until 5, CodePadId)))
         assertEquals(3, padded.caret(3))
-        assertEquals(4, padded.char(3))
-        assertEquals(7, padded.caret(5))
-        assertEquals(TextRange(4, 6), padded.range(3, 5))
-        assertEquals(TextRange(3, 7), padded.box(3, 5))
+        assertEquals(5, padded.char(3))
+        assertEquals(9, padded.caret(5))
+        assertEquals(TextRange(5, 7), padded.range(3, 5))
+        assertEquals(TextRange(3, 9), padded.box(3, 5))
         assertEquals(3, padded.textOffset(3))
-        assertEquals(3, padded.textOffset(4))
-        assertEquals(5, padded.textOffset(7))
-        assertEquals(7, padded.textOffset(9))
+        assertEquals(3, padded.textOffset(5))
+        assertEquals(5, padded.textOffset(9))
+        assertEquals(7, padded.textOffset(11))
     }
 
     @Test
     fun `a run starting where another ends keeps each box to its own pads`() {
         val padded = PaddedText.of(AnnotatedString("abcd"), listOf(PaddedRun(0 until 2, CodePadId), PaddedRun(2 until 4, HighlightPadId)))
-        assertEquals("${pad}ab$pad${pad}cd$pad", padded.text.text)
-        assertEquals(TextRange(0, 4), padded.box(0, 2))
-        assertEquals(TextRange(4, 8), padded.box(2, 4))
-        assertEquals(TextRange(1, 7), padded.range(0, 4))
+        assertEquals("$pad${join}ab$join$pad$join$pad${join}cd$join$pad", padded.text.text)
+        assertEquals(TextRange(0, 7), padded.box(0, 2))
+        assertEquals(TextRange(7, 13), padded.box(2, 4))
+        assertEquals(TextRange(2, 11), padded.range(0, 4))
     }
 
     @Test
@@ -50,7 +63,7 @@ class PaddedTextTest {
         val padded = PaddedText.of(AnnotatedString("ab cd e"), listOf(PaddedRun(3 until 5, CodePadId)))
         val code = Placeholder(5.sp, 1.sp, PlaceholderVerticalAlign.AboveBaseline)
         val placeholders = padded.placeholders(mapOf(CodePadId to InlineTextContent(code) {}))
-        assertEquals(listOf(AnnotatedString.Range(code, 3, 4), AnnotatedString.Range(code, 6, 7)), placeholders)
+        assertEquals(listOf(AnnotatedString.Range(code, 3, 4), AnnotatedString.Range(code, 8, 9)), placeholders)
     }
 
     @Test
@@ -76,8 +89,8 @@ class PaddedTextTest {
     @Test
     fun `a break before a run's pads stays out of its box`() {
         val padded = PaddedText.of(AnnotatedString("x-yz"), listOf(PaddedRun(2 until 4, CodePadId)))
-        assertEquals("x-${WebLineBreaks.Break}${pad}yz$pad", padded.text.text)
-        assertEquals(TextRange(3, 7), padded.box(2, 4))
+        assertEquals("x-${WebLineBreaks.Break}$pad${join}yz$join$pad", padded.text.text)
+        assertEquals(TextRange(3, 9), padded.box(2, 4))
     }
 
     @Test

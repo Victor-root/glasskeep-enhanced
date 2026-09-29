@@ -18,7 +18,7 @@ internal const val CodePadId = "codePad"
 internal const val HighlightPadId = "highlightPad"
 
 /** What stands in the laid-out text for a pad (appendInlineContent's own
- *  default): a letter to the line breaker, so a pad keeps to its run. */
+ *  default). */
 internal const val PadChar = '�'
 
 /** A run `[start, end)` of a text padded on either side by the inline
@@ -33,9 +33,12 @@ internal class PaddedRun(val range: IntRange, val padId: String)
  * the laid-out text only, and so does what makes Android break lines where
  * the WebView breaks them ([WebLineBreaks]): a joiner right after the
  * character it keeps with the next, a break before the pads that open a
- * run, after those closing one. The text's styles and links cover what is
- * laid out inside them. Offsets in and out of [caret], [char], [range],
- * [box] and [textOffset] are the text's own.
+ * run, after those closing one. Android's line breaker treats each pad as a
+ * word of its own, which would leave it at a line's end or start apart from
+ * its run: a joiner keeps every pad to what it pads, and to what touches
+ * the run where the web breaks no line. The text's styles and links cover
+ * what is laid out inside them. Offsets in and out of [caret], [char],
+ * [range], [box] and [textOffset] are the text's own.
  */
 internal class PaddedText private constructor(
     val text: AnnotatedString,
@@ -90,19 +93,22 @@ internal class PaddedText private constructor(
                 (closing[end] ?: mutableListOf<String>().also { closing[end] = it }) += run.padId
             }
             val lineBreaks = Array(length + 1) { WebLineBreaks.between(text, it) }
-            val opens = IntArray(length + 1) { opening[it]?.size ?: 0 }
-            val breaks = IntArray(length + 1) { if (lineBreaks[it] == WebLineBreaks.Break) 1 else 0 }
-            val closes = IntArray(length + 1) {
-                (closing[it]?.size ?: 0) + breaks[it] + if (lineBreaks[it] == WebLineBreaks.Join) 1 else 0
-            }
+            val opens = IntArray(length + 1)
+            val closes = IntArray(length + 1)
+            val breaks = IntArray(length + 1)
             val carets = IntArray(length + 1)
             val inserted = mutableListOf<Int>()
             val pads = mutableListOf<AnnotatedString.Range<String>>()
-            val builder = AnnotatedString.Builder(length + 2 * runs.size)
+            val builder = AnnotatedString.Builder(length + 6 * runs.size)
             var copied = 0
+            var joined = -1
             fun insert(char: Char) {
                 inserted += builder.length
                 builder.append(char)
+            }
+            fun join() {
+                if (joined != builder.length) insert(WebLineBreaks.Join)
+                joined = builder.length
             }
             fun pad(id: String) {
                 inserted += builder.length
@@ -110,17 +116,30 @@ internal class PaddedText private constructor(
                 builder.appendInlineContent(id, PadChar.toString())
             }
             for (i in 0..length) {
-                if (opens[i] == 0 && closes[i] == 0) {
+                val edge = lineBreaks[i]
+                val closingPads = closing[i]
+                val openingPads = opening[i]
+                if (closingPads == null && openingPads == null && edge == null) {
                     carets[i] = i + inserted.size
                     continue
                 }
                 builder.append(text.text, copied, i)
                 copied = i
-                if (lineBreaks[i] == WebLineBreaks.Join) insert(WebLineBreaks.Join)
-                closing[i]?.forEach(::pad)
-                if (lineBreaks[i] == WebLineBreaks.Break) insert(WebLineBreaks.Break)
+                val after = builder.length
+                if (edge == WebLineBreaks.Join || closingPads != null) join()
+                closingPads?.forEach { id -> join(); pad(id) }
+                val keepsNext = edge != WebLineBreaks.Break && i < length && !WebLineBreaks.isBreakingSpace(text.text[i])
+                if (closingPads != null && keepsNext) join()
+                if (edge == WebLineBreaks.Break) insert(WebLineBreaks.Break)
+                closes[i] = builder.length - after
+                breaks[i] = if (edge == WebLineBreaks.Break) 1 else 0
                 carets[i] = builder.length
-                opening[i]?.forEach(::pad)
+                if (openingPads != null) {
+                    val keepsPrevious = edge != WebLineBreaks.Break && i > 0 && !WebLineBreaks.isBreakingSpace(text.text[i - 1])
+                    if (keepsPrevious) join()
+                    openingPads.forEach { id -> pad(id); join() }
+                }
+                opens[i] = builder.length - carets[i]
             }
             builder.append(text.text, copied, length)
             return PaddedText(builder.toAnnotatedString(), length, opens, closes, breaks, carets, inserted.toIntArray(), pads)

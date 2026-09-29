@@ -52,6 +52,9 @@ internal object WebLineBreaks {
         }
     }
 
+    /** Whether a line may break after [char]: a space, but not a no-break one. */
+    fun isBreakingSpace(char: Char): Boolean = char.isWhitespace() && char !in "\u00A0\u2007\u202F"
+
     private const val EnDash = '\u2013'
     private const val Hyphen = '\u2010'
 
@@ -73,7 +76,7 @@ internal object WebLineBreaks {
      *  break right before it: at the start, after a breaking space, or
      *  after `-` or `?`. ICU keeps such a hyphen with the letter after it. */
     private fun opensSegment(before: Char?): Boolean =
-        before == null || before.isWhitespace() && before !in "\u00A0\u2007\u202F" || before == '-' || before == '?'
+        before == null || isBreakingSpace(before) || before == '-' || before == '?'
 
     private fun Char.isAsciiPrintable() = this in '!'..'~'
 

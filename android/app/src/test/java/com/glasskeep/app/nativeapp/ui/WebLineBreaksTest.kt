@@ -1,6 +1,8 @@
 package com.glasskeep.app.nativeapp.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -39,6 +41,15 @@ class WebLineBreaksTest {
         assertEquals("Ah│ ! Oh│ ? Quoi│ : fin.", laid("Ah ! Oh ? Quoi : fin."))
         assertEquals("«│ Bonjour│ »", laid("« Bonjour »"))
         assertEquals("plain text", laid("plain text"))
+    }
+
+    @Test
+    fun `a line breaks after a space, but not after a no-break one`() {
+        assertTrue(WebLineBreaks.isBreakingSpace(' '))
+        assertTrue(WebLineBreaks.isBreakingSpace('\n'))
+        assertFalse(WebLineBreaks.isBreakingSpace('\u00A0'))
+        assertFalse(WebLineBreaks.isBreakingSpace('\u202F'))
+        assertFalse(WebLineBreaks.isBreakingSpace('a'))
     }
 
     @Test
