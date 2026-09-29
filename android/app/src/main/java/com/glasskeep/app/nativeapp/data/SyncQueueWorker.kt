@@ -34,7 +34,14 @@ import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
 import com.glasskeep.app.nativeapp.data.network.TrashNoteRequest
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.util.concurrent.TimeUnit
@@ -61,135 +68,9 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
     override suspend fun doWork(): Result {
         if (BuildConfig.DEBUG) Log.d("GKSync", "doWork() started, runAttemptCount=$runAttemptCount")
-        val tokenStore = TokenStore(applicationContext)
-        val serverUrl = tokenStore.serverUrl
-        val token = tokenStore.token
-        if (serverUrl.isNullOrBlank() || token.isNullOrBlank()) {
-            NativeDebug.d("SyncQueueWorker: no session, skipping")
-            if (BuildConfig.DEBUG) Log.d("GKSync", "doWork() bailing: no session (serverUrl blank=${serverUrl.isNullOrBlank()}, token blank=${token.isNullOrBlank()})")
-            return Result.success()
-        }
-
-        val queueDao = SyncQueueDatabase.get(applicationContext).syncQueueDao()
-        val pending = queueDao.getPending()
-        if (BuildConfig.DEBUG) {
-            Log.d(
-                "GKSync",
-                "doWork() pending=${pending.size} " +
-                    pending.joinToString { "[id=${it.queueId} type=${it.type} note=${it.noteId} attempts=${it.attempts} status=${it.status}]" },
-            )
-        }
-        if (pending.isEmpty()) return Result.success()
-
-        val repository = NotesRepository(
-            // No lock-state callback: this runs with no UI on screen, so a
-            // 423 has nothing to redirect. The queue's own retry already
-            // does the right thing (the items stay pending until the
-            // instance is unlocked), and NativeNavHost reads the lock state
-            // fresh whenever the app comes back to the foreground. A
-            // refused session likewise waits for the app, whose first
-            // request finds out.
-            ApiClientFactory.create(serverUrl, tokenStore, onInstanceLocked = {}, onSessionExpired = {}),
-            AppDatabase.get(applicationContext).noteDao(),
-            queueDao,
-        )
-
-        var anyOutstanding = false
-        val blockedNoteIds = mutableSetOf<String>()
-        for ((index, item) in pending.withIndex()) {
-            // Preserve per-note ordering. In particular, no PATCH may run
-            // after this note's CREATE failed earlier in the same drain.
-            if (item.noteId in blockedNoteIds) {
-                anyOutstanding = true
-                continue
-            }
-            try {
-                applyItem(repository, item)
-                queueDao.delete(item.queueId)
-                if (BuildConfig.DEBUG) Log.d("GKSync", "item ${item.queueId} (${item.type}) note=${item.noteId} OK, deleted from queue")
-            } catch (t: Throwable) {
-                NativeDebug.e("SyncQueueWorker: item ${item.queueId} (${item.type}) for note ${item.noteId} failed", t)
-                if (BuildConfig.DEBUG) {
-                    Log.d("GKSync", "item ${item.queueId} (${item.type}) note=${item.noteId} FAILED: ${t.javaClass.simpleName}: ${t.message}")
-                }
-                anyOutstanding = true
-                blockedNoteIds += item.noteId
-                val attempts = item.attempts + 1
-                if (attempts >= MAX_ATTEMPTS) {
-                    queueDao.markFailed(item.queueId, attempts, t.message)
-                } else {
-                    queueDao.recordFailure(item.queueId, attempts, t.message)
-                }
-            }
-            if (index < pending.lastIndex) delay(QUEUE_ITEM_DELAY_MS)
-        }
+        val anyOutstanding = drainQueue(applicationContext, countFailures = true)
         if (BuildConfig.DEBUG) Log.d("GKSync", "doWork() finished: anyOutstanding=$anyOutstanding -> ${if (anyOutstanding) "Result.retry()" else "Result.success()"}")
         return if (anyOutstanding) Result.retry() else Result.success()
-    }
-
-    private suspend fun applyItem(repository: NotesRepository, item: SyncQueueEntity) {
-        when (SyncQueueType.valueOf(item.type)) {
-            SyncQueueType.CREATE -> {
-                val body = Json.decodeFromString<CreateNoteRequest>(item.payloadJson)
-                repository.createNoteOnline(body)
-            }
-            SyncQueueType.TITLE_CONTENT -> {
-                val body = Json.decodeFromString<PatchNoteRequest>(item.payloadJson)
-                repository.patchNote(item.noteId, body.title, body.content, body.clientUpdatedAt)
-            }
-            SyncQueueType.COLOR -> {
-                val body = Json.decodeFromString<SetColorRequest>(item.payloadJson)
-                repository.setColor(item.noteId, body.color, body.clientUpdatedAt)
-            }
-            SyncQueueType.TAGS -> {
-                val body = Json.decodeFromString<SetTagsRequest>(item.payloadJson)
-                repository.setTags(item.noteId, body.tags, body.clientUpdatedAt)
-            }
-            SyncQueueType.CHECKLIST_ITEMS -> {
-                val body = Json.decodeFromString<SetChecklistItemsRequest>(item.payloadJson)
-                repository.setChecklistItems(item.noteId, body.items, body.clientUpdatedAt)
-            }
-            SyncQueueType.CONVERT_TYPE -> {
-                val body = Json.decodeFromString<ConvertNoteTypeRequest>(item.payloadJson)
-                repository.convertNoteType(item.noteId, body.type, body.content, body.items, body.clientUpdatedAt)
-            }
-            SyncQueueType.IMAGES -> {
-                val body = Json.decodeFromString<SetImagesRequest>(item.payloadJson)
-                repository.setImages(item.noteId, body.images, body.clientUpdatedAt)
-            }
-            SyncQueueType.PINNED -> {
-                val body = Json.decodeFromString<SetPinnedRequest>(item.payloadJson)
-                repository.setPinned(item.noteId, body.pinned)
-            }
-            SyncQueueType.ARCHIVE -> {
-                val body = Json.decodeFromString<ArchiveNoteRequest>(item.payloadJson)
-                repository.setArchived(item.noteId, body.archived, body.clientUpdatedAt)
-            }
-            SyncQueueType.TRASH -> {
-                val body = Json.decodeFromString<TrashNoteRequest>(item.payloadJson)
-                repository.trashNote(item.noteId, body.clientUpdatedAt, body.mode)
-            }
-            SyncQueueType.RESTORE -> {
-                val body = Json.decodeFromString<ClientUpdatedAtRequest>(item.payloadJson)
-                repository.restoreNote(item.noteId, body.clientUpdatedAt)
-            }
-            SyncQueueType.PERMANENT_DELETE -> {
-                val body = Json.decodeFromString<ClientUpdatedAtRequest>(item.payloadJson)
-                repository.deleteNotePermanently(item.noteId, body.clientUpdatedAt)
-            }
-            SyncQueueType.REMINDER -> {
-                val body = Json.decodeFromString<SetReminderRequest>(item.payloadJson)
-                repository.setReminder(item.noteId, body.reminderAt, body.clientUpdatedAt)
-            }
-            SyncQueueType.REORDER -> {
-                // item.noteId is just the sentinel this type always
-                // enqueues under (see NotesRepository.reorderQueued):
-                // the payload alone is self-sufficient, unlike every
-                // other branch above.
-                val body = Json.decodeFromString<ReorderNotesRequest>(item.payloadJson)
-                repository.reorderNotes(body.pinnedIds, body.otherIds, body.clientReorderedAt)
-            }
-        }
     }
 
     companion object {
@@ -197,6 +78,152 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
         private const val UNIQUE_PERIODIC_WORK = "glasskeep_sync_queue_periodic"
         private const val MAX_ATTEMPTS = 5
         private const val QUEUE_ITEM_DELAY_MS = 200L
+
+        private suspend fun applyItem(repository: NotesRepository, item: SyncQueueEntity) {
+            when (SyncQueueType.valueOf(item.type)) {
+                SyncQueueType.CREATE -> {
+                    val body = Json.decodeFromString<CreateNoteRequest>(item.payloadJson)
+                    repository.createNoteOnline(body)
+                }
+                SyncQueueType.TITLE_CONTENT -> {
+                    val body = Json.decodeFromString<PatchNoteRequest>(item.payloadJson)
+                    repository.patchNote(item.noteId, body.title, body.content, body.clientUpdatedAt)
+                }
+                SyncQueueType.COLOR -> {
+                    val body = Json.decodeFromString<SetColorRequest>(item.payloadJson)
+                    repository.setColor(item.noteId, body.color, body.clientUpdatedAt)
+                }
+                SyncQueueType.TAGS -> {
+                    val body = Json.decodeFromString<SetTagsRequest>(item.payloadJson)
+                    repository.setTags(item.noteId, body.tags, body.clientUpdatedAt)
+                }
+                SyncQueueType.CHECKLIST_ITEMS -> {
+                    val body = Json.decodeFromString<SetChecklistItemsRequest>(item.payloadJson)
+                    repository.setChecklistItems(item.noteId, body.items, body.clientUpdatedAt)
+                }
+                SyncQueueType.CONVERT_TYPE -> {
+                    val body = Json.decodeFromString<ConvertNoteTypeRequest>(item.payloadJson)
+                    repository.convertNoteType(item.noteId, body.type, body.content, body.items, body.clientUpdatedAt)
+                }
+                SyncQueueType.IMAGES -> {
+                    val body = Json.decodeFromString<SetImagesRequest>(item.payloadJson)
+                    repository.setImages(item.noteId, body.images, body.clientUpdatedAt)
+                }
+                SyncQueueType.PINNED -> {
+                    val body = Json.decodeFromString<SetPinnedRequest>(item.payloadJson)
+                    repository.setPinned(item.noteId, body.pinned)
+                }
+                SyncQueueType.ARCHIVE -> {
+                    val body = Json.decodeFromString<ArchiveNoteRequest>(item.payloadJson)
+                    repository.setArchived(item.noteId, body.archived, body.clientUpdatedAt)
+                }
+                SyncQueueType.TRASH -> {
+                    val body = Json.decodeFromString<TrashNoteRequest>(item.payloadJson)
+                    repository.trashNote(item.noteId, body.clientUpdatedAt, body.mode)
+                }
+                SyncQueueType.RESTORE -> {
+                    val body = Json.decodeFromString<ClientUpdatedAtRequest>(item.payloadJson)
+                    repository.restoreNote(item.noteId, body.clientUpdatedAt)
+                }
+                SyncQueueType.PERMANENT_DELETE -> {
+                    val body = Json.decodeFromString<ClientUpdatedAtRequest>(item.payloadJson)
+                    repository.deleteNotePermanently(item.noteId, body.clientUpdatedAt)
+                }
+                SyncQueueType.REMINDER -> {
+                    val body = Json.decodeFromString<SetReminderRequest>(item.payloadJson)
+                    repository.setReminder(item.noteId, body.reminderAt, body.clientUpdatedAt)
+                }
+                SyncQueueType.REORDER -> {
+                    // item.noteId is just the sentinel this type always
+                    // enqueues under (see NotesRepository.reorderQueued):
+                    // the payload alone is self-sufficient, unlike every
+                    // other branch above.
+                    val body = Json.decodeFromString<ReorderNotesRequest>(item.payloadJson)
+                    repository.reorderNotes(body.pinnedIds, body.otherIds, body.clientReorderedAt)
+                }
+            }
+        }
+
+        private val drainLock = Mutex()
+        private val drainScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        /**
+         * Replays the queue, oldest first, one drain at a time: the worker's
+         * and the app's own ([triggerNow]) share the lock, so an item is
+         * never sent twice. Returns whether anything is still outstanding.
+         * Only the worker ([countFailures]) counts a failed try against an
+         * item's [MAX_ATTEMPTS]: the app drains on every edit, which would
+         * burn them all in a moment on a bad connection.
+         */
+        private suspend fun drainQueue(context: Context, countFailures: Boolean): Boolean = drainLock.withLock {
+            val tokenStore = TokenStore(context)
+            val serverUrl = tokenStore.serverUrl
+            val token = tokenStore.token
+            if (serverUrl.isNullOrBlank() || token.isNullOrBlank()) {
+                NativeDebug.d("SyncQueueWorker: no session, skipping")
+                if (BuildConfig.DEBUG) Log.d("GKSync", "drain bailing: no session (serverUrl blank=${serverUrl.isNullOrBlank()}, token blank=${token.isNullOrBlank()})")
+                return@withLock false
+            }
+
+            val queueDao = SyncQueueDatabase.get(context).syncQueueDao()
+            val pending = queueDao.getPending()
+            if (BuildConfig.DEBUG) {
+                Log.d(
+                    "GKSync",
+                    "drain pending=${pending.size} " +
+                        pending.joinToString { "[id=${it.queueId} type=${it.type} note=${it.noteId} attempts=${it.attempts} status=${it.status}]" },
+                )
+            }
+            if (pending.isEmpty()) return@withLock false
+
+            val repository = NotesRepository(
+                // No lock-state callback: this runs with no UI on screen, so a
+                // 423 has nothing to redirect. The queue's own retry already
+                // does the right thing (the items stay pending until the
+                // instance is unlocked), and NativeNavHost reads the lock state
+                // fresh whenever the app comes back to the foreground. A
+                // refused session likewise waits for the app, whose first
+                // request finds out.
+                ApiClientFactory.create(serverUrl, tokenStore, onInstanceLocked = {}, onSessionExpired = {}),
+                AppDatabase.get(context).noteDao(),
+                queueDao,
+            )
+
+            var anyOutstanding = false
+            val blockedNoteIds = mutableSetOf<String>()
+            for ((index, item) in pending.withIndex()) {
+                // Preserve per-note ordering. In particular, no PATCH may run
+                // after this note's CREATE failed earlier in the same drain.
+                if (item.noteId in blockedNoteIds) {
+                    anyOutstanding = true
+                    continue
+                }
+                try {
+                    applyItem(repository, item)
+                    queueDao.delete(item.queueId)
+                    if (BuildConfig.DEBUG) Log.d("GKSync", "item ${item.queueId} (${item.type}) note=${item.noteId} OK, deleted from queue")
+                } catch (t: CancellationException) {
+                    throw t
+                } catch (t: Throwable) {
+                    NativeDebug.e("SyncQueueWorker: item ${item.queueId} (${item.type}) for note ${item.noteId} failed", t)
+                    if (BuildConfig.DEBUG) {
+                        Log.d("GKSync", "item ${item.queueId} (${item.type}) note=${item.noteId} FAILED: ${t.javaClass.simpleName}: ${t.message}")
+                    }
+                    anyOutstanding = true
+                    blockedNoteIds += item.noteId
+                    if (countFailures) {
+                        val attempts = item.attempts + 1
+                        if (attempts >= MAX_ATTEMPTS) {
+                            queueDao.markFailed(item.queueId, attempts, t.message)
+                        } else {
+                            queueDao.recordFailure(item.queueId, attempts, t.message)
+                        }
+                    }
+                }
+                if (index < pending.lastIndex) delay(QUEUE_ITEM_DELAY_MS)
+            }
+            anyOutstanding
+        }
 
         /** Call right after enqueueing an edit, so it reaches the server
          *  within seconds rather than waiting for the periodic safety net.
@@ -234,6 +261,10 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, WorkRequest.MIN_BACKOFF_MILLIS, TimeUnit.MILLISECONDS)
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE_ONE_TIME_WORK, ExistingWorkPolicy.KEEP, request)
+            // WorkManager alone can take minutes to start on some phones
+            // (battery savers): the app sends the queue itself, at once.
+            val app = context.applicationContext
+            drainScope.launch { drainQueue(app, countFailures = false) }
         }
 
         /** Safety net for items that missed every triggerNow() call (app
