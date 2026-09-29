@@ -127,7 +127,10 @@ const SANITIZE_CONFIG = {
 export function richDocToHTML(doc) {
   if (!doc) return "";
   try {
-    const raw = generateHTML(doc, RENDER_EXTENSIONS);
+    // A line break ending a block collapses in static HTML, where the
+    // editor shows the empty line it opens (ProseMirror's trailing
+    // break): add the same break so read mode keeps that line.
+    const raw = generateHTML(doc, RENDER_EXTENSIONS).replace(/<br\s*\/?>(<\/(?:p|h[1-6])>)/g, "<br><br>$1");
     return DOMPurify.sanitize(raw, SANITIZE_CONFIG);
   } catch {
     return "";
