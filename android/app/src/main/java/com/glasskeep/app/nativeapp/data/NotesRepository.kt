@@ -76,8 +76,10 @@ import com.glasskeep.app.nativeapp.data.network.UserAiSettingsRequest
 import com.glasskeep.app.nativeapp.data.network.UserAiTestRequest
 import com.glasskeep.app.nativeapp.data.network.UserAiTestResponse
 import com.glasskeep.app.nativeapp.data.network.UserDto
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -188,6 +190,10 @@ private const val REORDER_QUEUE_NOTE_ID = "__reorder__"
  *  over as a raw string rather than a parsed DTO. */
 private val errorJson = Json { ignoreUnknownKeys = true }
 
+/** A cached note that takes at least this long to decode is worth a line in
+ *  the debug trail: the start-up reads one for every card. */
+private const val SLOW_DECODE_MS = 30L
+
 class NotesRepository(
     private val api: GlassKeepApi,
     private val noteDao: NoteDao,
@@ -205,9 +211,15 @@ class NotesRepository(
 
     fun observeTrashedNotes(): Flow<List<NoteEntity>> = noteDao.observeTrashed()
 
+    /** The list rows and the full detail rows of [notes], built off the main
+     *  thread: a detail row holds its note whole, images included. */
+    private suspend fun rowsOf(notes: List<NoteDto>): Pair<List<NoteEntity>, List<NoteDetailEntity>> =
+        withContext(Dispatchers.Default) { notes.map { it.toEntity() } to notes.map { it.toDetailEntity() } }
+
     /** Writes the lightweight list row and full offline detail together. */
     private suspend fun cacheNotes(notes: List<NoteDto>) {
-        noteDao.upsertNotesAndDetails(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() })
+        val (rows, details) = rowsOf(notes)
+        noteDao.upsertNotesAndDetails(rows, details)
     }
 
     /**
@@ -222,7 +234,10 @@ class NotesRepository(
 
     private suspend fun cachedNote(id: String): NoteDto? {
         noteDao.getDetailById(id)?.let { detail ->
-            val decoded = runCatching { detail.toNoteDto() }
+            val startedAt = System.nanoTime()
+            val decoded = withContext(Dispatchers.Default) { runCatching { detail.toNoteDto() } }
+            val tookMs = (System.nanoTime() - startedAt) / 1_000_000
+            if (tookMs >= SLOW_DECODE_MS) NativeDebug.d("NotesRepository.cachedNote id=$id: ${detail.payloadJson.length} chars decoded in $tookMs ms")
             decoded.onFailure { NativeDebug.e("NotesRepository cached detail decode failed id=$id", it) }
             decoded.getOrNull()?.let { return it }
         }
@@ -262,6 +277,7 @@ class NotesRepository(
      */
     suspend fun refresh() {
         NativeDebug.d("NotesRepository.refresh: fetching /api/notes")
+        val startedAt = System.nanoTime()
         val response = api.getNotes()
         if (!response.isSuccessful) {
             val error = "GET /api/notes failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
@@ -269,12 +285,17 @@ class NotesRepository(
             throw IllegalStateException(error)
         }
         val notes = response.body().orEmpty()
-        NativeDebug.d("NotesRepository.refresh: got ${notes.size} note(s)")
+        val readAt = System.nanoTime()
         // See NoteDao.replaceAll's own doc comment: a note with a queued,
         // not-yet-confirmed archive/trash/restore/pin (see the *Queued
         // methods below) must not have this refresh's now-stale server
         // snapshot silently undo its optimistic local state.
-        noteDao.replaceAll(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() }, getProtectedNoteIds())
+        val (rows, details) = rowsOf(notes)
+        noteDao.replaceAll(rows, details, getProtectedNoteIds())
+        NativeDebug.d(
+            "NotesRepository.refresh: ${notes.size} note(s), read in ${(readAt - startedAt) / 1_000_000} ms, " +
+                "cached in ${(System.nanoTime() - readAt) / 1_000_000} ms",
+        )
     }
 
     /**
@@ -423,7 +444,8 @@ class NotesRepository(
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }
-        noteDao.replaceArchived(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() }, getProtectedNoteIds())
+        val (rows, details) = rowsOf(notes)
+        noteDao.replaceArchived(rows, details, getProtectedNoteIds())
     }
 
     /** The trash's own list, on the same terms as [refreshArchived]. */
@@ -436,7 +458,8 @@ class NotesRepository(
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }
-        noteDao.replaceTrashed(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() }, getProtectedNoteIds())
+        val (rows, details) = rowsOf(notes)
+        noteDao.replaceTrashed(rows, details, getProtectedNoteIds())
     }
 
     /**

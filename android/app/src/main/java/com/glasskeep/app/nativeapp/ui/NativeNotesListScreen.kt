@@ -141,6 +141,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.zIndex
+import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.ImageCompression
@@ -195,6 +196,8 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 private val ErrorColor = Color(0xFFdc2626)
@@ -247,6 +250,14 @@ fun NativeNotesListScreen(
     val dark = LocalGkDark.current
     val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
+    // Each card reads its own full copy, images and collaborators included:
+    // a few at a time, so a long list does not hold every note's payload in
+    // memory at once while the app starts.
+    val loadCardDetail = remember(repository) {
+        val gate = Semaphore(CardDetailLoads)
+        val load: suspend (String) -> NoteDto? = { id -> gate.withPermit { repository.cachedNoteDetailOrNull(id) } }
+        load
+    }
     // null (as opposed to an actually-empty list) means Room's cold Flow
     // has not delivered its first emission yet, which is not instant: the
     // scrollable list below must not mount against that transient empty
@@ -254,6 +265,17 @@ fun NativeNotesListScreen(
     // to the top for good.
     val rawNotes by repository.observeNotes().collectAsState(initial = null)
     val notes = rawNotes ?: emptyList()
+    if (BuildConfig.DEBUG) {
+        val loaded = rawNotes != null
+        LaunchedEffect(Unit) { NativeDebug.boot("notes list: first composition") }
+        LaunchedEffect(loaded) {
+            if (loaded) {
+                NativeDebug.boot("notes list: ${notes.size} note(s) read from the phone")
+                withFrameNanos { }
+                NativeDebug.boot("notes list: notes on screen")
+            }
+        }
+    }
     // The archive and the trash are each their own server list
     // (App.jsx:3194-3205), which the page shows instead of the notes; the
     // drawer's tag counts keep reading the notes. Keyed on the view, so
@@ -1013,7 +1035,7 @@ fun NativeNotesListScreen(
                                     },
                                     typography = container.editorPrefs.typography.activeProfile,
                                     taskStrike = container.editorPrefs.taskStrike,
-                                    loadDetail = repository::cachedNoteDetailOrNull,
+                                    loadDetail = loadCardDetail,
                                     themeId = themeId,
                                     isDragged = note.id == draggedNoteId,
                                     isDragOver = note.id == dragOverNoteId,
@@ -2366,6 +2388,9 @@ private fun NotesMasonry(
 // is the closest native equivalent, not a byte-for-byte port.
 private val CardShadowTint = Color(0xFF8B5CF6)
 
+/** How many cards read their full copy from the phone at once. */
+private const val CardDetailLoads = 4
+
 // useNoteTouchDrag.js's timings: hold 300ms (moving over 10px first gives
 // the touch to the scroll), then the drag is dropped when the finger has
 // not moved 600ms after it began, or 3s after its last move.
@@ -2702,7 +2727,7 @@ private fun NoteCard(
         // cropped, over the card content like the checkbox below.
         if (!selectionMode) {
             note.iconSrc?.let { src ->
-                rememberDecodedImage(src)?.let { bitmap ->
+                rememberDecodedImageAsync(src)?.let { bitmap ->
                     Image(
                         bitmap = bitmap,
                         contentDescription = note.iconName?.takeIf { it.isNotBlank() }
@@ -2958,7 +2983,7 @@ private fun CardCollaborators(collaborators: List<CollaboratorDto>, dark: Boolea
         CollaborateIcon(size = 16.dp, tint = if (dark) Color(0xFF7C86FF) else Color(0xFF615FFF))
         Spacer(Modifier.width(4.dp))
         collaborators.take(2).forEachIndexed { index, person ->
-            val photo = person.avatarUrl?.takeIf { it.startsWith("data:") }?.let { rememberDecodedImage(it) }
+            val photo = person.avatarUrl?.takeIf { it.startsWith("data:") }?.let { rememberDecodedImageAsync(it) }
             Box(
                 modifier = Modifier
                     .offset(x = (-6 * index).dp)

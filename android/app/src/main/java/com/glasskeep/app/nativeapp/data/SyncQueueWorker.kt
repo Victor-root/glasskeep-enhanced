@@ -156,15 +156,6 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
          * burn them all in a moment on a bad connection.
          */
         private suspend fun drainQueue(context: Context, countFailures: Boolean): Boolean = drainLock.withLock {
-            val tokenStore = TokenStore(context)
-            val serverUrl = tokenStore.serverUrl
-            val token = tokenStore.token
-            if (serverUrl.isNullOrBlank() || token.isNullOrBlank()) {
-                NativeDebug.d("SyncQueueWorker: no session, skipping")
-                if (BuildConfig.DEBUG) Log.d("GKSync", "drain bailing: no session (serverUrl blank=${serverUrl.isNullOrBlank()}, token blank=${token.isNullOrBlank()})")
-                return@withLock false
-            }
-
             val queueDao = SyncQueueDatabase.get(context).syncQueueDao()
             val pending = queueDao.getPending()
             if (BuildConfig.DEBUG) {
@@ -174,7 +165,19 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
                         pending.joinToString { "[id=${it.queueId} type=${it.type} note=${it.noteId} attempts=${it.attempts} status=${it.status}]" },
                 )
             }
+            // Nothing to send: the encrypted session store is not opened at
+            // all, which the app start-up would otherwise pay for on every
+            // drain.
             if (pending.isEmpty()) return@withLock false
+
+            val tokenStore = TokenStore(context)
+            val serverUrl = tokenStore.serverUrl
+            val token = tokenStore.token
+            if (serverUrl.isNullOrBlank() || token.isNullOrBlank()) {
+                NativeDebug.d("SyncQueueWorker: no session, skipping")
+                if (BuildConfig.DEBUG) Log.d("GKSync", "drain bailing: no session (serverUrl blank=${serverUrl.isNullOrBlank()}, token blank=${token.isNullOrBlank()})")
+                return@withLock false
+            }
 
             val repository = NotesRepository(
                 // No lock-state callback: this runs with no UI on screen, so a

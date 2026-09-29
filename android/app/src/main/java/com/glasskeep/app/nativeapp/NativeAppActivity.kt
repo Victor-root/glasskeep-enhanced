@@ -46,6 +46,7 @@ class NativeAppActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NativeDebug.boot("NativeAppActivity.onCreate")
         val serverUrl = intent.getStringExtra(EXTRA_SERVER_URL)
             ?: error("NativeAppActivity started without EXTRA_SERVER_URL")
         NativeDebug.d("NativeAppActivity.onCreate serverUrl=$serverUrl")
@@ -54,6 +55,7 @@ class NativeAppActivity : ComponentActivity() {
         pendingNewNoteType = intent.getStringExtra(EXTRA_NEW_NOTE_TYPE)
 
         val container = NativeAppContainer(applicationContext)
+        NativeDebug.boot("container ready (session store, databases)")
 
         setContent {
             // The device setting, unless the header menu's light/dark entry

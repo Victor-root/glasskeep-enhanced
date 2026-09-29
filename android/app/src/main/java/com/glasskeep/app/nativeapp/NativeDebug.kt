@@ -1,5 +1,7 @@
 package com.glasskeep.app.nativeapp
 
+import android.os.Process
+import android.os.SystemClock
 import android.util.Log
 import com.glasskeep.app.BuildConfig
 
@@ -15,6 +17,12 @@ object NativeDebug {
 
     fun d(message: String) {
         if (BuildConfig.DEBUG) Log.d(TAG, message)
+    }
+
+    /** A line of the start-up trail, stamped with the time since this
+     *  process was started. */
+    fun boot(message: String) {
+        if (BuildConfig.DEBUG) Log.d(TAG, "[start +${SystemClock.uptimeMillis() - Process.getStartUptimeMillis()} ms] $message")
     }
 
     fun e(message: String, error: Throwable? = null) {
