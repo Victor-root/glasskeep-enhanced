@@ -722,6 +722,7 @@ const { attachSelfUpdateRoutes } = require("./routes/selfUpdateRoutes");
 const { attachAssetLinksRoutes } = require("./routes/assetLinksRoutes");
 const { attachDeviceLinkRoutes } = require("./routes/deviceLinkRoutes");
 const { attachFederationRoutes } = require("./routes/federationRoutes");
+const { attachOidcRoutes } = require("./routes/oidcRoutes");
 const { requireUnlocked } = require("./routes/lockMiddleware");
 const { t: serverT } = require("./i18n");
 const pushService = require("./services/pushNotifications");
@@ -1006,6 +1007,23 @@ function signToken(user, reason = "issue") {
     );
   } catch { /* ignore — diagnostic only */ }
   return token;
+}
+
+// What a successful sign-in answers with. The client stores it as its
+// whole auth state, so every sign-in method must return the same fields.
+function sessionResponse(user, reason) {
+  return {
+    token: signToken(user, reason),
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      is_admin: !!user.is_admin,
+      avatar_url: user.avatar_url || null,
+      language: user.language || null,
+    },
+    must_change_password: !!user.must_change_password,
+  };
 }
 
 // ── TEMP DIAGNOSTIC (logout investigation) ───────────────────────────
@@ -2387,6 +2405,22 @@ app.get("/api/auth/renew", auth, (req, res) => {
       language: user.language || null,
     },
   });
+});
+
+// Sign-in through the admin-configured OpenID Connect provider, and the
+// identities a user has linked to their account. Registered after the
+// lock gate, like the password sign-in: a locked instance opens no
+// session either way.
+attachOidcRoutes(app, {
+  db,
+  auth,
+  adminOnly,
+  getUserById,
+  insertUser,
+  isEmailTaken: (email) => !!(getUserByEmail.get(email) || getPendingByEmail.get(email)),
+  isAdminEmail: (email) => ADMIN_EMAILS.includes(String(email).toLowerCase()),
+  sessionResponse,
+  log: console,
 });
 
 // Get current user profile info (authenticated)
