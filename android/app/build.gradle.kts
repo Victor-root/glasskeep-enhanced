@@ -102,6 +102,12 @@ android {
     // compileOptions.targetCompatibility above, so setting it again here
     // is redundant.
 
+    testOptions {
+        // The code under test logs through android.util.Log, which a plain
+        // JVM test has no implementation of.
+        unitTests.isReturnDefaultValues = true
+    }
+
     buildFeatures {
         compose = true
         // BuildConfig is opt-in on AGP 8+. The self-update flow reads

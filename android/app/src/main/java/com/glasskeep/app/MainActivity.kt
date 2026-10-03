@@ -8,6 +8,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import com.glasskeep.app.nativeapp.NativeAppActivity
+import com.glasskeep.app.nativeapp.StartupWarmUp
 import com.glasskeep.app.net.CleartextPolicy
 import com.glasskeep.app.ui.OnboardingPager
 import com.glasskeep.app.ui.applyThemedSystemBars
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
         // or a new text / checklist / audio note) rides along as an
         // Intent extra, see launchApp.
         if (welcomeDone && savedUrl != null) {
+            StartupWarmUp.begin(this)
             launchApp(savedUrl)
             return
         }

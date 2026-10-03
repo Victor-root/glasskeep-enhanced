@@ -172,14 +172,18 @@ object ApiClientFactory {
         cache: Cache,
         onInstanceLocked: () -> Unit,
         onSessionExpired: (String) -> Unit,
-    ): GlassKeepApi {
+    ): GlassKeepApi =
+        create(baseUrl, RevalidatingCallFactory(okHttpClient(tokenStore, onInstanceLocked, onSessionExpired), cache))
+
+    /** The service itself, over whatever sends its requests. */
+    internal fun create(baseUrl: String, callFactory: Call.Factory): GlassKeepApi {
         val normalizedBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
         NativeDebug.d("ApiClientFactory.create baseUrl=$normalizedBaseUrl")
 
         val contentType = "application/json".toMediaType()
         val retrofit = Retrofit.Builder()
             .baseUrl(normalizedBaseUrl)
-            .callFactory(RevalidatingCallFactory(okHttpClient(tokenStore, onInstanceLocked, onSessionExpired), cache))
+            .callFactory(callFactory)
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()
 

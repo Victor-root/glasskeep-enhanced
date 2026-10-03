@@ -2347,6 +2347,31 @@ private fun SectionLabel(text: String, color: Color) {
 private fun masonryColumns(notes: List<NoteEntity>, listView: Boolean): List<List<NoteEntity>> =
     if (listView) listOf(notes) else (0..1).map { column -> notes.filterIndexed { index, _ -> index % 2 == column } }
 
+/** Cards a list builds in its first frame: about a screenful, so the notes
+ *  show at once rather than after every card of the list has been built. */
+private const val FirstFrameCards = 10
+
+/** Cards a list adds with each frame after its first, until it is complete. */
+private const val CardsPerFrame = 6
+
+/** How many of a list's [total] cards are on screen: [FirstFrameCards] at
+ *  first, then [CardsPerFrame] more with every frame. A card's column
+ *  depends on its index alone, so the ones that come later land below those
+ *  already there and nothing moves. */
+@Composable
+private fun rememberCardsOnScreen(total: Int): Int {
+    var count by remember { mutableIntStateOf(FirstFrameCards) }
+    LaunchedEffect(total) {
+        if (count >= total) return@LaunchedEffect
+        while (count < total) {
+            withFrameNanos { }
+            count += CardsPerFrame
+        }
+        NativeDebug.boot("notes list: all $total card(s) on screen")
+    }
+    return count
+}
+
 /** The [masonryColumns] of [list]. Keeping the columns in one shared
  * scroll surface reproduces both react-masonry-css's order and its
  * independent vertical packing. In the grid every card keeps its 12px
@@ -2359,7 +2384,7 @@ private fun NotesMasonry(
     list: NoteCardList,
     renderNoteCard: @Composable (NoteEntity, NoteCardPlace) -> Unit,
 ) {
-    val columns = masonryColumns(notes, listView)
+    val columns = masonryColumns(notes.take(rememberCardsOnScreen(notes.size)), listView)
     if (listView) {
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
             for (note in columns.single()) key(note.id) { renderNoteCard(note, NoteCardPlace(list, listView, 0)) }

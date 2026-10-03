@@ -2,8 +2,6 @@ package com.glasskeep.app.nativeapp.data
 
 import android.content.Context
 import android.util.Base64
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
 import kotlinx.serialization.json.Json
@@ -18,17 +16,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * each other's session.
  */
 class TokenStore(context: Context) {
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
-
-    private val prefs = EncryptedSharedPreferences.create(
-        context,
-        "glasskeep_native_session",
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-    )
+    private val prefs = SessionPrefs.get(context)
 
     var serverUrl: String?
         get() = prefs.getString(KEY_SERVER_URL, null)
