@@ -64,6 +64,12 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -77,6 +83,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
+import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.AiMessage
 import com.glasskeep.app.nativeapp.data.TypographyProfile
 import com.glasskeep.app.ui.ButtonGradient
@@ -362,7 +369,21 @@ fun NoteAiChatPanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester)
-                        .onFocusChanged { inputFocused = it.isFocused },
+                        .onFocusChanged { inputFocused = it.isFocused }
+                        // Enter sends and Shift+Enter keeps its new line, on a
+                        // phone too (handleKeyDown, NoteAiChatPanel.jsx:106).
+                        .onPreviewKeyEvent { event ->
+                            val enter = event.key == Key.Enter || event.key == Key.NumPadEnter
+                            if (enter && !event.isShiftPressed) {
+                                if (event.type == KeyEventType.KeyDown) {
+                                    NativeDebug.d("NoteAiChatPanel: Enter sends the question")
+                                    submit()
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        },
                 )
             }
             Spacer(Modifier.width(8.dp))
