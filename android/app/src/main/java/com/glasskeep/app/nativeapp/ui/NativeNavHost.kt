@@ -517,6 +517,11 @@ fun NativeNavHost(
     }
     val lock = container.lockState
     val showUnlockScreen = lock.isLocked && (!signedIn || lock.overlayOpen)
+    fun onUnlockSucceeded() {
+        lock.bannerDismissed = true
+        lock.overlayOpen = false
+        lockPokes++
+    }
     // The admin panel's encryption section, kept for the whole session as
     // the web keeps it mounted: a recovery key survives the panel closing.
     val adminEncryption = remember(serverUrl, signedIn) {
@@ -588,12 +593,11 @@ fun NativeNavHost(
                         container = container,
                         serverUrl = serverUrl,
                         // The next status read confirms it; closing the overlay
-                        // now is what stops the screen lingering for the
-                        // round-trip (App.jsx:7381).
-                        onUnlocked = { lock.overlayOpen = false; lockPokes++ },
+                        // and hiding the banner now is what stops the screen
+                        // lingering for the round-trip (App.jsx:7381).
+                        onUnlocked = ::onUnlockSucceeded,
                         onUnlockedWithSession = { mustChangePassword ->
-                            lock.overlayOpen = false
-                            lockPokes++
+                            onUnlockSucceeded()
                             // handleLoggedIn navigates, which needs a graph.
                             // A cold start behind this screen never composed
                             // the NavHost and has none; it is about to compose
@@ -608,7 +612,7 @@ fun NativeNavHost(
                         // Only from the banner's CTA: a cold start with no
                         // session has no local cache to go back to.
                         onBackToOffline = if (signedIn) {
-                            { lock.overlayOpen = false; lock.bannerDismissed = true }
+                            { lock.overlayOpen = false }
                         } else {
                             null
                         },
