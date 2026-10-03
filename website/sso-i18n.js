@@ -15,7 +15,6 @@
     "sso.nav.providers": "Providers",
     "sso.nav.help": "Troubleshooting",
 
-    "sso.hero.eyebrow": "Guide · Single sign-on",
     "sso.hero.title": "Sign in with<br /><span class=\"grad-text\">your own provider.</span>",
     "sso.hero.sub": "GlassKeep works with any OpenID Connect provider. An administrator allows it once; each user then declares their own provider in their settings, links their account to it and signs in through it. This guide covers Authentik, Keycloak and Authelia, with the exact values to enter on both sides.",
     "sso.hero.cta1": "Start the setup",
@@ -211,7 +210,6 @@
     "sso.nav.providers": "Fournisseurs",
     "sso.nav.help": "Dépannage",
 
-    "sso.hero.eyebrow": "Guide · Connexion unique",
     "sso.hero.title": "Connectez-vous avec<br /><span class=\"grad-text\">votre propre fournisseur.</span>",
     "sso.hero.sub": "GlassKeep fonctionne avec n'importe quel fournisseur OpenID Connect. Un administrateur l'autorise une fois ; chaque utilisateur déclare ensuite son propre fournisseur dans ses paramètres, y associe son compte et se connecte par ce biais. Ce guide couvre Authentik, Keycloak et Authelia, avec les valeurs exactes à saisir des deux côtés.",
     "sso.hero.cta1": "Commencer la configuration",
