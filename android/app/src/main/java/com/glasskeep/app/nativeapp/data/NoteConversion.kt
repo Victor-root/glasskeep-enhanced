@@ -75,35 +75,6 @@ object NoteConversion {
     }
 
     /**
-     * checklistItemsToText(): the Markdown-ish body a checklist becomes.
-     * Sections turn into `## Title` (with a blank line above), items into
-     * `- [ ]` / `- [x]`, and an indented item keeps its two-space prefix so
-     * [textToChecklistEntries] reads it back as indented. Empty rows are
-     * skipped so the result stays clean.
-     */
-    fun checklistEntriesToText(entries: List<ChecklistEntry>): String {
-        val normalized = ChecklistItems.normalize(entries)
-        val lines = mutableListOf<String>()
-        for (entry in normalized) {
-            when (entry) {
-                is ChecklistSectionData -> {
-                    val title = entry.title.trim()
-                    if (title.isEmpty()) continue
-                    if (lines.isNotEmpty() && lines.last().isNotEmpty()) lines.add("")
-                    lines.add("## $title")
-                }
-                is ChecklistItemData -> {
-                    val text = entry.text.trim()
-                    if (text.isEmpty()) continue
-                    val prefix = if (entry.indent > 0) "  " else ""
-                    lines.add("$prefix- [${if (entry.done) "x" else " "}] $text")
-                }
-            }
-        }
-        return lines.joinToString("\n")
-    }
-
-    /**
      * The checklist as rich blocks, ready for [RichDoc.encode].
      *
      * The web gets there through Markdown (checklistItemsToText, then

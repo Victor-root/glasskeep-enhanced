@@ -133,21 +133,6 @@ fun NoteImagesSection(
     }
 }
 
-@Composable
-private fun NoteImageThumbnail(image: NoteImageData, modifier: Modifier = Modifier) {
-    val bitmap = rememberDecodedImage(image.src)
-    Box(modifier.background(Color.Black.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap,
-                contentDescription = image.name.ifBlank { null },
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
-            )
-        }
-    }
-}
-
 /**
  * FullscreenImageViewer.jsx on a phone: the note stays visible behind a
  * frosted 30% black scrim, the image at its natural size (at most 92% of

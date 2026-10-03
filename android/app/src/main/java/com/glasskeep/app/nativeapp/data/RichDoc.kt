@@ -762,14 +762,6 @@ object RichDoc {
     fun newBlock(kind: RichBlockKind = RichBlockKind.PARAGRAPH): RichBlock =
         RichBlock(id = UUID.randomUUID().toString(), kind = kind, text = "", marks = emptyList())
 
-    /** The one mark instance of [type] covering the whole `[start, end)`
-     *  range, or null when the range carries none, or more than one with
-     *  different values (a selection spanning red and blue text). */
-    fun markAt(marks: List<RichMark>, type: RichMarkType, start: Int, end: Int): RichMark? {
-        val covering = marks.filter { it.type == type && it.start <= start && it.end >= end }
-        return covering.distinctBy { it.value to it.color }.singleOrNull()
-    }
-
     /** ProseMirror's `$from.marks()` for a collapsed caret: the marks of the
      *  character before it, or of the first character at the very start of
      *  a block. Every mark of this schema is inclusive (the link too, since
