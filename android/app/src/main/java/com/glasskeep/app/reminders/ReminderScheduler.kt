@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.glasskeep.app.nativeapp.NativeDebug
 import org.json.JSONObject
 
 /**
@@ -61,7 +62,7 @@ object ReminderScheduler {
         } else {
             true
         }
-        android.util.Log.i("GKReminders", "schedule: note=$noteId fires in ${(at - now) / 1000}s (canExact=$canExact)")
+        NativeDebug.d("reminder schedule: note=$noteId fires in ${(at - now) / 1000}s (canExact=$canExact)")
         try {
             if (canExact) {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
@@ -86,7 +87,7 @@ object ReminderScheduler {
 
     /** Reconcile the full set: cancel anything not present, (re)schedule all given. */
     fun syncAll(ctx: Context, items: List<ReminderItem>) {
-        android.util.Log.i("GKReminders", "syncAll: reconciling ${items.size} upcoming reminder(s)")
+        NativeDebug.d("reminder syncAll: reconciling ${items.size} upcoming reminder(s)")
         val keep = items.map { it.noteId }.toSet()
         val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         for (key in prefs.all.keys.toList()) {
@@ -100,7 +101,7 @@ object ReminderScheduler {
     /** Re-arm persisted alarms (used after a reboot). Past ones are dropped. */
     fun rescheduleAll(ctx: Context) {
         val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        android.util.Log.i("GKReminders", "rescheduleAll: re-arming ${prefs.all.size} persisted alarm(s) after boot")
+        NativeDebug.d("reminder rescheduleAll: re-arming ${prefs.all.size} persisted alarm(s) after boot")
         val now = System.currentTimeMillis()
         for ((noteId, raw) in prefs.all.toMap()) {
             try {

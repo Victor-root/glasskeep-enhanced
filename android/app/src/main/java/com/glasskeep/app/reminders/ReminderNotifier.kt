@@ -11,6 +11,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.glasskeep.app.MainActivity
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppActivity
+import com.glasskeep.app.nativeapp.NativeDebug
 
 /**
  * Posts a local "reminder due" notification. Mirrors UpdateNotifier: a
@@ -32,11 +33,11 @@ internal object ReminderNotifier {
     fun show(context: Context, noteId: String, title: String, body: String) {
         val mgr = NotificationManagerCompat.from(context)
         if (!mgr.areNotificationsEnabled()) {
-            android.util.Log.w("GKReminders", "notifier: notifications DISABLED — cannot post (note=$noteId)")
+            NativeDebug.d("reminder notifier: notifications disabled, cannot post (note=$noteId)")
             return
         }
         ensureChannel(context)
-        android.util.Log.i("GKReminders", "notifier: posting notification (note=$noteId)")
+        NativeDebug.d("reminder notifier: posting notification (note=$noteId)")
 
         // Tapping the notification — or its explicit "Open" action — enters
         // through MainActivity and reaches NativeAppActivity with the note id.
@@ -61,10 +62,10 @@ internal object ReminderNotifier {
             // Stable per-note id so re-firing the same note replaces its row
             // instead of stacking duplicates.
             mgr.notify(noteId.hashCode(), builder.build())
-            android.util.Log.i("GKReminders", "notifier: notify() OK (note=$noteId)")
+            NativeDebug.d("reminder notifier: notify() OK (note=$noteId)")
         } catch (e: SecurityException) {
             // Notifications revoked between the enabled-check and notify().
-            android.util.Log.w("GKReminders", "notifier: SecurityException posting (note=$noteId)", e)
+            NativeDebug.e("reminder notifier: SecurityException posting (note=$noteId)", e)
         }
     }
 

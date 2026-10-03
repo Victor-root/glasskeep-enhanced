@@ -10,6 +10,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.glasskeep.app.MainActivity
+import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.net.CleartextPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -46,9 +47,9 @@ class ReminderSyncWorker(
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val prefs = applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val session = resolveSession(prefs)
-        android.util.Log.i("GKReminders", "sync: start (session resolved=${session != null})")
+        NativeDebug.d("reminder sync: start (session resolved=${session != null})")
         if (session == null) {
-            android.util.Log.w("GKReminders", "sync: skipped — not signed in (no server_url/token yet)")
+            NativeDebug.d("reminder sync: skipped, not signed in (no server_url/token yet)")
             return@withContext Result.success()
         }
         val (serverUrl, token, urlVetted) = session
@@ -58,17 +59,17 @@ class ReminderSyncWorker(
         // sending the token in the clear across the internet is dropped
         // here rather than retried.
         if (!CleartextPolicy.isUsableAtStartup(serverUrl, urlVetted)) {
-            android.util.Log.w("GKReminders", "sync: skipped, stored server address is not usable in cleartext")
+            NativeDebug.d("reminder sync: skipped, stored server address is not usable in cleartext")
             return@withContext Result.success()
         }
 
         val body = try {
             httpGet("$serverUrl/api/reminders/upcoming", token)
         } catch (e: Exception) {
-            android.util.Log.w("GKReminders", "sync: network error, will retry — ${e.message}")
+            NativeDebug.e("reminder sync: network error, will retry", e)
             return@withContext Result.retry()
         } ?: run {
-            android.util.Log.w("GKReminders", "sync: auth rejected (401/403) — token stale? reopen the app")
+            NativeDebug.d("reminder sync: auth rejected (401/403), token stale? reopen the app")
             return@withContext Result.success()
         }
 
@@ -90,7 +91,7 @@ class ReminderSyncWorker(
         }
 
         // Reconcile the full set: arms new alarms, cancels ones no longer due.
-        android.util.Log.i("GKReminders", "sync: server returned ${items.size} upcoming reminder(s) -> arming")
+        NativeDebug.d("reminder sync: server returned ${items.size} upcoming reminder(s), arming")
         ReminderScheduler.syncAll(applicationContext, items)
         Result.success()
     }
@@ -103,7 +104,7 @@ class ReminderSyncWorker(
         } catch (t: Throwable) {
             // If the Keystore is temporarily unavailable, skipping a sync is
             // safer than falling back to a potentially obsolete plaintext JWT.
-            android.util.Log.w("GKReminders", "sync: native session read failed", t)
+            NativeDebug.e("reminder sync: native session read failed", t)
             return null
         }
 
@@ -139,7 +140,7 @@ class ReminderSyncWorker(
         }
         try {
             val code = conn.responseCode
-            android.util.Log.i("GKReminders", "sync: GET upcoming -> HTTP $code")
+            NativeDebug.d("reminder sync: GET upcoming -> HTTP $code")
             if (code == 401 || code == 403) return null
             if (code !in 200..299) throw RuntimeException("HTTP $code")
             return conn.inputStream.bufferedReader().use { it.readText() }
@@ -160,10 +161,7 @@ class ReminderSyncWorker(
         fun setAuthToken(ctx: Context, token: String) {
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putString(KEY_TOKEN, token).apply()
-            android.util.Log.i(
-                "GKReminders",
-                "setAuthToken: token ${if (token.isBlank()) "cleared" else "stored"}; scheduling periodic + immediate sync",
-            )
+            NativeDebug.d("reminder setAuthToken: token ${if (token.isBlank()) "cleared" else "stored"}; scheduling periodic + immediate sync")
             if (token.isNotBlank()) {
                 schedulePeriodic(ctx)
                 syncNow(ctx)

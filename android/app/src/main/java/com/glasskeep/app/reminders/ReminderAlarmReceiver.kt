@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.glasskeep.app.nativeapp.NativeAppActivity
+import com.glasskeep.app.nativeapp.NativeDebug
 
 /**
  * Fires when an AlarmManager reminder alarm goes off. Shows a local
@@ -19,10 +20,7 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
         val body = intent.getStringExtra(EXTRA_BODY) ?: ""
 
-        android.util.Log.i(
-            "GKReminders",
-            "alarm fired: note=$noteId (appForeground=${NativeAppActivity.isForeground})",
-        )
+        NativeDebug.d("reminder alarm fired: note=$noteId (appForeground=${NativeAppActivity.isForeground})")
 
         // The alarm has fired once — drop it from the persisted set so a
         // reboot doesn't resurrect it.
@@ -30,11 +28,11 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
 
         // App in foreground → the in-app notification already shows it.
         if (NativeAppActivity.isForeground) {
-            android.util.Log.i("GKReminders", "alarm: app foreground -> skipping system notif (in-app handles it)")
+            NativeDebug.d("reminder alarm: app foreground, skipping the system notification")
             return
         }
 
-        android.util.Log.i("GKReminders", "alarm: app not foreground -> posting system notif")
+        NativeDebug.d("reminder alarm: app not foreground, posting the system notification")
         ReminderNotifier.show(context, noteId, title, body)
     }
 
