@@ -33,6 +33,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -122,6 +123,31 @@ private val IndentStep = 28.dp
 /** AXIS_LOCK_PX (useChecklistDrag.js:11). */
 private val AxisLock = 8.dp
 
+/** What the web's `sm:` (640px) and `md:` (768px) change in the checklist,
+ *  read from the window's width in dp, which is 1 CSS px. */
+@Immutable
+private class ChecklistMetrics(width: Dp) {
+    /** Under `sm:` the list and its sections spill past the note's
+     *  gutter (max-sm:-mx-4, max-sm:-mx-2). */
+    val phone = width < 640.dp
+    private val desktop = width >= 768.dp
+
+    /** gap-1.5 sm:gap-3 md:gap-2: between a row's box, text and "✕". */
+    val rowGap = if (phone) 6.dp else if (desktop) 8.dp else 12.dp
+
+    /** space-y-6 md:space-y-4: between the blocks of the list. */
+    val blockGap = if (desktop) 16.dp else 24.dp
+
+    /** space-y-4 md:space-y-3: between the pieces of an empty list. */
+    val emptyGap = if (desktop) 12.dp else 16.dp
+
+    /** space-y-3 md:space-y-1: between the add row and the rows. */
+    val addRowGap = if (desktop) 4.dp else 12.dp
+
+    /** w-4 h-4 sm:w-3.5 sm:h-3.5: a section's colour dot. */
+    val sectionDot = if (phone) 16.dp else 14.dp
+}
+
 /** SECTION_COLORS (SectionHeader.jsx:15-25), in order. */
 internal val ChecklistSectionColors: List<Pair<String, Color>> = listOf(
     "slate" to Color(0xFF64748B),
@@ -180,6 +206,8 @@ fun ChecklistEditorBody(
     scrollViewport: () -> Rect?,
     readOnly: Boolean = false,
 ) {
+    val windowDp = windowWidth()
+    val metrics = remember(windowDp) { ChecklistMetrics(windowDp) }
     val blocks = remember(entries) { ChecklistItems.blocks(entries) }
     val hasChecked = remember(entries) { entries.any { it is ChecklistItemData && it.done } }
 
@@ -316,16 +344,17 @@ fun ChecklistEditorBody(
         commitEntries(entries + ChecklistItems.newSection() + ChecklistItems.newItem())
     }
 
-    // max-sm:-mx-4: the list reaches 16dp past the note's text gutter.
+    // max-sm:-mx-4: on a phone the list reaches 16dp past the note's text
+    // gutter.
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .bleedHorizontally(16.dp)
+            .then(if (metrics.phone) Modifier.bleedHorizontally(16.dp) else Modifier)
             .onGloballyPositioned { drag.attachRoot(it) }
             .onFocusChanged { editingInside = it.hasFocus },
     ) {
         if (entries.isEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(metrics.emptyGap)) {
                 if (!readOnly && insertPosition == "top") ChecklistAddRow(borderColor = borderColor, dark = dark) { addItemAtEdge() }
                 Text(
                     stringResource(R.string.native_checklist_empty),
@@ -341,11 +370,12 @@ fun ChecklistEditorBody(
                 }
             }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(metrics.blockGap)) {
                 blocks.forEach { block ->
                     val blockKey = block.section?.id ?: DefaultBlockKey
                     ChecklistSectionBlock(
                         block = block,
+                        metrics = metrics,
                         entries = entries,
                         readOnly = readOnly,
                         insertPosition = insertPosition,
@@ -409,10 +439,11 @@ fun ChecklistEditorBody(
                     }
                 }
 
-                // Its own 16dp top margin folds into the 24dp above it.
+                // Its own 16dp top margin folds into the gap above it.
                 if (hasChecked) {
                     ChecklistDoneArea(
                         blocks = blocks,
+                        metrics = metrics,
                         readOnly = readOnly,
                         showSectionLabels = blocks.size > 1,
                         collapsed = doneCollapsed,
@@ -439,7 +470,7 @@ fun ChecklistEditorBody(
         // The carried item's own floating copy, over everything.
         drag.liftedItemId?.let { id ->
             (entries.firstOrNull { it.id == id } as? ChecklistItemData)?.let { item ->
-                ChecklistLiftedRow(item = item, drag = drag, background = noteBackground, dark = dark, textColor = titleColor)
+                ChecklistLiftedRow(item = item, metrics = metrics, drag = drag, background = noteBackground, dark = dark, textColor = titleColor)
             }
         }
     }
@@ -450,6 +481,7 @@ fun ChecklistEditorBody(
 @Composable
 private fun ChecklistSectionBlock(
     block: ChecklistBlock,
+    metrics: ChecklistMetrics,
     entries: List<ChecklistEntry>,
     readOnly: Boolean,
     insertPosition: String,
@@ -489,6 +521,7 @@ private fun ChecklistSectionBlock(
         for (item in unchecked) key(item.id) {
             ChecklistRowView(
                 item = item,
+                metrics = metrics,
                 readOnly = readOnly,
                 dark = dark,
                 titleColor = titleColor,
@@ -513,20 +546,20 @@ private fun ChecklistSectionBlock(
 
     // A lifted section is the block itself, raised in its own place while
     // the others slide around it. The web's floating copy keeps the
-    // block's max-sm:-ml-2, so it rides 8dp left of the block.
+    // block's max-sm:-ml-2, so on a phone it rides 8dp left of the block.
     val lifted = drag.liftedBlockKey == blockKey
     val liftShape = RoundedCornerShape(8.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            // max-sm:-mx-2: a section reaches the panel's own edges.
-            .then(if (section != null) Modifier.bleedHorizontally(8.dp) else Modifier)
+            // max-sm:-mx-2: on a phone a section reaches the panel's own edges.
+            .then(if (section != null && metrics.phone) Modifier.bleedHorizontally(8.dp) else Modifier)
             .onGloballyPositioned { drag.placeBlock(blockKey, it) }
             .zIndex(if (lifted) 1f else 0f)
             .graphicsLayer {
                 translationY = if (lifted) drag.blockOffset else drag.blockShiftOf(blockKey)
                 if (lifted) {
-                    translationX = -8.dp.toPx()
+                    if (metrics.phone) translationX = -8.dp.toPx()
                     scaleX = 1.02f - 0.02f * drag.settle
                     scaleY = scaleX
                 }
@@ -542,9 +575,9 @@ private fun ChecklistSectionBlock(
             ),
     ) {
         if (section == null) {
-            // space-y-3 around the rows. An empty row list still carries its
-            // 12dp margin: under the "bottom" add row it collapses above the
-            // block, over the "top" one into the 24dp gap that follows.
+            // space-y-3 md:space-y-1 around the rows. An empty row list still
+            // carries its margin: under the "bottom" add row it collapses
+            // above the block, over the "top" one into the gap that follows.
             if (!readOnly && insertPosition == "top") {
                 ChecklistAddRow(
                     borderColor = borderColor,
@@ -552,13 +585,13 @@ private fun ChecklistSectionBlock(
                     modifier = Modifier.checklistDragSlot(AddRowSlot, drag),
                     onClick = onAddAtEdge,
                 )
-                if (unchecked.isNotEmpty()) Spacer(Modifier.height(12.dp))
+                if (unchecked.isNotEmpty()) Spacer(Modifier.height(metrics.addRowGap))
             } else if (!readOnly && unchecked.isEmpty()) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(metrics.addRowGap))
             }
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { Rows() }
             if (!readOnly && insertPosition != "top") {
-                if (unchecked.isNotEmpty()) Spacer(Modifier.height(12.dp))
+                if (unchecked.isNotEmpty()) Spacer(Modifier.height(metrics.addRowGap))
                 ChecklistAddRow(
                     borderColor = borderColor,
                     dark = dark,
@@ -576,6 +609,7 @@ private fun ChecklistSectionBlock(
             ) {
                 ChecklistSectionHeader(
                     section = section,
+                    metrics = metrics,
                     readOnly = readOnly,
                     accent = accent,
                     uncheckedCount = unchecked.size,
@@ -659,6 +693,7 @@ private suspend fun AwaitPointerEventScope.trackHandle(
 @Composable
 private fun ChecklistRowView(
     item: ChecklistItemData,
+    metrics: ChecklistMetrics,
     readOnly: Boolean,
     dark: Boolean,
     titleColor: Color,
@@ -787,7 +822,7 @@ private fun ChecklistRowView(
                 Spacer(Modifier.width(8.dp))
             }
             GkCheckbox(checked = item.done, onCheckedChange = onToggle, enabled = !readOnly)
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(metrics.rowGap))
             ChecklistRowText(
                 text = item.text,
                 done = false,
@@ -807,8 +842,8 @@ private fun ChecklistRowView(
                 modifier = Modifier.weight(1f),
             )
         }
-        // The row's 8dp gap plus the button's own ml-1.5.
-        if (!readOnly) ChecklistRemoveButton(dark = dark, gap = 14.dp, onRemove = onRemove)
+        // The row's 8dp gap plus the button's own ml-1.5 sm:ml-3 md:ml-2.
+        if (!readOnly) ChecklistRemoveButton(dark = dark, gap = 8.dp + metrics.rowGap, onRemove = onRemove)
     }
 }
 
@@ -823,6 +858,7 @@ private fun ChecklistRowView(
 @Composable
 private fun ChecklistLiftedRow(
     item: ChecklistItemData,
+    metrics: ChecklistMetrics,
     drag: ChecklistDragController,
     background: Color,
     dark: Boolean,
@@ -851,7 +887,7 @@ private fun ChecklistLiftedRow(
         Box(Modifier.padding(horizontal = 4.dp)) { ChecklistDragHandle(dark = dark) }
         Spacer(Modifier.width(8.dp))
         GkCheckbox(checked = false, onCheckedChange = null)
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(metrics.rowGap))
         Text(
             if (item.text.isEmpty()) {
                 AnnotatedString(placeholder, SpanStyle(color = if (dark) PlaceholderDark else PlaceholderLight))
@@ -863,7 +899,7 @@ private fun ChecklistLiftedRow(
             lineHeight = 20.sp,
             modifier = Modifier.weight(1f, fill = false).padding(bottom = 3.dp),
         )
-        ChecklistRemoveButton(dark = dark, gap = 14.dp, onRemove = null)
+        ChecklistRemoveButton(dark = dark, gap = 8.dp + metrics.rowGap, onRemove = null)
     }
 }
 
@@ -1102,6 +1138,7 @@ private class ChecklistAtRestTransformation(
 @Composable
 private fun ChecklistSectionHeader(
     section: ChecklistSectionData,
+    metrics: ChecklistMetrics,
     readOnly: Boolean,
     accent: Color?,
     uncheckedCount: Int,
@@ -1189,7 +1226,7 @@ private fun ChecklistSectionHeader(
             Box {
                 Box(
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(metrics.sectionDot)
                         .clip(CircleShape)
                         .then(
                             if (accent != null) {
@@ -1526,6 +1563,7 @@ private fun ChecklistAddSectionButton(borderColor: Color, dark: Boolean, modifie
 @Composable
 private fun ChecklistDoneArea(
     blocks: List<ChecklistBlock>,
+    metrics: ChecklistMetrics,
     readOnly: Boolean,
     showSectionLabels: Boolean,
     collapsed: Boolean,
@@ -1602,6 +1640,7 @@ private fun ChecklistDoneArea(
                         key(item.id) {
                             ChecklistDoneRow(
                                 item = item,
+                                metrics = metrics,
                                 readOnly = readOnly,
                                 dark = dark,
                                 borderColor = borderColor,
@@ -1623,6 +1662,7 @@ private fun ChecklistDoneArea(
 @Composable
 private fun ChecklistDoneRow(
     item: ChecklistItemData,
+    metrics: ChecklistMetrics,
     readOnly: Boolean,
     dark: Boolean,
     borderColor: Color,
@@ -1636,7 +1676,7 @@ private fun ChecklistDoneRow(
         modifier = Modifier.fillMaxWidth().padding(start = if (item.indent == 1) IndentStep else 0.dp),
     ) {
         GkCheckbox(checked = true, onCheckedChange = onToggle, enabled = !readOnly)
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(metrics.rowGap))
         ChecklistRowText(
             text = item.text,
             done = true,
@@ -1651,6 +1691,6 @@ private fun ChecklistDoneRow(
             onBlur = onBlur,
             modifier = Modifier.weight(1f),
         )
-        if (!readOnly) ChecklistRemoveButton(dark = dark, gap = 6.dp, onRemove = onRemove)
+        if (!readOnly) ChecklistRemoveButton(dark = dark, gap = metrics.rowGap, onRemove = onRemove)
     }
 }
