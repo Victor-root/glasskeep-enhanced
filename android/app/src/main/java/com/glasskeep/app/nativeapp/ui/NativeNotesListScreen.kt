@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -54,6 +55,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,9 +70,11 @@ import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -124,6 +128,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -213,9 +218,53 @@ private val CardBorderLight = Color(0xFFD1D5DB).copy(alpha = 0.3f)
 private val CardBorderDark = Color(0xFF4B5563).copy(alpha = 0.3f)
 
 /**
+ * What the web's width breakpoints decide on the notes page, from the
+ * window's width in dp (one CSS pixel each): the grid's columns
+ * (NotesSections.jsx:93, react-masonry-css), the page's side margins (:36),
+ * the checklist lines a card shows (:34), and whether Tailwind's `sm:` holds
+ * (640 and up), which roomier cards, header and dock follow.
+ */
+@Immutable
+internal data class NotesLayout(val columns: Int, val sideMargin: Dp, val checklistLines: Int, val roomy: Boolean) {
+    /** The wrapper margin under each card (NoteCard.jsx:184), which the
+     *  list view's last card keeps. */
+    val cardMargin: Dp get() = if (roomy) 12.dp else 8.dp
+
+    companion object {
+        fun of(width: Dp): NotesLayout {
+            val px = width.value.roundToInt()
+            val columns = when {
+                px <= 767 -> 2
+                px <= 1089 -> 3
+                px <= 1339 -> 4
+                px <= 1587 -> 5
+                px <= 1835 -> 6
+                else -> 7
+            }
+            val sideMargin = when {
+                px < 640 -> 16.dp
+                px < 768 -> 24.dp
+                px < 1024 -> 32.dp
+                else -> 48.dp
+            }
+            val roomy = px >= 640
+            return NotesLayout(columns, sideMargin, if (roomy) 8 else 4, roomy)
+        }
+    }
+}
+
+/** `max-w-2xl`: the list view's column and the assistant's answer. */
+private val ReadingColumnMaxWidth = 672.dp
+
+/** `mx-auto` on a column of at most [ReadingColumnMaxWidth]. */
+private fun Modifier.readingColumn(): Modifier =
+    wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = ReadingColumnMaxWidth).fillMaxWidth()
+
+/**
  * Notes list: the web's own masonry grid with real card previews (text
- * snippet, or the first few unchecked checklist items) - one column or
- * two, depending on the view chosen from the header menu - and a header
+ * snippet, or the first few unchecked checklist items) - two to seven
+ * columns by the window's width, or one in the list view chosen from the
+ * header menu - and a header
  * carrying the app's own branding, same shape as NotesHeader.jsx /
  * NoteCard.jsx on the web side, including the administrator entry point.
  * The archive and the trash are this same screen too, over their own
@@ -345,6 +394,10 @@ fun NativeNotesListScreen(
     val aiErrorMessage = stringResource(R.string.native_notes_ai_error)
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
+    val layout by remember(windowInfo, density) {
+        derivedStateOf { NotesLayout.of(with(density) { windowInfo.containerSize.width.toDp() }) }
+    }
 
     val notesScrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
     var headerVisible by rememberSaveable { mutableStateOf(true) }
@@ -960,6 +1013,7 @@ fun NativeNotesListScreen(
                     AiAnswerCard(
                         answer = aiAnswer,
                         loading = aiLoading,
+                        layout = layout,
                         dark = dark,
                         titleColor = titleColor,
                         citedNotes = citedNotes,
@@ -984,14 +1038,15 @@ fun NativeNotesListScreen(
                 val listView = container.shellPrefs.listView
                 val pinnedNotes = remember(filteredNotes) { filteredNotes.filter { it.pinned } }
                 val otherNotes = remember(filteredNotes) { filteredNotes.filter { !it.pinned } }
+                val columnCount = if (listView) 1 else layout.columns
                 if (rawShown != null) {
                     SideEffect {
-                        cardsShown.update(NoteCardList.PINNED, listView, masonryColumns(pinnedNotes, listView))
-                        cardsShown.update(NoteCardList.OTHERS, listView, masonryColumns(otherNotes, listView))
+                        cardsShown.update(NoteCardList.PINNED, listView, masonryColumns(pinnedNotes, columnCount))
+                        cardsShown.update(NoteCardList.OTHERS, listView, masonryColumns(otherNotes, columnCount))
                     }
                 }
-                // main.px-4.pb-12, over the body's own bottom inset.
-                Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 48.dp + navBarBottom)) {
+                // main.px-4.pb-12 (wider margins from 640), over the body's own bottom inset.
+                Column(Modifier.fillMaxWidth().padding(start = layout.sideMargin, end = layout.sideMargin, bottom = 48.dp + navBarBottom)) {
                     when {
                         rawShown == null || (refreshing && shownNotes.isEmpty()) ->
                             EmptyListText(stringResource(R.string.native_notes_loading), subtextColor, Modifier.padding(top = emptyTop))
@@ -1050,6 +1105,7 @@ fun NativeNotesListScreen(
                                     taskStrike = container.editorPrefs.taskStrike,
                                     loadDetail = loadCardDetail,
                                     themeId = themeId,
+                                    layout = layout,
                                     isDragged = note.id == draggedNoteId,
                                     isDragOver = note.id == dragOverNoteId,
                                     onBoundsChanged = { bounds ->
@@ -1070,16 +1126,16 @@ fun NativeNotesListScreen(
                             // grid instead picks the currently shortest lane, visibly
                             // reordering cards. Use the web's real column algorithm.
                             if (pinnedNotes.isNotEmpty()) {
-                                SectionLabel(stringResource(R.string.native_notes_section_pinned), subtextColor)
-                                NotesMasonry(pinnedNotes, listView, NoteCardList.PINNED, renderNoteCard)
+                                SectionLabel(stringResource(R.string.native_notes_section_pinned), subtextColor, listView)
+                                NotesMasonry(pinnedNotes, layout, listView, NoteCardList.PINNED, renderNoteCard)
                                 // The pinned section's mb-10.
                                 Spacer(Modifier.height(40.dp))
                             }
                             if (otherNotes.isNotEmpty()) {
                                 if (pinnedNotes.isNotEmpty()) {
-                                    SectionLabel(stringResource(R.string.native_notes_section_others), subtextColor)
+                                    SectionLabel(stringResource(R.string.native_notes_section_others), subtextColor, listView)
                                 }
-                                NotesMasonry(otherNotes, listView, NoteCardList.OTHERS, renderNoteCard)
+                                NotesMasonry(otherNotes, layout, listView, NoteCardList.OTHERS, renderNoteCard)
                             }
                         }
                     }
@@ -1240,6 +1296,7 @@ fun NativeNotesListScreen(
                 dark = dark,
                 modifier = Modifier.align(Alignment.TopCenter),
                 headerVisible = headerVisible,
+                roomy = layout.roomy,
             )
         }
 
@@ -1250,6 +1307,7 @@ fun NativeNotesListScreen(
             NativeHeader(
                 dark = dark,
                 themeId = themeId,
+                roomy = layout.roomy,
                 titleColor = titleColor,
                 // The two lenses read as their own names, not as the
                 // sentinels they are stored under.
@@ -1517,6 +1575,8 @@ private fun EmptyListText(text: String, color: Color, modifier: Modifier = Modif
 private fun NativeHeader(
     dark: Boolean,
     themeId: String,
+    /** From 640dp wide the web's `sm:p-6` pads the header evenly. */
+    roomy: Boolean,
     titleColor: Color,
     activeTagLabel: String?,
     /** The drawer's view, whose own glyph the section line shows. */
@@ -1562,7 +1622,7 @@ private fun NativeHeader(
     // The QR quick button makes the web tighten the whole row so it still
     // fits (NotesHeader.jsx:233, 249, 366, 572, 616).
     val sidePadding = if (qrQuickEnabled) 6.dp else 10.dp
-    val clusterGap = if (qrQuickEnabled) 6.dp else 12.dp
+    val clusterGap = if (qrQuickEnabled && !roomy) 6.dp else 12.dp
     val buttonGap = if (qrQuickEnabled) 0.dp else 4.dp
     val compactButton = if (qrQuickEnabled) 32.dp else 36.dp
     Column(
@@ -1577,7 +1637,13 @@ private fun NativeHeader(
                     .fillMaxWidth()
                     .then(if (searchOpen) Modifier.searchBackdrop() else Modifier)
                     // pb-7 while offline: the pill hangs under the title block.
-                    .padding(start = sidePadding, end = sidePadding, top = 16.dp, bottom = if (offline) 28.dp else 16.dp),
+                    .padding(
+                        if (roomy) {
+                            PaddingValues(24.dp)
+                        } else {
+                            PaddingValues(start = sidePadding, end = sidePadding, top = 16.dp, bottom = if (offline) 28.dp else 16.dp)
+                        },
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val openTagsLabel = stringResource(R.string.native_sidebar_open)
@@ -2010,6 +2076,7 @@ private const val HeaderShadowSteps = 16
 private fun AiAnswerCard(
     answer: String?,
     loading: Boolean,
+    layout: NotesLayout,
     dark: Boolean,
     titleColor: Color,
     citedNotes: List<NoteEntity>,
@@ -2025,7 +2092,8 @@ private fun AiAnswerCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = layout.sideMargin)
+            .readingColumn()
             .shadow(elevation = 2.dp, shape = shape, ambientColor = CardShadowTint.copy(alpha = 0.06f), spotColor = CardShadowTint.copy(alpha = 0.06f))
             .clip(shape)
             .background(if (dark) Color(0xEB282828) else Color(0xEBFFFFFF))
@@ -2125,6 +2193,7 @@ private fun AiAnswerCard(
                             typography = typography,
                             taskStrike = taskStrike,
                             themeId = themeId,
+                            layout = layout,
                         )
                     }
                 }
@@ -2342,23 +2411,24 @@ private fun HeaderMenuItem(
 
 // "Pinned"/"Others" group labels above the grid below, matching
 // NotesSections.jsx's own gk-section-label (uppercase, 12sp/600 on a 16sp
-// line, 4dp start margin, 12dp bottom margin before the cards start).
+// line, 4dp start margin, 12dp bottom margin before the cards start), in
+// the list view's own column.
 @Composable
-private fun SectionLabel(text: String, color: Color) {
+private fun SectionLabel(text: String, color: Color, listView: Boolean) {
     Text(
         text.uppercase(),
         color = color,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 4.dp, bottom = 12.dp),
+        modifier = (if (listView) Modifier.readingColumn() else Modifier).padding(start = 4.dp, bottom = 12.dp),
     )
 }
 
-/** Mobile branch of react-masonry-css's `items.map((item, index) =>
- * column[index % 2])`, or the list view's single column. */
-private fun masonryColumns(notes: List<NoteEntity>, listView: Boolean): List<List<NoteEntity>> =
-    if (listView) listOf(notes) else (0..1).map { column -> notes.filterIndexed { index, _ -> index % 2 == column } }
+/** react-masonry-css's `items.map((item, index) => column[index %
+ * columnCount])`; the list view is the one column. */
+private fun masonryColumns(notes: List<NoteEntity>, columnCount: Int): List<List<NoteEntity>> =
+    List(columnCount) { column -> notes.filterIndexed { index, _ -> index % columnCount == column } }
 
 /** Cards a list builds in its first frame: about a screenful, so the notes
  *  show at once rather than after every card of the list has been built. */
@@ -2389,17 +2459,24 @@ private fun rememberCardsOnScreen(total: Int): Int {
  * scroll surface reproduces both react-masonry-css's order and its
  * independent vertical packing. In the grid every card keeps its 12px
  * bottom margin, the last one included; the list's space-y-6 has none
- * after the last card. */
+ * after the last card, only the card's own margin, which the pinned
+ * section's mb-10 absorbs. */
 @Composable
 private fun NotesMasonry(
     notes: List<NoteEntity>,
+    layout: NotesLayout,
     listView: Boolean,
     list: NoteCardList,
     renderNoteCard: @Composable (NoteEntity, NoteCardPlace) -> Unit,
 ) {
-    val columns = masonryColumns(notes.take(rememberCardsOnScreen(notes.size)), listView)
+    val columns = masonryColumns(notes.take(rememberCardsOnScreen(notes.size)), if (listView) 1 else layout.columns)
     if (listView) {
-        Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        Column(
+            modifier = Modifier
+                .readingColumn()
+                .padding(bottom = if (list == NoteCardList.OTHERS) layout.cardMargin else 0.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
             for (note in columns.single()) key(note.id) { renderNoteCard(note, NoteCardPlace(list, listView, 0)) }
         }
         return
@@ -2467,6 +2544,7 @@ private fun ReorderableNoteCard(
     taskStrike: Boolean,
     loadDetail: suspend (String) -> NoteDto?,
     themeId: String?,
+    layout: NotesLayout,
     isDragged: Boolean,
     isDragOver: Boolean,
     onBoundsChanged: (Rect?) -> Unit,
@@ -2554,6 +2632,7 @@ private fun ReorderableNoteCard(
             taskStrike = taskStrike,
             loadDetail = loadDetail,
             themeId = themeId,
+            layout = layout,
         )
     }
 }
@@ -2655,6 +2734,7 @@ private fun NoteCard(
     taskStrike: Boolean = false,
     loadDetail: (suspend (String) -> NoteDto?)? = null,
     themeId: String? = null,
+    layout: NotesLayout,
 ) {
     val borderColor = if (dark) CardBorderDark else CardBorderLight
     // The list cache keeps only light columns; images and collaborators
@@ -2685,15 +2765,16 @@ private fun NoteCard(
                     role = Role.Button,
                     onClick = { if (selectionMode) onToggleSelect?.invoke() else onClick() },
                 )
-                .padding(9.dp),
+                // p-2 sm:p-3 and the 1dp border.
+                .padding(if (layout.roomy) 13.dp else 9.dp),
         ) {
             if (note.title.isNotBlank()) {
                 Text(
                     note.title,
                     color = titleColor,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
+                    fontSize = if (layout.roomy) 18.sp else 14.sp,
+                    lineHeight = if (layout.roomy) 28.sp else 20.sp,
                     modifier = Modifier.padding(end = if (!selectionMode && note.iconSrc != null) 32.dp else 0.dp),
                 )
             }
@@ -2716,7 +2797,7 @@ private fun NoteCard(
                 trailingMargin = 0.dp
             }
             when (note.type) {
-                "checklist" -> ChecklistCardPreview(note = note, titleColor = titleColor, dark = dark)
+                "checklist" -> ChecklistCardPreview(note = note, titleColor = titleColor, dark = dark, maxItems = layout.checklistLines)
                 "draw" -> DrawingCardPreview(
                     note = note,
                     dark = dark,
@@ -3185,14 +3266,14 @@ private fun formatReminderLabel(reminderAt: String): String {
  *  listed (what's left to do), capped at a handful, checked ones only
  *  count toward the "done/total" footer. */
 @Composable
-private fun ChecklistCardPreview(note: NoteEntity, titleColor: Color, dark: Boolean) {
+private fun ChecklistCardPreview(note: NoteEntity, titleColor: Color, dark: Boolean, maxItems: Int) {
     val entries = remember(note.itemsJson) { ChecklistItems.parseJson(note.itemsJson) }
     val items = remember(entries) { entries.filterIsInstance<ChecklistItemData>() }
     val total = items.size
     val done = items.count { it.done }
     val uncheckedTotal = items.count { !it.done }
-    val previewBlocks = remember(entries) {
-        var remaining = 4 // NotesSections.jsx: mobile maxPreviewItems
+    val previewBlocks = remember(entries, maxItems) {
+        var remaining = maxItems
         buildList {
             for (block in ChecklistItems.blocks(entries)) {
                 if (remaining <= 0) break

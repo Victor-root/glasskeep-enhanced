@@ -44,11 +44,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -213,6 +216,8 @@ internal fun SelectionActionBar(
     dark: Boolean,
     modifier: Modifier = Modifier,
     headerVisible: Boolean = true,
+    /** From 640dp wide the counter spells out "Selected:" (`sm:inline`). */
+    roomy: Boolean = false,
 ) {
     val closeLabel = stringResource(R.string.native_bulk_exit)
     val dividerColor = if (dark) Color(0xFFA78BFA).copy(alpha = 0.22f) else Color(0xFF7C3AED).copy(alpha = 0.22f)
@@ -220,6 +225,8 @@ internal fun SelectionActionBar(
 
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
+    var counterWidth by remember { mutableStateOf<Dp?>(null) }
+    val density = LocalDensity.current
     val progress by animateFloatAsState(
         targetValue = if (shown) 1f else 0f,
         animationSpec = tween(durationMillis = 220, easing = GkGlideEasing),
@@ -238,9 +245,11 @@ internal fun SelectionActionBar(
             .padding(top = top, start = 8.dp, end = 8.dp),
         contentAlignment = Alignment.TopCenter,
     ) {
-        // PAD 20, counter ~32, dividers 17 x 2, close 36, then 36 + 8 per
-        // button, 44 more for the kebab once anything overflows.
-        val budget = maxWidth - 20.dp - 32.dp - 34.dp - 36.dp
+        // PAD 20, the counter as measured when the dock opened (the web
+        // measures it once, MultiSelectToolbar.jsx:387-404, and 110 until
+        // then), dividers 17 x 2, close 36, then 36 + 8 per button, 44 more
+        // for the kebab once anything overflows.
+        val budget = maxWidth - 20.dp - (counterWidth ?: 110.dp) - 34.dp - 36.dp
         val fitAll = ((budget + 8.dp) / 44.dp).toInt()
         val visibleCount = if (fitAll >= actions.size) actions.size else ((budget - 44.dp + 8.dp) / 44.dp).toInt().coerceAtLeast(0)
         val shownActions = actions.take(visibleCount)
@@ -272,19 +281,31 @@ internal fun SelectionActionBar(
                 )
                 .padding(horizontal = 8.dp, vertical = 6.dp),
         ) {
-            Box(
+            val counterColor = if (dark) Color(0xFFF5F3FF) else Color(0xFF4D179A)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier
+                    .onSizeChanged { if (counterWidth == null) counterWidth = with(density) { it.width.toDp() } }
                     .clip(RoundedCornerShape(999.dp))
                     .background(
                         if (dark) Color(0xFF5D0DC0).copy(alpha = 0.6f) else Color(0xFFDED7FF).copy(alpha = 0.7f),
                     )
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             ) {
-                // Compact mode drops the "Selected:" prefix and keeps the
-                // number alone (MultiSelectToolbar.jsx's hidden sm:inline).
+                if (roomy) {
+                    Text(
+                        stringResource(R.string.native_bulk_selected_prefix),
+                        color = counterColor.copy(alpha = 0.7f),
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
                 Text(
                     selectedCount.toString(),
-                    color = if (dark) Color(0xFFF5F3FF) else Color(0xFF4D179A),
+                    color = counterColor,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                     fontWeight = FontWeight.SemiBold,

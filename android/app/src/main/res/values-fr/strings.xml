@@ -138,6 +138,7 @@
     <string name="native_notes_dark_mode">Mode sombre</string>
     <string name="native_notes_sign_out">Se déconnecter</string>
     <string name="native_bulk_exit">Quitter la sélection multiple</string>
+    <string name="native_bulk_selected_prefix">Sélectionné :</string>
     <string name="native_bulk_trashed_success">%1$d note(s) envoyée(s) à la corbeille</string>
     <string name="native_bulk_trash_confirm_message">Déplacer %1$d note(s) sélectionnée(s) vers la corbeille ?</string>
     <string name="native_bulk_deleted_success">%1$d note(s) supprimée(s) définitivement</string>
