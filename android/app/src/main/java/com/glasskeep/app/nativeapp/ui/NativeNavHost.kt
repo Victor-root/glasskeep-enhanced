@@ -841,7 +841,7 @@ fun NativeNavHost(
                 ChangelogModal(
                     container = container,
                     serverUrl = serverUrl,
-                    version = serverUpdate.info?.currentVersion,
+                    version = serverUpdate.currentVersion,
                     themeId = container.themeState.themeId,
                     dark = LocalGkDark.current,
                     onClose = { changelogOpen = false },

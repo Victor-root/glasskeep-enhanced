@@ -95,7 +95,7 @@ import java.net.URI
 internal fun ChangelogModal(
     container: NativeAppContainer,
     serverUrl: String,
-    version: String?,
+    version: String,
     themeId: String?,
     dark: Boolean,
     onClose: () -> Unit,
@@ -169,20 +169,18 @@ internal fun ChangelogModal(
                     Text(stringResource(R.string.native_changelog_subtitle), color = subtle, fontSize = 12.sp, lineHeight = 16.sp)
                 }
             }
-            version?.let {
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    "v$it",
-                    color = if (dark) Emerald300 else Emerald700,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    style = TextStyle(fontFeatureSettings = "tnum"),
-                    modifier = Modifier
-                        .background(Emerald500.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                )
-            }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                "v$version",
+                color = if (dark) Emerald300 else Emerald700,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                style = TextStyle(fontFeatureSettings = "tnum"),
+                modifier = Modifier
+                    .background(Emerald500.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
             Spacer(Modifier.width(12.dp))
             val closeLabel = stringResource(R.string.native_common_close)
             Box(

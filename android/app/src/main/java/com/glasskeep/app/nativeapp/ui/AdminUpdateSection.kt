@@ -131,15 +131,13 @@ internal fun AdminUpdateSection(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.alignByBaseline(),
                 )
-                update.info?.currentVersion?.let {
-                    Text(
-                        "v$it",
-                        color = subtleColor,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        modifier = Modifier.alignByBaseline(),
-                    )
-                }
+                Text(
+                    "v${update.currentVersion}",
+                    color = subtleColor,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.alignByBaseline(),
+                )
                 if (available) {
                     Text(
                         stringResource(R.string.native_update_available_pill, latestVersion),

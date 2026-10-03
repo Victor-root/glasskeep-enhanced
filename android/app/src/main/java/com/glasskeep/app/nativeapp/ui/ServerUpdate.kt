@@ -6,6 +6,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.bodyOrRefusal
 import com.glasskeep.app.nativeapp.data.network.AcknowledgeSelfUpdateRequest
@@ -75,6 +76,11 @@ internal class ServerUpdateState(
     private var stopped = false
 
     val updateAvailable: Boolean get() = info?.let { it.updateAvailable && it.latestVersion != null } == true
+
+    /** The server's own version, as far as it has told: the update check's,
+     *  else the update status's, else the installed app's (the web's bundle). */
+    val currentVersion: String
+        get() = info?.currentVersion ?: status?.runningVersion ?: BuildConfig.VERSION_NAME
 
     /** GET /api/update-check, silent on failure like the web's. */
     suspend fun checkForUpdate(): UpdateCheckDto? = try {
