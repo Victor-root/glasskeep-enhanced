@@ -13,6 +13,7 @@ import okhttp3.Request
 import okhttp3.Response
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /** The header a service method sets on the requests whose 401 refuses the
@@ -21,26 +22,26 @@ import java.util.concurrent.TimeUnit
  *  sends them without the token too, and takes the header off. */
 internal const val ANONYMOUS_REQUEST_HEADER = "X-GlassKeep-Anonymous"
 
+private const val CLIENT_ID_HEADER = "X-Client-Id"
+
 /**
  * Attaches `Authorization: Bearer <token>` to every request once the user
  * is signed in, but the [ANONYMOUS_REQUEST_HEADER] ones. ReminderSyncWorker.kt
  * already does the same thing for one endpoint, from a background thread
  * with no WebView involved. This is the same pattern, now used for the
- * whole app.
+ * whole app. Every request also names this run of the app in `X-Client-Id`
+ * (api.js), which the server hands back on the events a write causes.
  */
 private class AuthInterceptor(private val tokenStore: TokenStore) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val token = tokenStore.token
-        val request = when {
-            chain.request().header(ANONYMOUS_REQUEST_HEADER) != null ->
-                chain.request().newBuilder().removeHeader(ANONYMOUS_REQUEST_HEADER).build()
-            token != null ->
-                chain.request().newBuilder()
-                    .addHeader("Authorization", "Bearer $token")
-                    .build()
-            else -> chain.request()
+        val original = chain.request()
+        val request = original.newBuilder().header(CLIENT_ID_HEADER, ApiClientFactory.clientId)
+        when {
+            original.header(ANONYMOUS_REQUEST_HEADER) != null -> request.removeHeader(ANONYMOUS_REQUEST_HEADER)
+            token != null -> request.addHeader("Authorization", "Bearer $token")
         }
-        return chain.proceed(request)
+        return chain.proceed(request.build())
     }
 }
 
@@ -145,6 +146,10 @@ private class SessionExpiryInterceptor(private val onSessionExpired: (String) ->
  * a single app-wide singleton.
  */
 object ApiClientFactory {
+    /** Names this run of the app to the server, as api.js's getClientId()
+     *  does a tab, so the frames its own writes cause can be told apart. */
+    val clientId: String = "cid_${UUID.randomUUID()}"
+
     private val json = Json {
         ignoreUnknownKeys = true
         coerceInputValues = true

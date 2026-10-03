@@ -195,6 +195,13 @@ class RealtimeClient(
         )
     }.getOrNull()
 
+    /** The settings, profile and AI settings frames this app's own write
+     *  caused: the web skips them too, having applied the change itself. */
+    private fun isOwnEcho(type: String, data: String): Boolean = type in OWN_ECHO_TYPES && runCatching {
+        ((json.parseToJsonElement(data) as? JsonObject)?.get("originClientId") as? JsonPrimitive)?.contentOrNull ==
+            ApiClientFactory.clientId
+    }.getOrDefault(false)
+
     private fun noteIdOf(data: String): String? = runCatching {
         ((json.parseToJsonElement(data) as? JsonObject)?.get("noteId") as? JsonPrimitive)?.contentOrNull
     }.getOrNull()
@@ -253,7 +260,7 @@ class RealtimeClient(
                     onLiveNotification(it)
                 }
             }
-            if (payloadType != null && payloadType in AUXILIARY_EVENT_TYPES) {
+            if (payloadType != null && payloadType in AUXILIARY_EVENT_TYPES && !isOwnEcho(payloadType, data)) {
                 NativeDebug.d("RealtimeClient auxiliary event type=$payloadType")
                 onAuxiliaryEvent(payloadType)
             }
@@ -345,6 +352,11 @@ class RealtimeClient(
             "notifications_cleared",
             "notification_delivered",
             "notification_removed",
+        )
+        private val OWN_ECHO_TYPES = setOf(
+            "user_settings_updated",
+            "user_profile_updated",
+            "user_ai_settings_updated",
         )
         private const val RECONNECT_BASE_DELAY_MS = 1000L
         private const val RECONNECT_MAX_DELAY_MS = 30000L
