@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp.ui
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -248,6 +249,9 @@ fun NativeNavHost(
             previous = queue.size
         }
     }
+    LaunchedEffect(Unit) {
+        SyncQueueWorker.draining.collect { container.syncStatus.markDraining(it) }
+    }
     LaunchedEffect(lifecycleOwner, lockPokes) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
@@ -255,7 +259,9 @@ fun NativeNavHost(
                 val body = outcome.getOrNull()?.takeIf { it.isSuccessful }?.body()
                 if (body != null) {
                     container.lockState.apply(body)
+                    val wasReachable = container.syncStatus.serverReachable == true
                     container.syncStatus.recordReachable()
+                    sendQueueAfterHealthyCheck(context, repository, queueWaiting = !wasReachable || pendingSyncIds.isNotEmpty())
                 } else {
                     container.syncStatus.recordUnreachable(
                         syncErrorKindOf(outcome.exceptionOrNull(), outcome.getOrNull()?.code()),
@@ -928,6 +934,21 @@ private fun ListCover(route: String) {
             }
             .then(if (route != "notes") Modifier.blockTouchesBelow() else Modifier),
     )
+}
+
+/** The server answered: what gave up its attempts gets them back, and the
+ *  queue is sent when the server has just come back, something was revived
+ *  or changes are waiting, as the web does on a healthy check
+ *  (syncEngine.js:496-514). */
+private suspend fun sendQueueAfterHealthyCheck(context: Context, repository: NotesRepository, queueWaiting: Boolean) {
+    try {
+        val revived = repository.resetFailedQueue()
+        if (queueWaiting || revived > 0) SyncQueueWorker.triggerNow(context)
+    } catch (t: CancellationException) {
+        throw t
+    } catch (t: Throwable) {
+        NativeDebug.e("Sending the queue after a healthy check failed", t)
+    }
 }
 
 /** One settings read, applied to both live states. Best-effort: a failure

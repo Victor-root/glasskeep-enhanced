@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.glasskeep.app.nativeapp.data.ServerRefusal
+import java.io.IOException
 import java.net.SocketTimeoutException
 import kotlinx.serialization.SerializationException
 
@@ -19,16 +21,25 @@ enum class SyncErrorKind { UNREACHABLE, BACKEND_DOWN, SERVER_ERROR, TIMEOUT }
  *  else the server is simply unreachable. */
 fun syncErrorKindOf(error: Throwable?, httpCode: Int? = null): SyncErrorKind = when {
     error is SocketTimeoutException -> SyncErrorKind.TIMEOUT
+    error is ServerRefusal && error.status >= 500 -> SyncErrorKind.SERVER_ERROR
     httpCode != null && httpCode >= 500 -> SyncErrorKind.SERVER_ERROR
     error is SerializationException -> SyncErrorKind.BACKEND_DOWN
     else -> SyncErrorKind.UNREACHABLE
 }
 
+/** What marks the server down when a read fails: a network failure, a
+ *  timeout, an answer that is not GlassKeep's or a 5xx. Any other refusal
+ *  (a locked instance, a refused session) means it did answer, which the
+ *  web's health check also reads that way (syncEngine.js:518-541). */
+fun Throwable.signalsServerDown(): Boolean =
+    this is IOException || this is SerializationException || (this is ServerRefusal && status >= 500)
+
 /**
  * What the header's cloud icon and its panel read: whether the server
  * answered last time we asked, when a queued change was last pushed, and
- * whether a queue drain is running right now. The queue's own counts are
- * not held here, they are observed straight from the sync-queue table.
+ * whether the queue is being sent or the view read right now. The queue's
+ * own counts are not held here, they are observed straight from the
+ * sync-queue table.
  *
  * Session state, never cached: a "server unreachable" remembered across
  * launches would be a lie on the very first frame.
@@ -50,9 +61,14 @@ class SyncStatusState {
     var failedChecks: Int by mutableIntStateOf(0)
         private set
 
-    /** A queue drain (or a manual "sync now") is in flight. */
-    var syncing: Boolean by mutableStateOf(false)
-        private set
+    /** The view is being read from the server. */
+    private var pulling: Boolean by mutableStateOf(false)
+
+    /** The queue is being sent. */
+    private var draining: Boolean by mutableStateOf(false)
+
+    /** syncEngine.js's `_processing || _pulling` (its line 730). */
+    val syncing: Boolean get() = pulling || draining
 
     fun recordReachable() {
         serverReachable = true
@@ -72,8 +88,12 @@ class SyncStatusState {
         lastSyncError = error
     }
 
-    fun markSyncing(value: Boolean) {
-        syncing = value
+    fun markPulling(value: Boolean) {
+        pulling = value
+    }
+
+    fun markDraining(value: Boolean) {
+        draining = value
     }
 
     /**

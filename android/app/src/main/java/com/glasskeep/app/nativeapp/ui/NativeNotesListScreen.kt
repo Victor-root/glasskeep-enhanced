@@ -175,6 +175,7 @@ import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.NoteIconDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
+import com.glasskeep.app.nativeapp.signalsServerDown
 import com.glasskeep.app.nativeapp.syncErrorKindOf
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
@@ -721,17 +722,20 @@ fun NativeNotesListScreen(
     /** Reads [view]'s own list from the server (loadNotes,
      *  loadArchivedNotes, loadTrashedNotes, App.jsx:2862-3168). Only the
      *  latest load, the one for the view on screen, ends the loading state:
-     *  one still running for a view just left finishes quietly. */
-    fun loadView(view: String?) {
+     *  one still running for a view just left finishes quietly.
+     *  [reviveFailed] is "Sync now": what gave up its attempts gets them back
+     *  before the queue is sent (forceSync, syncEngine.js:349-386). */
+    fun loadView(view: String?, reviveFailed: Boolean = false) {
         val load = ++loads
         refreshing = true
-        // The queue drains alongside the pull, so the cloud icon reads
-        // "syncing" for both halves at once, like the web's own
+        // The queue drains alongside the pull and marks its own half, so
+        // the cloud icon reads "syncing" for both, like the web's own
         // _processing || _pulling (syncEngine.js:730).
-        container.syncStatus.markSyncing(true)
-        SyncQueueWorker.triggerNow(context)
+        container.syncStatus.markPulling(true)
         scope.launch {
             try {
+                if (reviveFailed) repository.resetFailedQueue()
+                SyncQueueWorker.triggerNow(context)
                 when (view) {
                     SidebarArchived -> repository.refreshArchived()
                     SidebarTrashed -> repository.refreshTrashed()
@@ -744,18 +748,18 @@ fun NativeNotesListScreen(
                 // Nothing on the list itself: the header's offline pill and
                 // cloud are how the web reports it.
                 NativeDebug.e("Notes refresh failed (view $view)", t)
-                container.syncStatus.recordUnreachable(syncErrorKindOf(t))
+                if (t.signalsServerDown()) container.syncStatus.recordUnreachable(syncErrorKindOf(t))
             } finally {
                 if (load == loads) {
                     refreshing = false
                     pullRefreshing = false
-                    container.syncStatus.markSyncing(false)
+                    container.syncStatus.markPulling(false)
                 }
             }
         }
     }
 
-    /** A pull or "sync now": the view on screen again (reloadCurrentView,
+    /** A pull: the view on screen again (reloadCurrentView,
      *  App.jsx:3171-3185). */
     fun refresh() {
         if (!refreshing) loadView(activeTagFilter)
@@ -1456,7 +1460,7 @@ fun NativeNotesListScreen(
             dark = dark,
             themeId = themeId,
             onDismiss = { syncSheetOpen = false },
-            onSyncNow = { refresh() },
+            onSyncNow = { loadView(activeTagFilter, reviveFailed = true) },
         )
     }
 }

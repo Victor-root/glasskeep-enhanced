@@ -877,6 +877,9 @@
     <string name="native_sync_error_backend_down">Le proxy répond mais GlassKeep n\'est pas accessible</string>
     <string name="native_sync_error_server_error">Le serveur a renvoyé une erreur</string>
     <string name="native_sync_error_timeout">Délai de vérification dépassé</string>
+    <string name="native_sync_rate_limited">Limite atteinte (HTTP %1$d)</string>
+    <string name="native_sync_unknown_error">Erreur inconnue</string>
+    <string name="native_sync_request_timeout">Délai de la requête dépassé</string>
     <string name="native_sync_failed_checks">%1$d tentative(s) de reconnexion \u00e9chou\u00e9e(s)</string>
     <string name="native_sync_queue_syncing">Synchronisation en cours (%1$d en cours, %2$d en attente)</string>
     <string name="native_sync_queue_waiting">%1$d modification(s) en attente de synchronisation</string>

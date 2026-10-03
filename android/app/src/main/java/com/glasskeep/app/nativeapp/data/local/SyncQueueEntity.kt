@@ -41,17 +41,12 @@ data class SyncQueueEntity(
 /** Which repository call SyncQueueWorker replays a given item with.
  *  CREATE covers both a blank note and a duplicate: the client-generated
  *  UUID is replayed verbatim, relying on POST /api/notes' idempotent-ID
- *  contract. ARCHIVE/TRASH/RESTORE/PERMANENT_DELETE/PINNED/REMINDER's note
- *  ids are also read by SyncQueueDao.getProtectedNoteIds() (see
- *  NotesRepository.refresh()'s own doc comment) since, unlike the
- *  patch-style types above them, each changes something a same-moment
- *  refresh() could otherwise silently clobber before the queue drains:
- *  which notes belong in the active-notes list, for the first four, or a
- *  single field a concurrent refresh() would overwrite back to its stale
- *  value, for PINNED/REMINDER. REORDER is deliberately NOT in that
- *  protected set even though it also touches a field (position) a
- *  refresh() could clobber: it can touch every note in the list at once,
- *  not one, which doesn't fit getProtectedNoteIds()'s per-note-id
- *  design - see NotesRepository.reorderQueued's own doc comment for the
- *  accepted tradeoff. */
+ *  contract. Every type but REORDER keeps its note id out of a same-moment
+ *  refresh() (see SyncQueueDao.getProtectedNoteIds()), which would
+ *  otherwise silently put the server's older copy back over the edit.
+ *  REORDER is deliberately NOT protected even though it also touches a
+ *  field (position) a refresh() could clobber: it can touch every note in
+ *  the list at once, not one, which doesn't fit getProtectedNoteIds()'s
+ *  per-note-id design - see NotesRepository.reorderQueued's own doc comment
+ *  for the accepted tradeoff. */
 enum class SyncQueueType { CREATE, TITLE_CONTENT, COLOR, TAGS, CHECKLIST_ITEMS, IMAGES, PINNED, ARCHIVE, TRASH, RESTORE, PERMANENT_DELETE, REMINDER, REORDER, CONVERT_TYPE, ICON }

@@ -43,6 +43,17 @@ interface SyncQueueDao {
     @Query("DELETE FROM sync_queue WHERE queueId = :queueId")
     suspend fun delete(queueId: Long)
 
+    /** Everything queued for a note the server no longer lets this user
+     *  touch (purgeQueueForNote, localDb.js). */
+    @Query("DELETE FROM sync_queue WHERE noteId = :noteId")
+    suspend fun deleteForNote(noteId: String)
+
+    /** Gives the items that gave up their attempts back, as the web does
+     *  once the server answers its health check (syncEngine.js:496-508) and
+     *  on "Sync now" (:372-381). Returns how many were put back to work. */
+    @Query("UPDATE sync_queue SET status = '${SyncQueueEntity.STATUS_PENDING}', attempts = 0, lastError = NULL WHERE status = '${SyncQueueEntity.STATUS_FAILED}'")
+    suspend fun resetFailed(): Int
+
     /** Signing out drops everything still queued: the web purges its own
      *  queue on an explicit sign-out for the same reason (App.jsx:4578-4583),
      *  since the next session may well be a different account. */
@@ -55,25 +66,15 @@ interface SyncQueueDao {
     @Query("UPDATE sync_queue SET status = '${SyncQueueEntity.STATUS_FAILED}', attempts = :attempts, lastError = :error WHERE queueId = :queueId")
     suspend fun markFailed(queueId: Long, attempts: Int, error: String?)
 
-    /** Locally-created notes until their CREATE row is removed (including
-     *  a failed row, so a refresh never erases unsynced user data), plus
-     *  notes with a not-yet-confirmed archive/trash/restore/permanent-delete/
-     *  pin/reminder: the refresh of any of the three lists (active,
-     *  archived, trashed, see NoteDao.replaceAll's own doc comment) must
-     *  not silently undo one of these actions while it's still in flight.
-     *  One shared, wider query rather than one per list: a type
-     *  irrelevant to a given list (e.g. PERMANENT_DELETE for the active
-     *  one) is a harmless no-op there, cheaper than keeping near-duplicate
-     *  queries in sync by hand. The
-     *  literal type names must keep matching SyncQueueType's own entries:
-     *  Room requires a compile-time constant here, so this can't
-     *  reference the enum directly the way STATUS_PENDING does above. */
-    @Query(
-        "SELECT DISTINCT noteId FROM sync_queue WHERE " +
-            "(type = 'CREATE') OR " +
-            "(status = '${SyncQueueEntity.STATUS_PENDING}' AND " +
-            "type IN ('ARCHIVE', 'TRASH', 'RESTORE', 'PERMANENT_DELETE', 'PINNED', 'REMINDER'))",
-    )
+    /** Every note a refresh of the three lists (active, archived, trashed,
+     *  see NoteDao.replaceAll's own doc comment) must leave alone: one with
+     *  a queued change of any kind and in any state, a failed one included,
+     *  as the web's hasPendingChanges() reads the queue (localDb.js:367-381),
+     *  so a refresh never erases unsynced user data. REORDER is the one
+     *  exception: its note id is a sentinel standing for the whole list (see
+     *  NotesRepository.reorderQueued's own doc comment). The literal must
+     *  keep matching SyncQueueType.REORDER: Room needs a constant here. */
+    @Query("SELECT DISTINCT noteId FROM sync_queue WHERE type != 'REORDER'")
     suspend fun getProtectedNoteIds(): List<String>
 
     /** Every note with anything still pending, of any type, deliberately

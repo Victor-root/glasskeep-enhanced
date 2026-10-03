@@ -15,6 +15,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkRequest
 import androidx.work.WorkerParameters
 import com.glasskeep.app.BuildConfig
+import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.local.AppDatabase
 import com.glasskeep.app.nativeapp.data.local.SyncQueueDatabase
@@ -25,6 +26,7 @@ import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
 import com.glasskeep.app.nativeapp.data.network.ConvertNoteTypeRequest
 import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
+import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.NotesHttpCache
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ReorderNotesRequest
@@ -41,11 +43,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 
 /**
@@ -65,6 +72,11 @@ import java.util.concurrent.TimeUnit
  * server's copy, never by retrying a write that will never stop being
  * stale (see App.jsx's onSyncComplete). Retrying is reserved for the
  * genuinely transient case (a thrown exception: network error, 5xx, ...).
+ * A note the server no longer knows (404) or no longer opens to this user
+ * (403) is abandoned with everything queued for it, and a session the
+ * server refuses (401) stops the drain with the queue untouched: it waits
+ * for the app to sign in again, rather than being failed for good while
+ * nobody is there to see it (syncEngine.js:213-263).
  */
 class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
@@ -81,63 +93,68 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
         private const val MAX_ATTEMPTS = 5
         private const val QUEUE_ITEM_DELAY_MS = 200L
 
-        private suspend fun applyItem(repository: NotesRepository, item: SyncQueueEntity) {
-            when (SyncQueueType.valueOf(item.type)) {
+        /** Replays [item]; the server's copy when it refused the write as older
+         *  than itself, else null. */
+        private suspend fun applyItem(repository: NotesRepository, item: SyncQueueEntity): NoteDto? {
+            return when (SyncQueueType.valueOf(item.type)) {
                 SyncQueueType.CREATE -> {
                     val body = Json.decodeFromString<CreateNoteRequest>(item.payloadJson)
                     repository.createNoteOnline(body)
+                    null
                 }
                 SyncQueueType.TITLE_CONTENT -> {
                     val body = Json.decodeFromString<PatchNoteRequest>(item.payloadJson)
-                    repository.patchNote(item.noteId, body.title, body.content, body.clientUpdatedAt)
+                    repository.patchNote(item.noteId, body.title, body.content, body.clientUpdatedAt).staleCopy()
                 }
                 SyncQueueType.COLOR -> {
                     val body = Json.decodeFromString<SetColorRequest>(item.payloadJson)
-                    repository.setColor(item.noteId, body.color, body.clientUpdatedAt)
+                    repository.setColor(item.noteId, body.color, body.clientUpdatedAt).staleCopy()
                 }
                 SyncQueueType.TAGS -> {
                     val body = Json.decodeFromString<SetTagsRequest>(item.payloadJson)
-                    repository.setTags(item.noteId, body.tags, body.clientUpdatedAt)
+                    repository.setTags(item.noteId, body.tags, body.clientUpdatedAt).staleCopy()
                 }
                 SyncQueueType.CHECKLIST_ITEMS -> {
                     val body = Json.decodeFromString<SetChecklistItemsRequest>(item.payloadJson)
-                    repository.setChecklistItems(item.noteId, body.items, body.clientUpdatedAt)
+                    repository.setChecklistItems(item.noteId, body.items, body.clientUpdatedAt).staleCopy()
                 }
                 SyncQueueType.CONVERT_TYPE -> {
                     val body = Json.decodeFromString<ConvertNoteTypeRequest>(item.payloadJson)
-                    repository.convertNoteType(item.noteId, body.type, body.content, body.items, body.clientUpdatedAt)
+                    repository.convertNoteType(item.noteId, body.type, body.content, body.items, body.clientUpdatedAt).staleCopy()
                 }
                 SyncQueueType.IMAGES -> {
                     val body = Json.decodeFromString<SetImagesRequest>(item.payloadJson)
-                    repository.setImages(item.noteId, body.images, body.clientUpdatedAt)
+                    repository.setImages(item.noteId, body.images, body.clientUpdatedAt).staleCopy()
                 }
                 SyncQueueType.PINNED -> {
                     val body = Json.decodeFromString<SetPinnedRequest>(item.payloadJson)
                     repository.setPinned(item.noteId, body.pinned)
+                    null
                 }
                 SyncQueueType.ARCHIVE -> {
                     val body = Json.decodeFromString<ArchiveNoteRequest>(item.payloadJson)
-                    repository.setArchived(item.noteId, body.archived, body.clientUpdatedAt)
+                    repository.setArchived(item.noteId, body.archived, body.clientUpdatedAt).staleCopy()
                 }
                 SyncQueueType.TRASH -> {
                     val body = Json.decodeFromString<TrashNoteRequest>(item.payloadJson)
-                    repository.trashNote(item.noteId, body.clientUpdatedAt, body.mode)
+                    repository.trashNote(item.noteId, body.clientUpdatedAt, body.mode).staleCopy()
                 }
                 SyncQueueType.RESTORE -> {
                     val body = Json.decodeFromString<ClientUpdatedAtRequest>(item.payloadJson)
-                    repository.restoreNote(item.noteId, body.clientUpdatedAt)
+                    repository.restoreNote(item.noteId, body.clientUpdatedAt).staleCopy()
                 }
                 SyncQueueType.PERMANENT_DELETE -> {
                     val body = Json.decodeFromString<ClientUpdatedAtRequest>(item.payloadJson)
-                    repository.deleteNotePermanently(item.noteId, body.clientUpdatedAt)
+                    repository.deleteNotePermanently(item.noteId, body.clientUpdatedAt).staleCopy()
                 }
                 SyncQueueType.REMINDER -> {
                     val body = Json.decodeFromString<SetReminderRequest>(item.payloadJson)
-                    repository.setReminder(item.noteId, body.reminderAt, body.clientUpdatedAt)
+                    repository.setReminder(item.noteId, body.reminderAt, body.clientUpdatedAt).staleCopy()
                 }
                 SyncQueueType.ICON -> {
                     val body = Json.decodeFromString<SetNoteIconRequest>(item.payloadJson)
                     repository.setNoteIcon(item.noteId, body.icon)
+                    null
                 }
                 SyncQueueType.REORDER -> {
                     // item.noteId is just the sentinel this type always
@@ -146,11 +163,33 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
                     // other branch above.
                     val body = Json.decodeFromString<ReorderNotesRequest>(item.payloadJson)
                     repository.reorderNotes(body.pinnedIds, body.otherIds, body.clientReorderedAt)
+                    null
                 }
             }
         }
 
+        private fun SaveNoteResult.staleCopy(): NoteDto? = (this as? SaveNoteResult.Stale)?.note
+
+        private fun DeleteResult.staleCopy(): NoteDto? = (this as? DeleteResult.Stale)?.note
+
+        /** The reason kept on a failed item, worded as syncEngine.js words
+         *  its lastError values (its lines 267-309). */
+        private fun failureText(context: Context, error: Throwable): String = when {
+            error is ServerRefusal && error.status == 429 -> context.getString(R.string.native_sync_rate_limited, error.status)
+            error is SocketTimeoutException -> context.getString(R.string.native_sync_request_timeout)
+            error is IOException -> context.getString(R.string.native_sync_server_unreachable)
+            error is ServerRefusal ->
+                "${error.error?.takeIf { it.isNotBlank() } ?: context.getString(R.string.native_sync_unknown_error)} (HTTP ${error.status})"
+            else -> error.message ?: context.getString(R.string.native_sync_unknown_error)
+        }
+
         private val drainLock = Mutex()
+        private val drainingState = MutableStateFlow(false)
+
+        /** Whether a drain is sending items right now: the header's cloud
+         *  reads "syncing" for as long, like the web's _processing. */
+        val draining: StateFlow<Boolean> = drainingState.asStateFlow()
+
         private val drainScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + backgroundErrorHandler)
 
         /** Runs [block] with no drain sending anything, or returns null at
@@ -214,36 +253,59 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
             var anyOutstanding = false
             val blockedNoteIds = mutableSetOf<String>()
-            for ((index, item) in pending.withIndex()) {
-                // Preserve per-note ordering. In particular, no PATCH may run
-                // after this note's CREATE failed earlier in the same drain.
-                if (item.noteId in blockedNoteIds) {
-                    anyOutstanding = true
-                    continue
-                }
-                try {
-                    applyItem(repository, item)
-                    queueDao.delete(item.queueId)
-                    if (BuildConfig.DEBUG) Log.d("GKSync", "item ${item.queueId} (${item.type}) note=${item.noteId} OK, deleted from queue")
-                } catch (t: CancellationException) {
-                    throw t
-                } catch (t: Throwable) {
-                    NativeDebug.e("SyncQueueWorker: item ${item.queueId} (${item.type}) for note ${item.noteId} failed", t)
-                    if (BuildConfig.DEBUG) {
-                        Log.d("GKSync", "item ${item.queueId} (${item.type}) note=${item.noteId} FAILED: ${t.javaClass.simpleName}: ${t.message}")
+            val abandonedNoteIds = mutableSetOf<String>()
+            drainingState.value = true
+            try {
+                for ((index, item) in pending.withIndex()) {
+                    if (item.noteId in abandonedNoteIds) continue
+                    // Preserve per-note ordering. In particular, no PATCH may run
+                    // after this note's CREATE failed earlier in the same drain.
+                    if (item.noteId in blockedNoteIds) {
+                        anyOutstanding = true
+                        continue
                     }
-                    anyOutstanding = true
-                    blockedNoteIds += item.noteId
-                    if (countFailures) {
-                        val attempts = item.attempts + 1
-                        if (attempts >= MAX_ATTEMPTS) {
-                            queueDao.markFailed(item.queueId, attempts, t.message)
-                        } else {
-                            queueDao.recordFailure(item.queueId, attempts, t.message)
+                    try {
+                        val staleCopy = applyItem(repository, item)
+                        queueDao.delete(item.queueId)
+                        repository.adoptServerCopy(staleCopy)
+                        if (BuildConfig.DEBUG) Log.d("GKSync", "item ${item.queueId} (${item.type}) note=${item.noteId} OK, deleted from queue")
+                    } catch (t: CancellationException) {
+                        throw t
+                    } catch (t: Throwable) {
+                        NativeDebug.e("SyncQueueWorker: item ${item.queueId} (${item.type}) for note ${item.noteId} failed", t)
+                        if (BuildConfig.DEBUG) {
+                            Log.d("GKSync", "item ${item.queueId} (${item.type}) note=${item.noteId} FAILED: ${t.javaClass.simpleName}: ${t.message}")
+                        }
+                        val status = (t as? ServerRefusal)?.status
+                        val isReorder = item.type == SyncQueueType.REORDER.name
+                        when {
+                            status == 401 -> break
+                            status == 409 && item.type == SyncQueueType.CREATE.name -> queueDao.delete(item.queueId)
+                            (status == 403 || status == 404) && isReorder -> queueDao.delete(item.queueId)
+                            status == 403 || status == 404 -> {
+                                queueDao.deleteForNote(item.noteId)
+                                repository.forgetNote(item.noteId)
+                                abandonedNoteIds += item.noteId
+                            }
+                            else -> {
+                                anyOutstanding = true
+                                blockedNoteIds += item.noteId
+                                if (countFailures) {
+                                    val attempts = item.attempts + 1
+                                    val reason = failureText(context, t)
+                                    if (attempts >= MAX_ATTEMPTS) {
+                                        queueDao.markFailed(item.queueId, attempts, reason)
+                                    } else {
+                                        queueDao.recordFailure(item.queueId, attempts, reason)
+                                    }
+                                }
+                            }
                         }
                     }
+                    if (index < pending.lastIndex) delay(QUEUE_ITEM_DELAY_MS)
                 }
-                if (index < pending.lastIndex) delay(QUEUE_ITEM_DELAY_MS)
+            } finally {
+                drainingState.value = false
             }
             anyOutstanding
         }

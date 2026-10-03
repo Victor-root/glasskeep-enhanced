@@ -25,6 +25,7 @@ import com.glasskeep.app.nativeapp.data.network.InstanceStatusResponse
 import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.NoteIconDto
+import com.glasskeep.app.nativeapp.data.network.NoteMutationResponse
 import com.glasskeep.app.nativeapp.data.network.NotesHttpCache
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.network.NotificationIdsRequest
@@ -99,7 +100,9 @@ import java.util.UUID
  *  one differently instead of pretending the write always succeeds. */
 sealed class SaveNoteResult {
     data class Saved(val note: NoteDto) : SaveNoteResult()
-    data object Stale : SaveNoteResult()
+    /** The write was older than the server's own copy, which the answer
+     *  carries in [note]. */
+    data class Stale(val note: NoteDto?) : SaveNoteResult()
     data object ReadOnly : SaveNoteResult()
     /** Trash-only: the caller no longer has any version of the original
      *  note to show (left a shared note, transferred it away, or deleted
@@ -128,7 +131,8 @@ sealed class ReorderResult {
  *  note to hand back, the row is gone (see DELETE /api/notes/:id/permanent). */
 sealed class DeleteResult {
     data object Deleted : DeleteResult()
-    data object Stale : DeleteResult()
+    /** The note was restored elsewhere meanwhile: [note] is its server copy. */
+    data class Stale(val note: NoteDto?) : DeleteResult()
 }
 
 /** Outcome of adding a collaborator (POST /api/notes/:id/collaborate).
@@ -286,18 +290,14 @@ class NotesRepository(
         NativeDebug.d("NotesRepository.refresh: fetching /api/notes")
         val startedAt = System.nanoTime()
         val response = api.getNotes()
-        if (!response.isSuccessful) {
-            val error = "GET /api/notes failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        if (!response.isSuccessful) throw response.refusal("GET /api/notes")
         val notes = response.body().orEmpty()
         val readAt = System.nanoTime()
         val fromNetwork = response.raw().networkResponse
         // See NoteDao.replaceAll's own doc comment: a note with a queued,
-        // not-yet-confirmed archive/trash/restore/pin (see the *Queued
-        // methods below) must not have this refresh's now-stale server
-        // snapshot silently undo its optimistic local state.
+        // not-yet-confirmed change (see the *Queued methods below) must not
+        // have this refresh's now-stale server snapshot silently undo its
+        // optimistic local state.
         val (rows, details) = rowsOf(notes)
         noteDao.replaceAll(rows, details, getProtectedNoteIds())
         NativeDebug.d(
@@ -342,13 +342,7 @@ class NotesRepository(
 
     /** Direct idempotent POST used only by [SyncQueueWorker]. */
     internal suspend fun createNoteOnline(request: CreateNoteRequest): NoteDto {
-        val response = api.createNote(request)
-        val note = response.body()
-        if (!response.isSuccessful || note == null) {
-            val error = "POST /api/notes failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        val note = api.createNote(request).bodyOrRefusal("POST /api/notes")
         cacheNotes(listOf(note))
         return note
     }
@@ -453,12 +447,7 @@ class NotesRepository(
     suspend fun refreshArchived() {
         NativeDebug.d("NotesRepository.refreshArchived: fetching /api/notes/archived")
         val response = api.getArchivedNotes()
-        val notes = response.body()
-        if (!response.isSuccessful || notes == null) {
-            val error = "GET /api/notes/archived failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        val notes = response.bodyOrRefusal("GET /api/notes/archived")
         val (rows, details) = rowsOf(notes)
         noteDao.replaceArchived(rows, details, getProtectedNoteIds())
     }
@@ -467,12 +456,7 @@ class NotesRepository(
     suspend fun refreshTrashed() {
         NativeDebug.d("NotesRepository.refreshTrashed: fetching /api/notes/trashed")
         val response = api.getTrashedNotes()
-        val notes = response.body()
-        if (!response.isSuccessful || notes == null) {
-            val error = "GET /api/notes/trashed failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        val notes = response.bodyOrRefusal("GET /api/notes/trashed")
         val (rows, details) = rowsOf(notes)
         noteDao.replaceTrashed(rows, details, getProtectedNoteIds())
     }
@@ -485,24 +469,39 @@ class NotesRepository(
      */
     suspend fun patchNote(id: String, title: String, content: String, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.patchNote id=$id")
-        val response = api.patchNote(id, PatchNoteRequest(title, content, clientUpdatedAt))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "PATCH /api/notes/$id failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        return settle(api.patchNote(id, PatchNoteRequest(title, content, clientUpdatedAt)), "PATCH /api/notes/$id")
+    }
+
+    /**
+     * What every write of one note does with the server's answer: a note
+     * it saved is mirrored into the cache; one it refused as older than its
+     * own copy, or as read-only, is handed back as such, the copy riding
+     * along on a stale one (see [adoptServerCopy]).
+     */
+    private suspend fun settle(response: Response<NoteMutationResponse>, request: String): SaveNoteResult {
+        val body = response.bodyOrRefusal(request)
         if (body.stale) {
-            NativeDebug.d("NotesRepository.patchNote id=$id: stale, not applied")
-            return SaveNoteResult.Stale
+            NativeDebug.d("NotesRepository: $request is stale, not applied")
+            return SaveNoteResult.Stale(body.note)
         }
         if (body.readOnly) {
-            NativeDebug.d("NotesRepository.patchNote id=$id: read-only, not applied")
+            NativeDebug.d("NotesRepository: $request is read-only, not applied")
             return SaveNoteResult.ReadOnly
         }
-        val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id: ok response with no note")
+        val saved = body.note ?: throw IllegalStateException("$request: ok response with no note")
         cacheNotes(listOf(saved))
         return SaveNoteResult.Saved(saved)
+    }
+
+    /**
+     * The server's copy of a note it refused a write for as older than
+     * itself, kept so the phone converges at once (App.jsx:2307-2337), unless
+     * another change of that note still waits in the queue. Called once the
+     * replayed item has left the queue.
+     */
+    suspend fun adoptServerCopy(note: NoteDto?) {
+        if (note == null || note.id in getProtectedNoteIds()) return
+        cacheNotes(listOf(note))
     }
 
     /**
@@ -513,13 +512,9 @@ class NotesRepository(
      */
     suspend fun setPinned(id: String, pinned: Boolean): NoteDto {
         NativeDebug.d("NotesRepository.setPinned id=$id pinned=$pinned")
-        val response = api.setPinned(id, SetPinnedRequest(pinned))
-        val note = response.body()?.note
-        if (!response.isSuccessful || note == null) {
-            val error = "PATCH /api/notes/$id (pinned) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        val request = "PATCH /api/notes/$id (pinned)"
+        val note = api.setPinned(id, SetPinnedRequest(pinned)).bodyOrRefusal(request).note
+            ?: throw IllegalStateException("$request: ok response with no note")
         cacheNotes(listOf(note))
         return note
     }
@@ -528,20 +523,7 @@ class NotesRepository(
      *  status-filtered active/archive views atomically. */
     suspend fun setArchived(id: String, archived: Boolean, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setArchived id=$id archived=$archived")
-        val response = api.archiveNote(id, ArchiveNoteRequest(archived, clientUpdatedAt))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "POST /api/notes/$id/archive failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        if (body.stale) {
-            NativeDebug.d("NotesRepository.setArchived id=$id: stale, not applied")
-            return SaveNoteResult.Stale
-        }
-        val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/archive: ok response with no note")
-        cacheNotes(listOf(saved))
-        return SaveNoteResult.Saved(saved)
+        return settle(api.archiveNote(id, ArchiveNoteRequest(archived, clientUpdatedAt)), "POST /api/notes/$id/archive")
     }
 
     /**
@@ -555,16 +537,7 @@ class NotesRepository(
     suspend fun trashNote(id: String, clientUpdatedAt: String = nowIso(), mode: String? = null): SaveNoteResult {
         NativeDebug.d("NotesRepository.trashNote id=$id mode=$mode")
         val response = api.trashNote(id, TrashNoteRequest(clientUpdatedAt, mode))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "POST /api/notes/$id/trash failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        if (body.stale) {
-            NativeDebug.d("NotesRepository.trashNote id=$id: stale, not applied")
-            return SaveNoteResult.Stale
-        }
+        val body = response.bodyOrRefusal("POST /api/notes/$id/trash")
         // A shared note: this user left it (or, as owner, transferred it
         // away by leaving), see NoteMutationResponse's own doc comment.
         // There's no updated version of the original note to hand back,
@@ -572,14 +545,12 @@ class NotesRepository(
         // screen has no reason to load (the caller navigates back either
         // way). Either branch means it's gone from this user's active
         // list, same local cleanup as an ordinary trash below.
-        if (body.left || body.deletedForAll) {
+        if (!body.stale && (body.left || body.deletedForAll)) {
             NativeDebug.d("NotesRepository.trashNote id=$id: original no longer accessible")
             noteDao.deleteById(id)
             return SaveNoteResult.Left
         }
-        val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/trash: ok response with no note")
-        cacheNotes(listOf(saved))
-        return SaveNoteResult.Saved(saved)
+        return settle(response, "POST /api/notes/$id/trash")
     }
 
     /** Restores a trashed note back to the active list. Also un-archives it
@@ -592,20 +563,7 @@ class NotesRepository(
      *  into the local cache so it shows up in the main list right away. */
     suspend fun restoreNote(id: String, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.restoreNote id=$id")
-        val response = api.restoreNote(id, ClientUpdatedAtRequest(clientUpdatedAt))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "POST /api/notes/$id/restore failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        if (body.stale) {
-            NativeDebug.d("NotesRepository.restoreNote id=$id: stale, not applied")
-            return SaveNoteResult.Stale
-        }
-        val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/restore: ok response with no note")
-        cacheNotes(listOf(saved))
-        return SaveNoteResult.Saved(saved)
+        return settle(api.restoreNote(id, ClientUpdatedAtRequest(clientUpdatedAt)), "POST /api/notes/$id/restore")
     }
 
     /** Permanently deletes a note already in trash. The trash view is the
@@ -615,15 +573,10 @@ class NotesRepository(
     suspend fun deleteNotePermanently(id: String, clientUpdatedAt: String = nowIso()): DeleteResult {
         NativeDebug.d("NotesRepository.deleteNotePermanently id=$id")
         val response = api.deleteNotePermanently(id, ClientUpdatedAtRequest(clientUpdatedAt))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "DELETE /api/notes/$id/permanent failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        val body = response.bodyOrRefusal("DELETE /api/notes/$id/permanent")
         if (body.stale) {
             NativeDebug.d("NotesRepository.deleteNotePermanently id=$id: stale, not applied")
-            return DeleteResult.Stale
+            return DeleteResult.Stale(body.note)
         }
         noteDao.deleteById(id)
         return DeleteResult.Deleted
@@ -634,20 +587,7 @@ class NotesRepository(
      *  are left out of the JSON entirely and stay untouched server-side. */
     suspend fun setColor(id: String, color: String, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setColor id=$id color=$color")
-        val response = api.setColor(id, SetColorRequest(color, clientUpdatedAt))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "PATCH /api/notes/$id (color) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        if (body.stale) {
-            NativeDebug.d("NotesRepository.setColor id=$id: stale, not applied")
-            return SaveNoteResult.Stale
-        }
-        val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (color): ok response with no note")
-        cacheNotes(listOf(saved))
-        return SaveNoteResult.Saved(saved)
+        return settle(api.setColor(id, SetColorRequest(color, clientUpdatedAt)), "PATCH /api/notes/$id (color)")
     }
 
     /** Replaces a note's tag list. Shares the general PATCH endpoint with
@@ -658,20 +598,7 @@ class NotesRepository(
      *  real outcomes here too, same as setColor(). */
     suspend fun setTags(id: String, tags: List<String>, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setTags id=$id tags=$tags")
-        val response = api.setTags(id, SetTagsRequest(tags, clientUpdatedAt))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "PATCH /api/notes/$id (tags) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        if (body.stale) {
-            NativeDebug.d("NotesRepository.setTags id=$id: stale, not applied")
-            return SaveNoteResult.Stale
-        }
-        val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (tags): ok response with no note")
-        cacheNotes(listOf(saved))
-        return SaveNoteResult.Saved(saved)
+        return settle(api.setTags(id, SetTagsRequest(tags, clientUpdatedAt)), "PATCH /api/notes/$id (tags)")
     }
 
     /** Replaces a checklist note's items (see ChecklistItems for the
@@ -681,20 +608,10 @@ class NotesRepository(
      *  (App.jsx) for this exact call. */
     suspend fun setChecklistItems(id: String, items: List<JsonElement>, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setChecklistItems id=$id count=${items.size}")
-        val response = api.setChecklistItems(id, SetChecklistItemsRequest(items = items, clientUpdatedAt = clientUpdatedAt))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "PATCH /api/notes/$id (items) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        if (body.stale) {
-            NativeDebug.d("NotesRepository.setChecklistItems id=$id: stale, not applied")
-            return SaveNoteResult.Stale
-        }
-        val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (items): ok response with no note")
-        cacheNotes(listOf(saved))
-        return SaveNoteResult.Saved(saved)
+        return settle(
+            api.setChecklistItems(id, SetChecklistItemsRequest(items = items, clientUpdatedAt = clientUpdatedAt)),
+            "PATCH /api/notes/$id (items)",
+        )
     }
 
     /**
@@ -711,20 +628,10 @@ class NotesRepository(
         clientUpdatedAt: String = nowIso(),
     ): SaveNoteResult {
         NativeDebug.d("NotesRepository.convertNoteType id=$id type=$type")
-        val response = api.convertNoteType(id, ConvertNoteTypeRequest(type, content, items, clientUpdatedAt))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "PATCH /api/notes/$id (convert) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        if (body.stale) {
-            NativeDebug.d("NotesRepository.convertNoteType id=$id: stale, not applied")
-            return SaveNoteResult.Stale
-        }
-        val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (convert): ok response with no note")
-        cacheNotes(listOf(saved))
-        return SaveNoteResult.Saved(saved)
+        return settle(
+            api.convertNoteType(id, ConvertNoteTypeRequest(type, content, items, clientUpdatedAt)),
+            "PATCH /api/notes/$id (convert)",
+        )
     }
 
     suspend fun convertNoteTypeQueued(id: String, type: String, content: String, items: List<JsonElement>) {
@@ -746,20 +653,10 @@ class NotesRepository(
      *  lightweight while offline detail retains the actual images. */
     suspend fun setImages(id: String, images: List<JsonElement>, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setImages id=$id count=${images.size}")
-        val response = api.setImages(id, SetImagesRequest(images = images, clientUpdatedAt = clientUpdatedAt))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "PATCH /api/notes/$id (images) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        if (body.stale) {
-            NativeDebug.d("NotesRepository.setImages id=$id: stale, not applied")
-            return SaveNoteResult.Stale
-        }
-        val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (images): ok response with no note")
-        cacheNotes(listOf(saved))
-        return SaveNoteResult.Saved(saved)
+        return settle(
+            api.setImages(id, SetImagesRequest(images = images, clientUpdatedAt = clientUpdatedAt)),
+            "PATCH /api/notes/$id (images)",
+        )
     }
 
     // ---- Offline sync queue (see SyncQueueWorker.kt) ------------------
@@ -839,12 +736,7 @@ class NotesRepository(
     suspend fun reorderNotes(pinnedIds: List<String>, otherIds: List<String>, clientReorderedAt: String): ReorderResult {
         NativeDebug.d("NotesRepository.reorderNotes pinned=${pinnedIds.size} others=${otherIds.size}")
         val response = api.reorderNotes(ReorderNotesRequest(pinnedIds, otherIds, clientReorderedAt))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "POST /api/notes/reorder failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        val body = response.bodyOrRefusal("POST /api/notes/reorder")
         if (body.stale) {
             NativeDebug.d("NotesRepository.reorderNotes: stale, not applied")
             return ReorderResult.Stale
@@ -997,6 +889,17 @@ class NotesRepository(
     /** The whole queue, for the header's sync panel (see SyncStatusSheet). */
     fun observeSyncQueue(): Flow<List<SyncQueueEntity>> = syncQueueDao.observeAll()
 
+    /** Gives the changes that gave up their attempts a clean start (see
+     *  SyncQueueDao.resetFailed). Returns how many there were. */
+    suspend fun resetFailedQueue(): Int = syncQueueDao.resetFailed()
+
+    /** Drops from the phone a note the server says is gone, or no longer
+     *  open to this user (App.jsx:2458-2470). */
+    suspend fun forgetNote(id: String) {
+        NativeDebug.d("NotesRepository.forgetNote id=$id")
+        noteDao.deleteById(id)
+    }
+
     /** Sets or clears this user's own icon for a note, and mirrors it into
      *  the local cache so the card's badge follows immediately. Deliberate
      *  user action, and a private per-user marker with no other device's
@@ -1039,20 +942,7 @@ class NotesRepository(
      *  ReminderSync.kt) see the change immediately, without a refresh(). */
     suspend fun setReminder(id: String, reminderAtIso: String?, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setReminder id=$id reminderAt=$reminderAtIso")
-        val response = api.setReminder(id, SetReminderRequest(reminderAtIso, clientUpdatedAt))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "POST /api/notes/$id/reminder failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        if (body.stale) {
-            NativeDebug.d("NotesRepository.setReminder id=$id: stale, not applied")
-            return SaveNoteResult.Stale
-        }
-        val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/reminder: ok response with no note")
-        cacheNotes(listOf(saved))
-        return SaveNoteResult.Saved(saved)
+        return settle(api.setReminder(id, SetReminderRequest(reminderAtIso, clientUpdatedAt)), "POST /api/notes/$id/reminder")
     }
 
     /** Sets the checklist insert-position preference ("top"/"bottom").

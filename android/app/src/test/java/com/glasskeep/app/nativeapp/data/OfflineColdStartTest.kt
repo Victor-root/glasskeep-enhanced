@@ -223,8 +223,8 @@ private class InMemoryNoteDao : NoteDao {
 }
 
 /** The sync queue table, kept in memory. [getProtectedNoteIds] follows the
- *  rule of the real query: a queued creation, or an action still pending
- *  that a refresh must not undo. */
+ *  rule of the real query: every queued change but a reorder, whatever its
+ *  state. */
 private class InMemorySyncQueueDao : SyncQueueDao {
     private val items = MutableStateFlow<List<SyncQueueEntity>>(emptyList())
     private var lastQueueId = 0L
@@ -247,6 +247,22 @@ private class InMemorySyncQueueDao : SyncQueueDao {
         items.value = items.value.filterNot { it.queueId == queueId }
     }
 
+    override suspend fun deleteForNote(noteId: String) {
+        items.value = items.value.filterNot { it.noteId == noteId }
+    }
+
+    override suspend fun resetFailed(): Int {
+        val failed = items.value.count { it.status == SyncQueueEntity.STATUS_FAILED }
+        items.value = items.value.map {
+            if (it.status == SyncQueueEntity.STATUS_FAILED) {
+                it.copy(status = SyncQueueEntity.STATUS_PENDING, attempts = 0, lastError = null)
+            } else {
+                it
+            }
+        }
+        return failed
+    }
+
     override suspend fun deleteAll() {
         items.value = emptyList()
     }
@@ -258,7 +274,7 @@ private class InMemorySyncQueueDao : SyncQueueDao {
         update(queueId) { it.copy(status = SyncQueueEntity.STATUS_FAILED, attempts = attempts, lastError = error) }
 
     override suspend fun getProtectedNoteIds() = items.value
-        .filter { it.type == "CREATE" || it.status == SyncQueueEntity.STATUS_PENDING && it.type in PROTECTED_TYPES }
+        .filter { it.type != "REORDER" }
         .map { it.noteId }
         .distinct()
 
@@ -270,9 +286,5 @@ private class InMemorySyncQueueDao : SyncQueueDao {
 
     private fun update(queueId: Long, change: (SyncQueueEntity) -> SyncQueueEntity) {
         items.value = items.value.map { if (it.queueId == queueId) change(it) else it }
-    }
-
-    private companion object {
-        val PROTECTED_TYPES = setOf("ARCHIVE", "TRASH", "RESTORE", "PERMANENT_DELETE", "PINNED", "REMINDER")
     }
 }
