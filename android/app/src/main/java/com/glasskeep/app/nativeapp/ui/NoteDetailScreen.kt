@@ -4252,7 +4252,7 @@ private fun NoteWarningBanner(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .padding(bottom = 8.dp)
+            .padding(top = 8.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(background)
             .border(1.dp, border, RoundedCornerShape(8.dp))
@@ -4261,6 +4261,6 @@ private fun NoteWarningBanner(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         icon(textColor)
-        Text(message, color = textColor, fontSize = 14.sp, lineHeight = 18.sp)
+        Text(message, color = textColor, fontSize = 14.sp, lineHeight = 20.sp)
     }
 }
