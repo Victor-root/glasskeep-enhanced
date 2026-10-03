@@ -8,7 +8,6 @@ import AiAdminSection from "./AiAdminSection.jsx";
 import AdminUpdateSection from "../admin/AdminUpdateSection.jsx";
 import FederationSection from "../admin/federation/FederationSection.jsx";
 import LoginBrandingSection from "./LoginBrandingSection.jsx";
-import OidcAdminSection from "../admin/OidcAdminSection.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import { RowIcon, SettingsSection } from "../common/SettingsAccordion.jsx";
 const SectionHeaderIcon = RowIcon;
@@ -655,6 +654,36 @@ export default function AdminPanel({
                 </button>
               </div>
 
+              {/* Single sign-on: users then set up their own provider
+                  from their settings. */}
+              <div className="flex items-center justify-between gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.UserCircle} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("allowSso")}</div>
+                    <div className="text-sm text-gray-500">{t("allowSsoDesc")}</div>
+                  </div>
+                </div>
+                <button
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                    adminSettings.ssoAllowed
+                      ? "bg-[var(--gk-switch-on)]"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                  onClick={() =>
+                    updateAdminSettings({
+                      ssoAllowed: !adminSettings.ssoAllowed,
+                    })
+                  }
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      adminSettings.ssoAllowed ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
               <LoginSloganRow
                 value={adminSettings.loginSlogan}
                 onSave={(slogan) => updateAdminSettings({ loginSlogan: slogan })}
@@ -874,22 +903,6 @@ export default function AdminPanel({
             >
             <div className="pl-3">
               <AiAdminSection token={authToken} showToast={showToast} />
-            </div>
-            </SettingsSection>
-          </div>
-
-          {/* Single sign-on through an OpenID Connect provider. The
-              client secret is write-only; the callback is derived from
-              the address this panel is open on. */}
-          <div className="mb-2">
-            <SettingsSection
-              icon={TI.UserCircle}
-              title={t("oidcSectionTitle")}
-              open={openSections.oidc}
-              onToggle={() => toggleSection("oidc")}
-            >
-            <div className="pl-3">
-              <OidcAdminSection token={authToken} showToast={showToast} />
             </div>
             </SettingsSection>
           </div>
