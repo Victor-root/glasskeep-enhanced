@@ -2036,12 +2036,15 @@ fun NoteDetailScreen(
                         Spacer(Modifier.width(2.dp))
                     }
                     val edit = editability
+                    // The web's modalHasChanges never counts a drawing's
+                    // strokes or an audio note's clips (useModalState.js:113),
+                    // which save by themselves.
                     val armed = edit != null && !isNoteReadOnly &&
-                        (titleText != currentNote.title || bodyChanged(edit))
+                        (titleText != currentNote.title || (bodyChanged(edit) && !edit.isDrawType && !edit.isAudioType))
                     ModalSaveButton(
                         dark = dark,
                         armed = armed,
-                        enabled = !saving && !isNoteReadOnly,
+                        enabled = armed && !saving,
                         contentDescription = stringResource(
                             when {
                                 !armed -> R.string.native_note_detail_saved
