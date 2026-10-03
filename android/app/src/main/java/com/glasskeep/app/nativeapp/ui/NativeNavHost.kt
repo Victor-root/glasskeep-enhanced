@@ -71,6 +71,7 @@ import com.glasskeep.app.nativeapp.SyncErrorKind
 import com.glasskeep.app.nativeapp.data.FederationEvent
 import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
+import com.glasskeep.app.nativeapp.data.NotificationFeedEvent
 import com.glasskeep.app.nativeapp.data.RealtimeClient
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.network.LoginProfileDto
@@ -86,6 +87,7 @@ import com.glasskeep.app.nativeapp.watchNetworkLoss
 import com.glasskeep.app.reminders.ReminderSyncWorker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -166,9 +168,11 @@ fun NativeNavHost(
     var preferencePokes by remember { mutableIntStateOf(0) }
     var aiSettingsPokes by remember { mutableIntStateOf(0) }
     var brandingPokes by remember { mutableIntStateOf(0) }
-    // The last share/revoke frame the server pushed, waiting to become a
-    // pill (the web's own showShareNotificationToast, App.jsx:3841).
-    var liveNotification by remember { mutableStateOf<NotificationDto?>(null) }
+    // What the server pushes about this user's notifications, waiting to
+    // become pills (the web's own showShareNotificationToast, App.jsx:3841)
+    // or to change the feed. A queue, not a single slot: frames that come
+    // before the next recomposition would otherwise overwrite one another.
+    val notificationFeed = remember { Channel<NotificationFeedEvent>(Channel.UNLIMITED) }
     // What the admin panel reloads its lists on while it is open.
     val adminEvents = remember { MutableSharedFlow<String>(extraBufferCapacity = 16) }
     // The same federation frames whole, for the pairing notices.
@@ -183,7 +187,7 @@ fun NativeNavHost(
             onInstanceLocked = { container.lockState.markLocked() },
             onSessionExpired = container::expireSession,
             onInstanceUnlocked = { lockPokes++ },
-            onLiveNotification = { liveNotification = it },
+            onNotificationFeed = { notificationFeed.trySend(it) },
             onAuxiliaryEvent = { type ->
                 adminEvents.tryEmit(type)
                 when (type) {
@@ -433,6 +437,17 @@ fun NativeNavHost(
         slideOutVertically(tween(180, easing = EaseIn)) { with(density) { NoteRise.roundToPx() } }
 
     toasts.removeServerRow = { id -> scope.launch { repository.removeNotifications(listOf(id)) } }
+    toasts.markServerRowDelivered = { id ->
+        scope.launch {
+            try {
+                repository.markNotificationsDelivered(listOf(id))
+            } catch (t: CancellationException) {
+                throw t
+            } catch (t: Throwable) {
+                NativeDebug.e("Acknowledging an expired pill failed", t)
+            }
+        }
+    }
 
     // A server row as a pill (the web's showShareNotificationToast,
     // App.jsx:3841), called from the composition rather than from the SSE
@@ -447,7 +462,7 @@ fun NativeNavHost(
                 decidePendingRegistration(context, api, repository, toasts, alerts, id, notification.id, approve)
             }
         }
-        toasts.show(
+        val shown = toasts.show(
             message = notificationMessageText(context, notification),
             variant = variantOf(notification),
             title = notificationTitleText(context, notification, withFallback = false),
@@ -468,11 +483,17 @@ fun NativeNavHost(
             serverId = notification.id,
             persistent = notification.persistent == 1 || notification.type == "reminder",
         )
+        if (shown != null) toasts.mergeServerRow(notification)
     }
-    LaunchedEffect(liveNotification) {
-        val notification = liveNotification ?: return@LaunchedEffect
-        liveNotification = null
-        showNotificationPill(notification)
+    LaunchedEffect(notificationFeed, serverUrl) {
+        for (event in notificationFeed) {
+            when (event) {
+                is NotificationFeedEvent.Arrived -> showNotificationPill(event.notification)
+                NotificationFeedEvent.Cleared -> toasts.clearServerRows()
+                is NotificationFeedEvent.Delivered -> toasts.serverRowsDelivered(event.ids)
+                is NotificationFeedEvent.Removed -> toasts.serverRowsRemoved(event.ids)
+            }
+        }
     }
     // Same "one instance for the whole app" placement as the pill above,
     // and the same reason: the web keeps exactly one tooltip portal at its

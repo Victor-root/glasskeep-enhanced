@@ -26,10 +26,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +59,8 @@ import com.glasskeep.app.nativeapp.data.NotifCategory
 import com.glasskeep.app.nativeapp.data.NotifVariantKey
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.nowIso
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 
 /** The four variants a notification can carry, and the accent each paints
  *  with (globalCSS.js:5009-5048). Shared by the toast pill and the
@@ -143,6 +147,15 @@ class ToastController {
      *  must not bring their pills back. */
     private val acknowledged = mutableSetOf<Int>()
 
+    /** Tells the server a row was delivered, once NativeNavHost has a session. */
+    var markServerRowDelivered: ((Int) -> Unit)? = null
+
+    /** How many rings the arrivals asked for. The ring itself is played from
+     *  the state's changes, so a burst that lands together rings once, as
+     *  the web's effect over its notification list does (App.jsx:812-823). */
+    internal var dingRequests by mutableIntStateOf(0)
+        private set
+
     fun show(
         message: CharSequence,
         variant: NotifVariant = NotifVariant.INFO,
@@ -162,6 +175,9 @@ class ToastController {
         secondaryOutlined: Boolean = true,
         stacked: Boolean = false,
     ): Long? {
+        // The unlock banner and screen already say so: an in-flight request
+        // must not raise it again (NotificationProvider.jsx:405-407).
+        if (InstanceLockedMessage.containsMatchIn(message.toString().trim())) return null
         val category = NotifCategory.of(type, variant.categoryKey)
         val settings = prefs
         if (settings != null && !settings.allowsNotification(category)) return null
@@ -203,7 +219,7 @@ class ToastController {
                 durationMs = durationMs,
             ),
         )
-        if (settings != null && settings.ringsFor(category)) NotificationDing.play()
+        if (settings != null && settings.ringsFor(category)) dingRequests++
         return id
     }
 
@@ -217,6 +233,15 @@ class ToastController {
 
     internal fun dismiss(id: Long) {
         queue.removeAll { it.id == id }
+    }
+
+    /** A pill that ran out its time: off the screen and, for a server row,
+     *  acknowledged as delivered, the way the web's provider resolves a timed
+     *  notification (NotificationProvider.jsx:478-490), so it is not shown
+     *  again at the next launch. */
+    internal fun expire(toast: GkToast) {
+        dismiss(toast.id)
+        toast.serverId?.let { markServerRowDelivered?.invoke(it) }
     }
 
     /** Opening a note acknowledges its reminders (App.jsx:5273-5292): their
@@ -246,7 +271,40 @@ class ToastController {
         serverHistory = serverHistory.filterNot { it.id == serverId }
         removeServerRow?.invoke(serverId)
     }
+
+    /** A row the server pushed, or replayed at launch, joins the centre's
+     *  feed at once, as every notification joins the web provider's history. */
+    internal fun mergeServerRow(row: NotificationDto) {
+        if (row.id <= 0 || serverHistory.any { it.id == row.id }) return
+        serverHistory = (listOf(row) + serverHistory).take(MaxLocalHistory)
+    }
+
+    /** Another device cleared this user's feed (notifications_cleared): the
+     *  messages the app raised itself have no server row and stay
+     *  (clearServerBackedNotifications, App.jsx:3932-3938). */
+    internal fun clearServerRows() {
+        queue.removeAll { it.serverId != null }
+        serverHistory = emptyList()
+    }
+
+    /** Another device acknowledged these rows (notification_delivered):
+     *  their pills are not needed here any more. The one on screen finishes
+     *  its time, as the web's burst is insulated from such a frame. */
+    internal fun serverRowsDelivered(ids: Set<Int>) {
+        val onScreen = queue.firstOrNull()
+        queue.removeAll { it !== onScreen && it.serverId in ids }
+    }
+
+    /** Another device deleted these rows (notification_removed): gone from
+     *  the screen and the history alike. */
+    internal fun serverRowsRemoved(ids: Set<Int>) {
+        queue.removeAll { it.serverId in ids }
+        serverHistory = serverHistory.filterNot { it.id in ids }
+    }
 }
+
+/** What the web drops without showing (the English and French wordings). */
+private val InstanceLockedMessage = Regex("^instance\\s+(is\\s+)?(locked|verrouill)", RegexOption.IGNORE_CASE)
 
 /** A pill's own row in the centre's history: negative, so it can never
  *  meet a server row's id. */
@@ -262,6 +320,9 @@ private const val MaxLocalHistory = 100
 
 /** MIN_BURST_SLICE / the default duration (NotificationProvider.jsx:179). */
 private const val MinBurstSliceMs = 800L
+
+/** How long after the last arrival a burst is counted (NotificationMobileToast.jsx:256). */
+private const val BurstSettleMs = 100L
 const val DefaultToastDurationMs = 10_000L
 
 /**
@@ -276,16 +337,31 @@ fun GkToastHost(
     dark: Boolean,
     durationMs: Long? = DefaultToastDurationMs,
 ) {
+    // The ring is independent of the pill: it sounds with the panel open too.
+    LaunchedEffect(controller) {
+        snapshotFlow { controller.dingRequests }.drop(1).collect { NotificationDing.play() }
+    }
+
     val current = controller.queue.firstOrNull()
     if (current == null || controller.suppressed) return
 
-    // A burst shares the configured duration between everything that
-    // arrived together, never dropping below 800ms a piece.
-    val slice = if (current.persistent) {
+    // A burst shares the configured duration between everything that had
+    // arrived 100ms after the last arrival, never dropping below 800ms a
+    // piece, and keeps that share until it has been shown, however the
+    // queue changes meanwhile (NotificationMobileToast.jsx:222-266).
+    var burstSize by remember { mutableIntStateOf(0) }
+    var burstShown by remember { mutableIntStateOf(0) }
+    if (burstSize == 0) {
+        LaunchedEffect(controller.queue.size) {
+            delay(BurstSettleMs)
+            burstSize = controller.queue.count { !it.persistent }.coerceAtLeast(1)
+        }
+    }
+    val slice = if (current.persistent || burstSize == 0) {
         null
     } else {
         (current.durationMs ?: durationMs)?.let { total ->
-            if (controller.queue.size > 1) maxOf(MinBurstSliceMs, total / controller.queue.size) else total
+            if (burstSize > 1) maxOf(MinBurstSliceMs, total / burstSize) else total
         }
     }
 
@@ -293,7 +369,11 @@ fun GkToastHost(
     LaunchedEffect(current.id, slice) {
         if (slice == null) return@LaunchedEffect
         progress.animateTo(0f, tween(durationMillis = slice.toInt(), easing = LinearEasing))
-        controller.dismiss(current.id)
+        if (++burstShown >= burstSize) {
+            burstSize = 0
+            burstShown = 0
+        }
+        controller.expire(current)
     }
 
     // gkMobileToastIn plays when the pill mounts: the next pill of a

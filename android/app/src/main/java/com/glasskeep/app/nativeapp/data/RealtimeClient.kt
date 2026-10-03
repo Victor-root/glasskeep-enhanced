@@ -12,6 +12,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -36,6 +37,17 @@ data class FederationEvent(
      *  than declining ours. */
     val cancelled: Boolean,
 )
+
+/** What reaches this user's notification feed, as the web's App.jsx routes
+ *  it (3836 and 3932-3954): a row pushed live, or what another device did
+ *  to the feed. Their order is kept, since a row can be acknowledged right
+ *  after it arrived. */
+sealed interface NotificationFeedEvent {
+    data class Arrived(val notification: NotificationDto) : NotificationFeedEvent
+    data object Cleared : NotificationFeedEvent
+    data class Delivered(val ids: Set<Int>) : NotificationFeedEvent
+    data class Removed(val ids: Set<Int>) : NotificationFeedEvent
+}
 
 /**
  * Long-lived connection to GET /api/events (server/index.js), so a note
@@ -73,7 +85,7 @@ class RealtimeClient(
     private val onInstanceLocked: () -> Unit,
     private val onSessionExpired: (String) -> Unit,
     private val onInstanceUnlocked: () -> Unit,
-    private val onLiveNotification: (NotificationDto) -> Unit,
+    private val onNotificationFeed: (NotificationFeedEvent) -> Unit,
     /** Settings/branding/admin events invalidate native secondary state.
      *  The host performs the appropriately scoped re-read. */
     private val onAuxiliaryEvent: (String) -> Unit,
@@ -202,6 +214,17 @@ class RealtimeClient(
             ApiClientFactory.clientId
     }.getOrDefault(false)
 
+    private fun feedEventOf(type: String, data: String): NotificationFeedEvent? = runCatching {
+        val root = json.parseToJsonElement(data) as? JsonObject ?: return null
+        val ids = (root["ids"] as? JsonArray)?.mapNotNullTo(mutableSetOf()) { (it as? JsonPrimitive)?.intOrNull }
+        when (type) {
+            "notifications_cleared" -> NotificationFeedEvent.Cleared
+            "notification_delivered" -> ids?.let { NotificationFeedEvent.Delivered(it) }
+            "notification_removed" -> ids?.let { NotificationFeedEvent.Removed(it) }
+            else -> null
+        }
+    }.getOrNull()
+
     private fun noteIdOf(data: String): String? = runCatching {
         ((json.parseToJsonElement(data) as? JsonObject)?.get("noteId") as? JsonPrimitive)?.contentOrNull
     }.getOrNull()
@@ -257,8 +280,12 @@ class RealtimeClient(
             if (payloadType != null && payloadType in LIVE_NOTIFICATION_TYPES) {
                 liveNotificationOf(data)?.let {
                     NativeDebug.d("RealtimeClient live notification type=${it.type}")
-                    onLiveNotification(it)
+                    onNotificationFeed(NotificationFeedEvent.Arrived(it))
                 }
+            }
+            if (payloadType != null && payloadType in FEED_EVENT_TYPES) {
+                NativeDebug.d("RealtimeClient feed event type=$payloadType")
+                feedEventOf(payloadType, data)?.let(onNotificationFeed)
             }
             if (payloadType != null && payloadType in AUXILIARY_EVENT_TYPES && !isOwnEcho(payloadType, data)) {
                 NativeDebug.d("RealtimeClient auxiliary event type=$payloadType")
@@ -349,6 +376,9 @@ class RealtimeClient(
             "logo_deleted",
             "pending_user_resolved",
             "user_list_changed",
+        )
+        /** What another device does to this user's notification feed. */
+        private val FEED_EVENT_TYPES = setOf(
             "notifications_cleared",
             "notification_delivered",
             "notification_removed",
