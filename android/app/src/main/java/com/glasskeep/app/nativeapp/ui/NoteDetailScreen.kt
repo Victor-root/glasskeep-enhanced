@@ -1221,7 +1221,7 @@ fun NoteDetailScreen(
                 }
             }
             if (failure != null) {
-                noteAiError = failure
+                noteAiError = context.localizedServerError(failure, R.string.native_note_ai_error)
             } else if (!started) {
                 noteAiError = aiErrorMessage
             }
