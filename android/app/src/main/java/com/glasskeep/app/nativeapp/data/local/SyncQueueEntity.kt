@@ -54,4 +54,4 @@ data class SyncQueueEntity(
  *  not one, which doesn't fit getProtectedNoteIds()'s per-note-id
  *  design - see NotesRepository.reorderQueued's own doc comment for the
  *  accepted tradeoff. */
-enum class SyncQueueType { CREATE, TITLE_CONTENT, COLOR, TAGS, CHECKLIST_ITEMS, IMAGES, PINNED, ARCHIVE, TRASH, RESTORE, PERMANENT_DELETE, REMINDER, REORDER, CONVERT_TYPE }
+enum class SyncQueueType { CREATE, TITLE_CONTENT, COLOR, TAGS, CHECKLIST_ITEMS, IMAGES, PINNED, ARCHIVE, TRASH, RESTORE, PERMANENT_DELETE, REMINDER, REORDER, CONVERT_TYPE, ICON }

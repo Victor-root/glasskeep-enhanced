@@ -31,6 +31,7 @@ import com.glasskeep.app.nativeapp.data.network.ReorderNotesRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
 import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
+import com.glasskeep.app.nativeapp.data.network.SetNoteIconRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
@@ -133,6 +134,10 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 SyncQueueType.REMINDER -> {
                     val body = Json.decodeFromString<SetReminderRequest>(item.payloadJson)
                     repository.setReminder(item.noteId, body.reminderAt, body.clientUpdatedAt)
+                }
+                SyncQueueType.ICON -> {
+                    val body = Json.decodeFromString<SetNoteIconRequest>(item.payloadJson)
+                    repository.setNoteIcon(item.noteId, body.icon)
                 }
                 SyncQueueType.REORDER -> {
                     // item.noteId is just the sentinel this type always

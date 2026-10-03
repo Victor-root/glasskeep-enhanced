@@ -383,11 +383,13 @@ class NotesRepository(
      * another fully-formed note of a type native can already view. Item
      * and image ids are regenerated like the web duplicate flow, and the
      * full result is cached and queued without requiring connectivity.
+     * The logo is per-user and has its own route (not part of the create),
+     * so its copy is queued right behind the create.
      */
     suspend fun duplicateNote(source: NoteDto, newTitle: String): NoteDto {
         NativeDebug.d("NotesRepository.duplicateNote queued id=${source.id}")
         val instant = nowIso()
-        return createNoteQueued(
+        val created = createNoteQueued(
             CreateNoteRequest(
                 id = UUID.randomUUID().toString(),
                 type = source.type,
@@ -404,6 +406,9 @@ class NotesRepository(
             ),
             userId = source.userId,
         )
+        val icon = source.icon ?: return created
+        syncQueueDao.enqueue(created.id, SyncQueueType.ICON.name, Json.encodeToString(SetNoteIconRequest(icon)), System.currentTimeMillis())
+        return created.copy(icon = icon).also { cacheNotes(listOf(it)) }
     }
 
     /** Full detail for one note. A locally-created note returns immediately;
