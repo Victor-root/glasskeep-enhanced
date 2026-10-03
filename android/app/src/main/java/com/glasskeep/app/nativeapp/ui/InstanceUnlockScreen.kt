@@ -402,7 +402,7 @@ internal fun LockedBanner(dark: Boolean, onUnlock: () -> Unit, onDismiss: () -> 
                 )
             }
         }
-        if (windowWidth() >= 640.dp) {
+        if (windowWidth() >= SmBreakpoint) {
             Row(
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = maxOf(safeTop, 12.dp), bottom = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

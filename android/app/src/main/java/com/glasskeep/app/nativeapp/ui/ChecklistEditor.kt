@@ -123,14 +123,14 @@ private val IndentStep = 28.dp
 /** AXIS_LOCK_PX (useChecklistDrag.js:11). */
 private val AxisLock = 8.dp
 
-/** What the web's `sm:` (640px) and `md:` (768px) change in the checklist,
- *  read from the window's width in dp, which is 1 CSS px. */
+/** What the web's `sm:` and `md:` change in the checklist, read from the
+ *  window's width in dp, which is 1 CSS px. */
 @Immutable
 private class ChecklistMetrics(width: Dp) {
     /** Under `sm:` the list and its sections spill past the note's
      *  gutter (max-sm:-mx-4, max-sm:-mx-2). */
-    val phone = width < 640.dp
-    private val desktop = width >= 768.dp
+    val phone = width < SmBreakpoint
+    private val desktop = width >= MdBreakpoint
 
     /** gap-1.5 sm:gap-3 md:gap-2: between a row's box, text and "✕". */
     val rowGap = if (phone) 6.dp else if (desktop) 8.dp else 12.dp

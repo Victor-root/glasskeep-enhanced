@@ -831,6 +831,9 @@ private fun AudioHeroPlayer(
 ) {
     val owned = playback.owns(clip)
     val playing = owned && playback.playing
+    // sm: widens the card's padding, the transport's gap and the title,
+    // and labels the add-recording button.
+    val wide = windowWidth() >= SmBreakpoint
     LaunchedEffect(clip.key) { playback.readMissingDuration(clip) }
     val durationMs = playback.durationMs(clip)
     var scrubRatio by remember(clip.key) { mutableStateOf<Float?>(null) }
@@ -849,7 +852,7 @@ private fun AudioHeroPlayer(
                 drawBlurredDisc(accent.copy(alpha = 0.3f), Offset(48.dp.toPx(), size.height - 48.dp.toPx()), 88.dp.toPx())
             }
             .border(1.dp, if (dark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.15f), shape)
-            .padding(20.dp),
+            .padding(if (wide) 24.dp else 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -870,8 +873,8 @@ private fun AudioHeroPlayer(
             Text(
                 clip.name.trim().ifEmpty { stringResource(R.string.native_audio_clip_default_name, index + 1) },
                 color = textColor,
-                fontSize = 16.sp,
-                lineHeight = 24.sp,
+                fontSize = if (wide) 18.sp else 16.sp,
+                lineHeight = if (wide) 28.sp else 24.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -890,7 +893,7 @@ private fun AudioHeroPlayer(
             }
         }
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (wide) 16.dp else 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (total > 1) {
@@ -964,7 +967,7 @@ private fun AudioHeroPlayer(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AudioDownloadMenu(clip, downloadName, themeId, dark, borderColor)
-            if (!readOnly) AudioAddRecordingButton(accent, dark, onAddRecording)
+            if (!readOnly) AudioAddRecordingButton(accent, dark, wide, onAddRecording)
         }
     }
 }
@@ -1218,9 +1221,10 @@ private fun AudioDownloadRow(title: String, extension: String, textColor: Color,
 }
 
 /** The hero's add-recording button (AudioPlayer.jsx:366-390): the mic with
- *  a "+" badge that pokes out of the circle. */
+ *  a "+" badge that pokes out of the circle, a 40dp circle on a phone and
+ *  from `sm:` a pill that names itself. */
 @Composable
-private fun AudioAddRecordingButton(accent: Color, dark: Boolean, onClick: () -> Unit) {
+private fun AudioAddRecordingButton(accent: Color, dark: Boolean, wide: Boolean, onClick: () -> Unit) {
     val label = stringResource(R.string.native_audio_add_recording)
     val interaction = remember { MutableInteractionSource() }
     val scale by pressScale(interaction, 0.98f)
@@ -1230,7 +1234,7 @@ private fun AudioAddRecordingButton(accent: Color, dark: Boolean, onClick: () ->
                 scaleX = scale
                 scaleY = scale
             }
-            .size(40.dp)
+            .then(if (wide) Modifier else Modifier.size(40.dp))
             .tailwindShadowSm(CircleShape)
             .background(if (dark) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.7f), CircleShape)
             .border(1.dp, if (dark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.1f), CircleShape)
@@ -1244,13 +1248,22 @@ private fun AudioAddRecordingButton(accent: Color, dark: Boolean, onClick: () ->
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Box {
-            MicIcon(size = 20.dp, tint = accent)
-            Canvas(Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp).size(12.dp)) {
-                val unit = size.width / 8f
-                drawCircle(accent)
-                drawLine(Color.White, Offset(4 * unit, 2 * unit), Offset(4 * unit, 6 * unit), 1.5f * unit, StrokeCap.Round)
-                drawLine(Color.White, Offset(2 * unit, 4 * unit), Offset(6 * unit, 4 * unit), 1.5f * unit, StrokeCap.Round)
+        Row(
+            modifier = if (wide) Modifier.padding(horizontal = 16.dp, vertical = 8.dp) else Modifier,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box {
+                MicIcon(size = 20.dp, tint = accent)
+                Canvas(Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp).size(12.dp)) {
+                    val unit = size.width / 8f
+                    drawCircle(accent)
+                    drawLine(Color.White, Offset(4 * unit, 2 * unit), Offset(4 * unit, 6 * unit), 1.5f * unit, StrokeCap.Round)
+                    drawLine(Color.White, Offset(2 * unit, 4 * unit), Offset(6 * unit, 4 * unit), 1.5f * unit, StrokeCap.Round)
+                }
+            }
+            if (wide) {
+                Text(label, color = accent, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }

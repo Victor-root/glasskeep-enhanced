@@ -114,8 +114,9 @@ private val AuthCardShape = RoundedCornerShape(12.dp)
 /** `max-w-md`: the widest the logo, the card and the rows below go. */
 private val AuthMaxWidth = 448.dp
 
-/** Tailwind's `md:`, from which the sign-in decoration gets four more cards. */
-private val AuthShellMdBreakpoint = 768.dp
+/** Tailwind's `sm:` and `md:`, which the web reads on the window's width. */
+internal val SmBreakpoint = 640.dp
+internal val MdBreakpoint = 768.dp
 
 /** The window's width, which the web's `sm:` and `md:` breakpoints read. */
 @Composable
@@ -246,7 +247,7 @@ internal fun AuthShell(
             Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
             Box(Modifier.fillMaxWidth().heightIn(min = screenHeight)) {
                 if (customBackground == null) {
-                    FloatingCardsBackground(dark, Modifier.matchParentSize(), fadeIn = false, md = windowWidth() >= AuthShellMdBreakpoint)
+                    FloatingCardsBackground(dark, Modifier.matchParentSize(), fadeIn = false, md = windowWidth() >= MdBreakpoint)
                 }
                 Column(
                     modifier = Modifier
