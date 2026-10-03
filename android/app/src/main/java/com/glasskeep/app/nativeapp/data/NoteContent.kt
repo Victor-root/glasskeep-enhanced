@@ -90,6 +90,31 @@ object NoteContent {
         if (type in BLOCK_TYPES) out.append("\n")
     }
 
+    /** Legacy Markdown without its syntax: the regex strip contentToPlain()
+     *  applies (richText.js:250-265) to notes written before the rich editor. */
+    fun legacyToPlainText(content: String): String = content
+        .replace(CodeFence) { it.value.replace("```", "") }
+        .replace(InlineCode, "$1")
+        .replace(Bold, "$1")
+        .replace(Underline, "$1")
+        .replace(Strike, "$1")
+        .replace(HeadingMark, "")
+        .replace(BulletMark, "")
+        .replace(OrderedMark, "")
+        .replace(QuoteMark, "")
+        .replace(RuleLine, "")
+
+    private val CodeFence = Regex("```[\\s\\S]*?```")
+    private val InlineCode = Regex("`([^`]+)`")
+    private val Bold = Regex("\\*\\*([^*]+)\\*\\*")
+    private val Underline = Regex("__([^_]+)__")
+    private val Strike = Regex("~~([^~]+)~~")
+    private val HeadingMark = Regex("^#{1,6}\\s+", RegexOption.MULTILINE)
+    private val BulletMark = Regex("^\\s*[-*+]\\s+", RegexOption.MULTILINE)
+    private val OrderedMark = Regex("^\\s*\\d+\\.\\s+", RegexOption.MULTILINE)
+    private val QuoteMark = Regex("^\\s*>\\s?", RegexOption.MULTILINE)
+    private val RuleLine = Regex("^---+$", RegexOption.MULTILINE)
+
     /** Wraps plain text back into a rich envelope, ready to send as
      *  `content`. Only ever called on text that came from
      *  [isDocPlainStructure]-approved docs, so there is no formatting to

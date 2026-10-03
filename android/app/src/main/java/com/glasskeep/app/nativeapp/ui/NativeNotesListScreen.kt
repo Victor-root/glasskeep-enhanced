@@ -660,7 +660,7 @@ fun NativeNotesListScreen(
         aiAnswer = null
         aiCitedNoteIds = emptyList()
         scope.launch {
-            val result = aiClient.ask(trimmed, shownNotes, AppLanguage.currentTag())
+            val result = aiClient.ask(trimmed, shownNotes, AppLanguage.aiTag())
             if (result.error != null) {
                 NativeDebug.e("Notes askAi failed: ${result.error}")
                 aiAnswer = aiErrorMessage

@@ -1231,7 +1231,7 @@ fun NoteDetailScreen(
         noteAiJob = scope.launch {
             var answer = ""
             var started = false
-            val failure = aiClient.askAboutNote(snapshot, history, question, AppLanguage.currentTag()) { delta ->
+            val failure = aiClient.askAboutNote(snapshot, history, question, AppLanguage.aiTag()) { delta ->
                 answer += delta
                 // The first chunk seeds the answer; every one after it
                 // replaces that same last message so it grows in place.

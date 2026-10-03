@@ -32,6 +32,10 @@ object AppLanguage {
         return device.toLanguageTags().substringBefore('-').takeIf { it.isNotEmpty() } ?: "en"
     }
 
+    /** What the AI is told to answer in: French or English, the only two
+     *  the web ever sends (ai.js's detectLang()). */
+    fun aiTag(): String = if (currentTag() == "fr") "fr" else "en"
+
     fun apply(language: String?) {
         val tag = language?.takeIf { it in Supported }
         val current = AppCompatDelegate.getApplicationLocales()

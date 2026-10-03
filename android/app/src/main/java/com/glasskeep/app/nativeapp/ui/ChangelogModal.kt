@@ -123,7 +123,7 @@ internal fun ChangelogModal(
         translated = ""
         scope.launch {
             var accumulated = ""
-            val failure = aiClient.translateChangelog(source, if (AppLanguage.currentTag() == "fr") "fr" else "en") { delta ->
+            val failure = aiClient.translateChangelog(source, AppLanguage.aiTag()) { delta ->
                 accumulated += delta
                 translated = accumulated
             }

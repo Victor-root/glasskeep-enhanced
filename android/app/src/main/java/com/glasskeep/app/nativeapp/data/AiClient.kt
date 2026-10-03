@@ -217,13 +217,13 @@ fun NoteEntity.toAiNote(): AiNoteDto = AiNoteDto(
     content = when (type) {
         "checklist" -> ChecklistPreview.parse(itemsJson)
             .joinToString("\n") { "- ${if (it.done) "[x]" else "[ ]"} ${it.text}" }
-        "draw" -> DrawingContent.parse(content)?.text.orEmpty().let(::plainOf)
+        "draw" -> DrawingContent.parse(content)?.text.orEmpty()
         else -> plainOf(content)
     },
     tags = TagsJson.parse(tagsJson),
 )
 
-/** A rich envelope read as plain text, legacy Markdown left as it is:
+/** A rich envelope read as plain text, legacy Markdown without its syntax:
  *  contentToPlain()'s two branches (richText.js:250-265). */
 private fun plainOf(content: String): String =
-    NoteContent.parseRichDoc(content)?.let { NoteContent.docToPlainText(it) } ?: content
+    NoteContent.parseRichDoc(content)?.let { NoteContent.docToPlainText(it) } ?: NoteContent.legacyToPlainText(content)
