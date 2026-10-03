@@ -587,7 +587,7 @@ fun NativeNotesListScreen(
     fun toggleSelectAllVisible() {
         val visibleIds = filteredNotes.mapTo(linkedSetOf()) { it.id }
         if (visibleIds.isEmpty()) return
-        selectedIds = if (visibleIds.all { it in selectedIds }) selectedIds - visibleIds else selectedIds + visibleIds
+        selectedIds = if (visibleIds.all { it in selectedIds }) emptySet() else visibleIds
     }
 
     fun bulkSetIcon(icon: NoteIconDto) {
