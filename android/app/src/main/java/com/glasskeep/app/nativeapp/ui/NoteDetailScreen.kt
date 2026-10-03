@@ -1899,9 +1899,11 @@ fun NoteDetailScreen(
     // reached them - they stayed on the workspace theme color underneath
     // this screen instead of following the note's own color the way the
     // rest of the screen does. The collaboration modal hands them its own
-    // surface while it is open, and the note's colour back after.
+    // surface while it is open, and the note's colour back after. Side by
+    // side only the top note colours them, the web's primary window
+    // (NoteModal.jsx:467-477).
     val systemBarColor = if (showCollaborators) collaboratorsSurface(dark) else modalBg
-    NoteSystemBars(container, systemBarColor)
+    if (splitPane != SplitPane.BOTTOM) NoteSystemBars(container, systemBarColor)
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
