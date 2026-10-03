@@ -1367,7 +1367,7 @@ pre code { padding: 0; border: 0; background: none; font-size: inherit; }
 .step { padding: 24px; min-width: 0; }
 .step-wide { grid-column: 1 / -1; }
 .step-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-.step-num { flex: none; width: 28px; height: 28px; border-radius: 9px; font-size: 0.85rem; }
+.step-num { flex: none; min-width: 34px; height: 28px; padding: 0 7px; border-radius: 9px; font-size: 0.85rem; letter-spacing: 0.02em; }
 .step h4 { font-size: 1.04rem; }
 .step > p { color: var(--text-soft); font-size: 0.94rem; }
 .step-fig { margin-top: 18px; }
