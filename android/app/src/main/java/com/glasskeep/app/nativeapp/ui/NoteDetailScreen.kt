@@ -202,6 +202,21 @@ import kotlinx.coroutines.withContext
 
 private val ErrorColor = Color(0xFFdc2626)
 
+/** The content frame of a drawing, text or checklist note, which NoteModal.jsx:756
+ *  sizes `px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4` (`px-6 pt-3 pb-6 max-sm:px-4
+ *  max-sm:pt-1 max-sm:pb-4` for a drawing). */
+private fun noteBodyPadding(drawing: Boolean, wide: Boolean): PaddingValues = when {
+    drawing -> if (wide) PaddingValues(start = 24.dp, top = 12.dp, end = 24.dp, bottom = 24.dp)
+    else PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp)
+    else -> if (wide) PaddingValues(start = 24.dp, top = 12.dp, end = 24.dp, bottom = 48.dp)
+    else PaddingValues(start = 24.dp, top = 4.dp, end = 24.dp, bottom = 16.dp)
+}
+
+/** An audio note's frame: `px-4 pt-2 pb-4 sm:px-5 sm:pt-3 sm:pb-5`. */
+private fun audioBodyPadding(wide: Boolean): PaddingValues =
+    if (wide) PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 20.dp)
+    else PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp)
+
 /** The pause after the last checklist keystroke, stroke or recording
  *  change before it is queued (App.jsx:4510-4515 waits the same 500ms). */
 private const val AutosaveDebounceMs = 500L
@@ -2230,6 +2245,7 @@ fun NoteDetailScreen(
                 )
             }
 
+            val wide = windowWidth() >= SmBreakpoint
             when {
                 loadError != null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(loadError.orEmpty(), color = ErrorColor, modifier = Modifier.padding(24.dp))
@@ -2281,7 +2297,7 @@ fun NoteDetailScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
-                                .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
+                                .padding(audioBodyPadding(wide)),
                         ) {
                             AudioClipsSection(
                                 clips = audioClips,
@@ -2338,13 +2354,7 @@ fun NoteDetailScreen(
                                 key = viewMode,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(
-                                        if (edit.isDrawType) {
-                                            PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp)
-                                        } else {
-                                            PaddingValues(start = 24.dp, top = 4.dp, end = 24.dp, bottom = 16.dp)
-                                        },
-                                    ),
+                                    .padding(noteBodyPadding(drawing = edit.isDrawType, wide = wide)),
                             ) {
                                 if (edit.isChecklistType) {
                                     ChecklistEditorBody(
