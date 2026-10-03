@@ -9,14 +9,21 @@
 // The flow is always Authorization Code with PKCE S256, a state and a
 // nonce, whatever the provider advertises: a provider that does not know
 // PKCE ignores the extra parameters, one that does gets the protection.
+//
+// The provider address is typed by a user, so where the server may go is
+// decided like for a user's AI endpoint (server/ai/endpointGuard.js): an
+// admin's provider may sit on the local network, anyone else's must be a
+// public address. Otherwise any account could make the server probe the
+// network it runs in. Every call takes `{ allowPrivate }` for that.
 
 const oidc = require("openid-client");
+const guard = require("../ai/endpointGuard");
 
 const SCOPES = "openid profile email";
 const HTTP_TIMEOUT_S = 10;
 const CONFIG_TTL_MS = 60 * 60 * 1000;
 
-// What an admin may type as an issuer: an http(s) URL with no
+// What a user may type as an issuer: an http(s) URL with no
 // credentials, query or fragment. The path is kept as typed, trailing
 // slash included, because discovery compares it exactly with the issuer
 // the provider advertises (Authentik's ends with a slash, Keycloak's
@@ -34,7 +41,7 @@ function normalizeIssuer(input) {
   return u.href;
 }
 
-// The GlassKeep origin the browser reaches us at, as the admin panel
+// The GlassKeep origin the browser reaches us at, as the settings page
 // reports it from window.location.origin.
 function normalizeOrigin(input) {
   if (typeof input !== "string" || !input.trim()) return null;
@@ -73,14 +80,22 @@ function negotiatedClientAuth(clientSecret) {
 // also checks its signature against the provider's published keys, so a
 // provider reached over plain http, or a proxy in between, cannot hand
 // over a forged identity.
-function discoveryOptions(issuer) {
+function discoveryOptions(issuer, allowPrivate) {
   const execute = [oidc.enableNonRepudiationChecks];
   if (new URL(issuer).protocol === "http:") execute.push(oidc.allowInsecureRequests);
-  return { timeout: HTTP_TIMEOUT_S, execute };
+  return { timeout: HTTP_TIMEOUT_S, execute, [oidc.customFetch]: fetcherFor(allowPrivate) };
+}
+
+// The fetch every request to the provider goes through. Without the right
+// to reach private addresses, the connection itself refuses them, whatever
+// DNS answers at that moment and wherever the provider's metadata points.
+function fetcherFor(allowPrivate) {
+  if (allowPrivate) return fetch;
+  return (url, init) => fetch(url, { ...init, dispatcher: guard.publicOnlyDispatcher() });
 }
 
 // A failure, reduced to a code the UI can translate plus the library's
-// own message for the admin's diagnosis.
+// own message for the user's diagnosis.
 class OidcProviderError extends Error {
   constructor(code, detail, extra = {}) {
     super(code);
@@ -92,6 +107,7 @@ class OidcProviderError extends Error {
 
 function asProviderError(err) {
   if (err instanceof OidcProviderError) return err;
+  if (err?.cause?.code === "GK_PRIVATE_ADDRESS") return new OidcProviderError("oidc_private_forbidden");
   if (err?.code === "OAUTH_JSON_ATTRIBUTE_COMPARISON_FAILED" && err?.cause?.attribute === "issuer") {
     return new OidcProviderError("oidc_issuer_mismatch", err.message, {
       advertisedIssuer: typeof err.cause?.body?.issuer === "string" ? err.cause.body.issuer : null,
@@ -100,14 +116,23 @@ function asProviderError(err) {
   return new OidcProviderError("oidc_discovery_failed", err?.cause?.message || err?.message);
 }
 
-async function discover(issuer, clientId, clientSecret) {
+async function discover(issuer, clientId, clientSecret, { allowPrivate }) {
+  if (!allowPrivate) {
+    const verdict = await guard.checkDestination(issuer, { allowPrivate: false });
+    if (!verdict.ok) {
+      throw new OidcProviderError(
+        verdict.reason === guard.REASON.PRIVATE ? "oidc_private_forbidden" : "oidc_discovery_failed",
+        verdict.reason,
+      );
+    }
+  }
   try {
     return await oidc.discovery(
       new URL(issuer),
       clientId,
       undefined,
       clientSecret ? negotiatedClientAuth(clientSecret) : oidc.None(),
-      discoveryOptions(issuer),
+      discoveryOptions(issuer, allowPrivate),
     );
   } catch (err) {
     throw asProviderError(err);
@@ -115,17 +140,19 @@ async function discover(issuer, clientId, clientSecret) {
 }
 
 // Discovery result per provider row, rebuilt when the row changes (its
-// updated_at moves) or after an hour so key rotation and endpoint moves
-// are picked up. Concurrent sign-ins share one in-flight discovery.
+// updated_at moves), when the network it may reach changes, or after an
+// hour so key rotation and endpoint moves are picked up. Concurrent
+// sign-ins share one in-flight discovery.
 const configCache = new Map();
 
-function getConfiguration(provider) {
+function getConfiguration(provider, access) {
+  const version = `${provider.updated_at}|${!!access.allowPrivate}`;
   const cached = configCache.get(provider.id);
-  if (cached && cached.version === provider.updated_at && Date.now() - cached.at < CONFIG_TTL_MS) {
+  if (cached && cached.version === version && Date.now() - cached.at < CONFIG_TTL_MS) {
     return cached.promise;
   }
-  const promise = discover(provider.issuer, provider.client_id, provider.client_secret);
-  const entry = { version: provider.updated_at, at: Date.now(), promise };
+  const promise = discover(provider.issuer, provider.client_id, provider.client_secret, access);
+  const entry = { version, at: Date.now(), promise };
   configCache.set(provider.id, entry);
   promise.catch(() => {
     if (configCache.get(provider.id) === entry) configCache.delete(provider.id);
@@ -135,8 +162,8 @@ function getConfiguration(provider) {
 
 // Starts a sign-in: returns the URL to send the browser to, and the
 // secrets the callback will need to finish it.
-async function beginAuthorization(provider) {
-  const config = await getConfiguration(provider);
+async function beginAuthorization(provider, access) {
+  const config = await getConfiguration(provider, access);
   const codeVerifier = oidc.randomPKCECodeVerifier();
   const state = oidc.randomState();
   const nonce = oidc.randomNonce();
@@ -155,8 +182,8 @@ async function beginAuthorization(provider) {
 // validated identity. The profile claims are read from the ID token and,
 // when it carries no email (Authelia's default), from the userinfo
 // endpoint, whose answer openid-client checks against the same subject.
-async function completeAuthorization(provider, query, { state, nonce, codeVerifier }) {
-  const config = await getConfiguration(provider);
+async function completeAuthorization(provider, query, { state, nonce, codeVerifier }, access) {
+  const config = await getConfiguration(provider, access);
   const currentUrl = new URL(callbackUrlFor(provider.public_origin));
   for (const [k, v] of Object.entries(query || {})) {
     if (typeof v === "string") currentUrl.searchParams.set(k, v);
@@ -182,20 +209,24 @@ async function completeAuthorization(provider, query, { state, nonce, codeVerifi
   };
 }
 
-// The admin panel's "Test the configuration": discovery from the issuer,
+// The settings' "Test the configuration": discovery from the issuer,
 // then the signing keys, which is everything that can be checked without
-// a person signing in. The client credentials are only proven by the
-// first real sign-in.
-async function testIssuer(issuer, clientId) {
-  const config = await discover(issuer, clientId);
+// a person signing in. The client credentials are only proven by linking
+// the account.
+async function testIssuer(issuer, clientId, access) {
+  const config = await discover(issuer, clientId, null, access);
   const meta = config.serverMetadata();
   let keyCount = 0;
   try {
-    const res = await fetch(meta.jwks_uri, { signal: AbortSignal.timeout(HTTP_TIMEOUT_S * 1000) });
+    const res = await fetcherFor(access.allowPrivate)(meta.jwks_uri, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_S * 1000),
+    });
     const body = await res.json();
     keyCount = Array.isArray(body?.keys) ? body.keys.length : 0;
   } catch (err) {
-    throw new OidcProviderError("oidc_jwks_failed", err?.message);
+    const e = asProviderError(err);
+    throw e.code === "oidc_private_forbidden" ? e : new OidcProviderError("oidc_jwks_failed", err?.message);
   }
   if (!keyCount) throw new OidcProviderError("oidc_jwks_failed", "no signing keys published");
   const warnings = [];
