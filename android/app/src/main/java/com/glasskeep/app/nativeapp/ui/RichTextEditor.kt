@@ -2150,7 +2150,7 @@ private fun annotatedTextFor(
 /** A block's marks, and in the view the links it makes of the phone
  *  numbers and e-mail addresses in it (linkifyContactsHTML). */
 private fun richMarksOf(block: RichBlock, surface: RichSurface): List<RichMark> =
-    if (surface == RichSurface.READER) block.marks + RichDoc.contactLinks(block.text, block.marks) else block.marks
+    if (surface == RichSurface.READER) block.marks + RichDoc.contactLinks(block) else block.marks
 
 /** Where [marks] start and end in [text], in order, its ends included: the
  *  edges of the web's text fragments, each mark being an element. */

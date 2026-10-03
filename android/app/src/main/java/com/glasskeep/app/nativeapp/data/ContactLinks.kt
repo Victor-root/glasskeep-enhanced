@@ -7,18 +7,21 @@ data class ContactLink(val start: Int, val end: Int, val uri: String)
 /**
  * linkifyContacts (markdown.jsx): the web turns phone numbers (North
  * American and French formats) and e-mail addresses of plain text into
- * `tel:` / `mailto:` links, the number dialled without its separators.
- * Web addresses are deliberately left alone.
+ * `tel:` / `mailto:` links, the number dialled without its separators. Its
+ * `\s` is JavaScript's, which also matches the no-break spaces a French
+ * number is often written with ([RichDoc.JsSpace]). Web addresses are
+ * deliberately left alone.
  */
 object ContactLinks {
+    private const val Space = RichDoc.JsSpace
     private const val PHONE =
-        "(?:\\+1[\\s.-]?)?\\(\\d{3}\\)[\\s.-]?\\d{3}[\\s.-]?\\d{4}" +
-            "|(?:\\+1[\\s.-]?)?\\d{3}[\\s.-]\\d{3}[\\s.-]\\d{4}" +
-            "|\\+33[\\s.-]?\\d[\\s.-]?\\d{2}[\\s.-]?\\d{2}[\\s.-]?\\d{2}[\\s.-]?\\d{2}" +
-            "|0\\d[\\s.-]?\\d{2}[\\s.-]?\\d{2}[\\s.-]?\\d{2}[\\s.-]?\\d{2}"
+        "(?:\\+1[$Space.-]?)?\\(\\d{3}\\)[$Space.-]?\\d{3}[$Space.-]?\\d{4}" +
+            "|(?:\\+1[$Space.-]?)?\\d{3}[$Space.-]\\d{3}[$Space.-]\\d{4}" +
+            "|\\+33[$Space.-]?\\d[$Space.-]?\\d{2}[$Space.-]?\\d{2}[$Space.-]?\\d{2}[$Space.-]?\\d{2}" +
+            "|0\\d[$Space.-]?\\d{2}[$Space.-]?\\d{2}[$Space.-]?\\d{2}[$Space.-]?\\d{2}"
     private const val EMAIL = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
     private val combined = Regex("($PHONE)|($EMAIL)")
-    private val phoneSeparators = Regex("[\\s.()-]")
+    private val phoneSeparators = Regex("[$Space.()-]")
 
     fun find(text: String): List<ContactLink> = combined.findAll(text).map { match ->
         val uri = if (match.groups[1] != null) {

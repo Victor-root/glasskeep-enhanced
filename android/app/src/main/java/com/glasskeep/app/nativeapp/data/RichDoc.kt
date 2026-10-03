@@ -890,9 +890,11 @@ object RichDoc {
      *  phone numbers and e-mail addresses into tel:/mailto: links. The web
      *  searches each DOM text node on its own, so this searches each run of
      *  text sharing one set of marks, between line breaks, and skips runs
-     *  already inside a link or inline code. */
-    fun contactLinks(text: String, marks: List<RichMark>): List<RichMark> {
-        if (text.isEmpty()) return emptyList()
+     *  already inside a link or inline code, and the code blocks. */
+    fun contactLinks(block: RichBlock): List<RichMark> {
+        val text = block.text
+        val marks = block.marks
+        if (text.isEmpty() || block.kind == RichBlockKind.CODE_BLOCK) return emptyList()
         val cuts = sortedSetOf(0, text.length)
         for (m in marks) {
             cuts.add(m.start.coerceIn(0, text.length))
@@ -914,13 +916,8 @@ object RichDoc {
                 (it.type == RichMarkType.LINK || it.type == RichMarkType.CODE) && it.start <= start && it.end >= end
             }
             if (insideLinkOrCode) continue
-            for (match in ContactRegex.findAll(text.substring(start, end))) {
-                val href = if (match.groups[1] != null) {
-                    "tel:" + match.value.filterNot { it in PhoneSeparators || JsWhitespaceRegex.matches(it.toString()) }
-                } else {
-                    "mailto:${match.value}"
-                }
-                links.add(RichMark(start + match.range.first, start + match.range.last + 1, RichMarkType.LINK, href))
+            for (contact in ContactLinks.find(text.substring(start, end))) {
+                links.add(RichMark(start + contact.start, start + contact.end, RichMarkType.LINK, contact.uri))
             }
         }
         return links
@@ -929,18 +926,9 @@ object RichDoc {
     /** JavaScript's `\s`, which also matches the no-break and typographic
      *  spaces a French phone number is often written with. */
     internal const val JsSpace = "\\s\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff"
-    private val JsWhitespaceRegex = Regex("[$JsSpace]")
-    private const val PhoneSeparators = ".()-"
     private val UrlSchemeRegex = Regex("^(https?|mailto|tel):", RegexOption.IGNORE_CASE)
     private val BareEmailRegex = Regex("^[\\w.+-]+@[\\w.-]+\\.[a-z]{2,}$", RegexOption.IGNORE_CASE)
     private val BarePhoneRegex = Regex("^\\+?\\d[\\d$JsSpace().-]+$")
-    private const val PhonePattern =
-        "(?:\\+1[$JsSpace.-]?)?\\(\\d{3}\\)[$JsSpace.-]?\\d{3}[$JsSpace.-]?\\d{4}" +
-            "|(?:\\+1[$JsSpace.-]?)?\\d{3}[$JsSpace.-]\\d{3}[$JsSpace.-]\\d{4}" +
-            "|\\+33[$JsSpace.-]?\\d[$JsSpace.-]?\\d{2}[$JsSpace.-]?\\d{2}[$JsSpace.-]?\\d{2}[$JsSpace.-]?\\d{2}" +
-            "|0\\d[$JsSpace.-]?\\d{2}[$JsSpace.-]?\\d{2}[$JsSpace.-]?\\d{2}[$JsSpace.-]?\\d{2}"
-    private const val EmailPattern = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
-    private val ContactRegex = Regex("($PhonePattern)|($EmailPattern)")
 }
 
 /** A colour, font or size: the three attributes of one textStyle mark on
