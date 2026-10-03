@@ -48,7 +48,7 @@ donc l'ordre d'exécution n'a aucune importance et un scénario qui
 | Partage entre deux comptes: droits réels, lecture seule, retrait, cloisonnement | `functional/f3-collaboration.mjs` | 9513 |
 | Profil, avatar, réglages et leur synchronisation entre onglets, rappels, notifications, changement de mot de passe | `functional/f4-compte-reglages-rappels.mjs` | 9514 |
 | Panneau d'administration: inscriptions en attente, comptes, garde-fous, réglages d'instance, logos, domaine des passkeys | `functional/f5-administration.mjs` | 9515 à 9518 |
-| Connexion OpenID Connect avec un faux fournisseur: réglage réservé à l'administrateur, secret qui ne ressort jamais, parcours complet, identité tenue par issuer + sub, aucun droit d'administrateur venu du fournisseur, association d'un compte existant, refus (autre navigateur, ticket ou état rejoué, jeton falsifié, nonce faux) | `functional/f6-sso.mjs` | 9519, 9520 |
+| Connexion OpenID Connect avec un faux fournisseur: interrupteur de l'administrateur, fournisseur déclaré par chaque compte et secret qui ne ressort jamais, adresse privée refusée à un compte ordinaire, association, connexion par identifiant, identité tenue par issuer + sub, refus (autre identité, autre adresse, autre navigateur, ticket ou état rejoué, jeton falsifié, nonce faux) | `functional/f6-sso.mjs` | 9519, 9520 |
 
 ### Éprouvés par mutation
 

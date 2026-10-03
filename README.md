@@ -349,13 +349,12 @@ ollama pull qwen3:4b-instruct-2507-q4_K_M
 
 ## 🔐 Single sign-on (OpenID Connect)
 
-An admin can let people sign in with **any standard OpenID Connect provider**: Authentik, Keycloak, Authelia, Zitadel, PocketID, … Configure it in **Admin panel → Single sign-on (SSO)** with the issuer URL, client ID and client secret; GlassKeep shows the redirect URI to declare at the provider and tests the configuration for you.
+Each user can sign in with **their own OpenID Connect provider**: Authentik, Keycloak, Authelia, Zitadel, PocketID, … The admin only flips **Allow single sign-on** in the admin panel; everyone then sets up their provider in **Settings → Security** and links their account by signing in there once. The login screen's **Sign in with my provider** asks for the GlassKeep email and does the rest.
 
 * The flow runs entirely on the server (Authorization Code + PKCE), the client secret never reaches a browser.
-* People are identified by their provider identity (issuer + subject), never by email, and the provider never grants GlassKeep admin rights.
-* Existing accounts link the provider from **Settings → Security**; new people can get an account automatically if the admin allows it.
+* An account is opened only by the identity it linked (issuer + subject), never by a matching email, and a provider never creates accounts or grants rights.
 
-> 📘 Step-by-step setup for Authentik, Keycloak and Authelia, account rules and troubleshooting: [`SSO.md`](./SSO.md)
+> 📘 Step-by-step setup for Authentik, Keycloak and Authelia, and troubleshooting: [`SSO.md`](./SSO.md)
 
 ---
 

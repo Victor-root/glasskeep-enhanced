@@ -1,8 +1,9 @@
 # 🔐 Single sign-on (OpenID Connect)
 
-GlassKeep can let people sign in through an **OpenID Connect provider**:
-Authentik, Keycloak, Authelia, Zitadel, PocketID, or any provider that
-follows the standard. Nothing in GlassKeep is specific to one of them.
+GlassKeep lets each user sign in through **their own OpenID Connect
+provider**: Authentik, Keycloak, Authelia, Zitadel, PocketID, or any
+provider that follows the standard. Nothing in GlassKeep is specific to
+one of them.
 
 > 🇫🇷 *Ce guide est en anglais comme le reste de la documentation du
 > projet. Les écrans de GlassKeep, eux, sont traduits.*
@@ -12,13 +13,11 @@ follows the standard. Nothing in GlassKeep is specific to one of them.
 ## 📚 Table of contents
 
 - [How it works, in plain words](#-how-it-works-in-plain-words)
-- [Before you start](#-before-you-start)
-- [Step 1: create the application at your provider](#step-1-create-the-application-at-your-provider)
-  - [Authentik](#authentik)
-  - [Keycloak](#keycloak)
-  - [Authelia](#authelia)
-- [Step 2: configure GlassKeep](#step-2-configure-glasskeep)
-- [Who gets in, and with which account](#-who-gets-in-and-with-which-account)
+- [For the admin: one switch](#-for-the-admin-one-switch)
+- [For each user: set up your provider](#-for-each-user-set-up-your-provider)
+  - [Step 1: create the application at your provider](#step-1-create-the-application-at-your-provider)
+  - [Step 2: enter it in GlassKeep and link your account](#step-2-enter-it-in-glasskeep-and-link-your-account)
+- [Signing in](#-signing-in)
 - [Android app](#-android-app)
 - [Troubleshooting](#-troubleshooting)
 - [Under the hood](#-under-the-hood)
@@ -27,33 +26,44 @@ follows the standard. Nothing in GlassKeep is specific to one of them.
 
 ## 🧠 How it works, in plain words
 
-The login screen shows an extra button, **"Sign in with &lt;provider&gt;"**.
-It sends you to your provider's own login page; once you are signed in
-there, you come back to GlassKeep already signed in. From then on
-GlassKeep works exactly as with a password: the rest of the app does
-not know, or care, how you signed in.
+- The **admin** only decides whether the instance allows single sign-on.
+- Each **user** who wants it declares their own provider in their
+  settings, then **links** their GlassKeep account by signing in there
+  once.
+- On the login screen, **"Sign in with my provider"** asks for the
+  GlassKeep email, sends you to that account's provider, and brings you
+  back signed in. From then on GlassKeep works exactly as with a
+  password.
 
-Your provider's secret never reaches your browser, and GlassKeep never
-gives admin rights because of something the provider says (a group, a
-role, a claim). Admins stay admins of GlassKeep, decided in GlassKeep.
-
----
-
-## ✅ Before you start
-
-- **GlassKeep should be reachable over HTTPS.** Most providers refuse a
-  plain `http://` redirect address, and sign-in data would travel
-  unencrypted. The admin panel warns you when it is not the case.
-- Open the admin panel **from the address your users use** (for example
-  `https://notes.example.com`, not a LAN IP). GlassKeep reads its own
-  public address from the page you are on, the same way the
-  cross-server pairing does, so there is nothing to type for it.
-- The instance must be unlocked if at-rest encryption is on, like any
-  other sign-in.
+Your provider's secret never reaches a browser. A provider never creates
+a GlassKeep account and never grants any right: it only opens the
+account that linked it.
 
 ---
 
-## Step 1: create the application at your provider
+## 🛡️ For the admin: one switch
+
+**Admin panel → Login page settings → Allow single sign-on (SSO).**
+
+That is all. Turning it off hides the button from the login screen and
+stops every sign-in through a provider; each user's configuration is
+kept for when it comes back on.
+
+A regular user's provider must be reachable at a **public address**: the
+server refuses to connect to a local network address on their behalf,
+the same rule as for a user's own AI endpoint, so that no account can use
+GlassKeep to probe the network it runs in. An admin's own provider may
+sit on the local network.
+
+---
+
+## 👤 For each user: set up your provider
+
+Before you start, open GlassKeep **from the address you sign in with**
+(for example `https://notes.example.com`), ideally over HTTPS: most
+providers refuse a plain `http://` redirect address.
+
+### Step 1: create the application at your provider
 
 Whatever the provider, you need:
 
@@ -61,39 +71,36 @@ Whatever the provider, you need:
 |---|---|
 | Client type | **Confidential** (it has a client secret) |
 | Grant / flow | **Authorization Code** |
-| Redirect URI | `https://<your GlassKeep address>/api/auth/oidc/callback` (shown in the admin panel, with a copy button) |
+| Redirect URI | `https://<your GlassKeep address>/api/auth/oidc/callback` (shown in your settings, with a copy button) |
 | Scopes | `openid`, `profile`, `email` |
 | Signing | RS256 (or any asymmetric algorithm the provider publishes in its JWKS) |
 
 PKCE (S256) is always used by GlassKeep; you can enforce it at the
-provider if it has that option.
+provider if it has that option. You will come back with three things:
+the **issuer URL**, the **client ID** and the **client secret**.
 
-You will come back with three things: the **issuer URL**, the
-**client ID** and the **client secret**.
+**Authentik**
 
-### Authentik
-
-1. **Applications → Providers → Create → OAuth2/OpenID Provider.**
-2. Client type: **Confidential**. Redirect URIs: the callback shown in
-   GlassKeep, mode *strict*. Signing key: any certificate (for RS256).
-3. **Applications → Applications → Create**, pick that provider, and
-   bind the users or groups allowed in.
+1. **Applications → Applications → Create with Provider**, provider type
+   **OAuth2/OpenID Provider**.
+2. Client type **Confidential**, redirect URI the one shown in GlassKeep
+   (mode *strict*), signing key: any certificate (for RS256).
+3. Optionally, in the application's **Policy / Group / User Bindings**
+   tab, use **Bind existing policy / group / user** to restrict who may
+   use it. With no binding, every Authentik user can.
 4. The issuer is shown on the provider page as **OpenID Configuration
    Issuer**, for example `https://auth.example.com/application/o/glasskeep/`.
    Copy it **with its trailing slash**.
 
-### Keycloak
+**Keycloak**
 
 1. In your realm, **Clients → Create client**, type *OpenID Connect*.
-2. **Client authentication: On** (confidential), **Standard flow: On**.
-3. **Valid redirect URIs**: the callback shown in GlassKeep.
-4. The client secret is in the **Credentials** tab.
-5. The issuer is `https://keycloak.example.com/realms/<realm>` (no
-   trailing slash).
+2. **Client authentication: On**, **Standard flow: On**, **Valid
+   redirect URIs**: the one shown in GlassKeep.
+3. The client secret is in the **Credentials** tab. The issuer is
+   `https://keycloak.example.com/realms/<realm>` (no trailing slash).
 
-### Authelia
-
-Declare a client in `identity_providers.oidc.clients`:
+**Authelia**
 
 ```yaml
 - client_id: glasskeep
@@ -113,61 +120,39 @@ Declare a client in `identity_providers.oidc.clients`:
 
 The issuer is your Authelia address, for example `https://auth.example.com`.
 Authelia only puts the email in the userinfo answer by default;
-GlassKeep reads it from there when the token does not carry it.
+GlassKeep reads it from there.
+
+### Step 2: enter it in GlassKeep and link your account
+
+**Settings → Security → Single sign-on:**
+
+1. Check the **public address** and **redirect URI** shown at the top:
+   the redirect URI is what you declared at your provider.
+2. Fill in a **name** for your provider, the **issuer URL**, the
+   **client ID** and the **client secret**.
+3. **Test the configuration**: GlassKeep fetches the provider's
+   `.well-known/openid-configuration` and signing keys. If the issuer you
+   typed differs from the one the provider publishes (the trailing
+   slash, typically), the test shows the right value with a button to
+   use it.
+4. **Save**, then **Link my account**. You sign in at your provider once
+   and come back with *"Your account is now linked"*.
+
+The client secret stays on the server; leave the field empty to keep the
+saved one. Changing the issuer or the client ID unlinks the account,
+since it is no longer the same provider: link it again.
 
 ---
 
-## Step 2: configure GlassKeep
+## 🔑 Signing in
 
-**Admin panel → Single sign-on (SSO):**
+On the login screen, **Sign in with my provider**, type your GlassKeep
+email, **Continue**. From the profile picker, choosing your profile is
+enough: the button then needs no email.
 
-1. Check the **public address** and the **redirect URI** shown at the
-   top; the redirect URI is what you declared at the provider.
-2. Fill in the **provider name** (it appears on the button, e.g.
-   "Authentik" or "SSO"), the **issuer URL**, the **client ID** and the
-   **client secret**.
-3. Press **Test the configuration**. GlassKeep fetches the provider's
-   `.well-known/openid-configuration` and its signing keys. If the
-   issuer you typed differs from the one the provider publishes (the
-   trailing slash, typically), the test shows the right value with a
-   button to use it.
-4. **Save**, then switch **Enable OpenID Connect** on. GlassKeep refuses
-   to enable a provider it cannot reach.
-
-The client secret is stored on the server only. The panel never shows
-it again; leave the field empty to keep the saved one.
-
-The client ID and secret themselves can only be proven by a real sign-in:
-try it from a private window.
-
----
-
-## 👥 Who gets in, and with which account
-
-GlassKeep identifies a person by what the provider guarantees to be
-stable and unique: the **issuer and subject** (`iss` + `sub`), kept in
-their own table. **The email is never used to decide which account
-opens**, because many providers let people change their email.
-
-- **Someone already linked** signs in to their account, whatever their
-  email has become at the provider.
-- **Someone new**, with **"Create accounts automatically"** on (the
-  default), gets a regular GlassKeep account named and addressed after
-  their provider profile, as long as no account or pending registration
-  already uses that email. Access control is then your provider's job:
-  bind the application to the users or groups allowed in. Turn the option
-  off if your provider is open to the public.
-- **Someone whose email is already used by a GlassKeep account** is
-  refused, with a message explaining what to do: sign in the usual way,
-  then **Settings → Security → Single sign-on → Link**. Linking while
-  signed in proves the person owns both, which matching emails would not.
-- Addresses listed in `ADMIN_EMAILS` are never created automatically,
-  since that variable would promote them to admin at the next start.
-  Create the account by hand, then link it.
-
-An account created through the provider has no password. It cannot
-unlink its only way in; an admin can set it a password from the user
-list if needed.
+GlassKeep only opens your account if your provider vouches for **the
+identity you linked** (issuer + subject). Signing in at the provider as
+someone else, even with the same email, is refused.
 
 ---
 
@@ -175,7 +160,7 @@ list if needed.
 
 The app signs in through the provider inside its own window, then comes
 back to GlassKeep by itself. Use the same server address in the app as
-the one the admin saved the configuration from.
+the one you set up your provider from.
 
 ---
 
@@ -183,12 +168,15 @@ the one the admin saved the configuration from.
 
 | What you see | What it means |
 |---|---|
+| No "Sign in with my provider" button | The admin has not allowed SSO, or no account has linked a provider yet. |
+| *"No provider is linked to this account"* | Wrong email, or the account has no linked provider: sign in another way and set it up in Settings → Security. |
+| *"This provider is on a local network address"* | Only an admin's provider may be on the LAN. Expose the provider at a public address. |
 | *"The provider publishes a different issuer"* | Use exactly the issuer the provider publishes (the test offers it). |
 | *"The provider could not be reached"* | The GlassKeep **server** must reach the issuer, not only your browser. Check DNS, firewall, and that a self-signed provider certificate is trusted by Node (`NODE_EXTRA_CA_CERTS`). |
-| *"To sign in with this provider, open GlassKeep at …"* | You are on another address than the one the configuration was saved from. Use that one, or save the configuration again from this one (and update the redirect URI at the provider). |
-| *"This sign-in attempt expired or was started in another browser"* | The round trip took more than 10 minutes, the server restarted in between, or the browser blocks cookies for GlassKeep. |
-| *"An account already uses this email"* | See [linking](#-who-gets-in-and-with-which-account). |
-| The provider says *redirect_uri mismatch* | The redirect URI declared at the provider must match the one shown in the admin panel character for character. |
+| *"Open GlassKeep at the address your provider was set up from"* | Use that address, or save the configuration again from this one (and update the redirect URI at the provider). |
+| *"You signed in at your provider with another identity"* | Sign out at the provider and sign in there with the account you linked. |
+| *"This sign-in attempt expired or was started in another browser"* | More than 10 minutes passed, the server restarted in between, or the browser blocks cookies for GlassKeep. |
+| The provider says *redirect_uri mismatch* | The redirect URI at the provider must match the one shown in GlassKeep character for character. |
 
 The server log says why a sign-in was refused, prefixed with `[oidc]`.
 It never logs tokens or secrets.
@@ -204,11 +192,13 @@ It never logs tokens or secrets.
 - The ID token is validated by the library: signature against the
   provider's JWKS (checked even though the token comes straight from the
   token endpoint), issuer, audience, expiry, nonce.
+- Identities are stored as `issuer` + `subject` and are never matched on
+  email. Linking, while signed in, is the only thing that ties one to an
+  account; signing in only checks it.
 - The attempt is bound to the browser that started it by an HttpOnly
   cookie, and the way back into the app is a one-time ticket valid for
-  one minute, traded for the usual GlassKeep session. A stolen callback
-  link or ticket is useless in another browser.
-- Storage: `oidc_providers` (one instance-wide row for now, with an
-  `owner_user_id` column reserved for providers users bring for their
-  own account later) and `user_external_identities` (`issuer` +
-  `subject`, unique).
+  one minute, traded for the usual GlassKeep session.
+- An unknown email and an account without a provider get the same
+  answer, and both count towards the usual sign-in throttle.
+- Storage: `oidc_providers` (one row per account's provider) and
+  `user_external_identities` (`issuer` + `subject`, unique).
