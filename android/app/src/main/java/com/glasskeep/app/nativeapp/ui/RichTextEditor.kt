@@ -181,6 +181,10 @@ import kotlinx.coroutines.launch
  *  below is expressed in. */
 private const val RemPx = 16f
 
+/** EditExtras.js's MOBILE_ARM_AUTO_HIDE_MS: a copy button shown by a tap
+ *  clears itself after 5s, there is no hover to hide it on. */
+private const val CodeCopyAutoHideMillis = 5000L
+
 /** Indent.js's INDENT_STEP_EM: one indent level is 1.75 times the block's
  *  own font size, so an indented heading shifts further than an indented
  *  paragraph, exactly as `margin-inline-start: Nem` does. */
@@ -356,7 +360,10 @@ fun RichTextEditor(
                                         copyText = block.text,
                                         noteColor = noteColor,
                                         armed = if (readModeEnabled) null else state.armedCodeBlock == block.id,
-                                        onArm = { armed -> state.armedCodeBlock = if (armed) block.id else null },
+                                        onArm = { armed ->
+                                            state.armedCodeBlock = if (armed) block.id else null
+                                            if (armed) focusManager.clearFocus()
+                                        },
                                         modifier = look.faded,
                                     ) {
                                         EditorText(block, look, Modifier.fillMaxWidth())
@@ -504,6 +511,12 @@ private fun RichEditorText(
                 },
         )
         val code = state.armedCode?.takeIf { it.first == block.id }?.second
+        LaunchedEffect(code) {
+            if (code != null) {
+                delay(CodeCopyAutoHideMillis)
+                state.armedCode = null
+            }
+        }
         val link = state.tappedLink?.takeIf { it.first == block.id }?.second
         val textLayout = if (code != null || link != null) layout else null
         if (code != null && textLayout != null) InlineCodeCopy(code, block.text, textLayout, noteColor, dark)
@@ -1631,7 +1644,7 @@ private fun RichEditorCodeBlock(
 ) {
     LaunchedEffect(armed) {
         if (armed == true) {
-            delay(5000)
+            delay(CodeCopyAutoHideMillis)
             onArm(false)
         }
     }
@@ -1784,11 +1797,9 @@ private fun ReaderText(
     var layout by remember { mutableStateOf<PaddedLayout?>(null) }
     val codeMarks = remember(block) { block.marks.filter { it.type == RichMarkType.CODE } }
     var armed by remember(block.id) { mutableStateOf<RichMark?>(null) }
-    // EditExtras.js's MOBILE_ARM_AUTO_HIDE_MS: the chip clears itself after
-    // 5s, there is no hover to hide it on.
     LaunchedEffect(armed) {
         if (armed != null) {
-            delay(5000)
+            delay(CodeCopyAutoHideMillis)
             armed = null
         }
     }
