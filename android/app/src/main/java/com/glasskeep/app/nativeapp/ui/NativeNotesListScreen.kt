@@ -3018,51 +3018,53 @@ private fun CardCollaborators(collaborators: List<CollaboratorDto>, dark: Boolea
     ) {
         CollaborateIcon(size = 16.dp, tint = if (dark) Color(0xFF7C86FF) else Color(0xFF615FFF))
         Spacer(Modifier.width(4.dp))
-        collaborators.take(2).forEachIndexed { index, person ->
-            val photo = person.avatarUrl?.takeIf { it.startsWith("data:") }?.let { rememberDecodedImageAsync(it) }
-            Box(
-                modifier = Modifier
-                    .offset(x = (-6 * index).dp)
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(
-                        when {
-                            photo != null -> Color.White
-                            dark -> Color(0x406060FF)
-                            else -> Color(0xFFE0E7FF)
-                        },
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (photo != null) {
-                    Image(photo, contentDescription = person.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                } else {
-                    Text(
-                        person.name.trim().take(1).uppercase(),
-                        color = if (dark) Color(0xFFA3B3FF) else Color(0xFF432DD7),
-                        fontSize = 8.sp,
-                        lineHeight = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+        // -space-x-1.5: each avatar overlaps the one before it, and the
+        // later ones are drawn on top.
+        Row(horizontalArrangement = Arrangement.spacedBy((-6).dp), verticalAlignment = Alignment.CenterVertically) {
+            collaborators.take(2).forEach { person ->
+                val photo = person.avatarUrl?.takeIf { it.startsWith("data:") }?.let { rememberDecodedImageAsync(it) }
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when {
+                                photo != null -> Color.White
+                                dark -> Color(0x406060FF)
+                                else -> Color(0xFFE0E7FF)
+                            },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (photo != null) {
+                        Image(photo, contentDescription = person.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    } else {
+                        Text(
+                            person.name.trim().take(1).uppercase(),
+                            color = if (dark) Color(0xFFA3B3FF) else Color(0xFF432DD7),
+                            fontSize = 8.sp,
+                            lineHeight = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
-        }
-        if (collaborators.size > 2) {
-            Box(
-                modifier = Modifier
-                    .offset(x = (-12).dp)
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(if (dark) Color(0xFF4A5565) else Color(0xFFE5E7EB)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "+${collaborators.size - 2}",
-                    color = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565),
-                    fontSize = 11.sp,
-                    lineHeight = 16.5.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+            if (collaborators.size > 2) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(if (dark) Color(0xFF4A5565) else Color(0xFFE5E7EB)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "+${collaborators.size - 2}",
+                        color = if (dark) Color(0xFFD1D5DC) else Color(0xFF4A5565),
+                        fontSize = 11.sp,
+                        lineHeight = 16.5.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
     }
