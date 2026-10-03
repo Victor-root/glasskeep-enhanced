@@ -930,6 +930,26 @@ class NotesRepository(
         cacheNotes(listOf(full.copy(archived = false, trashed = false)))
     }
 
+    /** Removes a note whose content the user emptied. One the server never
+     *  heard of leaves the phone alone, queue included; any other goes to the
+     *  trash and then for good, the legal path for the server
+     *  (App.jsx:6101-6125). */
+    suspend fun removeEmptyNoteQueued(id: String) {
+        NativeDebug.d("NotesRepository.removeEmptyNoteQueued id=$id")
+        val neverSent = SyncQueueWorker.runWhileIdle {
+            val unsent = syncQueueDao.hasQueuedCreate(id)
+            if (unsent) {
+                syncQueueDao.deleteForNote(id)
+                noteDao.deleteById(id)
+            }
+            unsent
+        }
+        if (neverSent != true) {
+            trashNoteQueued(id)
+            deleteNotePermanentlyQueued(id)
+        }
+    }
+
     /** Removes the cached trashed payload immediately while the permanent
      *  delete waits in the durable queue. */
     suspend fun deleteNotePermanentlyQueued(id: String) {

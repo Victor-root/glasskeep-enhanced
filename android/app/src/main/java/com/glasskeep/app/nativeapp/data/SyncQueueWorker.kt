@@ -148,6 +148,18 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
         private val drainLock = Mutex()
         private val drainScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + backgroundErrorHandler)
 
+        /** Runs [block] with no drain sending anything, or returns null at
+         *  once when one is already running: a caller must never wait out a
+         *  drain, which can last as long as the network's timeouts. */
+        internal suspend fun <T> runWhileIdle(block: suspend () -> T): T? {
+            if (!drainLock.tryLock()) return null
+            try {
+                return block()
+            } finally {
+                drainLock.unlock()
+            }
+        }
+
         /**
          * Replays the queue, oldest first, one drain at a time: the worker's
          * and the app's own ([triggerNow]) share the lock, so an item is

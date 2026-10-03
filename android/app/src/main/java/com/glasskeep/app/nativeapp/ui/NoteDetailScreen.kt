@@ -1727,6 +1727,17 @@ fun NoteDetailScreen(
         }
     }
 
+    // A note just created is blank: once it has held something, emptying it
+    // again is the user's doing and is announced, where one never touched
+    // goes without a word (materializeDraftIfNeeded, useDraftNote.js).
+    var workedOn by remember { mutableStateOf(false) }
+    if (isNew && !workedOn) {
+        LaunchedEffect(titleText, bodyText, richBlocks, drawingPaths, audioClips, images, editability) {
+            val edit = editability ?: return@LaunchedEffect
+            if (!isEmptyNote(edit)) workedOn = true
+        }
+    }
+
     /** Header and system back both flush the complete live editor state,
      *  including changes still inside a debounce or checklist row focus. */
     fun goBack() {
@@ -1746,9 +1757,10 @@ fun NoteDetailScreen(
             try {
                 if (removeEmpty) {
                     cancelPendingAutosaves()
-                    repository.trashNoteQueued(current.id, null)
-                    repository.deleteNotePermanentlyQueued(current.id)
-                    toasts.show(emptyRemovedMessage, NotifVariant.INFO, icon = "trash", durationMs = 3_000L)
+                    repository.removeEmptyNoteQueued(current.id)
+                    if (!isNew || workedOn || edit?.isDrawType == true) {
+                        toasts.show(emptyRemovedMessage, NotifVariant.INFO, icon = "trash", durationMs = 3_000L)
+                    }
                 } else {
                     flushLiveEdits()
                 }
