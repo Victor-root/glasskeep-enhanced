@@ -5,6 +5,9 @@ provider**: Authentik, Keycloak, Authelia, Zitadel, PocketID, or any
 provider that follows the standard. Nothing in GlassKeep is specific to
 one of them.
 
+> 📘 A version with screenshots, in English and French, is on the
+> [project website](https://victor-root.github.io/glasskeep-enhanced/sso.html).
+
 > 🇫🇷 *Ce guide est en anglais comme le reste de la documentation du
 > projet. Les écrans de GlassKeep, eux, sont traduits.*
 

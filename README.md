@@ -354,7 +354,7 @@ Each user can sign in with **their own OpenID Connect provider**: Authentik, Key
 * The flow runs entirely on the server (Authorization Code + PKCE), the client secret never reaches a browser.
 * An account is opened only by the identity it linked (issuer + subject), never by a matching email, and a provider never creates accounts or grants rights.
 
-> 📘 Step-by-step setup for Authentik, Keycloak and Authelia, and troubleshooting: [`SSO.md`](./SSO.md)
+> 📘 **Setup guide with screenshots** for Authentik, Keycloak and Authelia: [victor-root.github.io/glasskeep-enhanced/sso.html](https://victor-root.github.io/glasskeep-enhanced/sso.html). The same steps in text, with troubleshooting: [`SSO.md`](./SSO.md)
 
 ---
 

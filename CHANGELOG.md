@@ -1,5 +1,20 @@
 # 📋 Changelog
 
+## 🚧 Unreleased
+
+### ➕ Added
+- 🔐 **Single sign-on (OpenID Connect)**: sign in through your own provider (Authentik, Keycloak, Authelia, Zitadel, PocketID, or any standard OpenID Connect provider). An admin allows it with one switch (Admin → *Login page settings*); each user then declares their provider in Settings → Security, links their account by signing in there once, and uses **Sign in with my provider** on the login screen. Works in the web app and the Android app.
+- 📘 **Single sign-on setup guide** on the [project website](https://victor-root.github.io/glasskeep-enhanced/sso.html): the exact values for Authentik, Keycloak and Authelia, annotated screenshots and troubleshooting.
+
+### 🔒 Security
+- The flow runs on the server (Authorization Code with PKCE, state and nonce, ID token verified against the provider's keys); the client secret never reaches a browser.
+- An account is opened only by the identity it linked (issuer + subject), never by a matching e-mail; a provider never creates accounts or grants rights. Linking asks for the account password.
+- A regular user's provider must be on a public address, so no account can use the server to probe its network.
+
+### 🛠️ Upgrade
+
+No new setting to configure: single sign-on is off until an admin allows it, and the database migrates automatically on restart.
+
 ## 🚀 v2.6.0 (2026-09-08)
 
 Headline feature: **cross-server collaboration**. Pair two self-hosted GlassKeep servers and share notes across them in real time. Also in this release: a full **security audit** with every finding fixed, and a batch of pre-existing bugs found during manual testing.
