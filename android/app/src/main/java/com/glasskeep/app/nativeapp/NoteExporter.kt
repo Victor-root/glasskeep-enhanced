@@ -22,31 +22,12 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 
 /**
- * Exports a text note as a .md file, or a note image, and hands either to
- * the system share sheet, same content:// + FileProvider pattern
+ * Hands a text file, a note image, an audio clip or a ZIP of notes to the
+ * system share sheet, same content:// + FileProvider pattern
  * UpdateInstaller.kt already uses for the self-updater, so no storage
  * permission is needed.
- *
- * exportText() is text-only: it takes the plain body NoteDetailScreen
- * already computed for editing (edit.bodyPlainText), not the raw NoteDto,
- * so it has no content-parsing of its own to keep in sync with
- * NoteContent.kt. Matches the shape of the web app's own mdForDownload()
- * for a text note (# title, blank line, body) minus tags: exporting those
- * too would mean guessing at a Markdown convention the web export itself
- * doesn't use for tags, not a native data-layer gap.
  */
 object NoteExporter {
-    fun exportText(context: Context, title: String, body: String): Boolean {
-        val markdown = buildString {
-            if (title.isNotBlank()) {
-                append("# ").append(title).append("\n\n")
-            }
-            append(body)
-        }
-        val filename = sanitizeFilename(title.ifBlank { "note" }) + ".md"
-        return exportTextFile(context, filename, markdown, "text/markdown")
-    }
-
     /** Any already-named text file (the account export, the recovery key):
      *  the share sheet is this app's answer to the browser download the
      *  web's own downloadText()/triggerJSONDownload() start. */
