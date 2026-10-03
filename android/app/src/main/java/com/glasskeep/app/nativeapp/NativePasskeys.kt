@@ -16,6 +16,7 @@ import androidx.credentials.exceptions.CreateCredentialCancellationException
 import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -150,7 +151,9 @@ object NativePasskeys {
 
     private fun mapGetError(e: GetCredentialException): PasskeyCeremonyResult.Failed {
         val typeStr = e.type
+        // No passkey to offer is the browser's NotAllowedError too.
         val isCancel = e is GetCredentialCancellationException ||
+            e is NoCredentialException ||
             typeStr.contains("USER_CANCELED", ignoreCase = true) ||
             typeStr.contains("CANCEL", ignoreCase = true) ||
             typeStr.contains("INTERRUPT", ignoreCase = true)
