@@ -2440,11 +2440,14 @@ fun NoteDetailScreen(
                             !isReadOnlyAccess && !viewMode,
                         formatOpen = showFormatSheet,
                         // The web only offers the toggle when the read-mode
-                        // preference is on, and only for a text note.
-                        showModeButton = (edit.isTextType || (edit.isDrawType && !drawingCanvasMode)) && !isReadOnlyAccess &&
+                        // preference is on, and only for a text note. Neither
+                        // toggle is offered on a note paused by its mirror
+                        // server, whose editors would otherwise open writable
+                        // here (the web locks them instead).
+                        showModeButton = (edit.isTextType || (edit.isDrawType && !drawingCanvasMode)) && !isNoteReadOnly &&
                             container.editorPrefs.readModeEnabled,
                         viewMode = viewMode,
-                        showDrawModeButton = edit.isDrawType && !isReadOnlyAccess,
+                        showDrawModeButton = edit.isDrawType && !isNoteReadOnly,
                         // ModalFooter.jsx's read-only pill names whoever set it.
                         readOnlyTooltip = if (isReadOnlyAccess) {
                             roster.orEmpty().firstOrNull { it.isOwner }

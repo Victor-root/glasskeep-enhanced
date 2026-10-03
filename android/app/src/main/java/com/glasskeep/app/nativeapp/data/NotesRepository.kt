@@ -87,8 +87,10 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import okhttp3.Cache
 import retrofit2.Response
 import java.util.UUID
@@ -1119,7 +1121,7 @@ class NotesRepository(
             WorkspacePreferences(
                 shellTheme = body.shellTheme,
                 editorToolbarMode = body.editorToolbarMode,
-                typography = TypographyPresets.normalize(body.typographyPresets),
+                typography = (body.typographyPresets as? JsonObject)?.let(TypographyPresets::normalize),
                 profile = profile,
                 toastPosition = body.notificationsPositionMobile,
                 notificationsSound = body.notificationsSound,
@@ -1127,7 +1129,11 @@ class NotesRepository(
                 notificationsFilterTypes = body.notificationsFilterTypes,
                 checklistInsertPosition = body.checklistInsertPosition,
                 checklistRemoveSectionBehavior = body.checklistRemoveSectionBehavior,
-                toastDurationMs = body.notificationsDuration,
+                toastDuration = when (val raw = body.notificationsDuration) {
+                    is JsonNull -> ToastDuration(null)
+                    is JsonPrimitive -> raw.longOrNull?.let(::ToastDuration)
+                    else -> null
+                },
                 readModeEnabled = body.readModeEnabled,
                 taskStrikeEnabled = body.taskStrikeEnabled,
                 qrQuickEnabled = body.qrQuickEnabled,

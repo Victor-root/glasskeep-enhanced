@@ -937,14 +937,14 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     val prefs = repository.fetchWorkspacePreferences() ?: return
     prefs.shellTheme?.let { container.themeState.apply(it) }
     prefs.editorToolbarMode?.let { container.editorPrefs.applyToolbarMode(it) }
-    container.editorPrefs.applyTypography(prefs.typography)
+    prefs.typography?.let { container.editorPrefs.applyTypography(it) }
     AppLanguage.apply(prefs.profile?.language)
     prefs.profile?.let {
         container.shellPrefs.applyIsAdmin(it.isAdmin)
         container.tokenStore.profile = it
     }
     prefs.toastPosition?.let { container.editorPrefs.applyToastPosition(it) }
-    container.editorPrefs.applyToastDuration(prefs.toastDurationMs)
+    prefs.toastDuration?.let { container.editorPrefs.applyToastDuration(it.ms) }
     prefs.readModeEnabled?.let { container.editorPrefs.applyReadMode(it) }
     prefs.taskStrikeEnabled?.let { container.editorPrefs.applyTaskStrike(it) }
     prefs.qrQuickEnabled?.let { container.shellPrefs.applyQrQuick(it) }
