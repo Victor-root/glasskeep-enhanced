@@ -273,6 +273,9 @@ try {
       && fournisseur.origin === inst.base && !liste.text.includes(CLIENT_SECRET)
       && !liste.text.includes(CLIENT_ID), liste.text);
   const providerId = fournisseur?.id;
+  const malforme = await inst.call("POST", "/api/auth/oidc/login", { body: { providerId: { id: providerId } } });
+  t.check("un identifiant de fournisseur malformé est refusé proprement",
+    malforme.status === 404 && malforme.json?.error === "oidc_unavailable", malforme.text);
 
   // ───────────────────────────────────────────────────────────────────
   // 2. Le parcours complet, jusqu'à une session GlassKeep ordinaire.

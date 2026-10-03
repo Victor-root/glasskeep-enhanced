@@ -133,10 +133,6 @@ function getConfiguration(provider) {
   return promise;
 }
 
-function forgetConfiguration(providerId) {
-  configCache.delete(providerId);
-}
-
 // Starts a sign-in: returns the URL to send the browser to, and the
 // secrets the callback will need to finish it.
 async function beginAuthorization(provider) {
@@ -219,11 +215,8 @@ module.exports = {
   normalizeIssuer,
   normalizeOrigin,
   callbackUrlFor,
-  getConfiguration,
-  forgetConfiguration,
   beginAuthorization,
   completeAuthorization,
   testIssuer,
-  OidcProviderError,
   asProviderError,
 };

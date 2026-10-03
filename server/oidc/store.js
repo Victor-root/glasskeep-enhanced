@@ -145,7 +145,7 @@ function createOidcStore(db) {
   });
 
   return {
-    getProvider: (id) => stmts.getProvider.get(id),
+    getProvider: (id) => (typeof id === "string" ? stmts.getProvider.get(id) : undefined),
     getInstanceProvider: () => stmts.getInstanceProvider.get(),
     listEnabledInstanceProviders: () => stmts.listEnabledInstanceProviders.all(),
     saveInstanceProvider,
@@ -154,7 +154,6 @@ function createOidcStore(db) {
     linkIdentity,
     touchIdentity: (id, email) => stmts.touchIdentity.run(email || null, nowIso(), id),
     deleteIdentity: (id, userId) => stmts.deleteIdentity.run(id, userId).changes > 0,
-    transaction: (fn) => db.transaction(fn),
   };
 }
 
