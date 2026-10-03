@@ -41,4 +41,22 @@ class NoteExporterMarkdownTest {
         assertTrue(markdown.contains("  - [x] Passeport"))
         assertTrue(markdown.contains("billet.png"))
     }
+
+    @Test
+    fun textMarkdownLeavesABlankLineBeforeItsImages() {
+        val note = NoteEntity(
+            id = "note-2",
+            type = "text",
+            title = "Titre",
+            color = "default",
+            pinned = false,
+            updatedAt = null,
+            content = "Bonjour",
+            itemsJson = "[]",
+            tagsJson = "[]",
+            imageNamesJson = """["a.png"]""",
+        )
+
+        assertEquals("# Titre\n\nBonjour\n\n> _1 image(s) attached)_ a.png\n", NoteExporter.noteMarkdown(note))
+    }
 }

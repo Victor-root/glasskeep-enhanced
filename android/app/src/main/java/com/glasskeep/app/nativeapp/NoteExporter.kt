@@ -173,35 +173,38 @@ object NoteExporter {
         }
     }
 
-    internal fun noteMarkdown(note: NoteEntity): String = buildString {
-        if (note.title.isNotBlank()) append("# ").append(note.title).append("\n\n")
+    /** mdForDownload() (markdown.jsx:94-127): the web builds the same lines
+     *  and joins them, so each blank line is a line of its own here too. */
+    internal fun noteMarkdown(note: NoteEntity): String {
+        val lines = mutableListOf<String>()
+        if (note.title.isNotBlank()) lines.addAll(listOf("# ${note.title}", ""))
         val tags = TagsJson.parse(note.tagsJson)
         if (tags.isNotEmpty()) {
-            append("**Tags:** ").append(tags.joinToString(", ") { "`$it`" }).append("\n\n")
+            lines.addAll(listOf("**Tags:** ${tags.joinToString(", ") { "`$it`" }}", ""))
         }
         if (note.type == "text") {
-            append(NoteContent.previewPlainText(note.content, Int.MAX_VALUE))
+            lines.add(NoteContent.previewPlainText(note.content, Int.MAX_VALUE))
         } else {
             val rawItems = runCatching {
                 (Json.parseToJsonElement(note.itemsJson) as? JsonArray)?.toList().orEmpty()
             }.getOrDefault(emptyList())
             for (entry in ChecklistItems.parse(rawItems)) {
                 when (entry) {
-                    is ChecklistSectionData -> append("\n## ").append(entry.title).append("\n\n")
+                    is ChecklistSectionData -> lines.addAll(listOf("", "## ${entry.title}", ""))
                     is ChecklistItemData -> {
-                        if (entry.indent > 0) append("  ")
-                        append("- [").append(if (entry.done) "x" else " ").append("] ")
-                            .append(entry.text).append('\n')
+                        val indent = if (entry.indent > 0) "  " else ""
+                        lines.add("$indent- [${if (entry.done) "x" else " "}] ${entry.text}")
                     }
                 }
             }
         }
         val imageNames = TagsJson.parse(note.imageNamesJson)
         if (imageNames.isNotEmpty()) {
-            append("\n> _").append(imageNames.size).append(" image(s) attached)_ ")
-                .append(imageNames.joinToString(", ") { it.ifBlank { "image" } })
+            val names = imageNames.joinToString(", ") { it.ifBlank { "image" } }
+            lines.addAll(listOf("", "> _${imageNames.size} image(s) attached)_ $names"))
         }
-        append('\n')
+        lines.add("")
+        return lines.joinToString("\n")
     }
 
     private fun shareFile(context: Context, file: File, mimeType: String) {
