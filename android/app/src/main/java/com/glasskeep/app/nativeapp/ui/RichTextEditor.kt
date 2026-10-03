@@ -226,8 +226,8 @@ fun RichTextEditor(
     onBlocksChange: (List<RichBlock>) -> Unit,
     suppressKeyboard: Boolean = false,
 ) {
-    val itemEm = typography.p.size * RemPx
-    val flow = remember(blocks, itemEm) { richFlow(blocks, itemEm) }
+    val paragraphEm = typography.p.size * RemPx
+    val flow = remember(blocks, paragraphEm) { richFlow(blocks, RemPx, paragraphEm) }
     SideEffect {
         state.onBlocksChange = onBlocksChange
         state.keyboardSuppressed = suppressKeyboard
@@ -1179,8 +1179,9 @@ fun RichTextReader(
     accent: Color = RichDefaultAccent,
 ) {
     val surface = if (compact) RichSurface.CARD else RichSurface.READER
-    val itemEm = if (compact) 14f else typography.p.size * RemPx
-    val flow = remember(blocks, itemEm) { richFlow(blocks, itemEm) }
+    val itemEm = if (compact) 14f else RemPx
+    val paragraphEm = if (compact) 14f else typography.p.size * RemPx
+    val flow = remember(blocks, itemEm, paragraphEm) { richFlow(blocks, itemEm, paragraphEm) }
     // Sticky hover on a touch screen: a tap shows the code block's copy
     // button, a tap anywhere else hides it again.
     var shownCopy by remember { mutableStateOf<String?>(null) }
@@ -1343,9 +1344,11 @@ private class FlowBox(val id: Int, val top: Float, val bottom: Float)
  * items, so that list starts at 1, a nested one too; a list opening the
  * note or a quote, or following a code block or another ordered list,
  * counts on with the one counter all such lists share across the note.
- * [itemEm] is a list item's font size, and the em of a quote's indent.
+ * [itemEm] is a list item's font size, the page's, and the em of a quote's
+ * indent; [paragraphEm] is a paragraph's, the em of the indent a task item's
+ * text or a list item's own paragraph carries.
  */
-private fun richFlow(blocks: List<RichBlock>, itemEm: Float): RichFlow {
+private fun richFlow(blocks: List<RichBlock>, itemEm: Float, paragraphEm: Float): RichFlow {
     var noteCounter = 0
 
     /** The blocks `[from, to)`, all held by the same [depth] quotes. */
@@ -1418,7 +1421,7 @@ private fun richFlow(blocks: List<RichBlock>, itemEm: Float): RichFlow {
                     task -> if (levels[level - 1].first.kind == RichBlockKind.TASK_ITEM) 20f else 0f
                     else -> 16f
                 }
-                val indent = block.indent * IndentStepEm * itemEm
+                val indent = block.indent * IndentStepEm * (if (task) paragraphEm else itemEm)
                 val number = when {
                     block.kind != RichBlockKind.NUMBERED_ITEM -> null
                     entry.sharesCounter -> ++noteCounter
@@ -1431,7 +1434,7 @@ private fun richFlow(blocks: List<RichBlock>, itemEm: Float): RichFlow {
                 } else {
                     val item = parentStart + padding + indent
                     entry.childStart = item
-                    RichListPlacement(item + block.lineIndent * IndentStepEm * itemEm, item, number)
+                    RichListPlacement(item + block.lineIndent * IndentStepEm * paragraphEm, item, number)
                 }
                 heldByChecked = levels.take(level).count { it.checked }
                 chain = levels.flatMap { listOf(it.list, it.item) }
@@ -1961,7 +1964,7 @@ private fun richRowLook(
         style = style,
         lines = TextDecoration.combine(
             listOfNotNull(
-                TextDecoration.Underline.takeIf { typography.forKind(block.kind).underline },
+                TextDecoration.Underline.takeIf { block.kind.isHeading && typography.forKind(block.kind).underline },
                 TextDecoration.LineThrough.takeIf { struck },
             ),
         ),
@@ -1971,10 +1974,14 @@ private fun richRowLook(
 }
 
 /**
- * The block's own text style, straight from the user's typography profile
- * (typographyPresets.js's DEFAULT_PROFILE until they change it): size,
- * weight, colour and italic all come from there, its underline goes to
- * [RichRowLook.lines].
+ * The block's own text style from the user's typography profile
+ * (typographyPresets.js's DEFAULT_PROFILE until they change it). A heading
+ * takes its size, weight, colour and italic from its own preset, its
+ * underline goes to [RichRowLook.lines]. The Paragraph preset reaches only
+ * the size and weight of the paragraphs, list items and task items (the
+ * `p` they hold); its colour, italic and underline are the style button's
+ * preview alone. Code is the page's own 16px at 400, whatever Paragraph
+ * says, and everything else is the note's text colour.
  *
  * Line heights are the CSS ones: 1.5 for a paragraph in the view (the
  * page's own) but 1.55 in the editor (`.rt-editor-content`), 20px in a
@@ -1994,14 +2001,20 @@ private fun richBlockTextStyle(
     surface: RichSurface,
 ): TextStyle {
     val preset = typography.forKind(block.kind)
+    val heading = block.kind.isHeading
     val code = block.kind == RichBlockKind.CODE_BLOCK
-    val base = if (surface == RichSurface.CARD && !block.kind.isHeading) 14f else preset.size * RemPx
+    val base = when {
+        surface == RichSurface.CARD && !heading -> 14f
+        code -> RemPx
+        else -> preset.size * RemPx
+    }
     val fontSize = when {
         !code -> base
         surface == RichSurface.EDITOR -> base * 0.81f
         else -> base * 0.9f
     }
     val quoted = block.quotes.isNotEmpty()
+    val italic = if (heading) preset.italic else quoted
     val lineHeightFactor = when {
         block.kind.isHeading -> 1.5f
         block.listDepth > 0 -> 1.45f
@@ -2015,10 +2028,10 @@ private fun richBlockTextStyle(
     val tallest = block.marks.filter { it.type == RichMarkType.FONT_SIZE }.mapNotNull { richFontSizeOf(it.value) }.maxOrNull()
     val lineBox = maxOf(fontSize, tallest ?: 0f)
     return TextStyle(
-        color = richColorOf(preset.color, dark) ?: titleColor,
+        color = (if (heading) richColorOf(preset.color, dark) else null) ?: titleColor,
         fontSize = fontSize.sp,
-        fontWeight = FontWeight(preset.weight),
-        fontStyle = if (preset.italic || quoted && !block.kind.isHeading) FontStyle.Italic else FontStyle.Normal,
+        fontWeight = FontWeight(if (code) 400 else preset.weight),
+        fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
         fontFamily = if (code) FontFamily.Monospace else null,
         lineHeight = (if (code && surface == RichSurface.CARD) 18f else lineBox * lineHeightFactor).sp,
         // A style of its own replaces the theme's rather than adding to it.
