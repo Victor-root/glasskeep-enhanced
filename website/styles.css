@@ -404,7 +404,7 @@ p { margin: 0; }
 
 /* ── Hero ─────────────────────────────────────────────────────────────── */
 .hero {
-  padding: calc(var(--nav-h) + 74px) 0 88px;
+  padding: calc(var(--nav-h) + 40px) 0 88px;
   position: relative;
 }
 .hero-grid {
