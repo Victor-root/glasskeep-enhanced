@@ -139,6 +139,10 @@ class ToastController {
     /** Deletes a server row for good, once NativeNavHost has a session. */
     var removeServerRow: ((Int) -> Unit)? = null
 
+    /** Rows an opened note already acknowledged: a replay still on its way
+     *  must not bring their pills back. */
+    private val acknowledged = mutableSetOf<Int>()
+
     fun show(
         message: CharSequence,
         variant: NotifVariant = NotifVariant.INFO,
@@ -162,7 +166,7 @@ class ToastController {
         val settings = prefs
         if (settings != null && !settings.allowsNotification(category)) return null
         // A row replayed at launch and pushed live again shows once.
-        if (serverId != null && queue.any { it.serverId == serverId }) return null
+        if (serverId != null && (serverId in acknowledged || queue.any { it.serverId == serverId })) return null
         val id = nextId++
         // A pill echoing a server row is already in serverHistory.
         if (serverId == null) {
@@ -213,6 +217,13 @@ class ToastController {
 
     internal fun dismiss(id: Long) {
         queue.removeAll { it.id == id }
+    }
+
+    /** Opening a note acknowledges its reminders (App.jsx:5273-5292): their
+     *  pills go, the server rows being marked delivered by the caller. */
+    internal fun acknowledge(serverIds: List<Int>) {
+        acknowledged += serverIds
+        queue.removeAll { it.serverId in serverIds }
     }
 
     /** The web's remove(): off the screen and out of the history alike. */

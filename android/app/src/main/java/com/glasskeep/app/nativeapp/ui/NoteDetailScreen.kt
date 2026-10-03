@@ -1540,6 +1540,25 @@ fun NoteDetailScreen(
         }
     }
 
+    // Opening a note acknowledges the reminders it raised (App.jsx:5273-5292),
+    // by whichever way it was opened: their pills go and the server stops
+    // replaying them at each launch.
+    LaunchedEffect(noteId) {
+        try {
+            val reminders = repository.fetchPendingNotifications()
+                .filter { it.type == "reminder" && it.noteId == noteId }
+                .map { it.id }
+            if (reminders.isNotEmpty()) {
+                toasts.acknowledge(reminders)
+                repository.markNotificationsDelivered(reminders)
+            }
+        } catch (t: CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            NativeDebug.e("NoteDetailScreen reminder acknowledgement failed id=$noteId", t)
+        }
+    }
+
     // useModalHistory.js's `active`: the history covers a text note being
     // edited and a checklist, nothing else (a drawing's caption included).
     val historyActive = editability?.let { (it.isTextType && !viewMode) || it.isChecklistType } == true
