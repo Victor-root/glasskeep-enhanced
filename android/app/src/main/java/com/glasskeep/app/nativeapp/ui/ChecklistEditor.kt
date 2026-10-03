@@ -154,7 +154,8 @@ private val PlaceholderDark = Color(0xFF6A7282)
  *
  * Structural changes (reorder, indent, add, remove, section edits) hand
  * a whole new entry list back through [onEntriesChange]; typing does the
- * same with `persist = false`, and the row saves once it loses the focus.
+ * same with `persist = false`, which the screen saves after a short pause
+ * in the typing.
  *
  * [readOnly] (a read-only share, or a mirror whose server is away) keeps
  * the same list but frozen, as the web does: no handles, crosses or add

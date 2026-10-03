@@ -62,6 +62,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
@@ -127,6 +128,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
@@ -192,6 +196,10 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 private val ErrorColor = Color(0xFFdc2626)
+
+/** The pause after the last checklist keystroke, stroke or recording
+ *  change before it is queued (App.jsx:4510-4515 waits the same 500ms). */
+private const val AutosaveDebounceMs = 500L
 
 /** What the loaded note allows natively, decided once from its content
  *  shape (see RichDoc.parse, then NoteContent.isDocPlainStructure as the
@@ -430,6 +438,7 @@ fun NoteDetailScreen(
     var audioClips by remember { mutableStateOf<List<AudioClipDto>>(emptyList()) }
     var audioCaptionText by remember { mutableStateOf<String?>(null) }
     var audioSaveJob by remember { mutableStateOf<Job?>(null) }
+    var checklistSaveJob by remember { mutableStateOf<Job?>(null) }
 
     // Content images (text/checklist notes only, see edit.isTextType /
     // isChecklistType below); parsed once on load same as checklist items,
@@ -609,6 +618,7 @@ fun NoteDetailScreen(
     fun cancelPendingAutosaves() {
         drawingSaveJob?.cancel()
         audioSaveJob?.cancel()
+        checklistSaveJob?.cancel()
     }
 
     /** Commits the live editor state to the offline queue before an exit
@@ -621,9 +631,9 @@ fun NoteDetailScreen(
 
     /** One debounced autosave. A queue write that has started is always
      *  finished, even when a newer edit reschedules this one meanwhile. */
-    suspend fun autosaveLiveEdits() {
+    suspend fun autosaveLiveEdits(withItems: Boolean = false) {
         try {
-            withContext(NonCancellable) { persistLiveEdits(withItems = false) }
+            withContext(NonCancellable) { persistLiveEdits(withItems) }
             SyncQueueWorker.triggerNow(context)
             NativeDebug.d("NoteDetailScreen autosave queued id=$noteId")
         } catch (t: CancellationException) {
@@ -894,12 +904,11 @@ fun NoteDetailScreen(
      *  another row) with the same content.
      *
      * Note: this is one PATCH per action (toggle, add, remove, indent) and
-     * one per row blur, same as how often the web itself calls
-     * syncEntries(); this app's usual pattern elsewhere is to save once
-     * explicitly, but checklist edits are inherently a sequence of small,
-     * separately-meaningful mutations, not one big free-text edit. */
+     * one per row blur; typing is queued by scheduleChecklistAutosave. It
+     * replaces any pending typing save, which holds the same items. */
     fun saveChecklistItems(newItems: List<ChecklistEntry>) {
         val current = note ?: return
+        checklistSaveJob?.cancel()
         scope.launch {
             try {
                 repository.setChecklistItemsQueued(current.id, ChecklistItems.encode(newItems))
@@ -917,12 +926,22 @@ fun NoteDetailScreen(
         checklistPrefs.edit().putBoolean("ck-done-$noteId", collapsed).apply()
     }
 
-    /** The editor hands back a whole new entry list for any structural
-     *  change; typing hands one back with persist = false, since the web
-     *  only saves a row's text once it loses focus. */
+    /** The web saves a row's text on every keystroke; here a pause in the
+     *  typing queues it, so the database is not written once per letter. */
+    fun scheduleChecklistAutosave() {
+        checklistSaveJob?.cancel()
+        checklistSaveJob = scope.launch {
+            delay(AutosaveDebounceMs)
+            autosaveLiveEdits(withItems = true)
+        }
+    }
+
+    /** The editor hands back a whole new entry list for any change; a
+     *  structural one is saved at once, typing (persist = false) after a
+     *  pause, or earlier when the row loses its focus or the note closes. */
     fun updateChecklistEntries(entries: List<ChecklistEntry>, persist: Boolean) {
         editability = editability?.copy(checklistItems = entries)
-        if (persist) saveChecklistItems(entries)
+        if (persist) saveChecklistItems(entries) else scheduleChecklistAutosave()
     }
 
     // ---------- Drawing note edits (DrawingContent.parse-approved notes only) ----------
@@ -934,7 +953,7 @@ fun NoteDetailScreen(
     fun scheduleDrawingAutosave() {
         drawingSaveJob?.cancel()
         drawingSaveJob = scope.launch {
-            delay(600)
+            delay(AutosaveDebounceMs)
             autosaveLiveEdits()
         }
     }
@@ -1007,7 +1026,7 @@ fun NoteDetailScreen(
     fun scheduleAudioAutosave() {
         audioSaveJob?.cancel()
         audioSaveJob = scope.launch {
-            delay(600)
+            delay(AutosaveDebounceMs)
             autosaveLiveEdits()
         }
     }
@@ -1710,6 +1729,26 @@ fun NoteDetailScreen(
                 saving = false
             }
         }
+    }
+
+    // Android may kill an app that has left the screen without another
+    // call, so whatever is still in a debounce is queued as it goes.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP && note != null) {
+                scope.launch {
+                    try {
+                        flushLiveEdits()
+                        SyncQueueWorker.triggerNow(context)
+                    } catch (t: Throwable) {
+                        NativeDebug.e("NoteDetailScreen background flush failed", t)
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     /** Nothing typed, drawn, recorded or attached: closing such a note
