@@ -6,8 +6,8 @@ import { localizeServerError, localizeSecretRejection } from "../../utils/server
 import PasskeyLoginButton from "./PasskeyLoginButton.jsx";
 import QrLoginButton from "./QrLoginButton.jsx";
 import QrLoginPanel from "./QrLoginPanel.jsx";
-import OidcLoginButtons from "./OidcLoginButtons.jsx";
-import { fetchOidcProviders, oidcErrorMessage } from "../../auth/oidcClient.js";
+import OidcLoginButton from "./OidcLoginButton.jsx";
+import { fetchOidcAvailable, oidcErrorMessage } from "../../auth/oidcClient.js";
 
 export default function LoginView({
   dark,
@@ -46,19 +46,25 @@ export default function LoginView({
     />
   ) : null;
 
-  // Providers the admin enabled for single sign-on, and the error line
-  // under their buttons. A failure reported by the provider's redirect
-  // arrives through `oidcError`, possibly after this screen mounted.
-  const [oidcProviders, setOidcProviders] = useState([]);
+  // Single sign-on with the provider an account declared in its settings,
+  // offered once the admin allows it and some account has linked one. A
+  // failure reported by the provider's redirect arrives through
+  // `oidcError`, possibly after this screen mounted.
+  const [oidcAvailable, setOidcAvailable] = useState(false);
   const [oidcErr, setOidcErr] = useState("");
   useEffect(() => {
-    fetchOidcProviders().then(setOidcProviders).catch(() => setOidcProviders([]));
+    fetchOidcAvailable().then(setOidcAvailable).catch(() => setOidcAvailable(false));
   }, []);
   useEffect(() => {
     if (oidcError) setOidcErr(oidcErrorMessage(oidcError));
   }, [oidcError]);
-  const oidcButtons = (
-    <OidcLoginButtons providers={oidcProviders} error={oidcErr} onError={setOidcErr} />
+  const oidcButton = (oidcAvailable || oidcErr) && (
+    <OidcLoginButton
+      userId={mode === "password" ? selectedProfile?.id : undefined}
+      defaultEmail={email}
+      error={oidcErr}
+      onError={setOidcErr}
+    />
   );
 
   // If no visible profiles, show manual login directly
@@ -136,7 +142,7 @@ export default function LoginView({
             a side panel) so hiding them behind "Manual login" was an
             unnecessary extra click. */}
         <PasskeyLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
-        {oidcButtons}
+        {oidcButton}
         <QrLoginButton open={qrOpen} onToggle={setQrOpen} />
         <div className="mt-4 text-center">
           <button
@@ -187,7 +193,7 @@ export default function LoginView({
           >{t("signIn")}</button>
         </form>
         <PasskeyLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
-        {oidcButtons}
+        {oidcButton}
         <QrLoginButton open={qrOpen} onToggle={setQrOpen} />
         <div className="mt-4 text-sm text-center flex justify-center gap-4">
           {hasProfiles && (
@@ -241,7 +247,7 @@ export default function LoginView({
       </form>
 
       <PasskeyLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
-      {oidcButtons}
+      {oidcButton}
       <QrLoginButton open={qrOpen} onToggle={setQrOpen} />
 
       <div className="mt-4 text-sm flex justify-between items-center">
