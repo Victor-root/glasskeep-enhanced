@@ -22,12 +22,20 @@ export function isOnProviderOrigin(provider) {
   return provider?.origin === window.location.origin;
 }
 
+// The Android app opens other sites in a browser tab. The provider has to
+// load inside the app instead, where the cookie tying the attempt to this
+// browser lives, so the app is told which URL is coming.
+function goToProvider(authorizationUrl) {
+  window.AndroidTheme?.beginSingleSignOn?.(authorizationUrl);
+  window.location.assign(authorizationUrl);
+}
+
 export async function startOidcSignIn(providerId) {
   const { authorizationUrl } = await api("/auth/oidc/login", {
     method: "POST",
     body: { providerId },
   });
-  window.location.assign(authorizationUrl);
+  goToProvider(authorizationUrl);
 }
 
 export async function startOidcLink(token, providerId) {
@@ -36,7 +44,7 @@ export async function startOidcLink(token, providerId) {
     token,
     body: { providerId },
   });
-  window.location.assign(authorizationUrl);
+  goToProvider(authorizationUrl);
 }
 
 export function exchangeOidcTicket(ticket) {

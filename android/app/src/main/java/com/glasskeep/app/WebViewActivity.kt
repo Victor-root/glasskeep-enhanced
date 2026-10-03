@@ -46,6 +46,16 @@ class WebViewActivity : AppCompatActivity() {
     private var pendingOpenNoteId: String? = null
     private var pageLoaded = false
 
+    // Single sign-on round trip. The server ties a sign-in attempt to a
+    // cookie in this WebView, so the trip to the provider and back has to
+    // stay here instead of going to a Custom Tab like other sites. The web
+    // app announces the provider URL it is about to open (the bridge call
+    // below); the first navigation matching it lets that provider host in
+    // until a page of our own server loads again. Only the app's code can
+    // announce: a link in a note never makes a site load in the WebView.
+    @Volatile private var announcedSsoUrl: Uri? = null
+    private var ssoProviderHost: String? = null
+
     // Held while we wait for the POST_NOTIFICATIONS runtime grant on
     // Android 13+. Once the user replies, we re-attempt the notif post
     // for this release (or drop it on the floor if denied).
@@ -303,6 +313,14 @@ class WebViewActivity : AppCompatActivity() {
          *  edit-heavy phone UI for a comfy, focus-driven viewer. */
         @JavascriptInterface
         fun isAndroidTV(): Boolean = isTelevision()
+
+        /** Called by the web app right before it navigates to the single
+         *  sign-on provider. See [isSsoNavigation]. */
+        @JavascriptInterface
+        fun beginSingleSignOn(authorizationUrl: String?) {
+            if (authorizationUrl.isNullOrBlank()) return
+            announcedSsoUrl = Uri.parse(authorizationUrl)
+        }
 
         /** Open a URL in the device's external browser. Used by docs /
          *  changelog links so the user isn't navigated AWAY from the
@@ -617,6 +635,9 @@ class WebViewActivity : AppCompatActivity() {
                     val sameHost = appHost != null &&
                         appHost.equals(target.host, ignoreCase = true)
                     return if (sameHost) {
+                        ssoProviderHost = null
+                        false
+                    } else if (isSsoNavigation(target, appHost)) {
                         false
                     } else {
                         // Genuinely external link (a note's link, GitHub, …) —
@@ -851,6 +872,25 @@ class WebViewActivity : AppCompatActivity() {
             pendingOpenNoteId = it
             maybeDispatchOpenNote()
         }
+    }
+
+    /** True when [target] is part of a single sign-on round trip: the
+     *  provider URL the web app announced, provided it sends the browser
+     *  back to this server's OIDC callback, or a later page on that same
+     *  provider host. */
+    private fun isSsoNavigation(target: Uri, appHost: String?): Boolean {
+        announcedSsoUrl?.let { announced ->
+            announcedSsoUrl = null
+            val matches = runCatching {
+                val back = Uri.parse(announced.getQueryParameter("redirect_uri") ?: "")
+                announced.host.equals(target.host, ignoreCase = true) &&
+                    announced.getQueryParameter("state") == target.getQueryParameter("state") &&
+                    appHost != null && appHost.equals(back.host, ignoreCase = true) &&
+                    back.path == "/api/auth/oidc/callback"
+            }.getOrDefault(false)
+            if (matches) ssoProviderHost = target.host
+        }
+        return ssoProviderHost?.equals(target.host, ignoreCase = true) == true
     }
 
     /** Open `uri` via the user's default browser using Android Custom
