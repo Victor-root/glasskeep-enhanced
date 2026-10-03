@@ -147,6 +147,7 @@ import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.DrawingContent
 import com.glasskeep.app.nativeapp.data.DrawingDimensionsDto
 import com.glasskeep.app.nativeapp.data.DrawingStrokeDto
+import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.NoteConversion
 import com.glasskeep.app.nativeapp.data.NoteImageData
@@ -201,7 +202,6 @@ private val ErrorColor = Color(0xFFdc2626)
 private data class Editability(
     val isTextType: Boolean,
     val bodyEditable: Boolean,
-    val isLegacyPlain: Boolean,
     val bodyPlainText: String,
     val isChecklistType: Boolean = false,
     /** The checklist's own entries, rows and section markers in one flat
@@ -216,6 +216,10 @@ private data class Editability(
      *  is the top-level `richBlocks` state, same split as bodyText. */
     val isRichEditableType: Boolean = false,
     val originalRichBlocks: List<RichBlock>? = null,
+    /** A legacy Markdown or plain text note, read as renderSafeMarkdown
+     *  reads it (blank lines kept) for as long as nothing in it changed;
+     *  [originalRichBlocks] is its editor's reading, legacyMarkdownToRichDoc's. */
+    val legacyReadBlocks: List<RichBlock>? = null,
     /** True when DrawingContent.parse approved a "draw" note's content.
      *  The three original* fields are the as-loaded snapshot the drawing
      *  autosave's dimensions/caption fall back on; the live, edited
@@ -244,6 +248,7 @@ private fun Editability.rebaselined(
 ): Editability = copy(
     bodyPlainText = if (bodyEditable) body else bodyPlainText,
     originalRichBlocks = if (isRichEditableType || isDrawType) blocks else originalRichBlocks,
+    legacyReadBlocks = legacyReadBlocks.takeIf { blocks == originalRichBlocks },
     originalDrawingPaths = if (isDrawType) paths else originalDrawingPaths,
     originalDrawingDimensions = if (isDrawType) dimensions else originalDrawingDimensions,
     originalAudioClips = if (isAudioType) clips else originalAudioClips,
@@ -555,7 +560,6 @@ fun NoteDetailScreen(
                 RichDoc.encode(richBlocks ?: listOf(RichDoc.newBlock())),
             )
             edit.isAudioType -> AudioContent.encode(audioClips, audioCaptionText.orEmpty())
-            edit.isLegacyPlain -> bodyText
             else -> NoteContent.plainTextToRichContent(bodyText)
         }
         val currentItems = if (edit.isChecklistType) {
@@ -1382,7 +1386,6 @@ fun NoteDetailScreen(
                         Editability(
                             isTextType = true,
                             bodyEditable = false,
-                            isLegacyPlain = false,
                             bodyPlainText = "",
                             isRichEditableType = true,
                             originalRichBlocks = parsedRichBlocks,
@@ -1390,14 +1393,21 @@ fun NoteDetailScreen(
                     } else {
                         val richDoc = NoteContent.parseRichDoc(fetched.content)
                         when {
-                            richDoc == null -> Editability(true, bodyEditable = true, isLegacyPlain = true, bodyPlainText = fetched.content)
+                            richDoc == null -> Editability(
+                                isTextType = true,
+                                bodyEditable = false,
+                                bodyPlainText = "",
+                                isRichEditableType = true,
+                                originalRichBlocks = MarkdownDoc.toRichBlocks(fetched.content),
+                                legacyReadBlocks = MarkdownDoc.toRichBlocks(fetched.content, keepBlankLines = true),
+                            )
                             NoteContent.isDocPlainStructure(richDoc) -> {
                                 val plain = NoteContent.docToPlainText(richDoc)
-                                Editability(true, bodyEditable = true, isLegacyPlain = false, bodyPlainText = plain)
+                                Editability(true, bodyEditable = true, bodyPlainText = plain)
                             }
                             else -> {
                                 val plain = NoteContent.docToPlainText(richDoc)
-                                Editability(true, bodyEditable = false, isLegacyPlain = false, bodyPlainText = plain)
+                                Editability(true, bodyEditable = false, bodyPlainText = plain)
                             }
                         }
                     }
@@ -1406,7 +1416,6 @@ fun NoteDetailScreen(
                     Editability(
                         isTextType = false,
                         bodyEditable = false,
-                        isLegacyPlain = false,
                         bodyPlainText = "",
                         isChecklistType = true,
                         checklistItems = ChecklistItems.parse(fetched.items),
@@ -1423,7 +1432,6 @@ fun NoteDetailScreen(
                         Editability(
                             isTextType = false,
                             bodyEditable = false,
-                            isLegacyPlain = false,
                             bodyPlainText = "",
                             isDrawType = true,
                             originalDrawingPaths = drawing.paths,
@@ -1432,7 +1440,7 @@ fun NoteDetailScreen(
                             originalRichBlocks = captionBlocks,
                         )
                     } else {
-                        Editability(isTextType = false, bodyEditable = false, isLegacyPlain = false, bodyPlainText = "")
+                        Editability(isTextType = false, bodyEditable = false, bodyPlainText = "")
                     }
                 }
                 "audio" -> {
@@ -1440,14 +1448,13 @@ fun NoteDetailScreen(
                     Editability(
                         isTextType = false,
                         bodyEditable = false,
-                        isLegacyPlain = false,
                         bodyPlainText = "",
                         isAudioType = true,
                         originalAudioClips = audio.clips,
                         originalAudioCaptionText = audio.text,
                     )
                 }
-                else -> Editability(isTextType = false, bodyEditable = false, isLegacyPlain = false, bodyPlainText = "")
+                else -> Editability(isTextType = false, bodyEditable = false, bodyPlainText = "")
             }
             bodyText = editability?.bodyPlainText.orEmpty()
             richBlocks = editability?.originalRichBlocks
@@ -1651,7 +1658,6 @@ fun NoteDetailScreen(
                     editability = Editability(
                         isTextType = false,
                         bodyEditable = false,
-                        isLegacyPlain = false,
                         bodyPlainText = "",
                         isChecklistType = true,
                         checklistItems = entries,
@@ -1668,7 +1674,6 @@ fun NoteDetailScreen(
                     editability = Editability(
                         isTextType = true,
                         bodyEditable = false,
-                        isLegacyPlain = false,
                         bodyPlainText = "",
                         isRichEditableType = true,
                         originalRichBlocks = blocks,
@@ -2261,7 +2266,8 @@ fun NoteDetailScreen(
                                     }
                                 } else if (edit.isRichEditableType && viewMode) {
                                     RichTextReader(
-                                        blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
+                                        blocks = edit.legacyReadBlocks.takeIf { richBlocks == edit.originalRichBlocks }
+                                            ?: richBlocks ?: edit.originalRichBlocks.orEmpty(),
                                         typography = container.editorPrefs.typography.activeProfile,
                                         taskStrike = container.editorPrefs.taskStrike,
                                         dark = dark,
