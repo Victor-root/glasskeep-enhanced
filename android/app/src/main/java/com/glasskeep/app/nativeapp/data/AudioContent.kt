@@ -56,7 +56,7 @@ data class AudioContentDto(
  * missing id or MIME type is filled in (normalizeClip).
  */
 object AudioContent {
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
 
     fun parse(content: String?): AudioContentDto {
         if (content.isNullOrBlank()) return AudioContentDto()

@@ -54,7 +54,7 @@ data class DrawingContentDto(
  * "type not supported" notice instead of being silently emptied out.
  */
 object DrawingContent {
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
 
     /** Null for corrupt/unrecognized content; an empty [DrawingContentDto]
      *  for a blank/new note, that being the one case where "nothing here
