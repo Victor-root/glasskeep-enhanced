@@ -38,12 +38,22 @@ enum class NotifCategory(val key: String) {
             "collaborator_removed", "collaborator_removed_with_copy",
             "collaborator_left", "shared_note_deleted", "shared_note_deleted_with_copy",
             -> ACCESS
-            else -> when (variant) {
-                NotifVariantKey.SUCCESS -> SUCCESS
-                NotifVariantKey.WARNING -> WARNING
-                NotifVariantKey.ERROR -> ERROR
-                NotifVariantKey.INFO -> INFO
-            }
+            else -> ofVariant(variant)
+        }
+
+        /** The bucket of the sound list (soundCategoryFor, App.jsx:742-761):
+         *  the sound side never told a reminder or a pairing notice apart, so
+         *  those ring as their variant does. */
+        fun soundOf(type: String?, variant: NotifVariantKey): NotifCategory = when (type) {
+            "federation", "reminder" -> ofVariant(variant)
+            else -> of(type, variant)
+        }
+
+        private fun ofVariant(variant: NotifVariantKey): NotifCategory = when (variant) {
+            NotifVariantKey.SUCCESS -> SUCCESS
+            NotifVariantKey.WARNING -> WARNING
+            NotifVariantKey.ERROR -> ERROR
+            NotifVariantKey.INFO -> INFO
         }
     }
 }

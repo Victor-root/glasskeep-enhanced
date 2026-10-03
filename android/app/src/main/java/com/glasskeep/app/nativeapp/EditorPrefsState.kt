@@ -86,8 +86,8 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
     }
 
     /** True when a message of this category should be shown at all, and
-     *  true when it should also ring. Both read "absent means on", the
-     *  web's own `types?.[key] !== false`. */
+     *  true when it should also ring (for a [NotifCategory.soundOf] bucket).
+     *  Both read "absent means on", the web's own `types?.[key] !== false`. */
     fun allowsNotification(category: NotifCategory): Boolean = notificationsFilterTypes[category]
 
     fun ringsFor(category: NotifCategory): Boolean =

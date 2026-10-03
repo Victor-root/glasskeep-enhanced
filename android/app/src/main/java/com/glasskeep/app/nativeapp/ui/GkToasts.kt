@@ -72,6 +72,12 @@ enum class NotifVariant(val accent: Color, val tintAlpha: Float, val categoryKey
     ERROR(Color(0xFFEF4444), 0.06f, NotifVariantKey.ERROR),
 }
 
+/** A message the app raised itself, kept for the centre: its [row] as the
+ *  cards show it, and, when it carries buttons, the [toast] it was raised
+ *  as, whose buttons stay usable there (a pairing request keeps its Accept
+ *  and Decline). */
+internal class LocalNotice(val row: NotificationDto, val toast: GkToast?)
+
 /** Where the pill sits: the user's `notificationsPositionMobile`, bottom
  *  by default (App.jsx:385-391). */
 enum class ToastPosition { TOP, BOTTOM }
@@ -138,7 +144,7 @@ class ToastController {
      *  server rows as last fetched, so the centre opens on them at once and
      *  refreshes silently, plus every message the app raised itself. */
     internal var serverHistory by mutableStateOf<List<NotificationDto>>(emptyList())
-    internal val localHistory = mutableStateListOf<NotificationDto>()
+    internal val localHistory = mutableStateListOf<LocalNotice>()
 
     /** Deletes a server row for good, once NativeNavHost has a session. */
     var removeServerRow: ((Int) -> Unit)? = null
@@ -184,42 +190,44 @@ class ToastController {
         // A row replayed at launch and pushed live again shows once.
         if (serverId != null && (serverId in acknowledged || queue.any { it.serverId == serverId })) return null
         val id = nextId++
+        val toast = GkToast(
+            id = id,
+            title = title,
+            message = message as? AnnotatedString ?: AnnotatedString(message.toString()),
+            variant = variant,
+            icon = icon,
+            serverId = serverId,
+            persistent = persistent,
+            actionLabel = actionLabel,
+            action = action,
+            secondaryActionLabel = secondaryActionLabel,
+            secondaryAction = secondaryAction,
+            secondaryOutlined = secondaryOutlined,
+            stacked = stacked,
+            durationMs = durationMs,
+        )
         // A pill echoing a server row is already in serverHistory.
         if (serverId == null) {
             localHistory.add(
                 0,
-                NotificationDto(
-                    id = localHistoryId(id),
-                    senderUserId = 0,
-                    type = type.orEmpty(),
-                    noteTitle = title.orEmpty(),
-                    variant = variant.name.lowercase(),
-                    message = message.toString(),
-                    icon = icon,
-                    createdAt = nowIso(),
+                LocalNotice(
+                    NotificationDto(
+                        id = localHistoryId(id),
+                        senderUserId = 0,
+                        type = type.orEmpty(),
+                        noteTitle = title.orEmpty(),
+                        variant = variant.name.lowercase(),
+                        message = message.toString(),
+                        icon = icon,
+                        createdAt = nowIso(),
+                    ),
+                    toast.takeIf { it.actionLabel != null },
                 ),
             )
             while (localHistory.size > MaxLocalHistory) localHistory.removeAt(localHistory.lastIndex)
         }
-        queue.add(
-            GkToast(
-                id = id,
-                title = title,
-                message = message as? AnnotatedString ?: AnnotatedString(message.toString()),
-                variant = variant,
-                icon = icon,
-                serverId = serverId,
-                persistent = persistent,
-                actionLabel = actionLabel,
-                action = action,
-                secondaryActionLabel = secondaryActionLabel,
-                secondaryAction = secondaryAction,
-                secondaryOutlined = secondaryOutlined,
-                stacked = stacked,
-                durationMs = durationMs,
-            ),
-        )
-        if (settings != null && settings.ringsFor(category)) dingRequests++
+        queue.add(toast)
+        if (settings != null && settings.ringsFor(NotifCategory.soundOf(type, variant.categoryKey))) dingRequests++
         return id
     }
 
@@ -254,7 +262,7 @@ class ToastController {
     /** The web's remove(): off the screen and out of the history alike. */
     internal fun remove(id: Long) {
         dismiss(id)
-        localHistory.removeAll { it.id == localHistoryId(id) }
+        localHistory.removeAll { it.row.id == localHistoryId(id) }
     }
 
     /** Opening the bell dismisses every active notification (the web's

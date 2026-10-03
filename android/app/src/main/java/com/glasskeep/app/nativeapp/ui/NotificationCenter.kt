@@ -146,21 +146,22 @@ fun NotificationCenter(
         try {
             val pending = repository.fetchPendingNotifications()
             val history = repository.fetchNotificationHistory()
-            // The web drops a muted category before it ever reaches its
-            // store (App.jsx:792-801), so it never shows here either.
-            toasts.serverHistory = (pending + history)
+            // The web drops a muted category from what arrives or is replayed
+            // before it reaches its store (App.jsx:792-801), but its history
+            // is merged as it is (useShareNotifications.js:557-570).
+            toasts.serverHistory = (pending.filter { container.editorPrefs.allowsNotification(categoryOf(it)) } + history)
                 .distinctBy { it.id }
-                .filter { container.editorPrefs.allowsNotification(categoryOf(it)) }
             if (pending.isNotEmpty()) repository.markNotificationsDelivered(pending.map { it.id })
         } catch (t: Throwable) {
             NativeDebug.e("NotificationCenter load failed", t)
         }
     }
-    val notifications = (toasts.serverHistory + toasts.localHistory)
+    val notifications = (toasts.serverHistory + toasts.localHistory.map { it.row })
         .sortedByDescending { parseIsoToEpochMillis(it.createdAt) ?: 0L }
+    val localToasts = toasts.localHistory.mapNotNull { notice -> notice.toast?.let { notice.row.id to it } }.toMap()
     val removeRow = { row: NotificationDto ->
         if (row.id < 0) {
-            toasts.localHistory.removeAll { it.id == row.id }
+            toasts.localHistory.removeAll { it.row.id == row.id }
         } else {
             toasts.serverHistory = toasts.serverHistory.filterNot { it.id == row.id }
         }
@@ -256,6 +257,39 @@ fun NotificationCenter(
                             enteredIds += notification.id
                             entry.animateTo(1f, tween(220, easing = GkGlideEasing))
                         }
+                        val openLabel = notificationOpenLabelRes(notification.type)
+                        val pendingId = notification.message?.toIntOrNull()
+                            ?.takeIf { notification.type == "pending_user_registered" }
+                        val localToast = localToasts[notification.id]
+                        val actions = buildList {
+                            if (notification.noteId != null && openLabel != null) {
+                                add(CardAction(stringResource(openLabel), primary = true) { notification.noteId?.let(onOpenNote) })
+                            }
+                            if (pendingId != null) {
+                                fun decide(approve: Boolean) {
+                                    scope.launch {
+                                        if (decidePendingRegistration(context, api, repository, toasts, alerts, pendingId, notification.id, approve)) {
+                                            removeRow(notification)
+                                        }
+                                    }
+                                    onDismiss()
+                                }
+                                add(CardAction(stringResource(R.string.native_admin_approve), primary = true) { decide(approve = true) })
+                                add(CardAction(stringResource(R.string.native_admin_reject), primary = false) { decide(approve = false) })
+                            }
+                            if (localToast != null) {
+                                // What its pill offered, which opening the bell took off the screen.
+                                fun fire(action: (() -> Unit)?) {
+                                    action?.invoke()
+                                    removeRow(notification)
+                                    onDismiss()
+                                }
+                                localToast.actionLabel?.let { add(CardAction(it, primary = true) { fire(localToast.action) }) }
+                                localToast.secondaryActionLabel?.let {
+                                    add(CardAction(it, primary = !localToast.secondaryOutlined) { fire(localToast.secondaryAction) })
+                                }
+                            }
+                        }
                         NotificationCard(
                             modifier = Modifier.graphicsLayer {
                                 alpha = entry.value
@@ -265,28 +299,11 @@ fun NotificationCenter(
                             },
                             notification = notification,
                             dark = dark,
-                            onOpen = { notification.noteId?.let(onOpenNote) },
+                            actions = actions,
+                            actionsBelow = actions.size > 1 || localToast?.stacked == true,
                             onDismissCard = {
                                 removeRow(notification)
                                 if (notification.id >= 0) scope.launch { repository.removeNotifications(listOf(notification.id)) }
-                            },
-                            onApprovePending = notification.message?.toIntOrNull()?.let { pendingId ->
-                                {
-                                    scope.launch {
-                                        if (decidePendingRegistration(context, api, repository, toasts, alerts, pendingId, notification.id, approve = true)) {
-                                            removeRow(notification)
-                                        }
-                                    }
-                                }
-                            },
-                            onRejectPending = notification.message?.toIntOrNull()?.let { pendingId ->
-                                {
-                                    scope.launch {
-                                        if (decidePendingRegistration(context, api, repository, toasts, alerts, pendingId, notification.id, approve = false)) {
-                                            removeRow(notification)
-                                        }
-                                    }
-                                }
                             },
                         )
                     }
@@ -467,6 +484,9 @@ internal fun TopSheetGrabber(
     }
 }
 
+/** One button of a card: the primary one tinted, the other bordered. */
+private class CardAction(val label: String, val primary: Boolean, val onClick: () -> Unit)
+
 /**
  * `.gk-notif-card--compact`: the LED-strip card, 2dp accent border (the
  * CSS asks 2.5px, Chromium floors it) over
@@ -479,10 +499,9 @@ private fun NotificationCard(
     modifier: Modifier,
     notification: NotificationDto,
     dark: Boolean,
-    onOpen: () -> Unit,
+    actions: List<CardAction>,
+    actionsBelow: Boolean,
     onDismissCard: () -> Unit,
-    onApprovePending: (() -> Unit)?,
-    onRejectPending: (() -> Unit)?,
 ) {
     val density = LocalDensity.current
     val variant = variantOf(notification)
@@ -562,15 +581,15 @@ private fun NotificationCard(
                 },
         ) {
             Row(
-                // Centred on the card, except a card carrying Approve/Reject.
-                verticalAlignment = if (notification.type == "pending_user_registered") Alignment.Top else Alignment.CenterVertically,
+                // Centred on the card, except one whose buttons sit on a row under the text.
+                verticalAlignment = if (actionsBelow) Alignment.Top else Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(9.dp),
                 // The web's 9px 12px padding sits inside its 2px border.
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
             ) {
                 Box(
                     Modifier
-                        .padding(top = if (notification.type == "pending_user_registered") 1.dp else 0.dp)
+                        .padding(top = if (actionsBelow) 1.dp else 0.dp)
                         .size(26.dp),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -594,36 +613,18 @@ private fun NotificationCard(
                             lineHeight = 16.2.sp,
                             modifier = Modifier.weight(1f),
                         )
-                        val openLabel = notificationOpenLabelRes(notification.type)
-                        if (notification.noteId != null && openLabel != null) {
-                            NotificationAction(
-                                label = stringResource(openLabel),
-                                primary = true,
-                                dark = dark,
-                                textColor = textColor,
-                                onClick = onOpen,
-                            )
+                        if (!actionsBelow) {
+                            actions.firstOrNull()?.let {
+                                NotificationAction(it.label, it.primary, dark, textColor, it.onClick)
+                            }
                         }
                     }
-                    if (notification.type == "pending_user_registered" && onApprovePending != null && onRejectPending != null) {
+                    if (actionsBelow && actions.isNotEmpty()) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                         ) {
-                            NotificationAction(
-                                label = stringResource(R.string.native_admin_approve),
-                                primary = true,
-                                dark = dark,
-                                textColor = textColor,
-                                onClick = onApprovePending,
-                            )
-                            NotificationAction(
-                                label = stringResource(R.string.native_admin_reject),
-                                primary = false,
-                                dark = dark,
-                                textColor = textColor,
-                                onClick = onRejectPending,
-                            )
+                            actions.forEach { NotificationAction(it.label, it.primary, dark, textColor, it.onClick) }
                         }
                     }
                 }
