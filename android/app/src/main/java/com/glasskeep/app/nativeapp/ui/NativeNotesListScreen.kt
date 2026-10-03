@@ -79,6 +79,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -162,14 +163,12 @@ import com.glasskeep.app.nativeapp.data.DrawingContent
 import com.glasskeep.app.nativeapp.data.DrawingContentDto
 import com.glasskeep.app.nativeapp.data.DrawingStrokeDto
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
-import com.glasskeep.app.nativeapp.data.NoteContent
-import com.glasskeep.app.nativeapp.data.RichBlock
-import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.TypographyPresets
 import com.glasskeep.app.nativeapp.data.TypographyProfile
 import com.glasskeep.app.nativeapp.data.bodyOrRefusal
+import com.glasskeep.app.nativeapp.data.countTags
 import com.glasskeep.app.nativeapp.data.isReminderPast
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.local.SyncQueueEntity
@@ -201,6 +200,8 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -213,6 +214,12 @@ private val ErrorColor = Color(0xFFdc2626)
 // just the wrong one (a plain black/white tint instead of these).
 private val CardBorderLight = Color(0xFFD1D5DB).copy(alpha = 0.3f)
 private val CardBorderDark = Color(0xFF4B5563).copy(alpha = 0.3f)
+
+/** The notes a search kept out of [source], the list it ran over. */
+private class SearchedNotes(val source: List<NoteEntity>, val notes: List<NoteEntity>)
+
+/** The pause after the last keystroke before the search runs. */
+private const val SearchDebounceMs = 120L
 
 /**
  * What the web's width breakpoints decide on the notes page, from the
@@ -299,7 +306,6 @@ fun NativeNotesListScreen(
     val dark = LocalGkDark.current
     val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
-    val cardDetails = remember(repository, density) { CardDetails(repository, density) }
     // null (as opposed to an actually-empty list) means Room's cold Flow
     // has not delivered its first emission yet, which is not instant: the
     // scrollable list below must not mount against that transient empty
@@ -384,6 +390,7 @@ fun NativeNotesListScreen(
     val aiErrorMessage = stringResource(R.string.native_notes_ai_error)
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    val cardDetails = remember(repository, density) { CardDetails(repository, density) }
     val windowInfo = LocalWindowInfo.current
     val layout by remember(windowInfo, density) {
         derivedStateOf { NotesLayout.of(with(density) { windowInfo.containerSize.width.toDp() }) }
@@ -401,18 +408,12 @@ fun NativeNotesListScreen(
     // Tag list + per-tag note count for the drawer (TagSidebar.kt), same
     // "derive from what's already loaded" approach as filteredNotes below:
     // no dedicated tags table/query, just a client-side tally over the
-    // notes already observed for this screen.
-    val tagCounts = remember(notes) {
-        val counts = LinkedHashMap<String, Int>()
-        for (note in notes) {
-            for (tag in TagsJson.parse(note.tagsJson)) {
-                val key = tag.trim()
-                if (key.isEmpty()) continue
-                counts[key] = (counts[key] ?: 0) + 1
-            }
+    // notes already observed for this screen, off the main thread.
+    val tagCounts by produceState(emptyList<Pair<String, Int>>(), notes) {
+        value = withContext(Dispatchers.Default) {
+            val collator = Collator.getInstance()
+            countTags(notes).toList().sortedWith(compareBy(collator) { it.first.lowercase() })
         }
-        val collator = Collator.getInstance()
-        counts.toList().sortedWith(compareBy(collator) { it.first.lowercase() })
     }
 
     // Manual drag reorder (see NotesRepository.reorderQueued), on any view
@@ -491,17 +492,40 @@ fun NativeNotesListScreen(
 
     // Client-side parity with App.jsx: multi-tags are OR'ed, then search
     // matches title/body/tags/checklist rows/image display names.
-    val filteredNotes = remember(shownNotes, searchQuery, activeTagFilter, activeTagFilters) {
+    val tagFilteredNotes = remember(shownNotes, activeTagFilter, activeTagFilters) {
         // The images and reminders lenses are not folders: they narrow the
         // list already loaded, and the notes they hide are still in the
         // plain view (App.jsx:7063-7077).
-        val byTag = when (activeTagFilter) {
+        val byLens = when (activeTagFilter) {
             SidebarAllImages -> shownNotes.filter { it.hasImages }
             SidebarReminders -> shownNotes.filter { !it.reminderAt.isNullOrBlank() }
             else -> shownNotes
         }
-        byTag.filter { it.matchesAnyTag(activeTagFilters) && it.matchesSearchQuery(searchQuery) }
+        byLens.filter { it.matchesAnyTag(activeTagFilters) }
     }
+    // The search reads every note, so it runs off the main thread a beat
+    // after the last keystroke, like the web's deferred search: the list
+    // stays as it was until the answer for the latest text comes.
+    var searched by remember { mutableStateOf<SearchedNotes?>(null) }
+    LaunchedEffect(tagFilteredNotes, searchQuery) {
+        if (searchQuery.isEmpty()) {
+            searched = null
+            return@LaunchedEffect
+        }
+        delay(SearchDebounceMs)
+        val matching = withContext(Dispatchers.Default) {
+            tagFilteredNotes.filter {
+                ensureActive()
+                it.matchesSearchQuery(searchQuery)
+            }
+        }
+        searched = SearchedNotes(tagFilteredNotes, matching)
+    }
+    val filteredNotes = when {
+        searchQuery.isEmpty() -> tagFilteredNotes
+        else -> searched?.takeIf { it.source === tagFilteredNotes }?.notes ?: tagFilteredNotes
+    }
+    LaunchedEffect(filteredNotes) { cardDetails.warm(filteredNotes) }
 
     val errorCreateTemplate = stringResource(R.string.native_notes_create_error)
     val archivedSuccessTemplate = stringResource(R.string.native_bulk_archived_success)
@@ -2837,7 +2861,11 @@ private fun NoteCard(
             }
 
             val textPreview = remember(note.type, note.content) {
-                if (note.type in TypedPreviews) emptyList() else cardPreviewBlocks(note.content, maxNodes = 8)
+                when {
+                    note.type in TypedPreviews -> emptyList()
+                    details != null -> details.preview(note)
+                    else -> cardPreviewBlocks(note.content, CardPreviewNodes)
+                }
             }
             if (note.type in TypedPreviews || textPreview.isNotEmpty()) {
                 Spacer(Modifier.height(trailingMargin))
@@ -3280,29 +3308,34 @@ private fun ReminderChip(reminderAt: String, dark: Boolean, accent: Color) {
  *  but this is app content, like the web's own per-language formatting. */
 @Composable
 private fun formatReminderLabel(reminderAt: String): String {
-    val ms = parseIsoToEpochMillis(reminderAt) ?: return ""
-    val isFrench = Locale.getDefault().language == "fr"
-    val time = SimpleDateFormat(if (isFrench) "HH:mm" else "hh:mm a", Locale.getDefault()).format(Date(ms))
+    val todayTemplate = stringResource(R.string.native_reminder_chip_today)
+    val tomorrowTemplate = stringResource(R.string.native_reminder_chip_tomorrow)
+    val dateTemplate = stringResource(R.string.native_reminder_chip_date)
+    return remember(reminderAt, todayTemplate, tomorrowTemplate, dateTemplate) {
+        val ms = parseIsoToEpochMillis(reminderAt) ?: return@remember ""
+        val isFrench = Locale.getDefault().language == "fr"
+        val time = SimpleDateFormat(if (isFrench) "HH:mm" else "hh:mm a", Locale.getDefault()).format(Date(ms))
 
-    val target = Calendar.getInstance().apply { timeInMillis = ms }
-    val now = Calendar.getInstance()
-    val tomorrow = (now.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, 1) }
-    fun sameDay(a: Calendar, b: Calendar) =
-        a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
+        val target = Calendar.getInstance().apply { timeInMillis = ms }
+        val now = Calendar.getInstance()
+        val tomorrow = (now.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, 1) }
+        fun sameDay(a: Calendar, b: Calendar) =
+            a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
 
-    return when {
-        sameDay(target, now) -> stringResource(R.string.native_reminder_chip_today, time)
-        sameDay(target, tomorrow) -> stringResource(R.string.native_reminder_chip_tomorrow, time)
-        else -> {
-            val sameYear = target.get(Calendar.YEAR) == now.get(Calendar.YEAR)
-            val datePattern = when {
-                isFrench && sameYear -> "d MMM"
-                isFrench -> "d MMM yyyy"
-                sameYear -> "MMM d"
-                else -> "MMM d, yyyy"
+        when {
+            sameDay(target, now) -> String.format(todayTemplate, time)
+            sameDay(target, tomorrow) -> String.format(tomorrowTemplate, time)
+            else -> {
+                val sameYear = target.get(Calendar.YEAR) == now.get(Calendar.YEAR)
+                val datePattern = when {
+                    isFrench && sameYear -> "d MMM"
+                    isFrench -> "d MMM yyyy"
+                    sameYear -> "MMM d"
+                    else -> "MMM d, yyyy"
+                }
+                val date = SimpleDateFormat(datePattern, Locale.getDefault()).format(Date(ms))
+                String.format(dateTemplate, date, time)
             }
-            val date = SimpleDateFormat(datePattern, Locale.getDefault()).format(Date(ms))
-            stringResource(R.string.native_reminder_chip_date, date, time)
         }
     }
 }
@@ -3437,19 +3470,7 @@ private fun ChecklistSectionCardHeader(title: String, collapsed: Boolean, accent
 }
 
 /** The note types whose card shows its own preview instead of text. */
-private val TypedPreviews = setOf("checklist", "draw", "audio")
-
-/** Text as NoteCard.jsx previews it: a rich document through its first
- *  [maxNodes] top-level nodes, else Markdown cut at 350 characters with
- *  its blank lines kept as spacer lines; nothing without any text. */
-private fun cardPreviewBlocks(content: String, maxNodes: Int = Int.MAX_VALUE): List<RichBlock> {
-    if (content.isEmpty()) return emptyList()
-    RichDoc.parsePreview(content, maxNodes)?.let { return it }
-    val raw = NoteContent.parseRichDoc(content)?.let { NoteContent.docToPlainText(it) } ?: content
-    if (raw.isBlank()) return emptyList()
-    val source = if (raw.length > 350) raw.take(350).trimEnd() + "…" else raw
-    return MarkdownDoc.toRichBlocks(source, keepBlankLines = true)
-}
+internal val TypedPreviews = setOf("checklist", "draw", "audio")
 
 // internal, not private: NoteDetailScreen.kt (same package, different
 // file) needs this too. Kotlin's top-level `private` is file-scoped.

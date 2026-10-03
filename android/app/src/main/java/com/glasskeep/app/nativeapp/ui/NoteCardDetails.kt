@@ -5,11 +5,16 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.glasskeep.app.nativeapp.data.MarkdownDoc
+import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.NoteImages
 import com.glasskeep.app.nativeapp.data.NotesRepository
+import com.glasskeep.app.nativeapp.data.RichBlock
+import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.network.CollaboratorDto
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -26,6 +31,12 @@ private const val CardDetailLoads = 4
 /** What a [CardDetail] weighs beyond its thumbnails, for the cache. */
 private const val CardDetailBaseBytes = 1024
 
+/** The top-level nodes of a text note a card previews. */
+internal const val CardPreviewNodes = 8
+
+/** How many notes' previews are kept. */
+private const val CardPreviewEntries = 1024
+
 internal class CardImage(val name: String, val bitmap: ImageBitmap)
 
 /** What a card shows of its note beyond the list row: the thumbnails of its
@@ -41,12 +52,26 @@ internal class CardDetail(
     val bytes: Int get() = images.sumOf { it.bitmap.width * it.bitmap.height * 4 } + CardDetailBaseBytes
 }
 
+/** Text as NoteCard.jsx previews it: a rich document through its first
+ *  [maxNodes] top-level nodes, else Markdown cut at 350 characters with
+ *  its blank lines kept as spacer lines; nothing without any text. */
+internal fun cardPreviewBlocks(content: String, maxNodes: Int = Int.MAX_VALUE): List<RichBlock> {
+    if (content.isEmpty()) return emptyList()
+    RichDoc.parsePreview(content, maxNodes)?.let { return it }
+    val raw = NoteContent.parseRichDoc(content)?.let { NoteContent.docToPlainText(it) } ?: content
+    if (raw.isBlank()) return emptyList()
+    val source = if (raw.length > 350) raw.take(350).trimEnd() + "…" else raw
+    return MarkdownDoc.toRichBlocks(source, keepBlankLines = true)
+}
+
 /**
  * Reads each card's [CardDetail], a few at a time so a long list does not
  * hold every note's payload in memory at once while the app starts, and
  * remembers what it read for the note's current version: a card built again
  * (the search cleared, a view switched) draws at once at its final height.
- * Thumbnails are decoded no bigger than a card draws them.
+ * Thumbnails are decoded no bigger than a card draws them. A text note's
+ * preview is derived once per body, ahead of its card when [warm] has had
+ * the time.
  */
 internal class CardDetails(private val repository: NotesRepository, density: Density) {
     private val gate = Semaphore(CardDetailLoads)
@@ -56,8 +81,12 @@ internal class CardDetails(private val repository: NotesRepository, density: Den
         override fun sizeOf(key: String, value: Known): Int = value.detail.bytes
     }
 
+    private val previews = LruCache<String, Preview>(CardPreviewEntries)
+
     @Volatile
     private var generation = 0
+
+    private class Preview(val content: String, val blocks: List<RichBlock>)
 
     private class Known(val updatedAt: String?, val generation: Int, val detail: CardDetail)
 
@@ -72,6 +101,19 @@ internal class CardDetails(private val repository: NotesRepository, density: Den
         val detail = gate.withPermit { withContext(Dispatchers.Default) { readNote(note.id, previous?.detail) } } ?: return null
         reads.put(note.id, Known(note.updatedAt, startedAt, detail))
         return detail
+    }
+
+    fun preview(note: NoteEntity): List<RichBlock> {
+        previews.get(note.id)?.takeIf { it.content == note.content }?.let { return it.blocks }
+        return cardPreviewBlocks(note.content, CardPreviewNodes).also { previews.put(note.id, Preview(note.content, it)) }
+    }
+
+    /** Derives the previews of [notes] ahead of their cards, off the main thread. */
+    suspend fun warm(notes: List<NoteEntity>) = withContext(Dispatchers.Default) {
+        for (note in notes) {
+            ensureActive()
+            if (note.type !in TypedPreviews) preview(note)
+        }
     }
 
     /** The notes were just read from the server again: what the phone kept

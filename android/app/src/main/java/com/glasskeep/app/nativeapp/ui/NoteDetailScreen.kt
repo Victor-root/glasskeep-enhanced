@@ -73,6 +73,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -163,7 +164,7 @@ import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.RichEdits
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
-import com.glasskeep.app.nativeapp.data.TagsJson
+import com.glasskeep.app.nativeapp.data.countTags
 import com.glasskeep.app.nativeapp.data.formatIso
 import com.glasskeep.app.nativeapp.data.hasText
 import com.glasskeep.app.nativeapp.data.network.CollaboratorDto
@@ -509,16 +510,10 @@ fun NoteDetailScreen(
         showCollaborators = true
     }
 
-    val tagsWithCounts = remember(allNotes) {
-        val counts = LinkedHashMap<String, Int>()
-        for (n in allNotes) {
-            for (rawTag in TagsJson.parse(n.tagsJson)) {
-                val key = rawTag.trim()
-                if (key.isEmpty()) continue
-                counts[key] = (counts[key] ?: 0) + 1
-            }
+    val tagsWithCounts by produceState(emptyList<TagCount>(), allNotes) {
+        value = withContext(Dispatchers.Default) {
+            countTags(allNotes).map { (tag, count) -> TagCount(tag, count) }.sortedBy { it.tag.lowercase() }
         }
-        counts.map { (tag, count) -> TagCount(tag, count) }.sortedBy { it.tag.lowercase() }
     }
 
     val errorLoadTemplate = stringResource(R.string.native_note_detail_error)

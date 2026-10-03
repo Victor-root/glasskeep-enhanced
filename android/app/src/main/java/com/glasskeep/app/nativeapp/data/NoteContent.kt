@@ -68,8 +68,10 @@ object NoteContent {
     fun docToPlainText(doc: JsonObject): String {
         val out = StringBuilder()
         walkPlain(doc, out)
-        return out.toString().replace(Regex("\n{3,}"), "\n\n").trim()
+        return out.toString().replace(ExtraBlankLines, "\n\n").trim()
     }
+
+    private val ExtraBlankLines = Regex("\n{3,}")
 
     private val BLOCK_TYPES =
         setOf("paragraph", "heading", "listItem", "taskItem", "blockquote", "codeBlock")
