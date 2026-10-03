@@ -87,7 +87,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.longOrNull
@@ -1130,8 +1129,8 @@ class NotesRepository(
                 checklistInsertPosition = body.checklistInsertPosition,
                 checklistRemoveSectionBehavior = body.checklistRemoveSectionBehavior,
                 toastDuration = when (val raw = body.notificationsDuration) {
-                    is JsonNull -> ToastDuration(null)
-                    is JsonPrimitive -> raw.longOrNull?.let(::ToastDuration)
+                    null -> ToastDuration(null)
+                    is JsonPrimitive -> raw.longOrNull?.let { ToastDuration(it) }
                     else -> null
                 },
                 readModeEnabled = body.readModeEnabled,

@@ -109,7 +109,7 @@ class AudioRecorderController(private val context: Context) {
                     AudioRecordingResult(
                         dataUrl = "data:audio/mp4;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP),
                         mimeType = "audio/mp4",
-                        durationSeconds = readDurationMs(file) / 1000f,
+                        durationSeconds = extractDurationMs { it.setDataSource(file.absolutePath) } / 1000f,
                         sizeBytes = bytes.size.toLong(),
                     ),
                 )
@@ -176,19 +176,6 @@ class AudioRecorderController(private val context: Context) {
         rec?.release()
         file?.delete()
     }
-
-    private fun readDurationMs(file: File): Long {
-        val retriever = MediaMetadataRetriever()
-        return try {
-            retriever.setDataSource(file.absolutePath)
-            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-        } catch (t: Throwable) {
-            NativeDebug.e("AudioRecorderController.readDurationMs failed", t)
-            0L
-        } finally {
-            retriever.release()
-        }
-    }
 }
 
 data class AudioRecordingResult(val dataUrl: String, val mimeType: String, val durationSeconds: Float, val sizeBytes: Long)
@@ -199,6 +186,36 @@ sealed interface AudioRecordingOutcome {
     data class Recorded(val result: AudioRecordingResult) : AudioRecordingOutcome
     data object Empty : AudioRecordingOutcome
     data object Failed : AudioRecordingOutcome
+}
+
+/** The duration a container's header states, in ms, or 0 when the
+ *  platform cannot read it. [setSource] points the retriever at the clip. */
+private fun extractDurationMs(setSource: (MediaMetadataRetriever) -> Unit): Long {
+    val retriever = MediaMetadataRetriever()
+    return try {
+        setSource(retriever)
+        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+    } catch (t: Throwable) {
+        NativeDebug.e("extractDurationMs failed", t)
+        0L
+    } finally {
+        retriever.release()
+    }
+}
+
+/** The bytes behind a clip's base64 `data:` URL, or null when it is not one. */
+private fun decodeDataUrl(dataUrl: String): ByteArray? = try {
+    Base64.decode(dataUrl.substringAfter("base64,", ""), Base64.DEFAULT)
+} catch (e: IllegalArgumentException) {
+    NativeDebug.e("decodeDataUrl: not a base64 data: URL", e)
+    null
+}
+
+/** A clip's length from its own header, read without playing it, off the
+ *  main thread; 0 when the device cannot tell. */
+suspend fun readClipDurationMs(dataUrl: String): Int = withContext(Dispatchers.Default) {
+    val bytes = decodeDataUrl(dataUrl) ?: return@withContext 0
+    extractDurationMs { it.setDataSource(ByteArrayMediaDataSource(bytes)) }.toInt()
 }
 
 /** In-memory MediaDataSource over an already-decoded byte array, so a
@@ -247,14 +264,7 @@ class AudioPlayerController {
      *  reaches [onError] with nothing left loaded. */
     suspend fun load(dataUrl: String, onReady: () -> Unit, onError: () -> Unit, onCompletion: () -> Unit) {
         stop()
-        val bytes = withContext(Dispatchers.Default) {
-            try {
-                Base64.decode(dataUrl.substringAfter("base64,", ""), Base64.DEFAULT)
-            } catch (e: IllegalArgumentException) {
-                NativeDebug.e("AudioPlayerController.load: not a base64 data: URL", e)
-                null
-            }
-        }
+        val bytes = withContext(Dispatchers.Default) { decodeDataUrl(dataUrl) }
         if (bytes == null || bytes.isEmpty()) {
             onError()
             return

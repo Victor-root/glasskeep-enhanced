@@ -47,6 +47,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -111,6 +112,7 @@ import com.glasskeep.app.nativeapp.AudioRecordingResult
 import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.data.AudioClipDto
 import com.glasskeep.app.nativeapp.data.AudioContent
+import com.glasskeep.app.nativeapp.readClipDurationMs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -679,6 +681,8 @@ private data class ClipKey(val id: String, val audioDataUrl: String)
 
 private val AudioClipDto.key: ClipKey get() = ClipKey(id, audioDataUrl)
 
+private val AudioClipDto.storedDurationMs: Int get() = ((duration ?: 0f) * 1000).toInt()
+
 /**
  * The hero's `<audio>` element (AudioPlayer.jsx): one clip at a time, its
  * position kept while paused and seekable before it ever played, back at
@@ -701,7 +705,24 @@ private class ClipPlayback(private val scope: CoroutineScope) {
     var failed by mutableStateOf(false)
         private set
 
+    private val headerDurations = mutableStateMapOf<ClipKey, Int>()
+
     fun owns(target: AudioClipDto): Boolean = clip == target.key
+
+    /** The player's own length once it has loaded the clip, else the stored
+     *  one, else what its header states (readMissingDuration). */
+    fun durationMs(target: AudioClipDto): Int {
+        if (owns(target) && loadedDurationMs > 0) return loadedDurationMs
+        return target.storedDurationMs.takeIf { it > 0 } ?: headerDurations[target.key] ?: 0
+    }
+
+    /** A clip with no stored length gets it from its header once, so the
+     *  time shows and the track seeks before the first play, as the web's
+     *  preload="metadata" does. */
+    suspend fun readMissingDuration(target: AudioClipDto) {
+        if (target.storedDurationMs > 0 || headerDurations.containsKey(target.key)) return
+        headerDurations[target.key] = readClipDurationMs(target.audioDataUrl)
+    }
 
     /** Starts over when [key] is not the clip this playback holds. */
     fun follow(key: ClipKey?) {
@@ -810,11 +831,8 @@ private fun AudioHeroPlayer(
 ) {
     val owned = playback.owns(clip)
     val playing = owned && playback.playing
-    val durationMs = if (owned && playback.loadedDurationMs > 0) {
-        playback.loadedDurationMs
-    } else {
-        ((clip.duration ?: 0f) * 1000).toInt()
-    }
+    LaunchedEffect(clip.key) { playback.readMissingDuration(clip) }
+    val durationMs = playback.durationMs(clip)
     var scrubRatio by remember(clip.key) { mutableStateOf<Float?>(null) }
     val positionMs = if (owned) playback.positionMs else 0
     val ratio = scrubRatio ?: if (durationMs > 0) positionMs.toFloat() / durationMs else 0f
