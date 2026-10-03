@@ -8,6 +8,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.animateDpAsState
@@ -69,7 +70,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -119,8 +119,9 @@ import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
@@ -429,12 +430,34 @@ fun NativeNotesListScreen(
     // but multi-select, like the web's canDrag = !multiMode: a filtered
     // view still swaps inside the full pinned/others group below, and the
     // archive and the trash reorder their own list.
-    // Unclipped window bounds per card (see ReorderableNoteCard), read by
-    // the drag to find the card under the finger - not State, nothing
-    // should recompose when they change.
-    val cardBounds = remember { mutableMapOf<String, Rect>() }
+    // Where each card is (see ReorderableNoteCard), read by the drag to find
+    // the card under the finger - not State, nothing should recompose when
+    // it changes.
+    val cardPositions = remember { CardPositions() }
     var draggedNoteId by remember { mutableStateOf<String?>(null) }
     var dragOverNoteId by remember { mutableStateOf<String?>(null) }
+    // .dragging and .drag-over (globalCSS.js:559-570), each eased over
+    // 150ms: one animation for the whole list, since a single card is held
+    // and a single one outlined at a time.
+    val heldDim = remember { Animatable(0f) }
+    var dimmedNoteId by remember { mutableStateOf<String?>(null) }
+    val dropOutline = remember { Animatable(0f) }
+    LaunchedEffect(draggedNoteId) {
+        val held = draggedNoteId
+        if (held != null) {
+            dimmedNoteId = held
+            heldDim.animateTo(1f, tween(150, easing = CssEase))
+        } else if (dimmedNoteId != null) {
+            heldDim.animateTo(0f, tween(150, easing = CssEase))
+            dimmedNoteId = null
+        }
+    }
+    LaunchedEffect(dragOverNoteId) {
+        if (dragOverNoteId != null) {
+            dropOutline.snapTo(0f)
+            dropOutline.animateTo(1f, tween(150, easing = CssEase))
+        }
+    }
     // The held finger's window Y, for the edge auto-scroll below.
     var dragPointerY by remember { mutableFloatStateOf(0f) }
 
@@ -447,9 +470,7 @@ fun NativeNotesListScreen(
     // useNoteTouchDrag.js): the outlined drop target.
     fun trackDrag(id: String, pointerInWindow: Offset) {
         dragPointerY = pointerInWindow.y
-        dragOverNoteId = cardBounds.entries.firstOrNull { (otherId, bounds) ->
-            otherId != id && bounds.contains(pointerInWindow)
-        }?.key
+        dragOverNoteId = cardPositions.cardAt(pointerInWindow, except = id)
     }
 
     // Web-equivalent swap semantics (see NotesRepository.reorderQueued's
@@ -1106,11 +1127,11 @@ fun NativeNotesListScreen(
                                     loadDetail = loadCardDetail,
                                     themeId = themeId,
                                     layout = layout,
-                                    isDragged = note.id == draggedNoteId,
+                                    dimmed = note.id == dimmedNoteId,
                                     isDragOver = note.id == dragOverNoteId,
-                                    onBoundsChanged = { bounds ->
-                                        if (bounds == null) cardBounds.remove(note.id) else cardBounds[note.id] = bounds
-                                    },
+                                    heldDim = heldDim,
+                                    dropOutline = dropOutline,
+                                    positions = cardPositions,
                                     onDragStart = { pointer ->
                                         NativeDebug.d("NativeNotesListScreen reorder: drag start ${note.id}")
                                         draggedNoteId = note.id
@@ -2521,15 +2542,33 @@ private val DropOutlineWidth = 2.5.dp
 private val DropOutlineOffset = 4.dp
 private val DropOutlineColor = Color(0xFF6366F1)
 
+/** Where the cards are in the window, by note id. Kept as layout
+ *  coordinates, which answer with the current scroll position when asked:
+ *  nothing is published while the page scrolls. */
+private class CardPositions {
+    private val coordinates = HashMap<String, LayoutCoordinates>()
+
+    fun place(id: String, at: LayoutCoordinates) {
+        coordinates[id] = at
+    }
+
+    /** The card under [pointerInWindow], except the held one's [except]. */
+    fun cardAt(pointerInWindow: Offset, except: String): String? {
+        coordinates.values.removeAll { !it.isAttached }
+        return coordinates.entries.firstOrNull { (id, at) ->
+            id != except && Rect(at.positionInWindow(), at.size.toSize()).contains(pointerInWindow)
+        }?.key
+    }
+}
+
 /** Wraps NoteCard with the touch reordering of the lists, leaving
  *  NoteCard itself untouched: the assistant's cited notes are plain
  *  NoteCards with no reorder concept, so the gesture plumbing has no
  *  business being on NoteCard itself.
  *
- *  Like the web, the held card stays in place, dimmed to 35% and 97%, and
- *  the card under the finger gets the dashed drop outline. The bounds
- *  reported up are the card's unclipped window bounds, dropped when the
- *  card leaves the list. */
+ *  Like the web, the held card stays in place, dimmed to 35% and 97% by
+ *  [heldDim], and the card under the finger gets the dashed drop outline
+ *  drawn by [dropOutline]. Only those two cards carry the extra drawing. */
 @Composable
 private fun ReorderableNoteCard(
     note: NoteEntity,
@@ -2545,44 +2584,27 @@ private fun ReorderableNoteCard(
     loadDetail: suspend (String) -> NoteDto?,
     themeId: String?,
     layout: NotesLayout,
-    isDragged: Boolean,
+    dimmed: Boolean,
     isDragOver: Boolean,
-    onBoundsChanged: (Rect?) -> Unit,
+    heldDim: Animatable<Float, AnimationVector1D>,
+    dropOutline: Animatable<Float, AnimationVector1D>,
+    positions: CardPositions,
     onDragStart: (Offset) -> Unit,
     onDragMove: (Offset) -> Unit,
     onDrop: () -> Unit,
     onDragCancel: () -> Unit,
 ) {
-    val currentOnBoundsChanged by rememberUpdatedState(onBoundsChanged)
     val currentOnDragStart by rememberUpdatedState(onDragStart)
     val currentOnDragMove by rememberUpdatedState(onDragMove)
     val currentOnDrop by rememberUpdatedState(onDrop)
     val currentOnDragCancel by rememberUpdatedState(onDragCancel)
-    DisposableEffect(note.id) { onDispose { currentOnBoundsChanged(null) } }
-    var windowOrigin by remember { mutableStateOf(Offset.Zero) }
-    val dimAlpha by animateFloatAsState(
-        targetValue = if (isDragged) 0.35f else 1f,
-        animationSpec = tween(150, easing = CssEase),
-        label = "dragAlpha",
-    )
-    val dimScale by animateFloatAsState(
-        targetValue = if (isDragged) 0.97f else 1f,
-        animationSpec = tween(150, easing = CssEase),
-        label = "dragScale",
-    )
-    val outline = remember { Animatable(0f) }
-    LaunchedEffect(isDragOver) {
-        if (isDragOver) {
-            outline.snapTo(0f)
-            outline.animateTo(1f, tween(150, easing = CssEase))
-        }
-    }
+    val coordinates = remember { CoordinatesHolder() }
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .onGloballyPositioned { coordinates ->
-                windowOrigin = coordinates.positionInWindow()
-                currentOnBoundsChanged(Rect(windowOrigin, coordinates.size.toSize()))
+            .onPlaced {
+                coordinates.value = it
+                positions.place(note.id, it)
             }
             .then(
                 if (selectionMode) {
@@ -2590,34 +2612,45 @@ private fun ReorderableNoteCard(
                 } else {
                     Modifier.pointerInput(note.id) {
                         detectNoteReorder(
-                            onStart = { position -> currentOnDragStart(windowOrigin + position) },
-                            onMove = { position -> currentOnDragMove(windowOrigin + position) },
+                            onStart = { position -> currentOnDragStart(coordinates.toWindow(position)) },
+                            onMove = { position -> currentOnDragMove(coordinates.toWindow(position)) },
                             onDrop = { currentOnDrop() },
                             onCancel = { currentOnDragCancel() },
                         )
                     }
                 },
             )
-            .drawWithContent {
-                drawContent()
+            .then(
                 if (isDragOver) {
-                    val progress = outline.value
-                    val width = DropOutlineWidth.toPx()
-                    val inset = DropOutlineOffset.toPx() * progress + width / 2f
-                    drawRoundRect(
-                        color = lerp(titleColor, DropOutlineColor, progress),
-                        topLeft = Offset(-inset, -inset),
-                        size = Size(size.width + 2 * inset, size.height + 2 * inset),
-                        cornerRadius = CornerRadius(12.dp.toPx() + inset),
-                        style = Stroke(width = width, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * width, 2 * width))),
-                    )
-                }
-            }
-            .graphicsLayer {
-                alpha = dimAlpha
-                scaleX = dimScale
-                scaleY = dimScale
-            },
+                    Modifier.drawWithContent {
+                        drawContent()
+                        val progress = dropOutline.value
+                        val width = DropOutlineWidth.toPx()
+                        val inset = DropOutlineOffset.toPx() * progress + width / 2f
+                        drawRoundRect(
+                            color = lerp(titleColor, DropOutlineColor, progress),
+                            topLeft = Offset(-inset, -inset),
+                            size = Size(size.width + 2 * inset, size.height + 2 * inset),
+                            cornerRadius = CornerRadius(12.dp.toPx() + inset),
+                            style = Stroke(width = width, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * width, 2 * width))),
+                        )
+                    }
+                } else {
+                    Modifier
+                },
+            )
+            .then(
+                if (dimmed) {
+                    Modifier.graphicsLayer {
+                        val progress = heldDim.value
+                        alpha = 1f - 0.65f * progress
+                        scaleX = 1f - 0.03f * progress
+                        scaleY = 1f - 0.03f * progress
+                    }
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         NoteCard(
             note = note,
@@ -2636,6 +2669,10 @@ private fun ReorderableNoteCard(
         )
     }
 }
+
+/** [local], a position inside the card, in the window's coordinates. */
+private fun CoordinatesHolder.toWindow(local: Offset): Offset =
+    value?.takeIf { it.isAttached }?.localToWindow(local) ?: local
 
 /**
  * useNoteTouchDrag.js's gesture. The first 300ms are only watched: a
@@ -2719,6 +2756,21 @@ private class NoteCardsShown {
     }
 }
 
+/** [fadeIn] as the card first composes: noteAppear's 150ms (globalCSS.js:589-592).
+ *  A card that does not fade has no animation and no layer, and one that has
+ *  faded drops both. */
+@Composable
+private fun rememberFadeIn(fadeIn: Boolean): Modifier {
+    var fading by remember { mutableStateOf(fadeIn) }
+    if (!fading) return Modifier
+    val appear = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        appear.animateTo(1f, tween(150, easing = EaseOut))
+        fading = false
+    }
+    return Modifier.graphicsLayer { alpha = appear.value }
+}
+
 /** One note's card; with [fadeIn] it fades in over 150ms. */
 @Composable
 private fun NoteCard(
@@ -2746,16 +2798,13 @@ private fun NoteCard(
     val collaborators = detail?.collaborators.orEmpty()
     val showCollaborators = detail != null && (collaborators.isNotEmpty() || detail?.access != "owner")
     val shape = RoundedCornerShape(12.dp)
-    val appear = remember { Animatable(if (fadeIn) 0f else 1f) }
-    LaunchedEffect(appear) { appear.animateTo(1f, tween(150, easing = EaseOut)) }
-    Box(Modifier.fillMaxWidth().graphicsLayer { alpha = appear.value }) {
+    Box(Modifier.fillMaxWidth().then(rememberFadeIn(fadeIn))) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 // min-h-[54px] on .note-card (NoteCard.jsx:218): an almost
                 // empty note still reads as a card rather than a text line.
                 .heightIn(min = 54.dp)
-                .shadow(elevation = 2.dp, shape = shape, ambientColor = CardShadowTint.copy(alpha = 0.06f), spotColor = CardShadowTint.copy(alpha = 0.06f))
                 .clip(shape)
                 .background(noteColorFor(note.color, dark))
                 .border(width = 1.dp, color = borderColor, shape = shape)
