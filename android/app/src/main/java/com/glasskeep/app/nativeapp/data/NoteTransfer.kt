@@ -66,9 +66,10 @@ object NoteTransfer {
 
     /**
      * A GlassKeep .json export. Text notes whose `content` is still the
-     * Markdown of an older export are upgraded to the rich envelope, the
-     * way ensureRichContent() does, so an old backup comes back as
-     * first-class rich notes; every other field passes through untouched.
+     * Markdown of an older export, or missing, are upgraded to the rich
+     * envelope, the way ensureRichContent() does, so an old backup comes
+     * back as first-class rich notes; every other field passes through
+     * untouched.
      */
     fun readGlassKeepExport(raw: String): ImportPayload? {
         val root = runCatching { json.parseToJsonElement(raw) }.getOrNull() ?: return null
@@ -81,12 +82,12 @@ object NoteTransfer {
             for (element in notes) {
                 val note = element as? JsonObject ?: continue
                 val type = note["type"]?.jsonPrimitive?.contentOrNull
-                val content = note["content"]?.jsonPrimitive?.contentOrNull
-                if (type != "text" || content == null || NoteContent.parseRichDoc(content) != null) {
+                val content = (note["content"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                if (type != "text" || (content != null && NoteContent.parseRichDoc(content) != null)) {
                     add(note)
                     continue
                 }
-                add(JsonObject(note + ("content" to JsonPrimitive(richFromMarkdown(content)))))
+                add(JsonObject(note + ("content" to JsonPrimitive(richFromMarkdown(content.orEmpty())))))
             }
         }
         return ImportPayload(upgraded, notes.size)
@@ -99,7 +100,7 @@ object NoteTransfer {
      */
     fun readGoogleKeep(context: Context, uris: List<Uri>): ImportPayload {
         val jsonFiles = mutableListOf<String>()
-        val imagesByName = mutableMapOf<String, ByteArray>()
+        val imagesByName = mutableMapOf<String, KeepImage>()
         for (uri in uris) {
             val name = displayName(context, uri).orEmpty()
             when {
@@ -107,7 +108,7 @@ object NoteTransfer {
                 name.endsWith(".json", ignoreCase = true) ->
                     readBytes(context, uri)?.let { jsonFiles.add(it.decodeToString()) }
                 IMAGE_EXTENSIONS.containsMatchIn(name) ->
-                    readBytes(context, uri)?.let { imagesByName[name.lowercase()] = it }
+                    readBytes(context, uri)?.let { imagesByName[name.lowercase()] = KeepImage(name, it) }
             }
         }
         val notes = buildJsonArray {
@@ -169,7 +170,10 @@ object NoteTransfer {
 
     fun secretKeyFilename(): String = "glass-keep-secret-key-${fileTimestamp()}.txt"
 
-    private fun keepNote(text: String, imagesByName: Map<String, ByteArray>): JsonObject? {
+    /** An image file of a Keep selection, under the name it came with. */
+    private class KeepImage(val name: String, val bytes: ByteArray)
+
+    private fun keepNote(text: String, imagesByName: Map<String, KeepImage>): JsonObject? {
         val obj = runCatching { json.parseToJsonElement(text) }.getOrNull() as? JsonObject ?: return null
         // Soft filter: a Takeout .zip also carries JSON from Drive,
         // Calendar and the rest. Only what looks like a Keep note is read.
@@ -205,13 +209,13 @@ object NoteTransfer {
             for (attachment in (obj["attachments"] as? JsonArray).orEmpty()) {
                 val path = (attachment as? JsonObject)?.get("filePath")?.jsonPrimitive?.contentOrNull ?: continue
                 val base = path.substringAfterLast('/').lowercase()
-                val bytes = imagesByName[base] ?: continue
-                val src = ImageCompression.compressToDataUrl(bytes) ?: continue
+                val image = imagesByName[base] ?: continue
+                val src = ImageCompression.compressToDataUrl(image.bytes) ?: continue
                 add(
                     buildJsonObject {
                         put("id", UUID.randomUUID().toString())
                         put("src", src)
-                        put("name", base)
+                        put("name", image.name)
                     },
                 )
             }
@@ -270,7 +274,7 @@ object NoteTransfer {
         context: Context,
         uri: Uri,
         jsonFiles: MutableList<String>,
-        imagesByName: MutableMap<String, ByteArray>,
+        imagesByName: MutableMap<String, KeepImage>,
     ) {
         try {
             context.contentResolver.openInputStream(uri)?.use { stream ->
@@ -282,7 +286,7 @@ object NoteTransfer {
                             val lower = name.lowercase()
                             when {
                                 lower.endsWith(".json") -> jsonFiles.add(zip.readBytes().decodeToString())
-                                IMAGE_EXTENSIONS.containsMatchIn(lower) -> imagesByName[lower] = zip.readBytes()
+                                IMAGE_EXTENSIONS.containsMatchIn(lower) -> imagesByName[lower] = KeepImage(name, zip.readBytes())
                             }
                         }
                         zip.closeEntry()
