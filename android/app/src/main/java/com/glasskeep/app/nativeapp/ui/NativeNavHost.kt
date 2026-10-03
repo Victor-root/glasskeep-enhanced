@@ -67,6 +67,7 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.SyncErrorKind
 import com.glasskeep.app.nativeapp.data.FederationEvent
 import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
@@ -79,8 +80,10 @@ import com.glasskeep.app.nativeapp.data.renewSessionTokenIfStale
 import com.glasskeep.app.nativeapp.restartApp
 import com.glasskeep.app.nativeapp.syncErrorKindOf
 import com.glasskeep.app.nativeapp.syncReminderAlarms
+import com.glasskeep.app.nativeapp.watchNetworkLoss
 import com.glasskeep.app.reminders.ReminderSyncWorker
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -252,20 +255,36 @@ fun NativeNavHost(
     LaunchedEffect(Unit) {
         SyncQueueWorker.draining.collect { container.syncStatus.markDraining(it) }
     }
+    // The platform's own word that the connection is gone, as the browser's
+    // offline event is for the web: no waiting for the next probe.
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            val stopWatching = watchNetworkLoss(context) { container.syncStatus.recordUnreachable(SyncErrorKind.UNREACHABLE) }
+            try {
+                awaitCancellation()
+            } finally {
+                stopWatching()
+            }
+        }
+    }
     LaunchedEffect(lifecycleOwner, lockPokes) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            var consecutiveTimeouts = 0
             while (true) {
                 val outcome = runCatching { container.api(serverUrl).instanceStatus() }
                 val body = outcome.getOrNull()?.takeIf { it.isSuccessful }?.body()
                 if (body != null) {
+                    consecutiveTimeouts = 0
                     container.lockState.apply(body)
                     val wasReachable = container.syncStatus.serverReachable == true
                     container.syncStatus.recordReachable()
                     sendQueueAfterHealthyCheck(context, repository, queueWaiting = !wasReachable || pendingSyncIds.isNotEmpty())
                 } else {
-                    container.syncStatus.recordUnreachable(
-                        syncErrorKindOf(outcome.exceptionOrNull(), outcome.getOrNull()?.code()),
-                    )
+                    val kind = syncErrorKindOf(outcome.exceptionOrNull(), outcome.getOrNull()?.code())
+                    consecutiveTimeouts = if (kind == SyncErrorKind.TIMEOUT) consecutiveTimeouts + 1 else 0
+                    // A first timeout alone is a slow answer, not an outage
+                    // (syncEngine.js:566-575): the second one counts.
+                    if (consecutiveTimeouts != 1) container.syncStatus.recordUnreachable(kind)
                 }
                 delay(
                     when {
