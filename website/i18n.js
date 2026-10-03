@@ -13,6 +13,7 @@ window.GK_I18N = {
     "nav.platforms": "Platforms",
     "nav.install": "Install",
     "nav.migrate": "Import",
+    "nav.sso": "SSO",
     "nav.langLabel": "Switch to French",
     "nav.modeLabel": "Toggle dark mode",
     "nav.modeLabelSystem": "Following system theme (click for light mode)",
@@ -62,6 +63,7 @@ window.GK_I18N = {
     "f3.body": "Optional at-rest encryption keeps note content unreadable in the database. Sign in with passkeys (fingerprint, face, or a hardware key) on desktop and Android alike.",
     "f3.c1": "At-rest encryption",
     "f3.c2": "Passkeys",
+    "f3.c3": "Single sign-on",
 
     "f4.title": "Every kind of note",
     "f4.body": "Rich text with live formatting, checklists with sections, freehand drawings, images and audio notes, all in one place.",
@@ -143,6 +145,7 @@ window.GK_I18N = {
     "footer.l1": "Repository",
     "footer.l2": "Releases",
     "footer.l3": "Discussions",
+    "footer.l4": "SSO guide",
 
     "lightbox.close": "Close",
     "lightbox.prev": "Previous screenshot",
@@ -159,6 +162,7 @@ window.GK_I18N = {
     "nav.platforms": "Plateformes",
     "nav.install": "Installation",
     "nav.migrate": "Import",
+    "nav.sso": "SSO",
     "nav.langLabel": "Passer en anglais",
     "nav.modeLabel": "Basculer le mode sombre",
     "nav.modeLabelSystem": "Suit le thème du système (cliquer pour le mode clair)",
@@ -208,6 +212,7 @@ window.GK_I18N = {
     "f3.body": "Le chiffrement au repos optionnel rend le contenu des notes illisible dans la base. Connectez-vous avec des passkeys (empreinte, visage ou clé physique), sur ordinateur comme sur Android.",
     "f3.c1": "Chiffrement au repos",
     "f3.c2": "Passkeys",
+    "f3.c3": "Authentification unique (SSO)",
 
     "f4.title": "Tous les types de notes",
     "f4.body": "Texte enrichi avec mise en forme en direct, listes à cocher avec sections, dessins à main levée, images et notes audio, le tout au même endroit.",
@@ -289,6 +294,7 @@ window.GK_I18N = {
     "footer.l1": "Dépôt",
     "footer.l2": "Versions",
     "footer.l3": "Discussions",
+    "footer.l4": "Guide SSO",
 
     "lightbox.close": "Fermer",
     "lightbox.prev": "Capture précédente",

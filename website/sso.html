@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="glasskeep" data-mode="light" data-title-key="sso.meta.title" data-desc-key="sso.meta.desc">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GlassKeep: Single sign-on setup guide</title>
+<meta name="description" content="Set up OpenID Connect sign-in in GlassKeep with Authentik, Keycloak or Authelia: the exact values, annotated screenshots and troubleshooting." />
+<meta name="theme-color" content="#6366f1" />
+
+<meta property="og:type" content="website" />
+<meta property="og:title" content="GlassKeep: Single sign-on setup guide" />
+<meta property="og:description" content="Set up OpenID Connect sign-in in GlassKeep with Authentik, Keycloak or Authelia: the exact values, annotated screenshots and troubleshooting." />
+<meta property="og:url" content="https://victor-root.github.io/glasskeep-enhanced/sso.html" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="assets/logo.png" />
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+<meta property="og:image" content="assets/logo.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body class="guide">
+
+<div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+
+<nav class="nav glass" id="nav">
+  <a class="brand" href="index.html">
+    <img class="brand-mark" src="assets/logo.png" alt="" width="32" height="32" />
+    GlassKeep
+  </a>
+  <div class="nav-links">
+    <a href="#overview" data-i18n="sso.nav.overview">Overview</a>
+    <a href="#setup" data-i18n="sso.nav.setup">Setup</a>
+    <a href="#providers" data-i18n="sso.nav.providers">Providers</a>
+    <a href="#help" data-i18n="sso.nav.help">Troubleshooting</a>
+  </div>
+  <div class="nav-actions">
+    <button class="lang-btn" id="langToggle" data-i18n-attr="aria-label:nav.langLabel" aria-label="Change language">
+      <span id="langCurrent">EN</span>
+    </button>
+    <button class="icon-btn" id="modeToggle" data-i18n-attr="aria-label:nav.modeLabel;title:nav.modeLabel" aria-label="Toggle dark mode" title="Toggle dark mode">
+      <svg id="modeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/></svg>
+    </button>
+    <a class="btn btn-primary nav-gh" href="https://github.com/Victor-root/glasskeep-enhanced" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.8 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.8-1.5-3.8-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.7 2.7 1.2 3.4.9.1-.7.4-1.2.7-1.5-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C17.5 4.4 18.5 4.7 18.5 4.7c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.5-1.5 7.8-5.8 7.8-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+      <span class="gh-label">GitHub</span>
+    </a>
+  </div>
+</nav>
+
+<header class="hero guide-hero" id="top">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow" data-i18n="sso.hero.eyebrow">Guide · Single sign-on</span>
+      <h1 data-i18n-html="sso.hero.title">Sign in with<br /><span class="grad-text">your own provider.</span></h1>
+      <p class="hero-sub" data-i18n="sso.hero.sub">GlassKeep works with any OpenID Connect provider. An administrator allows it once; each user then declares their own provider in their settings, links their account to it and signs in through it. This guide covers Authentik, Keycloak and Authelia, with the exact values to enter on both sides.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#setup"><span data-i18n="sso.hero.cta1">Start the setup</span></a>
+        <a class="btn btn-ghost" href="#help" data-i18n="sso.hero.cta2">Troubleshooting</a>
+      </div>
+      <div class="hero-meta">
+        <span><svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"/><path d="M11 11a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 12l0 2.5"/></svg><span data-i18n="sso.hero.meta1">Authorization Code with PKCE</span></span>
+        <span><svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11m0 2a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z"/><path d="M12 16m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg><span data-i18n="sso.hero.meta2">Client secret never leaves the server</span></span>
+        <span><svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M11.5 3a17 17 0 0 0 0 18"/><path d="M12.5 3a17 17 0 0 1 0 18"/></svg><span data-i18n="sso.hero.meta3">Any standard OIDC provider</span></span>
+      </div>
+    </div>
+    <div class="hero-shot"><div class="shot">
+<div class="shot-bar"><span class="shot-title" data-i18n="sso.bar.login">GlassKeep · Sign in</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light l-en" src="assets/sso/gk-login-en.webp" alt="The login screen with the Sign in with my provider button opened on its identifier field" width="600" height="560" decoding="async" data-i18n-attr="alt:sso.s4.alt" />
+<img class="shot-dark l-en" src="assets/sso/gk-login-en-dark.webp" alt="The login screen with the Sign in with my provider button opened on its identifier field" width="600" height="560" decoding="async" data-i18n-attr="alt:sso.s4.alt" />
+<img class="shot-light l-fr" src="assets/sso/gk-login-fr.webp" alt="The login screen with the Sign in with my provider button opened on its identifier field" width="600" height="560" decoding="async" data-i18n-attr="alt:sso.s4.alt" />
+<img class="shot-dark l-fr" src="assets/sso/gk-login-fr-dark.webp" alt="The login screen with the Sign in with my provider button opened on its identifier field" width="600" height="560" decoding="async" data-i18n-attr="alt:sso.s4.alt" />
+</div></div></div>
+  </div>
+</header>
+
+<section id="overview">
+  <div class="wrap">
+    <div class="section-head reveal"><span class="eyebrow" data-i18n="sso.over.eyebrow">Overview</span><h2 data-i18n-html="sso.over.title">Three steps,<br /><span class="grad-text">two sides.</span></h2><p class="section-lead" data-i18n-html="sso.over.lead">Single sign-on involves GlassKeep and your identity provider. The order below avoids going back and forth between the two.</p></div>
+    <div class="flows"><article class="flow glass reveal"><span class="flow-num">1</span><h3 data-i18n="sso.flow1.t">Allow it</h3><p data-i18n="sso.flow1.b">An administrator turns on Allow single sign-on in the admin panel. There is nothing else to configure at instance level.</p></article><article class="flow glass reveal"><span class="flow-num">2</span><h3 data-i18n="sso.flow2.t">Declare your provider</h3><p data-i18n="sso.flow2.b">In Settings, Security, enter the provider's issuer, client ID and client secret. Then link your account by signing in at the provider once.</p></article><article class="flow glass reveal"><span class="flow-num">3</span><h3 data-i18n="sso.flow3.t">Sign in</h3><p data-i18n="sso.flow3.b">On the login screen, choose Sign in with my provider, give your GlassKeep username or email and authenticate at the provider.</p></article></div>
+    <div class="before glass reveal">
+      <h3 data-i18n="sso.before.title">Four things to have in place</h3>
+      <div class="before-grid"><div class="before-item reveal"><span class="before-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div><h4 data-i18n="sso.b1.t">GlassKeep served over HTTPS</h4><p data-i18n="sso.b1.b">Most providers refuse a plain http redirect address, and credentials would otherwise travel unencrypted.</p></div></div><div class="before-item reveal"><span class="before-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div><h4 data-i18n="sso.b2.t">Configuration from the address your users use</h4><p data-i18n="sso.b2.b">GlassKeep reads its own public address from the page you are on. Open it at your domain, not at a local IP, before filling in the form.</p></div></div><div class="before-item reveal"><span class="before-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div><h4 data-i18n="sso.b3.t">A provider reachable from the GlassKeep server</h4><p data-i18n="sso.b3.b">Not only from your browser. For an account that is not an administrator, the provider must also sit on a public address: the server refuses to connect to a local network address on a user's behalf.</p></div></div><div class="before-item reveal"><span class="before-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div><h4 data-i18n="sso.b4.t">A provider opens only the account that linked it</h4><p data-i18n="sso.b4.b">Identities are matched on issuer and subject, never on e-mail. A provider cannot create accounts or grant any right.</p></div></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="setup" class="setup">
+  <div class="wrap"><div class="section-head reveal"><span class="eyebrow" data-i18n="sso.setup.eyebrow">Setup</span><h2 data-i18n-html="sso.setup.title">From zero to <span class="grad-text">signed in.</span></h2></div></div>
+<section class="stage" id="allow">
+  <div class="wrap">
+    <div class="stage-head reveal">
+      <span class="stage-num">1</span>
+      <div><h2 class="stage-title" data-i18n="sso.s1.title">Allow single sign-on</h2><p class="stage-lead" data-i18n="sso.s1.lead">Administrators only. The switch is in the admin panel, under Login page settings. Turning it off hides the button and stops every provider sign-in; each user's configuration is kept for when it comes back.</p></div>
+    </div>
+<div class="stage-fig reveal"><div class="shot">
+<div class="shot-bar"><span class="shot-title" data-i18n="sso.bar.admin">GlassKeep · Admin panel</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light l-en" src="assets/sso/gk-admin-switch-en.webp" alt="The admin panel with the Allow single sign-on switch turned on" width="512" height="250" loading="lazy" decoding="async" data-i18n-attr="alt:sso.s1.alt" />
+<img class="shot-dark l-en" src="assets/sso/gk-admin-switch-en-dark.webp" alt="The admin panel with the Allow single sign-on switch turned on" width="512" height="250" loading="lazy" decoding="async" data-i18n-attr="alt:sso.s1.alt" />
+<img class="shot-light l-fr" src="assets/sso/gk-admin-switch-fr.webp" alt="The admin panel with the Allow single sign-on switch turned on" width="512" height="250" loading="lazy" decoding="async" data-i18n-attr="alt:sso.s1.alt" />
+<img class="shot-dark l-fr" src="assets/sso/gk-admin-switch-fr-dark.webp" alt="The admin panel with the Allow single sign-on switch turned on" width="512" height="250" loading="lazy" decoding="async" data-i18n-attr="alt:sso.s1.alt" />
+</div></div></div>
+  </div>
+</section>
+<section class="stage" id="provider">
+  <div class="wrap">
+    <div class="stage-head reveal">
+      <span class="stage-num">2</span>
+      <div><h2 class="stage-title" data-i18n="sso.s2.title">Create the application at your provider</h2><p class="stage-lead" data-i18n="sso.s2.lead">Pick your provider below. Whatever it is, the application needs the values in this table, and you bring back three things: the issuer URL, the client ID and the client secret.</p></div>
+    </div>
+<div class="spec glass reveal"><dl><div class="spec-row"><dt data-i18n="sso.spec.type">Client type</dt><dd><span data-i18n="sso.spec.typev">Confidential (the application has a client secret)</span></dd></div><div class="spec-row"><dt data-i18n="sso.spec.grant">Grant</dt><dd><span data-i18n="sso.spec.grantv">Authorization Code only</span></dd></div><div class="spec-row"><dt data-i18n="sso.spec.redirect">Redirect URI</dt><dd><span data-i18n="sso.spec.redirectv">Shown, with a copy button, in GlassKeep's settings. It must match at the provider character for character.</span></dd></div><div class="spec-row"><dt data-i18n="sso.spec.scopes">Scopes</dt><dd><span><span class="copy-chip" data-copy="openid profile email" role="button" tabindex="0">openid</span> <span class="copy-chip" data-copy="openid profile email" role="button" tabindex="0">profile</span> <span class="copy-chip" data-copy="openid profile email" role="button" tabindex="0">email</span></span></dd></div><div class="spec-row"><dt data-i18n="sso.spec.pkce">PKCE</dt><dd><span data-i18n="sso.spec.pkcev">S256. GlassKeep always sends it; enforce it at the provider when the option exists.</span></dd></div><div class="spec-row"><dt data-i18n="sso.spec.sign">ID token signature</dt><dd><span data-i18n="sso.spec.signv">Asymmetric (RS256 or similar), verified against the provider's published keys.</span></dd></div></dl></div>
+    <div class="tabs reveal" id="providers">
+      <div class="tablist" role="tablist" aria-label="Identity provider" data-i18n-attr="aria-label:sso.tabs.label"><button class="tab" role="tab" id="tab-ak" aria-controls="panel-ak" data-tab="ak" data-hash="authentik" aria-selected="true" tabindex="0"><span class="tab-name">Authentik</span><span class="tab-sub" data-i18n="sso.tab.akd">Admin interface</span></button><button class="tab" role="tab" id="tab-kc" aria-controls="panel-kc" data-tab="kc" data-hash="keycloak" aria-selected="false" tabindex="-1"><span class="tab-name">Keycloak</span><span class="tab-sub" data-i18n="sso.tab.kcd">Admin console</span></button><button class="tab" role="tab" id="tab-au" aria-controls="panel-au" data-tab="au" data-hash="authelia" aria-selected="false" tabindex="-1"><span class="tab-name">Authelia</span><span class="tab-sub" data-i18n="sso.tab.aud">Configuration file</span></button></div>
+    </div>
+    <div class="tab-panel" role="tabpanel" id="panel-ak" aria-labelledby="tab-ak" tabindex="0">
+  <p class="panel-note" data-i18n-html="sso.ak.note">Written against authentik 2026.8. Labels can differ slightly on other versions.</p>
+  <div class="steps">
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">1</span><h4 data-i18n="sso.ak.s1.t">Start a new application</h4></div>
+  <p data-i18n-html="sso.ak.s1.b">In the admin interface, open Applications, Applications and choose New Application. Name it GlassKeep. The slug becomes part of the issuer URL, so keep <code>glasskeep</code>.</p>
+  <div class="step-fig"><div class="shot">
+<div class="shot-bar"><span class="shot-title">authentik</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/ak-2-app.webp" alt="authentik wizard, step 1: application name GlassKeep and slug glasskeep" width="1120" height="793" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.s1.alt" />
+<img class="shot-dark" src="assets/sso/ak-2-app-dark.webp" alt="authentik wizard, step 1: application name GlassKeep and slug glasskeep" width="1120" height="793" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.s1.alt" />
+</div></div></div>
+</article>
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">2</span><h4 data-i18n="sso.ak.s2.t">Choose OAuth2/OpenID Provider</h4></div>
+  <p data-i18n-html="sso.ak.s2.b">GlassKeep speaks standard OpenID Connect, so the generic provider type is the right one.</p>
+  <div class="step-fig"><div class="shot">
+<div class="shot-bar"><span class="shot-title">authentik</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/ak-3-type.webp" alt="authentik wizard, step 2: the OAuth2/OpenID Provider type selected" width="1120" height="793" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.s2.alt" />
+<img class="shot-dark" src="assets/sso/ak-3-type-dark.webp" alt="authentik wizard, step 2: the OAuth2/OpenID Provider type selected" width="1120" height="793" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.s2.alt" />
+</div></div></div>
+</article>
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">3</span><h4 data-i18n="sso.ak.s3.t">Configure the provider</h4></div>
+  <p data-i18n-html="sso.ak.s3.b">Pick an authorization flow: <code>implicit-consent</code> signs users straight in, <code>explicit-consent</code> asks them to approve each time. Leave the client type on Confidential. authentik generates the client ID and the client secret on this page: copy both.</p>
+  <div class="step-fig"><div class="shot">
+<div class="shot-bar"><span class="shot-title">authentik</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/ak-4-provider.webp" alt="authentik wizard, step 3: provider name, authorization flow, confidential client type, generated client ID and secret" width="1120" height="793" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.s3.alt" />
+<img class="shot-dark" src="assets/sso/ak-4-provider-dark.webp" alt="authentik wizard, step 3: provider name, authorization flow, confidential client type, generated client ID and secret" width="1120" height="793" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.s3.alt" />
+</div></div></div>
+</article>
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">4</span><h4 data-i18n="sso.ak.s4.t">Restrict the grants and add the redirect URI</h4></div>
+  <p data-i18n-html="sso.ak.s4.b">authentik enables several grant types by default; keep Authorization Code only. Add one redirect entry in Strict mode with the type Authorization and GlassKeep's callback address. The signing key defaults to the self-signed certificate, which gives RS256.</p>
+  <div class="step-fig"><div class="shot">
+<div class="shot-bar"><span class="shot-title">authentik</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/ak-5-redirect.webp" alt="authentik wizard: only Authorization Code checked, and a strict authorization redirect URI" width="1120" height="793" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.s4.alt" />
+<img class="shot-dark" src="assets/sso/ak-5-redirect-dark.webp" alt="authentik wizard: only Authorization Code checked, and a strict authorization redirect URI" width="1120" height="793" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.s4.alt" />
+</div></div></div>
+</article>
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">5</span><h4 data-i18n="sso.ak.s5.t">Create it and read the issuer</h4></div>
+  <p data-i18n-html="sso.ak.s5.b">Finish the wizard with Create Application, then open Applications, Providers and the provider you just made. Copy OpenID Configuration Issuer exactly as shown, trailing slash included.</p>
+  <div class="step-fig"><div class="shot">
+<div class="shot-bar"><span class="shot-title">authentik</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/ak-10-provider.webp" alt="authentik provider page showing the OpenID Configuration Issuer" width="1110" height="600" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.s5.alt" />
+<img class="shot-dark" src="assets/sso/ak-10-provider-dark.webp" alt="authentik provider page showing the OpenID Configuration Issuer" width="1110" height="600" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.s5.alt" />
+</div></div></div>
+</article>
+  </div>
+  <div class="optional glass reveal">
+  <h4 data-i18n="sso.ak.opt.t">Optional: choose who can use the application</h4>
+  <p data-i18n-html="sso.ak.opt.b">With no binding, every authentik user can authenticate to the application. That does not weaken GlassKeep, which only opens the account that linked an identity, but you may prefer to list the application for specific people. Open the application, Policy / Group / User Bindings, Create or bind. Click Bind a user (or Bind a group) and the wizard moves on; select the user or group and choose Create.</p>
+  <div class="optional-figs"><div class="shot">
+<div class="shot-bar"><span class="shot-title">authentik</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/ak-12-bind-type.webp" alt="authentik binding wizard with the Bind a user, Bind a group and Bind an existing policy options" width="1120" height="793" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.opt.alt1" />
+<img class="shot-dark" src="assets/sso/ak-12-bind-type-dark.webp" alt="authentik binding wizard with the Bind a user, Bind a group and Bind an existing policy options" width="1120" height="793" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.opt.alt1" />
+</div></div><div class="shot">
+<div class="shot-bar"><span class="shot-title">authentik</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/ak-13-bind-user.webp" alt="authentik binding wizard with a user selected" width="1120" height="793" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.opt.alt2" />
+<img class="shot-dark" src="assets/sso/ak-13-bind-user-dark.webp" alt="authentik binding wizard with a user selected" width="1120" height="793" loading="lazy" decoding="async" data-i18n-attr="alt:sso.ak.opt.alt2" />
+</div></div></div>
+</div>
+  <div class="take glass"><h4 data-i18n="sso.take.title">What to take back to GlassKeep</h4><ul><li><span class="take-k" data-i18n="sso.take.issuer">Issuer URL</span><span class="take-v" data-i18n="sso.take.ak.issuer">Provider page, step 5</span></li><li><span class="take-k" data-i18n="sso.take.id">Client ID</span><span class="take-v" data-i18n="sso.take.ak.id">Step 3 of the wizard</span></li><li><span class="take-k" data-i18n="sso.take.secret">Client secret</span><span class="take-v" data-i18n="sso.take.ak.secret">Step 3 of the wizard</span></li></ul></div>
+</div>
+<div class="tab-panel" role="tabpanel" id="panel-kc" aria-labelledby="tab-kc" tabindex="0">
+  <p class="panel-note" data-i18n-html="sso.kc.note">Written against Keycloak 26. The steps are the same on recent versions.</p>
+  <div class="steps">
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">1</span><h4 data-i18n="sso.kc.s1.t">Create a realm</h4></div>
+  <p data-i18n-html="sso.kc.s1.b">Use an existing realm or create a dedicated one: Manage realms, Create realm. The realm name is part of the issuer URL (here <code>home</code>).</p>
+  <div class="step-fig"><div class="shot">
+<div class="shot-bar"><span class="shot-title">Keycloak</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/kc-1-realm.webp" alt="Keycloak Create realm dialog with the name home" width="860" height="606" loading="lazy" decoding="async" data-i18n-attr="alt:sso.kc.s1.alt" />
+<img class="shot-dark" src="assets/sso/kc-1-realm-dark.webp" alt="Keycloak Create realm dialog with the name home" width="860" height="606" loading="lazy" decoding="async" data-i18n-attr="alt:sso.kc.s1.alt" />
+</div></div></div>
+</article>
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">2</span><h4 data-i18n="sso.kc.s2.t">Create the client</h4></div>
+  <p data-i18n-html="sso.kc.s2.b">In the realm, open Clients and choose Create client. Client type OpenID Connect, client ID <code>glasskeep</code>.</p>
+  <div class="step-fig"><div class="shot">
+<div class="shot-bar"><span class="shot-title">Keycloak</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/kc-2-general.webp" alt="Keycloak Create client, general settings: OpenID Connect, client ID glasskeep" width="1110" height="490" loading="lazy" decoding="async" data-i18n-attr="alt:sso.kc.s2.alt" />
+<img class="shot-dark" src="assets/sso/kc-2-general-dark.webp" alt="Keycloak Create client, general settings: OpenID Connect, client ID glasskeep" width="1110" height="490" loading="lazy" decoding="async" data-i18n-attr="alt:sso.kc.s2.alt" />
+</div></div></div>
+</article>
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">3</span><h4 data-i18n="sso.kc.s3.t">Capability config</h4></div>
+  <p data-i18n-html="sso.kc.s3.b">Turn Client authentication on: this makes the client confidential and generates a secret. Keep Standard flow checked and Direct access grants unchecked. Turn Require PKCE on, with the S256 method.</p>
+  <div class="step-fig"><div class="shot">
+<div class="shot-bar"><span class="shot-title">Keycloak</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/kc-3-capability.webp" alt="Keycloak capability config: client authentication on, standard flow only, PKCE S256 required" width="1110" height="595" loading="lazy" decoding="async" data-i18n-attr="alt:sso.kc.s3.alt" />
+<img class="shot-dark" src="assets/sso/kc-3-capability-dark.webp" alt="Keycloak capability config: client authentication on, standard flow only, PKCE S256 required" width="1110" height="595" loading="lazy" decoding="async" data-i18n-attr="alt:sso.kc.s3.alt" />
+</div></div></div>
+</article>
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">4</span><h4 data-i18n="sso.kc.s4.t">Login settings</h4></div>
+  <p data-i18n-html="sso.kc.s4.b">Set Root URL and Home URL to GlassKeep's address and add GlassKeep's callback address to Valid redirect URIs, then save.</p>
+  <div class="step-fig"><div class="shot">
+<div class="shot-bar"><span class="shot-title">Keycloak</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/kc-4-login.webp" alt="Keycloak login settings with the GlassKeep callback as a valid redirect URI" width="1110" height="495" loading="lazy" decoding="async" data-i18n-attr="alt:sso.kc.s4.alt" />
+<img class="shot-dark" src="assets/sso/kc-4-login-dark.webp" alt="Keycloak login settings with the GlassKeep callback as a valid redirect URI" width="1110" height="495" loading="lazy" decoding="async" data-i18n-attr="alt:sso.kc.s4.alt" />
+</div></div></div>
+</article>
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">5</span><h4 data-i18n="sso.kc.s5.t">Copy the client secret</h4></div>
+  <p data-i18n-html="sso.kc.s5.b">Open the client, then the Credentials tab. Copy the Client Secret; the eye icon reveals it.</p>
+  <div class="step-fig"><div class="shot">
+<div class="shot-bar"><span class="shot-title">Keycloak</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/kc-5-credentials.webp" alt="Keycloak client Credentials tab with the masked client secret" width="1110" height="550" loading="lazy" decoding="async" data-i18n-attr="alt:sso.kc.s5.alt" />
+<img class="shot-dark" src="assets/sso/kc-5-credentials-dark.webp" alt="Keycloak client Credentials tab with the masked client secret" width="1110" height="550" loading="lazy" decoding="async" data-i18n-attr="alt:sso.kc.s5.alt" />
+</div></div></div>
+</article>
+  </div>
+  <div class="callout glass reveal"><p data-i18n-html="sso.kc.issuer">The issuer is <code>https://sso.example.com/realms/home</code>: the Keycloak address, <code>/realms/</code> and the realm name, with no trailing slash. To check it, open <code>/realms/home/.well-known/openid-configuration</code> on your Keycloak and compare its <code>issuer</code> field with what you will enter, character by character.</p></div>
+  <div class="take glass"><h4 data-i18n="sso.take.title">What to take back to GlassKeep</h4><ul><li><span class="take-k" data-i18n="sso.take.issuer">Issuer URL</span><span class="take-v" data-i18n="sso.take.kc.issuer">Built from the realm name, see below</span></li><li><span class="take-k" data-i18n="sso.take.id">Client ID</span><span class="take-v" data-i18n="sso.take.kc.id">The client ID you chose</span></li><li><span class="take-k" data-i18n="sso.take.secret">Client secret</span><span class="take-v" data-i18n="sso.take.kc.secret">Credentials tab of the client</span></li></ul></div>
+</div>
+<div class="tab-panel" role="tabpanel" id="panel-au" aria-labelledby="tab-au" tabindex="0">
+  <p class="panel-note" data-i18n-html="sso.au.note">Written against Authelia 4.39. It assumes OpenID Connect is already enabled on your Authelia (an <code>hmac_secret</code> and a signing key under <code>identity_providers.oidc</code>). If it is not, start with Authelia's own OpenID Connect guide.</p>
+  <div class="steps">
+<article class="step step-wide glass reveal">
+  <div class="step-head"><span class="step-num">1</span><h4 data-i18n="sso.au.s1.t">Generate the client secret</h4></div>
+  <p data-i18n-html="sso.au.s1.b">Authelia stores only a hash of the secret. This command prints both: the plain secret (<code>Random Password</code>), which you give to GlassKeep, and the digest, which goes in the configuration.</p>
+  <pre><button class="copy-btn" data-i18n="copy" data-copy="docker run --rm authelia/authelia:latest authelia crypto hash generate pbkdf2 --variant sha512 --random --random.length 72 --random.charset alphanumeric">Copy</button><code>docker run --rm authelia/authelia:latest authelia crypto hash generate pbkdf2 --variant sha512 --random --random.length 72 --random.charset alphanumeric</code></pre>
+</article>
+<article class="step step-wide glass reveal">
+  <div class="step-head"><span class="step-num">2</span><h4 data-i18n="sso.au.s2.t">Declare the client</h4></div>
+  <p data-i18n-html="sso.au.s2.b">Add this entry under <code>identity_providers.oidc.clients</code> and replace the digest with yours. <code>one_factor</code> requires a password only; use <code>two_factor</code> to require a second factor.</p>
+  <pre><button class="copy-btn" data-i18n="copy" data-copy="identity_providers:
+  oidc:
+    clients:
+      - client_id: &#x27;glasskeep&#x27;
+        client_name: &#x27;GlassKeep&#x27;
+        client_secret: &#x27;$pbkdf2-sha512$310000$&lt;digest&gt;&#x27;
+        public: false
+        authorization_policy: &#x27;one_factor&#x27;
+        require_pkce: true
+        pkce_challenge_method: &#x27;S256&#x27;
+        redirect_uris:
+          - &#x27;https://notes.example.com/api/auth/oidc/callback&#x27;
+        scopes: [&#x27;openid&#x27;, &#x27;profile&#x27;, &#x27;email&#x27;]
+        response_types: [&#x27;code&#x27;]
+        grant_types: [&#x27;authorization_code&#x27;]
+        token_endpoint_auth_method: &#x27;client_secret_basic&#x27;">Copy</button><code>identity_providers:
+  oidc:
+    clients:
+      - client_id: &#x27;glasskeep&#x27;
+        client_name: &#x27;GlassKeep&#x27;
+        client_secret: &#x27;$pbkdf2-sha512$310000$&lt;digest&gt;&#x27;
+        public: false
+        authorization_policy: &#x27;one_factor&#x27;
+        require_pkce: true
+        pkce_challenge_method: &#x27;S256&#x27;
+        redirect_uris:
+          - &#x27;https://notes.example.com/api/auth/oidc/callback&#x27;
+        scopes: [&#x27;openid&#x27;, &#x27;profile&#x27;, &#x27;email&#x27;]
+        response_types: [&#x27;code&#x27;]
+        grant_types: [&#x27;authorization_code&#x27;]
+        token_endpoint_auth_method: &#x27;client_secret_basic&#x27;</code></pre>
+</article>
+<article class="step step-wide glass reveal">
+  <div class="step-head"><span class="step-num">3</span><h4 data-i18n="sso.au.s3.t">Restart and check</h4></div>
+  <p data-i18n-html="sso.au.s3.b">Restart Authelia and open <code>https://auth.example.com/.well-known/openid-configuration</code>. Its <code>issuer</code> field is the value to enter in GlassKeep, here <code>https://auth.example.com</code>, with no trailing slash. The account that signs in must exist in Authelia's user backend.</p>
+  
+</article>
+  </div>
+  
+  <div class="take glass"><h4 data-i18n="sso.take.title">What to take back to GlassKeep</h4><ul><li><span class="take-k" data-i18n="sso.take.issuer">Issuer URL</span><span class="take-v" data-i18n="sso.take.au.issuer">Your Authelia address</span></li><li><span class="take-k" data-i18n="sso.take.id">Client ID</span><span class="take-v" data-i18n="sso.take.au.id">The client_id you declared</span></li><li><span class="take-k" data-i18n="sso.take.secret">Client secret</span><span class="take-v" data-i18n="sso.take.au.secret">The plain secret printed in step 1</span></li></ul></div>
+</div>
+  </div>
+</section>
+<section class="stage" id="declare">
+  <div class="wrap">
+    <div class="stage-head reveal">
+      <span class="stage-num">3</span>
+      <div><h2 class="stage-title" data-i18n="sso.s3.title">Declare the provider in GlassKeep</h2><p class="stage-lead" data-i18n="sso.s3.lead">From the address your users use, open Settings, Security, Single sign-on. Any user can do this once an administrator has allowed it.</p></div>
+    </div>
+<div class="steps steps-2">
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">1</span><h4 data-i18n="sso.g1.t">Fill in the form</h4></div>
+  <p data-i18n-html="sso.g1.b">Give the provider a name (it only labels your settings), the issuer URL, the client ID and the client secret. The redirect URI at the top is the one to declare at the provider; it and the public address come from the page you are on.</p>
+  <div class="step-fig narrow"><div class="shot">
+<div class="shot-bar"><span class="shot-title" data-i18n="sso.bar.settings">GlassKeep · Settings</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light l-en" src="assets/sso/gk-form-en.webp" alt="The Single sign-on card in Settings, filled in with provider name, issuer, client ID and a masked client secret" width="507" height="800" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g1.alt" />
+<img class="shot-dark l-en" src="assets/sso/gk-form-en-dark.webp" alt="The Single sign-on card in Settings, filled in with provider name, issuer, client ID and a masked client secret" width="507" height="800" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g1.alt" />
+<img class="shot-light l-fr" src="assets/sso/gk-form-fr.webp" alt="The Single sign-on card in Settings, filled in with provider name, issuer, client ID and a masked client secret" width="507" height="820" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g1.alt" />
+<img class="shot-dark l-fr" src="assets/sso/gk-form-fr-dark.webp" alt="The Single sign-on card in Settings, filled in with provider name, issuer, client ID and a masked client secret" width="507" height="820" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g1.alt" />
+</div></div></div>
+</article>
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">2</span><h4 data-i18n="sso.g2.t">Test the configuration</h4></div>
+  <p data-i18n-html="sso.g2.b">GlassKeep fetches the provider's discovery document and its signing keys. If the issuer you typed differs from the one the provider publishes, the test shows the right value with a button to use it. The client ID and secret are proven when you link the account.</p>
+  <div class="step-fig narrow"><div class="shot">
+<div class="shot-bar"><span class="shot-title" data-i18n="sso.bar.settings">GlassKeep · Settings</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light l-en" src="assets/sso/gk-test-en.webp" alt="The same card after a successful test: provider found, one signing key published" width="507" height="820" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g2.alt" />
+<img class="shot-dark l-en" src="assets/sso/gk-test-en-dark.webp" alt="The same card after a successful test: provider found, one signing key published" width="507" height="820" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g2.alt" />
+<img class="shot-light l-fr" src="assets/sso/gk-test-fr.webp" alt="The same card after a successful test: provider found, one signing key published" width="507" height="820" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g2.alt" />
+<img class="shot-dark l-fr" src="assets/sso/gk-test-fr-dark.webp" alt="The same card after a successful test: provider found, one signing key published" width="507" height="820" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g2.alt" />
+</div></div></div>
+</article>
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">3</span><h4 data-i18n="sso.g3.t">Save, then link your account</h4></div>
+  <p data-i18n-html="sso.g3.b">Linking adds a way into your account, so GlassKeep asks for your password first, then sends you to the provider to authenticate once.</p>
+  <div class="step-fig narrow"><div class="shot">
+<div class="shot-bar"><span class="shot-title" data-i18n="sso.bar.settings">GlassKeep · Settings</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light l-en" src="assets/sso/gk-link-en.webp" alt="The link step asking for the GlassKeep password" width="507" height="322" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g3.alt" />
+<img class="shot-dark l-en" src="assets/sso/gk-link-en-dark.webp" alt="The link step asking for the GlassKeep password" width="507" height="322" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g3.alt" />
+<img class="shot-light l-fr" src="assets/sso/gk-link-fr.webp" alt="The link step asking for the GlassKeep password" width="507" height="338" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g3.alt" />
+<img class="shot-dark l-fr" src="assets/sso/gk-link-fr-dark.webp" alt="The link step asking for the GlassKeep password" width="507" height="338" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g3.alt" />
+</div></div></div>
+</article>
+<article class="step glass reveal">
+  <div class="step-head"><span class="step-num">4</span><h4 data-i18n="sso.g4.t">Linked</h4></div>
+  <p data-i18n-html="sso.g4.b">The settings now show the linked identity. You can unlink it or remove the provider at any time. Changing the issuer or the client ID unlinks the account, since it is no longer the same provider.</p>
+  <div class="step-fig narrow"><div class="shot">
+<div class="shot-bar"><span class="shot-title" data-i18n="sso.bar.settings">GlassKeep · Settings</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light l-en" src="assets/sso/gk-linked-en.webp" alt="The Single sign-on card showing the linked account with Edit, Unlink and Remove provider" width="507" height="218" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g4.alt" />
+<img class="shot-dark l-en" src="assets/sso/gk-linked-en-dark.webp" alt="The Single sign-on card showing the linked account with Edit, Unlink and Remove provider" width="507" height="218" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g4.alt" />
+<img class="shot-light l-fr" src="assets/sso/gk-linked-fr.webp" alt="The Single sign-on card showing the linked account with Edit, Unlink and Remove provider" width="507" height="232" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g4.alt" />
+<img class="shot-dark l-fr" src="assets/sso/gk-linked-fr-dark.webp" alt="The Single sign-on card showing the linked account with Edit, Unlink and Remove provider" width="507" height="232" loading="lazy" decoding="async" data-i18n-attr="alt:sso.g4.alt" />
+</div></div></div>
+</article>
+</div>
+  </div>
+</section>
+<section class="stage" id="signin">
+  <div class="wrap">
+    <div class="stage-head reveal">
+      <span class="stage-num">4</span>
+      <div><h2 class="stage-title" data-i18n="sso.s4.title">Sign in</h2><p class="stage-lead" data-i18n="sso.s4.lead">On the login screen, choose Sign in with my provider and type your GlassKeep username or email. From the profile picker, selecting your profile is enough.</p></div>
+    </div>
+<div class="signin-grid">
+  <div class="signin-text glass reveal"><p data-i18n-html="sso.s4.b">GlassKeep then sends you to your provider and signs you in only if the identity it returns is the one linked to that account. Any other identity is refused, even with the same e-mail address.</p><div class="signin-fig"><div class="shot">
+<div class="shot-bar"><span class="shot-title" data-i18n="sso.bar.login">GlassKeep · Sign in</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light l-en" src="assets/sso/gk-login-en.webp" alt="The login screen with the Sign in with my provider button opened on its identifier field" width="600" height="560" loading="lazy" decoding="async" data-i18n-attr="alt:sso.s4.alt" />
+<img class="shot-dark l-en" src="assets/sso/gk-login-en-dark.webp" alt="The login screen with the Sign in with my provider button opened on its identifier field" width="600" height="560" loading="lazy" decoding="async" data-i18n-attr="alt:sso.s4.alt" />
+<img class="shot-light l-fr" src="assets/sso/gk-login-fr.webp" alt="The login screen with the Sign in with my provider button opened on its identifier field" width="600" height="560" loading="lazy" decoding="async" data-i18n-attr="alt:sso.s4.alt" />
+<img class="shot-dark l-fr" src="assets/sso/gk-login-fr-dark.webp" alt="The login screen with the Sign in with my provider button opened on its identifier field" width="600" height="560" loading="lazy" decoding="async" data-i18n-attr="alt:sso.s4.alt" />
+</div></div></div></div>
+  <div class="signin-provs">
+    <p class="signin-label reveal" data-i18n="sso.s4.prov">At the provider, the page is the provider's own</p>
+    <div class="reveal"><div class="shot">
+<div class="shot-bar"><span class="shot-title">authentik</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/authentik-signin.webp" alt="The authentik sign-in page" width="800" height="560" loading="lazy" decoding="async" data-i18n-attr="alt:sso.si.ak.alt" />
+<img class="shot-dark" src="assets/sso/authentik-signin-dark.webp" alt="The authentik sign-in page" width="800" height="560" loading="lazy" decoding="async" data-i18n-attr="alt:sso.si.ak.alt" />
+</div></div></div>
+    <div class="reveal"><div class="shot">
+<div class="shot-bar"><span class="shot-title">Keycloak</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/keycloak-signin.webp" alt="The Keycloak sign-in page" width="800" height="560" loading="lazy" decoding="async" data-i18n-attr="alt:sso.si.kc.alt" />
+<img class="shot-dark" src="assets/sso/keycloak-signin-dark.webp" alt="The Keycloak sign-in page" width="800" height="560" loading="lazy" decoding="async" data-i18n-attr="alt:sso.si.kc.alt" />
+</div></div></div>
+    <div class="reveal"><div class="shot">
+<div class="shot-bar"><span class="shot-title">Authelia</span><span class="shot-btns" aria-hidden="true"><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></svg></span><span class="shot-btn"><svg viewBox="0 0 24 24"><path d="M6 15l6 -6l6 6"/></svg></span><span class="shot-btn close"><svg viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></span></span></div>
+<div class="shot-media">
+<img class="shot-light" src="assets/sso/authelia-signin.webp" alt="The Authelia sign-in page" width="800" height="560" loading="lazy" decoding="async" data-i18n-attr="alt:sso.si.au.alt" />
+<img class="shot-dark" src="assets/sso/authelia-signin-dark.webp" alt="The Authelia sign-in page" width="800" height="560" loading="lazy" decoding="async" data-i18n-attr="alt:sso.si.au.alt" />
+</div></div></div>
+  </div>
+</div>
+  </div>
+</section>
+</section>
+
+<section id="help">
+  <div class="wrap">
+    <div class="section-head reveal"><span class="eyebrow" data-i18n="sso.help.eyebrow">Troubleshooting</span><h2 data-i18n-html="sso.help.title">When it <span class="grad-text">does not work.</span></h2><p class="section-lead" data-i18n-html="sso.help.lead">The server log states why a sign-in was refused, prefixed with <code>[oidc]</code>. It never logs tokens or secrets.</p></div>
+    <div class="faq"><details class="faq-item glass reveal"><summary><span data-i18n="sso.q1.q">There is no “Sign in with my provider” button</span></summary><p data-i18n-html="sso.q1.a">Either an administrator has not allowed single sign-on, or no account has linked a provider yet. The button appears once both are true.</p></details><details class="faq-item glass reveal"><summary><span data-i18n="sso.q2.q">“No provider is linked to this account”</span></summary><p data-i18n-html="sso.q2.a">The username or e-mail does not match an account that has linked a provider. Sign in another way, then link it in Settings, Security, Single sign-on.</p></details><details class="faq-item glass reveal"><summary><span data-i18n="sso.q3.q">“The provider publishes a different issuer”</span></summary><p data-i18n-html="sso.q3.a">The issuer must match what the provider publishes exactly, trailing slash included; the test button offers the right value. Behind a reverse proxy, the issuer follows the provider's own hostname settings (for Keycloak, its hostname and proxy-headers options): fix it there, not in GlassKeep.</p></details><details class="faq-item glass reveal"><summary><span data-i18n="sso.q4.q">“The provider could not be reached”</span></summary><p data-i18n-html="sso.q4.a">The GlassKeep server, not only your browser, must reach the issuer: check DNS and firewall. A provider with a certificate from a private authority needs that authority trusted by Node (the <code>NODE_EXTRA_CA_CERTS</code> environment variable).</p></details><details class="faq-item glass reveal"><summary><span data-i18n="sso.q5.q">“This provider is on a local network address”</span></summary><p data-i18n-html="sso.q5.a">Only an administrator's provider may sit on the local network. For other accounts, expose the provider on a public address.</p></details><details class="faq-item glass reveal"><summary><span data-i18n="sso.q6.q">“Open GlassKeep at the address your provider was set up from”</span></summary><p data-i18n-html="sso.q6.a">The configuration was saved from another address. Sign in from that one, or save it again from the current address and update the redirect URI at the provider.</p></details><details class="faq-item glass reveal"><summary><span data-i18n="sso.q7.q">The provider reports a redirect URI mismatch</span></summary><p data-i18n-html="sso.q7.a">The redirect URI declared at the provider must equal the one shown in GlassKeep: same scheme, host, port and path.</p></details><details class="faq-item glass reveal"><summary><span data-i18n="sso.q8.q">“You signed in with another identity”</span></summary><p data-i18n-html="sso.q8.a">The account authenticated at the provider is not the one linked to this GlassKeep account. Sign out at the provider and sign in with the account you linked.</p></details><details class="faq-item glass reveal"><summary><span data-i18n="sso.q9.q">“This sign-in attempt expired or was started in another browser”</span></summary><p data-i18n-html="sso.q9.a">More than ten minutes passed, the server restarted in between, or the browser blocks cookies for GlassKeep. The attempt is tied to the browser that started it.</p></details><details class="faq-item glass reveal"><summary><span data-i18n="sso.q10.q">On the Android app</span></summary><p data-i18n-html="sso.q10.a">The provider opens in a separate screen that shares only cookies with the app, then returns to GlassKeep by itself. Use the same server address in the app as the one the provider was set up from.</p></details></div>
+  </div>
+</section>
+<section class="secmodel">
+  <div class="wrap">
+    <div class="section-head reveal"><span class="eyebrow" data-i18n="sso.sec.eyebrow">Security model</span><h2 data-i18n-html="sso.sec.title">What protects <span class="grad-text">your account.</span></h2></div>
+    <ul class="sec-list glass"><li class="reveal"><span class="before-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="sso.sec1">Authorization Code flow with PKCE (S256), state and nonce, handled by the certified openid-client library.</span></li><li class="reveal"><span class="before-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="sso.sec2">The ID token is verified against the provider's published keys: signature, issuer, audience, expiry and nonce.</span></li><li class="reveal"><span class="before-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="sso.sec3">The client secret stays on the server and is never sent back to a browser.</span></li><li class="reveal"><span class="before-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="sso.sec4">A sign-in attempt is tied to the browser that started it; the way back into the app is a single-use ticket valid for one minute.</span></li><li class="reveal"><span class="before-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="sso.sec5">Linking requires the account password, and accounts are never matched on e-mail.</span></li></ul>
+  </div>
+</section>
+
+<section style="padding-top:20px">
+  <div class="wrap">
+    <div class="cta glass reveal">
+      <h2 data-i18n="sso.cta.title">Something not working?</h2>
+      <p data-i18n="sso.cta.body">Open a discussion or an issue with the error shown and the matching [oidc] log lines. Never post a client secret.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://github.com/Victor-root/glasskeep-enhanced/discussions" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.8 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.8-1.5-3.8-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.7 2.7 1.2 3.4.9.1-.7.4-1.2.7-1.5-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C17.5 4.4 18.5 4.7 18.5 4.7c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.5-1.5 7.8-5.8 7.8-10.9C23.5 5.7 18.3.5 12 .5z"/></svg><span data-i18n="sso.cta.btn1">Ask in Discussions</span></a>
+        <a class="btn btn-ghost" href="https://github.com/Victor-root/glasskeep-enhanced/issues" target="_blank" rel="noopener" data-i18n="sso.cta.btn2">Report an issue</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div>© <span id="year"></span> <span data-i18n="footer.text">GlassKeep: self-hosted notes, built in the open.</span></div>
+    <div class="foot-links">
+      <a href="https://github.com/Victor-root/glasskeep-enhanced" target="_blank" rel="noopener" data-i18n="footer.l1">Repository</a>
+      <a href="https://github.com/Victor-root/glasskeep-enhanced/releases" target="_blank" rel="noopener" data-i18n="footer.l2">Releases</a>
+      <a href="https://github.com/Victor-root/glasskeep-enhanced/discussions" target="_blank" rel="noopener" data-i18n="footer.l3">Discussions</a>
+      <a href="sso.html" data-i18n="sso.foot.sso">SSO guide</a>
+    </div>
+  </div>
+</footer>
+
+<!-- ── Screenshot lightbox ────────────────────────────────────────────── -->
+<!-- Populated/positioned entirely by app.js: the FLIP-style open/close
+     animation needs the clicked thumbnail's exact live rect, which only JS
+     has. Icons are exact Tabler outline paths (x, chevron-left/right,
+     maximize), same sourcing as every other icon on the page. -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="lightbox-backdrop" id="lightboxBackdrop"></div>
+
+  <button class="lightbox-btn lightbox-close" id="lightboxClose" data-i18n-attr="aria-label:lightbox.close" aria-label="Close">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg>
+  </button>
+  <button class="lightbox-btn lightbox-prev" id="lightboxPrev" data-i18n-attr="aria-label:lightbox.prev" aria-label="Previous screenshot">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6l6 6"/></svg>
+  </button>
+  <button class="lightbox-btn lightbox-next" id="lightboxNext" data-i18n-attr="aria-label:lightbox.next" aria-label="Next screenshot">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6l-6 6"/></svg>
+  </button>
+
+  <img class="lightbox-img" id="lightboxImg" src="" alt="" />
+  <div class="lightbox-meta" id="lightboxMeta">
+    <span class="lightbox-caption" id="lightboxCaption"></span>
+    <span class="lightbox-count" id="lightboxCount"></span>
+  </div>
+</div>
+
+<script src="i18n.js"></script>
+<script src="sso-i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
