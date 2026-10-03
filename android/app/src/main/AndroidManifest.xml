@@ -103,6 +103,14 @@
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
 
+        <!-- Single sign-on provider pages, kept out of the main WebView and
+             its native bridges. See SsoActivity. -->
+        <activity
+            android:name=".SsoActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+
         <!-- Self-update FileProvider: lets us hand the downloaded APK to
              Android's system installer (ACTION_VIEW with
              application/vnd.android.package-archive) without granting

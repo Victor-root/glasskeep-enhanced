@@ -47,14 +47,24 @@ class WebViewActivity : AppCompatActivity() {
     private var pageLoaded = false
 
     // Single sign-on round trip. The server ties a sign-in attempt to a
-    // cookie in this WebView, so the trip to the provider and back has to
-    // stay here instead of going to a Custom Tab like other sites. The web
-    // app announces the provider URL it is about to open (the bridge call
-    // below); the first navigation matching it lets that provider host in
-    // until a page of our own server loads again. Only the app's code can
-    // announce: a link in a note never makes a site load in the WebView.
+    // cookie in the app's cookie store, which a Custom Tab does not share,
+    // and the provider is a third-party site that must not run next to the
+    // bridges of this WebView. So the trip goes through SsoActivity, a
+    // bridge-less WebView on the same cookies, which hands back the
+    // address the provider returns to. The web app announces the provider
+    // URL it is about to open (the bridge call below): only the app's own
+    // code can start the trip, a link in a note never does.
     @Volatile private var announcedSsoUrl: Uri? = null
-    private var ssoProviderHost: String? = null
+    private val ssoLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val back = result.data?.getStringExtra(SsoActivity.EXTRA_RETURN_URL)
+            ?.let { Uri.parse(it) } ?: return@registerForActivityResult
+        val appHost = webView.url?.let { Uri.parse(it).host }
+        if (appHost != null && appHost.equals(back.host, ignoreCase = true)) {
+            webView.loadUrl(back.toString())
+        }
+    }
 
     // Held while we wait for the POST_NOTIFICATIONS runtime grant on
     // Android 13+. Once the user replies, we re-attempt the notif post
@@ -315,7 +325,7 @@ class WebViewActivity : AppCompatActivity() {
         fun isAndroidTV(): Boolean = isTelevision()
 
         /** Called by the web app right before it navigates to the single
-         *  sign-on provider. See [isSsoNavigation]. */
+         *  sign-on provider. See [isAnnouncedSsoNavigation]. */
         @JavascriptInterface
         fun beginSingleSignOn(authorizationUrl: String?) {
             if (authorizationUrl.isNullOrBlank()) return
@@ -635,10 +645,14 @@ class WebViewActivity : AppCompatActivity() {
                     val sameHost = appHost != null &&
                         appHost.equals(target.host, ignoreCase = true)
                     return if (sameHost) {
-                        ssoProviderHost = null
                         false
-                    } else if (isSsoNavigation(target, appHost)) {
-                        false
+                    } else if (isAnnouncedSsoNavigation(target, appHost)) {
+                        ssoLauncher.launch(
+                            Intent(this@WebViewActivity, SsoActivity::class.java)
+                                .putExtra(SsoActivity.EXTRA_URL, target.toString())
+                                .putExtra(SsoActivity.EXTRA_APP_HOST, appHost)
+                        )
+                        true
                     } else {
                         // Genuinely external link (a note's link, GitHub, …) —
                         // hand it to a Custom Tab so Back returns to the WebView
@@ -874,23 +888,18 @@ class WebViewActivity : AppCompatActivity() {
         }
     }
 
-    /** True when [target] is part of a single sign-on round trip: the
-     *  provider URL the web app announced, provided it sends the browser
-     *  back to this server's OIDC callback, or a later page on that same
-     *  provider host. */
-    private fun isSsoNavigation(target: Uri, appHost: String?): Boolean {
-        announcedSsoUrl?.let { announced ->
-            announcedSsoUrl = null
-            val matches = runCatching {
-                val back = Uri.parse(announced.getQueryParameter("redirect_uri") ?: "")
-                announced.host.equals(target.host, ignoreCase = true) &&
-                    announced.getQueryParameter("state") == target.getQueryParameter("state") &&
-                    appHost != null && appHost.equals(back.host, ignoreCase = true) &&
-                    back.path == "/api/auth/oidc/callback"
-            }.getOrDefault(false)
-            if (matches) ssoProviderHost = target.host
-        }
-        return ssoProviderHost?.equals(target.host, ignoreCase = true) == true
+    /** True when [target] is the provider URL the web app announced, and
+     *  it sends the browser back to this server's OIDC callback. */
+    private fun isAnnouncedSsoNavigation(target: Uri, appHost: String?): Boolean {
+        val announced = announcedSsoUrl ?: return false
+        announcedSsoUrl = null
+        return runCatching {
+            val back = Uri.parse(announced.getQueryParameter("redirect_uri") ?: "")
+            announced.host.equals(target.host, ignoreCase = true) &&
+                announced.getQueryParameter("state") == target.getQueryParameter("state") &&
+                appHost != null && appHost.equals(back.host, ignoreCase = true) &&
+                back.path == "/api/auth/oidc/callback"
+        }.getOrDefault(false)
     }
 
     /** Open `uri` via the user's default browser using Android Custom
