@@ -414,6 +414,7 @@ private fun ChangePasswordDialog(
         dark = dark,
         borderColor = borderColor,
         dismissOnClickOutside = false,
+        blur = BackdropBlurSm,
     ) {
         Text(
             stringResource(if (forced) R.string.native_force_password_title else R.string.native_settings_change_password),

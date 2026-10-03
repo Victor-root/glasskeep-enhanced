@@ -254,6 +254,7 @@ internal fun QrScannerModal(container: NativeAppContainer, serverUrl: String, on
         dark = dark,
         borderColor = borderColor,
         maxWidth = 384.dp,
+        blur = BackdropBlurSm,
         screenPadding = 16.dp,
         widthFraction = 0.94f,
         cornerRadius = 16.dp,

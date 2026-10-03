@@ -484,6 +484,7 @@ private fun EditUserDialog(
         dismissOnClickOutside = false,
         background = if (dark) Color(0xFF282828).copy(alpha = 0.98f) else Color.White.copy(alpha = 0.98f),
         scrimAlpha = 0.5f,
+        blur = BackdropBlurSm,
         screenPadding = 16.dp,
         widthFraction = 1f,
     ) {

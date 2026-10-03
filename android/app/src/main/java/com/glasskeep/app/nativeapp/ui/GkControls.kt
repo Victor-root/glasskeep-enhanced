@@ -923,12 +923,13 @@ internal fun SettingsPopoverOption(
  * `PasskeySettingsSection.jsx:540-600`): a 90%-wide card capped at
  * 448px, 12px radius, 24px padding, over a flat `rgba(0,0,0,0.6)`
  * scrim, the platform's own dialog dim. No entrance animation, matching
- * the web's plain conditional render. The web also blurs the scrim by
- * 8px; a dialog window can't blur what is behind it here, so the scrim
- * stays flat. [scrimAlpha] replaces the dim for a web dialog drawn over
- * a lighter `bg-black/40`. [screenPadding], [widthFraction], [cornerRadius]
- * and [contentPadding] fit a modal with other proportions, such as the QR
- * scanner's `p-4` backdrop around a `w-[94%] rounded-2xl p-5` card.
+ * the web's plain conditional render. [blur] is the CSS radius of a
+ * `backdrop-blur-*` scrim (Android 12+; flat elsewhere), which only some
+ * web dialogs carry. [scrimAlpha] replaces the dim for a web dialog drawn
+ * over a lighter `bg-black/40`. [screenPadding], [widthFraction],
+ * [cornerRadius] and [contentPadding] fit a modal with other proportions,
+ * such as the QR scanner's `p-4` backdrop around a `w-[94%] rounded-2xl p-5`
+ * card.
  */
 @Composable
 internal fun GkDialog(
@@ -940,6 +941,7 @@ internal fun GkDialog(
     background: Color = if (dark) DialogBgDark else Color.White,
     elevation: Dp = 24.dp,
     scrimAlpha: Float? = null,
+    blur: Dp? = null,
     screenPadding: Dp = 0.dp,
     widthFraction: Float = 0.9f,
     cornerRadius: Dp = 12.dp,
@@ -953,7 +955,7 @@ internal fun GkDialog(
             usePlatformDefaultWidth = false,
         ),
     ) {
-        DialogWindowBackdrop(dim = scrimAlpha)
+        DialogWindowBackdrop(dim = scrimAlpha, blur = blur)
         val shape = RoundedCornerShape(cornerRadius)
         Column(
             modifier = Modifier
@@ -969,6 +971,9 @@ internal fun GkDialog(
         )
     }
 }
+
+/** Tailwind v4's `backdrop-blur-sm`. */
+internal val BackdropBlurSm = 8.dp
 
 /**
  * The window of the dialog it is called from, painted as the web's plain
