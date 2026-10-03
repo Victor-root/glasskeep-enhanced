@@ -89,9 +89,30 @@ function discoveryOptions(issuer, allowPrivate) {
 // The fetch every request to the provider goes through. Without the right
 // to reach private addresses, the connection itself refuses them, whatever
 // DNS answers at that moment and wherever the provider's metadata points.
+// Whoever runs the provider also decides how big its answers are, and
+// every one of them is read whole into memory: past a size no real
+// metadata, key set or token response comes near, the read is cut.
 function fetcherFor(allowPrivate) {
-  if (allowPrivate) return fetch;
-  return (url, init) => fetch(url, { ...init, dispatcher: guard.publicOnlyDispatcher() });
+  return async (url, init) => capped(await fetch(
+    url,
+    allowPrivate ? init : { ...init, dispatcher: guard.publicOnlyDispatcher() },
+  ));
+}
+
+const MAX_RESPONSE_BYTES = 1024 * 1024;
+const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
+
+function capped(res) {
+  if (!res.body || NULL_BODY_STATUSES.has(res.status)) return res;
+  let seen = 0;
+  const body = res.body.pipeThrough(new TransformStream({
+    transform(chunk, controller) {
+      seen += chunk.byteLength;
+      if (seen > MAX_RESPONSE_BYTES) controller.error(new Error("provider response too large"));
+      else controller.enqueue(chunk);
+    },
+  }));
+  return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
 }
 
 // A failure, reduced to a code the UI can translate plus the library's
