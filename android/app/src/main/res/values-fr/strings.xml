@@ -153,7 +153,7 @@
     <string name="native_bulk_deselect_all">Tout désélectionner</string>
     <string name="native_bulk_export_zip">Télécharger (.zip)</string>
     <string name="native_bulk_export_success">ZIP prêt à partager</string>
-    <string name="native_bulk_export_error">Impossible de créer l\'export ZIP.</string>
+    <string name="native_bulk_export_error">Échec du téléchargement ZIP</string>
 
     <string name="native_sidebar_open">Ouvrir les tags</string>
     <string name="native_sidebar_all_images">Toutes les images</string>
@@ -342,7 +342,7 @@
     <string name="native_settings_ai_api_key">Clé API</string>
     <string name="native_settings_ai_api_key_placeholder">Optionnelle, laisser vide pour les endpoints locaux</string>
     <string name="native_settings_ai_api_key_placeholder_set">•••• (une clé est enregistrée, saisissez-en une nouvelle pour la remplacer)</string>
-    <string name="native_settings_ai_api_key_hint">Requise uniquement pour les fournisseurs distants (OpenAI, OpenRouter, …). Stockée côté serveur, jamais renvoyée au navigateur.</string>
+    <string name="native_settings_ai_api_key_hint">Requise uniquement pour les fournisseurs distants (OpenAI, OpenRouter, …). Stockée côté serveur, jamais renvoyée à l'application.</string>
     <string name="native_settings_ai_api_key_clear">Supprimer la clé enregistrée</string>
     <string name="native_settings_ai_api_key_cleared">Clé API supprimée</string>
     <string name="native_settings_ai_temperature">Température</string>
@@ -577,8 +577,8 @@
     <string name="native_settings_paste_title">Comportement du collage</string>
     <string name="native_settings_paste_rich">Mise en forme</string>
     <string name="native_settings_paste_plain">Texte brut</string>
-    <string name="native_settings_paste_rich_desc">Ctrl+V conserve la mise en forme des sources comme Word ou les pages web. Ctrl+Shift+V colle toujours en texte brut.</string>
-    <string name="native_settings_paste_plain_desc">Ctrl+V supprime toujours la mise en forme et colle en texte brut, comme Ctrl+Shift+V.</string>
+    <string name="native_settings_paste_rich_desc">Le collage conserve la mise en forme des sources comme Word ou les pages web. Le collage en texte brut colle toujours du texte brut.</string>
+    <string name="native_settings_paste_plain_desc">Le collage supprime toujours la mise en forme et colle en texte brut, comme le collage en texte brut.</string>
     <string name="native_drawing_pen">Stylo</string>
     <string name="native_drawing_eraser">Gomme</string>
     <string name="native_drawing_color">Couleur</string>
@@ -651,7 +651,7 @@
     <string name="native_audio_playback_error">Impossible de lire cet enregistrement sur cet appareil</string>
     <string name="native_audio_rename_clip">Renommer cet enregistrement</string>
     <string name="native_audio_remove_clip">Supprimer cet enregistrement</string>
-    <string name="native_audio_remove_clip_confirm">Cliquez à nouveau pour confirmer</string>
+    <string name="native_audio_remove_clip_confirm">Touchez à nouveau pour confirmer</string>
     <string name="native_audio_storage">Stockage</string>
     <string name="native_audio_storage_used">Stockage utilisé : %1$d%%</string>
     <string name="native_audio_storage_tooltip">Utilisation du stockage</string>
@@ -676,7 +676,7 @@
     <string name="reminder_notification_channel">Rappels</string>
     <string name="reminder_open_action">Ouvrir</string>
     <string name="update_notification_title">Mise à jour GlassKeep disponible</string>
-    <string name="update_notification_text">Version %1$s — toucher pour télécharger et installer</string>
+    <string name="update_notification_text">Version %1$s : toucher pour télécharger et installer</string>
     <string name="update_notification_bigtext">La version %1$s est disponible. Touchez pour télécharger et installer. Pensez à mettre aussi votre serveur GlassKeep à jour, sinon certaines fonctionnalités ne marcheront pas.</string>
     <string name="update_downloading">Téléchargement de la mise à jour…</string>
     <string name="update_download_failed">Échec du téléchargement</string>
@@ -1012,7 +1012,7 @@
     <string name="native_admin_restart_in_progress">Redémarrage en cours</string>
     <string name="native_admin_restart_waiting">En attente du retour du serveur…</string>
     <string name="native_admin_restart_done">Le serveur a bien été redémarré.</string>
-    <string name="native_admin_reload_in">Un rechargement va être effectué dans %1$d seconde(s).</string>
+    <string name="native_admin_reload_in">L'application va être rechargée dans %1$d seconde(s).</string>
     <string name="native_admin_shutdown_title">Éteindre le serveur ?</string>
     <string name="native_admin_shutdown_confirm">Le service sera arrêté. Vous devrez le relancer manuellement.</string>
     <string name="native_admin_shutdown_confirm_btn">Éteindre</string>
@@ -1250,7 +1250,7 @@
     <string name="native_update_docker_hint_footnote">Après modification, lancez : docker compose up -d. Le bouton « Mettre à jour maintenant » apparaîtra ensuite ici.</string>
     <string name="native_update_docker_perm_intro">Le socket Docker est bien monté, mais GlassKeep n\'a pas encore la permission de l\'utiliser. C\'est fréquent sur Synology Container Manager, où le socket appartient à root. Recréez (ou redémarrez) le conteneur une fois, GlassKeep s\'accorde l\'accès au prochain démarrage et le bouton « Mettre à jour maintenant » apparaîtra ici.</string>
     <string name="native_update_docker_perm_footnote">Synology : arrêtez le projet dans Container Manager, puis relancez-le. En ligne de commande : docker compose up -d --force-recreate.</string>
-    <string name="native_update_docker_daemon_hint">Le socket Docker est monté mais le démon Docker n\'a pas répondu. Vérifiez que Docker tourne sur l\'hôte, puis rechargez cette page.</string>
+    <string name="native_update_docker_daemon_hint">Le socket Docker est monté mais le démon Docker n\'a pas répondu. Vérifiez que Docker tourne sur l\'hôte, puis relancez l'application.</string>
     <string name="native_update_method_terminal">Installation standard</string>
     <string name="native_update_method_terminal_description">Relancez le script et choisissez l\'option 2.</string>
     <string name="native_update_method_docker">Installation Docker</string>
@@ -1270,7 +1270,7 @@
     <string name="native_update_headline_cancelling">Annulation de la mise à jour...</string>
     <string name="native_update_subtext_running">Veuillez garder cette fenêtre ouverte jusqu\'à la fin de la mise à jour.</string>
     <string name="native_update_subtext_waiting">L\'application redémarre. Patientez, nous nous reconnectons automatiquement.</string>
-    <string name="native_update_subtext_success">GlassKeep a été mis à jour avec succès. Rechargez la page pour utiliser la nouvelle version.</string>
+    <string name="native_update_subtext_success">GlassKeep a été mis à jour avec succès. Rechargez l'application pour utiliser la nouvelle version.</string>
     <string name="native_update_subtext_error">La mise à jour n\'a pas pu aboutir. L\'application est peut-être toujours sur l\'ancienne version.</string>
     <string name="native_update_subtext_error_oom">La compilation a manqué de mémoire sur cette machine. L\'app est peut-être dans un état incohérent, restaurez une sauvegarde ou relancez le script d\'installation.</string>
     <string name="native_update_subtext_error_network">La mise à jour n\'a pas pu joindre le réseau et la restauration n\'a pas pu aboutir. Vérifiez l\'accès Internet du serveur, puis relancez le script d\'installation manuellement si besoin.</string>

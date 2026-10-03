@@ -158,7 +158,7 @@
     <string name="native_bulk_deselect_all">Deselect all</string>
     <string name="native_bulk_export_zip">Download (.zip)</string>
     <string name="native_bulk_export_success">ZIP ready to share</string>
-    <string name="native_bulk_export_error">Couldn\'t create the ZIP export.</string>
+    <string name="native_bulk_export_error">ZIP download failed</string>
 
     <string name="native_sidebar_open">Open tags</string>
     <string name="native_sidebar_all_images">All Images</string>
@@ -347,7 +347,7 @@
     <string name="native_settings_ai_api_key">API key</string>
     <string name="native_settings_ai_api_key_placeholder">Optional, leave blank for local endpoints</string>
     <string name="native_settings_ai_api_key_placeholder_set">•••• (a key is set, type to replace it)</string>
-    <string name="native_settings_ai_api_key_hint">Only required for remote providers (OpenAI, OpenRouter, …). Stored on the server, never sent back to the browser.</string>
+    <string name="native_settings_ai_api_key_hint">Only required for remote providers (OpenAI, OpenRouter, …). Stored on the server, never sent back to the app.</string>
     <string name="native_settings_ai_api_key_clear">Remove the saved key</string>
     <string name="native_settings_ai_api_key_cleared">API key removed</string>
     <string name="native_settings_ai_temperature">Temperature</string>
@@ -582,8 +582,8 @@
     <string name="native_settings_paste_title">Paste behavior</string>
     <string name="native_settings_paste_rich">Rich text</string>
     <string name="native_settings_paste_plain">Plain text</string>
-    <string name="native_settings_paste_rich_desc">Ctrl+V keeps formatting from sources like Word or web pages. Ctrl+Shift+V still pastes plain text.</string>
-    <string name="native_settings_paste_plain_desc">Ctrl+V always strips formatting and pastes plain text, like Ctrl+Shift+V.</string>
+    <string name="native_settings_paste_rich_desc">Pasting keeps formatting from sources like Word or web pages. Pasting as plain text still pastes plain text.</string>
+    <string name="native_settings_paste_plain_desc">Pasting always strips formatting and pastes plain text, like pasting as plain text.</string>
     <string name="native_drawing_pen">Pen</string>
     <string name="native_drawing_eraser">Eraser</string>
     <string name="native_drawing_color">Color</string>
@@ -656,7 +656,7 @@
     <string name="native_audio_playback_error">Couldn\'t play this recording on this device</string>
     <string name="native_audio_rename_clip">Rename this recording</string>
     <string name="native_audio_remove_clip">Delete this recording</string>
-    <string name="native_audio_remove_clip_confirm">Click again to confirm</string>
+    <string name="native_audio_remove_clip_confirm">Tap again to confirm</string>
     <string name="native_audio_storage">Storage</string>
     <string name="native_audio_storage_used">Storage used: %1$d%%</string>
     <string name="native_audio_storage_tooltip">Storage usage</string>
@@ -685,14 +685,14 @@
     <string name="reminder_notification_channel">Reminders</string>
     <string name="reminder_open_action">Open</string>
     <string name="update_notification_title">GlassKeep update available</string>
-    <string name="update_notification_text">Version %1$s — tap to download and install</string>
+    <string name="update_notification_text">Version %1$s: tap to download and install</string>
     <string name="update_notification_bigtext">Version %1$s is available. Tap to download and install. Make sure the GlassKeep server is also on the latest version, otherwise some features won\'t work.</string>
     <string name="update_downloading">Downloading update…</string>
     <string name="update_download_failed">Update download failed</string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_up_to_date">GlassKeep is up to date</string>
 
-    <!-- First-launch onboarding screen — explains why we ask for each
+    <!-- First-launch onboarding screen: explains why we ask for each
          OS permission so the user knows what they're agreeing to. -->
     <string name="welcome_title">Welcome to GlassKeep</string>
     <string name="welcome_subtitle">A few quick permissions before you start. You can skip any of them. The matching feature simply won\'t work until granted.</string>
@@ -710,7 +710,7 @@
     <string name="welcome_install_title">Install updates</string>
     <string name="welcome_install_desc">GlassKeep isn\'t on the Play Store, so Android needs your permission to install the updated APK we download for you.</string>
     <string name="welcome_battery_title">Battery optimization (optional)</string>
-    <string name="welcome_battery_desc">So your reminders fire on time even when the app is fully closed, allow GlassKeep to ignore battery optimization. Without it, Android may delay or block reminders in the background. It\'s optional — you can decline, and reminders will still work most of the time.</string>
+    <string name="welcome_battery_desc">So your reminders fire on time even when the app is fully closed, allow GlassKeep to ignore battery optimization. Without it, Android may delay or block reminders in the background. It\'s optional: you can decline, and reminders will still work most of the time.</string>
 
     <string name="native_collaborators_title">Collaborators</string>
     <string name="native_collaborators_owner">Owner</string>
@@ -1023,7 +1023,7 @@
     <string name="native_admin_restart_in_progress">Restart in progress</string>
     <string name="native_admin_restart_waiting">Waiting for the server to come back online…</string>
     <string name="native_admin_restart_done">Server successfully restarted.</string>
-    <string name="native_admin_reload_in">A hard refresh will be performed in %1$d second(s).</string>
+    <string name="native_admin_reload_in">The app will be reloaded in %1$d second(s).</string>
     <string name="native_admin_shutdown_title">Shut down server?</string>
     <string name="native_admin_shutdown_confirm">The service will be stopped. You will need to start it manually.</string>
     <string name="native_admin_shutdown_confirm_btn">Shut down</string>
@@ -1263,7 +1263,7 @@
     <string name="native_update_docker_hint_footnote">After saving, run: docker compose up -d. The \'Update now\' button will then appear here.</string>
     <string name="native_update_docker_perm_intro">The Docker socket is mounted, but GlassKeep does not yet have permission to use it. This is common on Synology Container Manager, where the socket is owned by root. Recreate (or restart) the container once, GlassKeep grants itself access on the next start and the \'Update now\' button will appear here.</string>
     <string name="native_update_docker_perm_footnote">Synology: stop the project in Container Manager, then start it again. CLI: docker compose up -d --force-recreate.</string>
-    <string name="native_update_docker_daemon_hint">The Docker socket is mounted but the Docker daemon did not respond. Make sure Docker is running on the host, then reload this page.</string>
+    <string name="native_update_docker_daemon_hint">The Docker socket is mounted but the Docker daemon did not respond. Make sure Docker is running on the host, then restart the app.</string>
     <string name="native_update_method_terminal">Standard install</string>
     <string name="native_update_method_terminal_description">Re-run the script and choose option 2.</string>
     <string name="native_update_method_docker">Docker install</string>
@@ -1283,7 +1283,7 @@
     <string name="native_update_headline_cancelling">Cancelling update...</string>
     <string name="native_update_subtext_running">Please keep this window open until the update is finished.</string>
     <string name="native_update_subtext_waiting">The app is restarting. Hang on, we will reconnect automatically.</string>
-    <string name="native_update_subtext_success">GlassKeep was updated successfully. Reload the page to use the new version.</string>
+    <string name="native_update_subtext_success">GlassKeep was updated successfully. Reload the app to use the new version.</string>
     <string name="native_update_subtext_error">The update could not be completed. The app may still be running on the previous version.</string>
     <string name="native_update_subtext_error_oom">The build ran out of memory on this host. The app may be in an inconsistent state, restore from a backup or re-run the install script.</string>
     <string name="native_update_subtext_error_network">The update couldn\'t reach the network and could not be rolled back. Check the server\'s Internet access, then run the install script manually if needed.</string>
