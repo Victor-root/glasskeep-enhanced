@@ -107,12 +107,13 @@ object NoteConversion {
      * The checklist as rich blocks, ready for [RichDoc.encode].
      *
      * The web gets there through Markdown (checklistItemsToText, then
-     * marked, then generateJSON), which lands on a level-2 heading per
-     * section and a task list of the items. This builds the same document
-     * directly, with one deliberate difference: an indented item carries
-     * the `indent` attribute this project's own Indent extension uses,
-     * rather than a nested task list. Both render as one step of extra
-     * margin, and the flat form is the one the native editor can edit.
+     * marked, then generateJSON). marked writes each `- [ ]` as a plain
+     * `<li>` holding a checkbox the schema has no node for, and TaskItem
+     * only reads `li[data-type=taskItem]`, so what lands is a level-2
+     * heading per section and bullet lists of the items, whose done state
+     * is gone and whose indented items form a nested list. This builds that
+     * document directly, the text of each heading and item read as Markdown
+     * like marked reads it.
      */
     fun checklistEntriesToRichBlocks(entries: List<ChecklistEntry>): List<RichBlock> {
         val normalized = ChecklistItems.normalize(entries)
@@ -122,18 +123,15 @@ object NoteConversion {
                 is ChecklistSectionData -> {
                     val title = entry.title.trim()
                     if (title.isEmpty()) continue
-                    blocks.add(RichDoc.newBlock(RichBlockKind.HEADING_2).copy(text = title))
+                    blocks.add(MarkdownDoc.inlineBlock(RichBlockKind.HEADING_2, title))
                 }
                 is ChecklistItemData -> {
                     val text = entry.text.trim()
                     if (text.isEmpty()) continue
-                    blocks.add(
-                        RichDoc.newBlock(RichBlockKind.TASK_ITEM).copy(
-                            text = text,
-                            checked = entry.done,
-                            indent = entry.indent.coerceIn(0, 1),
-                        ),
-                    )
+                    // The Markdown of a first item indented under nothing is
+                    // a top-level item.
+                    val nested = entry.indent > 0 && blocks.lastOrNull()?.kind == RichBlockKind.BULLET_ITEM
+                    blocks.add(MarkdownDoc.inlineBlock(RichBlockKind.BULLET_ITEM, text).copy(nestLevel = if (nested) 1 else 0))
                 }
             }
         }

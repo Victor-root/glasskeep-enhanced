@@ -240,7 +240,7 @@ object MarkdownDoc {
         else -> RichBlockKind.HEADING_5
     }
 
-    private fun inlineBlock(kind: RichBlockKind, raw: String): RichBlock {
+    internal fun inlineBlock(kind: RichBlockKind, raw: String): RichBlock {
         val (text, marks) = MarkdownInline.parse(raw)
         return RichDoc.newBlock(kind).copy(text = text, marks = marks)
     }
