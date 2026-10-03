@@ -154,6 +154,8 @@ import com.glasskeep.app.nativeapp.data.AudioContent
 import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.DrawingContent
+import com.glasskeep.app.nativeapp.data.DrawingContentDto
+import com.glasskeep.app.nativeapp.data.DrawingStrokeDto
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.NoteImageData
@@ -2822,41 +2824,8 @@ private fun DrawingCardPreview(
         )
         Spacer(Modifier.height(8.dp))
     }
-    val dims = drawing.dimensions
-    val pageHeight = when {
-        dims == null -> Float.MAX_VALUE
-        dims.originalHeight != null -> dims.originalHeight
-        dims.height > 1000f -> dims.height / 2f
-        else -> dims.height
-    }
-    val strokes = drawing.paths.filter { stroke ->
-        stroke.tool != "eraser" && stroke.points.isNotEmpty() && stroke.points.first().y < pageHeight * 3f
-    }
-    val bounds = remember(strokes) {
-        if (strokes.isEmpty()) {
-            null
-        } else {
-            var left = Float.MAX_VALUE
-            var top = Float.MAX_VALUE
-            var right = -Float.MAX_VALUE
-            var bottom = -Float.MAX_VALUE
-            strokes.forEach { stroke ->
-                val half = stroke.size / 2f
-                stroke.points.forEach { p ->
-                    left = minOf(left, p.x - half)
-                    top = minOf(top, p.y - half)
-                    right = maxOf(right, p.x + half)
-                    bottom = maxOf(bottom, p.y + half)
-                }
-            }
-            androidx.compose.ui.geometry.Rect(
-                (left - 10f).coerceAtLeast(0f),
-                (top - 10f).coerceAtLeast(0f),
-                right + 10f,
-                bottom + 10f,
-            )
-        }
-    }
+    val preview = remember(drawing) { drawingPreviewOf(drawing) }
+    val bounds = preview.bounds
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         if (bounds == null) {
             val emptyColor = Color(0xFFE5E7EB)
@@ -2883,13 +2852,46 @@ private fun DrawingCardPreview(
                     .clip(RoundedCornerShape(4.dp)),
             ) {
                 val scale = size.width / bounds.width
-                strokes.forEach { stroke ->
+                preview.drawn.forEach { stroke ->
                     val points = stroke.points.map { Offset((it.x - bounds.left) * scale, (it.y - bounds.top) * scale) }
                     drawStroke(points, themedStrokeColor(stroke.color, dark), maxOf(1f, stroke.size) * scale)
                 }
             }
         }
     }
+}
+
+/** What DrawingPreview.jsx keeps of a drawing: the strokes with a point on
+ *  its first three pages (a page is 600 units tall without usable
+ *  dimensions), cropped to their bounds plus 10 units. A stroke of the old
+ *  eraser frames the preview like any other, though it draws nothing. */
+private class DrawingPreviewStrokes(val drawn: List<DrawingStrokeDto>, val bounds: Rect?)
+
+private fun drawingPreviewOf(drawing: DrawingContentDto): DrawingPreviewStrokes {
+    val dims = drawing.dimensions
+    val pageHeight = when {
+        dims == null || dims.width == 0f || dims.height == 0f -> 600f
+        dims.originalHeight != null && dims.originalHeight != 0f -> dims.originalHeight
+        dims.height > 1000f -> dims.height / 2f
+        else -> dims.height
+    }
+    val kept = drawing.paths.filter { stroke -> stroke.points.any { it.y < pageHeight * 3f } }
+    if (kept.isEmpty()) return DrawingPreviewStrokes(emptyList(), null)
+    var left = Float.MAX_VALUE
+    var top = Float.MAX_VALUE
+    var right = -Float.MAX_VALUE
+    var bottom = -Float.MAX_VALUE
+    kept.forEach { stroke ->
+        val half = (if (stroke.size == 0f) 2f else stroke.size) / 2f
+        stroke.points.forEach { p ->
+            left = minOf(left, p.x - half)
+            top = minOf(top, p.y - half)
+            right = maxOf(right, p.x + half)
+            bottom = maxOf(bottom, p.y + half)
+        }
+    }
+    val bounds = Rect((left - 10f).coerceAtLeast(0f), (top - 10f).coerceAtLeast(0f), right + 10f, bottom + 10f)
+    return DrawingPreviewStrokes(kept.filter { it.tool != "eraser" }, bounds)
 }
 
 /** NoteCard.jsx:428-467: up to ten recording rows, then "+N en plus". */
