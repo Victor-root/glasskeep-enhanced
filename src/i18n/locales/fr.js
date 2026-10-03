@@ -1611,6 +1611,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   oidcSaved: "Fournisseur enregistré",
   oidcNotLinkedYet: "Pas encore associé : associez votre compte pour vous connecter avec ce fournisseur.",
   oidcLinkAccount: "Associer mon compte",
+  oidcLinkPasswordHint: "L'association ajoute une façon d'entrer dans votre compte : confirmez avec votre mot de passe GlassKeep.",
+  oidcLinkPasswordPlaceholder: "Votre mot de passe GlassKeep",
   oidcEditConfig: "Modifier",
   oidcLinkedOn: "associé le {date}",
   oidcLinkedToast: "Votre compte est maintenant associé à votre fournisseur.",
