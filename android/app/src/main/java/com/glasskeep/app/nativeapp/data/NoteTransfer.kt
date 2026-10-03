@@ -268,7 +268,7 @@ object NoteTransfer {
     }
 
     private fun richFromMarkdown(markdown: String): String =
-        RichDoc.encode(MarkdownDoc.toRichBlocks(markdown))
+        RichDoc.encode(MarkdownDoc.toRichBlocks(markdown, editable = true))
 
     private fun readZip(
         context: Context,

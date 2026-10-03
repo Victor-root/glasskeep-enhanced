@@ -51,8 +51,10 @@ object MarkdownDoc {
     /** Markdown as blocks. Empty (or blank) input gives one empty
      *  paragraph, same as the web's own emptyRichDoc(). [keepBlankLines]
      *  is renderSafeMarkdown's reading (utils/markdown.jsx), where every
-     *  blank line becomes a one-line spacer, fenced code excepted. */
-    fun toRichBlocks(markdown: String, keepBlankLines: Boolean = false): List<RichBlock> {
+     *  blank line becomes a one-line spacer, fenced code excepted.
+     *  [editable] is legacyMarkdownToRichDoc's, what Tiptap's schema makes
+     *  of the HTML: no sixth level heading, inline code taking no other mark. */
+    fun toRichBlocks(markdown: String, keepBlankLines: Boolean = false, editable: Boolean = false): List<RichBlock> {
         if (markdown.isBlank()) return listOf(RichDoc.newBlock())
         val normalized = markdown.replace("\r\n", "\n").replace('\r', '\n')
         val source = if (keepBlankLines) markBlankLines(normalized) else normalized
@@ -60,11 +62,13 @@ object MarkdownDoc {
         val blocks = mutableListOf<RichBlock>()
         val paragraph = mutableListOf<String>()
 
+        fun block(kind: RichBlockKind, raw: String) = inlineBlock(kind, raw, editable)
+
         fun flushParagraph() {
             if (paragraph.isEmpty()) return
             // `breaks: true`: the lines of one paragraph stay one block,
             // separated by the hard breaks RichDoc encodes as "\n".
-            blocks.add(inlineBlock(RichBlockKind.PARAGRAPH, paragraph.joinToString("\n")))
+            blocks.add(block(RichBlockKind.PARAGRAPH, paragraph.joinToString("\n")))
             paragraph.clear()
         }
 
@@ -109,7 +113,7 @@ object MarkdownDoc {
             val underline = SETEXT_UNDERLINE.matchEntire(line)
             if (underline != null && paragraph.isNotEmpty()) {
                 val level = if (underline.groupValues[1].startsWith('=')) 1 else 2
-                blocks.add(inlineBlock(headingKind(level), paragraph.joinToString("\n").trim()))
+                blocks.add(block(headingKind(level), paragraph.joinToString("\n").trim()))
                 paragraph.clear()
                 index++
                 continue
@@ -125,14 +129,14 @@ object MarkdownDoc {
                 flushParagraph()
                 val level = heading.groupValues[1].length
                 // Tiptap's heading stops at level 5: its parser reads an h6
-                // as a paragraph, where the reading view still draws a
-                // heading, the deepest one there is.
+                // as a paragraph, where the view still draws a heading, the
+                // deepest one there is.
                 val kind = when {
                     level <= 5 -> headingKind(level)
-                    keepBlankLines -> RichBlockKind.HEADING_5
-                    else -> RichBlockKind.PARAGRAPH
+                    editable -> RichBlockKind.PARAGRAPH
+                    else -> RichBlockKind.HEADING_5
                 }
-                blocks.add(inlineBlock(kind, heading.groupValues[2].trim()))
+                blocks.add(block(kind, heading.groupValues[2].trim()))
                 index++
                 continue
             }
@@ -161,7 +165,7 @@ object MarkdownDoc {
             if (quoted != null) {
                 flushParagraph()
                 val holder = quote ?: RichQuote().also { quote = it }
-                blocks.add(inlineBlock(RichBlockKind.PARAGRAPH, quoted.groupValues[1]).copy(quotes = listOf(holder)))
+                blocks.add(block(RichBlockKind.PARAGRAPH, quoted.groupValues[1]).copy(quotes = listOf(holder)))
                 index++
                 continue
             }
@@ -169,7 +173,7 @@ object MarkdownDoc {
             if (bullet != null) {
                 flushParagraph()
                 blocks.add(
-                    inlineBlock(RichBlockKind.BULLET_ITEM, TASK_BOX.replaceFirst(bullet.groupValues[2], ""))
+                    block(RichBlockKind.BULLET_ITEM, TASK_BOX.replaceFirst(bullet.groupValues[2], ""))
                         .copy(indent = indentOf(bullet.groupValues[1])),
                 )
                 index++
@@ -182,7 +186,7 @@ object MarkdownDoc {
                 val start = numbered.groupValues[2].toIntOrNull() ?: Int.MAX_VALUE
                 val opensList = blocks.lastOrNull()?.kind != RichBlockKind.NUMBERED_ITEM
                 blocks.add(
-                    inlineBlock(RichBlockKind.NUMBERED_ITEM, TASK_BOX.replaceFirst(numbered.groupValues[3], ""))
+                    block(RichBlockKind.NUMBERED_ITEM, TASK_BOX.replaceFirst(numbered.groupValues[3], ""))
                         .copy(indent = indentOf(numbered.groupValues[1]), listStart = start.takeIf { opensList && it != 1 }),
                 )
                 index++
@@ -240,8 +244,8 @@ object MarkdownDoc {
         else -> RichBlockKind.HEADING_5
     }
 
-    internal fun inlineBlock(kind: RichBlockKind, raw: String): RichBlock {
-        val (text, marks) = MarkdownInline.parse(raw)
+    internal fun inlineBlock(kind: RichBlockKind, raw: String, editable: Boolean): RichBlock {
+        val (text, marks) = MarkdownInline.parse(raw, editable)
         return RichDoc.newBlock(kind).copy(text = text, marks = marks)
     }
 }

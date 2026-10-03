@@ -13,18 +13,25 @@ import com.glasskeep.app.nativeapp.data.pm.HtmlEntities
  * addresses GFM links and `<https://...>` are read; an image is dropped
  * and a link whose address DOMPurify would strip keeps only its text, as
  * on the web.
+ *
+ * The reading that goes through Tiptap's schema ([editable]) sets its marks
+ * as the editor does, inline code taking no other one: bold code is code,
+ * and a code span in a link is no link. The view keeps them all, as the
+ * browser draws them.
  */
 internal object MarkdownInline {
-    fun parse(raw: String): Pair<String, List<RichMark>> {
-        val fragment = Scanner(raw, inLink = false).scan()
+    fun parse(raw: String, editable: Boolean): Pair<String, List<RichMark>> {
+        val fragment = Scanner(raw, inLink = false, editable).scan()
         return fragment.text to fragment.marks
     }
 
-    /** This text under one more [type] mark, set as the editor sets it: no
-     *  second one of the same type over it, none over inline code, which
-     *  takes no other mark. */
-    private fun Fragment.marked(type: RichMarkType, value: String? = null): Fragment =
-        if (text.isEmpty()) this else Fragment(text, RichDoc.setMark(marks, type, 0, text.length, value))
+    /** This text under one more [type] mark, no second one of the same type
+     *  over it, and with [editable] none over inline code. */
+    private fun Fragment.marked(type: RichMarkType, editable: Boolean, value: String? = null): Fragment = when {
+        text.isEmpty() -> this
+        editable -> Fragment(text, RichDoc.setMark(marks, type, 0, text.length, value))
+        else -> Fragment(text, RichDoc.clearMark(marks, type, 0, text.length) + RichMark(0, text.length, type, value))
+    }
 
     private sealed interface Piece
 
@@ -57,7 +64,7 @@ internal object MarkdownInline {
         else -> false
     }
 
-    private class Scanner(private val raw: String, private val inLink: Boolean) {
+    private class Scanner(private val raw: String, private val inLink: Boolean, private val editable: Boolean) {
         private val pieces = mutableListOf<Piece>()
         private val text = StringBuilder()
         private val hasAt = '@' in raw
@@ -156,10 +163,10 @@ internal object MarkdownInline {
         private fun link(index: Int): Int? {
             val link = LinkSyntax.parse(raw, index) ?: return null
             if (inLink) return null
-            val label = Scanner(link.label, inLink = true).scan()
+            val label = Scanner(link.label, inLink = true, editable).scan()
             val href = HtmlEntities.decodeAll(link.destination, inAttribute = true)
             flush()
-            val linked = if (href.isBlank() || !RichLinks.isAllowedUri(href)) label else label.marked(RichMarkType.LINK, href)
+            val linked = if (href.isBlank() || !RichLinks.isAllowedUri(href)) label else label.marked(RichMarkType.LINK, editable, href)
             if (linked.text.isNotEmpty()) pieces.add(linked)
             return link.end
         }
@@ -260,7 +267,7 @@ internal object MarkdownInline {
                     else -> RichMarkType.ITALIC
                 }
                 val inner = flatten(pieces.subList(openerIndex + 1, closerIndex))
-                val wrapped = inner.marked(type)
+                val wrapped = inner.marked(type, editable)
                 repeat(closerIndex - openerIndex - 1) { pieces.removeAt(openerIndex + 1) }
                 pieces.add(openerIndex + 1, wrapped)
                 opener.count -= used

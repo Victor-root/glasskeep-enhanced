@@ -123,7 +123,7 @@ object NoteConversion {
                 is ChecklistSectionData -> {
                     val title = entry.title.trim()
                     if (title.isEmpty()) continue
-                    blocks.add(MarkdownDoc.inlineBlock(RichBlockKind.HEADING_2, title))
+                    blocks.add(MarkdownDoc.inlineBlock(RichBlockKind.HEADING_2, title, editable = true))
                 }
                 is ChecklistItemData -> {
                     val text = entry.text.trim()
@@ -131,7 +131,7 @@ object NoteConversion {
                     // The Markdown of a first item indented under nothing is
                     // a top-level item.
                     val nested = entry.indent > 0 && blocks.lastOrNull()?.kind == RichBlockKind.BULLET_ITEM
-                    blocks.add(MarkdownDoc.inlineBlock(RichBlockKind.BULLET_ITEM, text).copy(nestLevel = if (nested) 1 else 0))
+                    blocks.add(MarkdownDoc.inlineBlock(RichBlockKind.BULLET_ITEM, text, editable = true).copy(nestLevel = if (nested) 1 else 0))
                 }
             }
         }

@@ -1428,7 +1428,7 @@ fun NoteDetailScreen(
                                 bodyEditable = false,
                                 bodyPlainText = "",
                                 isRichEditableType = true,
-                                originalRichBlocks = MarkdownDoc.toRichBlocks(fetched.content),
+                                originalRichBlocks = MarkdownDoc.toRichBlocks(fetched.content, editable = true),
                                 legacyReadBlocks = MarkdownDoc.toRichBlocks(fetched.content, keepBlankLines = true),
                             )
                             NoteContent.isDocPlainStructure(richDoc) -> {

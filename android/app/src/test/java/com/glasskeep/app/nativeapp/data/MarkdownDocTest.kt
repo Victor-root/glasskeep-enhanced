@@ -14,8 +14,8 @@ class MarkdownDocTest {
         return "${block.kind.name.lowercase()}$indent(${block.text.replace("\n", "\\n")})" + if (marks.isEmpty()) "" else "[$marks]"
     }
 
-    private fun read(markdown: String, keepBlankLines: Boolean = false): String =
-        MarkdownDoc.toRichBlocks(markdown, keepBlankLines).joinToString(" | ") { describe(it) }
+    private fun read(markdown: String, keepBlankLines: Boolean = false, editable: Boolean = false): String =
+        MarkdownDoc.toRichBlocks(markdown, keepBlankLines, editable).joinToString(" | ") { describe(it) }
 
     @Test
     fun underscoresInsideAWordAreNotEmphasis() {
@@ -35,9 +35,16 @@ class MarkdownDocTest {
     }
 
     @Test
-    fun marksNeverStackOnTheirOwnTypeNorOnInlineCode() {
-        assertEquals("paragraph(a b c)[bold:0-2 code:2-3 bold:3-5]", read("**a `b` c**"))
+    fun marksNeverStackOnTheirOwnType() {
         assertEquals("paragraph(a b c)[bold:0-5]", read("**a **b** c**"))
+    }
+
+    @Test
+    fun theViewKeepsMarksOverInlineCodeWhereTheSchemaDropsThem() {
+        assertEquals("paragraph(a b c)[bold:0-5 code:2-3]", read("**a `b` c**"))
+        assertEquals("paragraph(a b c)[bold:0-2 code:2-3 bold:3-5]", read("**a `b` c**", editable = true))
+        assertEquals("paragraph(a)[code:0-1 link:0-1=./a.md]", read("[`a`](./a.md)"))
+        assertEquals("paragraph(a)[code:0-1]", read("[`a`](./a.md)", editable = true))
     }
 
     @Test
@@ -100,10 +107,10 @@ class MarkdownDocTest {
 
     @Test
     fun sixthLevelHeadingIsAParagraphInTheEditorAndTheDeepestHeadingWhenRead() {
-        assertEquals("paragraph(six)", read("###### six"))
-        assertEquals("heading_5(six)", read("###### six", keepBlankLines = true))
+        assertEquals("paragraph(six)", read("###### six", editable = true))
+        assertEquals("heading_5(six)", read("###### six"))
         assertEquals("heading_1(a) | heading_2(b)", read("# a #\n## b ##"))
-        assertEquals("paragraph(#######)", read("#######"))
+        assertEquals("paragraph(#######)", read("#######", editable = true))
     }
 
     @Test
