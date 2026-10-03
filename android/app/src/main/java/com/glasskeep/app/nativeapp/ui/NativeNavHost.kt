@@ -938,7 +938,7 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     prefs.shellTheme?.let { container.themeState.apply(it) }
     prefs.editorToolbarMode?.let { container.editorPrefs.applyToolbarMode(it) }
     prefs.typography?.let { container.editorPrefs.applyTypography(it) }
-    AppLanguage.apply(prefs.profile?.language)
+    prefs.profile?.language?.let { AppLanguage.apply(it) }
     prefs.profile?.let {
         container.shellPrefs.applyIsAdmin(it.isAdmin)
         container.tokenStore.profile = it
