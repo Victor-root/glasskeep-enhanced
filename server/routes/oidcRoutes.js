@@ -37,7 +37,6 @@ const {
   normalizeIssuer,
   normalizeOrigin,
   callbackUrlFor,
-  forgetConfiguration,
   beginAuthorization,
   completeAuthorization,
   testIssuer,
@@ -47,12 +46,13 @@ const { createOidcStore } = require("../oidc/store");
 
 const FLOW_TTL_MS = 10 * 60 * 1000;
 const TICKET_TTL_MS = 60 * 1000;
-const MAX_PENDING = 500;
+const MAX_PENDING = 5000;
 const MAX_DISPLAY_NAME_LEN = 40;
 const MAX_ACCOUNT_NAME_LEN = 80;
 const BINDING_COOKIE = "gk_oidc";
 const BINDING_COOKIE_PATH = "/api/auth/oidc";
 const BINDING_RE = /^[A-Za-z0-9_-]{43}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+$/;
 
 function nowIso() {
   return new Date().toISOString();
@@ -185,7 +185,7 @@ function attachOidcRoutes(app, deps) {
       return { user };
     }
     if (!provider.auto_create_accounts) return { error: "oidc_no_account" };
-    if (!identity.email) return { error: "oidc_email_missing" };
+    if (!EMAIL_RE.test(identity.email)) return { error: "oidc_email_missing" };
     // ADMIN_EMAILS promotes matching accounts at every boot, so an
     // account created here under one of those addresses would become an
     // admin on the provider's word. It has to be created and linked by
@@ -371,7 +371,6 @@ function attachOidcRoutes(app, deps) {
       enabled: enabled ? 1 : 0,
       auto_create_accounts: autoCreateAccounts ? 1 : 0,
     }, req.user.id);
-    forgetConfiguration(saved.id);
     log.info?.(`[oidc] provider ${saved.id} saved by admin=${req.user.id} enabled=${enabled}`);
     res.json({ provider: adminView(saved) });
   });

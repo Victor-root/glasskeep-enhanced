@@ -4663,7 +4663,7 @@ export default function App() {
     if (ticket) {
       exchangeOidcTicket(ticket)
         .then(completeLogin)
-        .catch((e) => setOidcLoginError(e?.message || "oidc_failed"));
+        .catch((e) => setOidcLoginError(e || "oidc_failed"));
     } else if (error && !token) {
       setOidcLoginError(error);
     } else if (error) {
