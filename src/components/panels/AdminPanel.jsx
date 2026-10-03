@@ -8,6 +8,7 @@ import AiAdminSection from "./AiAdminSection.jsx";
 import AdminUpdateSection from "../admin/AdminUpdateSection.jsx";
 import FederationSection from "../admin/federation/FederationSection.jsx";
 import LoginBrandingSection from "./LoginBrandingSection.jsx";
+import OidcAdminSection from "../admin/OidcAdminSection.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import { RowIcon, SettingsSection } from "../common/SettingsAccordion.jsx";
 const SectionHeaderIcon = RowIcon;
@@ -873,6 +874,22 @@ export default function AdminPanel({
             >
             <div className="pl-3">
               <AiAdminSection token={authToken} showToast={showToast} />
+            </div>
+            </SettingsSection>
+          </div>
+
+          {/* Single sign-on through an OpenID Connect provider. The
+              client secret is write-only; the callback is derived from
+              the address this panel is open on. */}
+          <div className="mb-2">
+            <SettingsSection
+              icon={TI.UserCircle}
+              title={t("oidcSectionTitle")}
+              open={openSections.oidc}
+              onToggle={() => toggleSection("oidc")}
+            >
+            <div className="pl-3">
+              <OidcAdminSection token={authToken} showToast={showToast} />
             </div>
             </SettingsSection>
           </div>

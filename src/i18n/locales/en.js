@@ -1569,4 +1569,77 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedErrNotPending: "This invitation was already handled.",
   fedErrGeneric:
     "Could not send the invitation. Check the address and try again.",
+
+  // single sign-on (OpenID Connect)
+  oidcSectionTitle: "Single sign-on (SSO)",
+  oidcIntro:
+    "Let people sign in with an OpenID Connect provider such as Authentik, Keycloak or Authelia. Create an OAuth2/OpenID application at your provider, then fill in what it gives you.",
+  oidcHttpWarning:
+    "GlassKeep is not open over HTTPS here. Most providers refuse a plain http callback address, and sign-in data would travel unencrypted. Put GlassKeep behind HTTPS before relying on SSO.",
+  oidcEnableLabel: "Enable OpenID Connect",
+  oidcEnableDesc: "Adds a sign-in button for this provider on the login screen.",
+  oidcPublicUrlLabel: "GlassKeep public address",
+  oidcCallbackLabel: "Redirect URI to declare at the provider",
+  oidcCallbackHint:
+    "Both are taken from the address this page is open on. Open the admin panel from the address your users use, then save.",
+  oidcOriginChanged:
+    "The saved configuration uses {saved}. Saving from this page will switch it to this address, and the redirect URI at the provider must match.",
+  oidcDisplayNameLabel: "Provider name",
+  oidcDisplayNamePlaceholder: "Authentik",
+  oidcDisplayNameHint: "Shown on the button: \"Sign in with …\".",
+  oidcIssuerLabel: "Issuer URL",
+  oidcIssuerHint:
+    "The provider's issuer, exactly as it publishes it (trailing slash included). GlassKeep reads everything else from its .well-known/openid-configuration.",
+  oidcClientIdLabel: "Client ID",
+  oidcClientSecretLabel: "Client secret",
+  oidcClientSecretPlaceholderSet: "Saved (leave empty to keep it)",
+  oidcClientSecretHint: "Stays on the server: it is never sent back to a browser.",
+  oidcAutoCreateLabel: "Create accounts automatically",
+  oidcAutoCreateDesc:
+    "Someone who signs in for the first time gets a GlassKeep account, if no account uses their email yet. Turn off to only let existing accounts that linked the provider in.",
+  oidcAdminRightsNote:
+    "Accounts created this way are regular users: groups or claims from the provider never grant admin rights. An existing account links the provider from Settings > Security.",
+  oidcTestButton: "Test the configuration",
+  oidcTesting: "Testing…",
+  oidcTestOk: "Provider found, {count} signing key(s) published.",
+  oidcTestWarnIssuerHttp: "The issuer is not served over HTTPS.",
+  oidcTestWarnPkce: "The provider does not advertise PKCE S256. GlassKeep sends it anyway.",
+  oidcTestCredentialsNote: "The client ID and secret are checked at the first sign-in.",
+  oidcAdvertisedIssuer: "The provider publishes this issuer: {issuer}",
+  oidcUseAdvertisedIssuer: "Use it",
+  oidcSaved: "Single sign-on settings saved",
+  oidcSignIn: "Sign in with {provider}",
+  oidcSignInProgress: "Redirecting…",
+  oidcWrongOrigin: "To sign in with this provider, open GlassKeep at {origin}.",
+  oidcLinkedToast: "Your account is now linked to the provider.",
+  oidcSettingsTitle: "Single sign-on",
+  oidcSettingsSubtitle: "Link your account to sign in through your organisation's provider.",
+  oidcLinkWith: "Link {provider}",
+  oidcLinkedOn: "linked {date}",
+  oidcRemovedProvider: "Provider no longer configured",
+  oidcUnlink: "Unlink",
+  oidcUnlinkTitle: "Unlink this provider?",
+  oidcUnlinkConfirm: "You will no longer be able to sign in with {provider} until you link it again.",
+  oidcUnlinkedToast: "{provider} unlinked",
+  oidcNoPasswordHint:
+    "This account has no password, so the provider is its only way in and cannot be unlinked. An admin can set a password for it.",
+  oidcErrFailed: "Sign-in with the provider failed. Try again, or contact your administrator.",
+  oidcErrExpired: "This sign-in attempt expired or was started in another browser. Please try again.",
+  oidcErrDenied: "Sign-in was cancelled at the provider.",
+  oidcErrUnavailable: "Single sign-on is not available right now.",
+  oidcErrAccountExists:
+    "An account already uses this email. Sign in another way, then link the provider from Settings > Security.",
+  oidcErrNoAccount: "No GlassKeep account is linked to this identity. Ask your administrator.",
+  oidcErrEmailMissing:
+    "The provider did not share an email address, which is needed to create your account. Ask your administrator.",
+  oidcErrIdentityInUse: "This identity is already linked to another GlassKeep account.",
+  oidcErrPasswordRequired: "Set a password before unlinking the provider, or you could no longer sign in.",
+  oidcErrIssuerInvalid: "The issuer must be an http(s) address, with no query or fragment.",
+  oidcErrOriginInvalid: "GlassKeep's own address could not be determined from this page.",
+  oidcErrIncomplete: "Fill in the provider name, issuer, client ID and client secret before enabling.",
+  oidcErrIssuerMismatch:
+    "The provider publishes a different issuer than the one entered. It has to match exactly.",
+  oidcErrDiscoveryFailed:
+    "The provider could not be reached, or its .well-known/openid-configuration is not valid.",
+  oidcErrJwksFailed: "The provider's signing keys (JWKS) could not be read.",
 };

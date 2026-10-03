@@ -1570,4 +1570,77 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedErrNotPending: "Cette invitation a déjà été traitée.",
   fedErrGeneric:
     "Impossible d'envoyer l'invitation. Vérifiez l'adresse et réessayez.",
+
+  // connexion unique (OpenID Connect)
+  oidcSectionTitle: "Connexion unique (SSO)",
+  oidcIntro:
+    "Permettez la connexion avec un fournisseur OpenID Connect comme Authentik, Keycloak ou Authelia. Créez une application OAuth2/OpenID chez votre fournisseur, puis reportez ici ce qu'il vous donne.",
+  oidcHttpWarning:
+    "GlassKeep n'est pas ouvert en HTTPS ici. La plupart des fournisseurs refusent une adresse de retour en http, et les données de connexion circuleraient en clair. Placez GlassKeep derrière HTTPS avant de compter sur le SSO.",
+  oidcEnableLabel: "Activer OpenID Connect",
+  oidcEnableDesc: "Ajoute un bouton de connexion pour ce fournisseur sur la page de connexion.",
+  oidcPublicUrlLabel: "Adresse publique de GlassKeep",
+  oidcCallbackLabel: "URI de redirection à déclarer chez le fournisseur",
+  oidcCallbackHint:
+    "Les deux viennent de l'adresse sur laquelle cette page est ouverte. Ouvrez le panneau d'administration depuis l'adresse qu'utilisent vos utilisateurs, puis enregistrez.",
+  oidcOriginChanged:
+    "La configuration enregistrée utilise {saved}. Enregistrer depuis cette page la fera passer sur cette adresse, et l'URI de redirection chez le fournisseur devra correspondre.",
+  oidcDisplayNameLabel: "Nom du fournisseur",
+  oidcDisplayNamePlaceholder: "Authentik",
+  oidcDisplayNameHint: "Affiché sur le bouton : « Se connecter avec … ».",
+  oidcIssuerLabel: "URL de l'émetteur (issuer)",
+  oidcIssuerHint:
+    "L'issuer du fournisseur, exactement tel qu'il le publie (barre oblique finale comprise). GlassKeep lit tout le reste dans son .well-known/openid-configuration.",
+  oidcClientIdLabel: "Identifiant client (Client ID)",
+  oidcClientSecretLabel: "Secret client (Client Secret)",
+  oidcClientSecretPlaceholderSet: "Enregistré (laisser vide pour le conserver)",
+  oidcClientSecretHint: "Reste sur le serveur : il n'est jamais renvoyé à un navigateur.",
+  oidcAutoCreateLabel: "Créer les comptes automatiquement",
+  oidcAutoCreateDesc:
+    "Une personne qui se connecte pour la première fois reçoit un compte GlassKeep, si aucun compte n'utilise déjà son e-mail. Désactivez pour ne laisser entrer que les comptes existants qui ont associé le fournisseur.",
+  oidcAdminRightsNote:
+    "Les comptes créés ainsi sont des utilisateurs ordinaires : les groupes ou attributs du fournisseur ne donnent jamais les droits d'administrateur. Un compte existant associe le fournisseur depuis Paramètres > Sécurité.",
+  oidcTestButton: "Tester la configuration",
+  oidcTesting: "Test en cours…",
+  oidcTestOk: "Fournisseur trouvé, {count} clé(s) de signature publiée(s).",
+  oidcTestWarnIssuerHttp: "L'issuer n'est pas servi en HTTPS.",
+  oidcTestWarnPkce: "Le fournisseur n'annonce pas PKCE S256. GlassKeep l'envoie quand même.",
+  oidcTestCredentialsNote: "L'identifiant et le secret client sont vérifiés à la première connexion.",
+  oidcAdvertisedIssuer: "Le fournisseur publie cet issuer : {issuer}",
+  oidcUseAdvertisedIssuer: "L'utiliser",
+  oidcSaved: "Réglages de connexion unique enregistrés",
+  oidcSignIn: "Se connecter avec {provider}",
+  oidcSignInProgress: "Redirection…",
+  oidcWrongOrigin: "Pour vous connecter avec ce fournisseur, ouvrez GlassKeep à l'adresse {origin}.",
+  oidcLinkedToast: "Votre compte est maintenant associé au fournisseur.",
+  oidcSettingsTitle: "Connexion unique",
+  oidcSettingsSubtitle: "Associez votre compte pour vous connecter via le fournisseur de votre organisation.",
+  oidcLinkWith: "Associer {provider}",
+  oidcLinkedOn: "associé le {date}",
+  oidcRemovedProvider: "Fournisseur qui n'est plus configuré",
+  oidcUnlink: "Dissocier",
+  oidcUnlinkTitle: "Dissocier ce fournisseur ?",
+  oidcUnlinkConfirm: "Vous ne pourrez plus vous connecter avec {provider} tant que vous ne l'aurez pas associé à nouveau.",
+  oidcUnlinkedToast: "{provider} dissocié",
+  oidcNoPasswordHint:
+    "Ce compte n'a pas de mot de passe : le fournisseur est son seul accès et ne peut donc pas être dissocié. Un administrateur peut lui définir un mot de passe.",
+  oidcErrFailed: "La connexion avec le fournisseur a échoué. Réessayez, ou contactez votre administrateur.",
+  oidcErrExpired: "Cette tentative de connexion a expiré ou a été lancée dans un autre navigateur. Veuillez réessayer.",
+  oidcErrDenied: "La connexion a été annulée chez le fournisseur.",
+  oidcErrUnavailable: "La connexion unique n'est pas disponible pour le moment.",
+  oidcErrAccountExists:
+    "Un compte utilise déjà cet e-mail. Connectez-vous autrement, puis associez le fournisseur depuis Paramètres > Sécurité.",
+  oidcErrNoAccount: "Aucun compte GlassKeep n'est associé à cette identité. Adressez-vous à votre administrateur.",
+  oidcErrEmailMissing:
+    "Le fournisseur n'a pas communiqué d'adresse e-mail, nécessaire pour créer votre compte. Adressez-vous à votre administrateur.",
+  oidcErrIdentityInUse: "Cette identité est déjà associée à un autre compte GlassKeep.",
+  oidcErrPasswordRequired: "Définissez un mot de passe avant de dissocier le fournisseur, sinon vous ne pourriez plus vous connecter.",
+  oidcErrIssuerInvalid: "L'issuer doit être une adresse http(s), sans paramètres ni fragment.",
+  oidcErrOriginInvalid: "L'adresse de GlassKeep n'a pas pu être déterminée depuis cette page.",
+  oidcErrIncomplete: "Renseignez le nom du fournisseur, l'issuer, l'identifiant et le secret client avant d'activer.",
+  oidcErrIssuerMismatch:
+    "Le fournisseur publie un autre issuer que celui saisi. Il doit correspondre exactement.",
+  oidcErrDiscoveryFailed:
+    "Le fournisseur est injoignable, ou son .well-known/openid-configuration n'est pas valide.",
+  oidcErrJwksFailed: "Les clés de signature (JWKS) du fournisseur n'ont pas pu être lues.",
 };

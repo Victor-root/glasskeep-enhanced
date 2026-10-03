@@ -9,6 +9,7 @@ import TI from "../../icons/editor/index.jsx";
 import { fileToCompressedDataURL } from "../../utils/helpers.js";
 import TypographyModal from "./TypographyModal.jsx";
 import PasskeySettingsSection from "../settings/PasskeySettingsSection.jsx";
+import OidcSettingsSection from "../settings/OidcSettingsSection.jsx";
 import UserAiSettingsSection from "../settings/UserAiSettingsSection.jsx";
 import PushNotificationToggle from "../settings/PushNotificationToggle.jsx";
 import WorkspaceThemeSection from "../settings/WorkspaceThemeSection.jsx";
@@ -495,6 +496,16 @@ export default function SettingsPanel({
                 visible={open}
               />
             </div>
+
+            {/* Single sign-on: identities from the admin-configured
+                provider linked to this account. Hidden while the
+                instance has no provider. */}
+            <OidcSettingsSection
+              token={token}
+              showToast={showToast}
+              showGenericConfirm={showGenericConfirm}
+              visible={open}
+            />
             </div>
             </SettingsSection>
           </div>

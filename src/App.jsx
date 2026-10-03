@@ -53,6 +53,7 @@ import LoginView from "./components/auth/LoginView.jsx";
 import RegisterView from "./components/auth/RegisterView.jsx";
 import SecretLoginView from "./components/auth/SecretLoginView.jsx";
 import ChangePasswordModal from "./components/auth/ChangePasswordModal.jsx";
+import { exchangeOidcTicket, oidcErrorMessage, takeOidcRedirectResult } from "./auth/oidcClient.js";
 import TagSidebar from "./components/panels/TagSidebar.jsx";
 import SettingsPanel from "./components/panels/SettingsPanel.jsx";
 import AdminPanel from "./components/panels/AdminPanel.jsx";
@@ -4653,6 +4654,25 @@ export default function App() {
     navigate("#/notes");
     return { ok: true };
   };
+  // Back from the single sign-on provider: the server left a one-time
+  // ticket to trade for a session, the outcome of linking an identity
+  // from the settings, or the reason it failed. Read once, at boot.
+  const [oidcLoginError, setOidcLoginError] = useState(null);
+  useEffect(() => {
+    const { ticket, error, linked } = takeOidcRedirectResult();
+    if (ticket) {
+      exchangeOidcTicket(ticket)
+        .then(completeLogin)
+        .catch((e) => setOidcLoginError(e?.message || "oidc_failed"));
+    } else if (error && !token) {
+      setOidcLoginError(error);
+    } else if (error) {
+      showToast(oidcErrorMessage(error), "error");
+    } else if (linked) {
+      showToast(t("oidcLinkedToast"), "success");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const signIn = async (email, password) => {
     const res = await api("/login", {
       method: "POST",
@@ -7472,6 +7492,7 @@ export default function App() {
         onLogin={signIn}
         onLoginById={signInById}
         onPasskeyLogin={completeLogin}
+        oidcError={oidcLoginError}
         goRegister={() => navigate("#/register")}
         goSecret={() => navigate("#/login-secret")}
         allowRegistration={allowRegistration}
