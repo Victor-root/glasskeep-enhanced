@@ -1054,6 +1054,7 @@
     <string name="native_admin_creating">En cours...</string>
     <string name="native_admin_create_user_cta">Créer l\'utilisateur</string>
     <string name="native_admin_fill_required">Veuillez remplir tous les champs requis</string>
+    <string name="native_admin_name_email_required">Le nom et l’e-mail sont obligatoires</string>
     <string name="native_admin_user_created">Utilisateur créé avec succès !</string>
     <string name="native_admin_edit_user_title">Modifier l\'utilisateur</string>
     <string name="native_admin_reset_password_label">Réinitialiser le mot de passe (laisser vide pour conserver l\'actuel)</string>

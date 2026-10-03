@@ -434,8 +434,8 @@ private fun CountPill(count: Int, background: Color, textColor: Color) {
  * The edit modal (AdminPanel.jsx:922-1014): a borderless card on a 50%
  * scrim that a tap outside leaves open, its pencil and title, the name,
  * address and reset-password fields, the admin switch, then Cancel and
- * "Update User". The browser's `required` keeps an emptied name or address
- * from submitting at all.
+ * "Update User". An emptied name or address is refused with a message, in
+ * place of the browser's own "required" bubble.
  */
 @Composable
 private fun EditUserDialog(
@@ -457,7 +457,11 @@ private fun EditUserDialog(
     var admin by rememberSaveable(user.id) { mutableStateOf(user.isAdmin) }
     var updating by remember { mutableStateOf(false) }
     fun submit() {
-        if (updating || name.isEmpty() || email.isEmpty()) return
+        if (updating) return
+        if (name.isEmpty() || email.isEmpty()) {
+            toasts.error(context.getString(R.string.native_admin_name_email_required))
+            return
+        }
         updating = true
         scope.launch {
             try {

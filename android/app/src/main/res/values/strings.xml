@@ -1065,6 +1065,7 @@
     <string name="native_admin_creating">Creating...</string>
     <string name="native_admin_create_user_cta">Create User</string>
     <string name="native_admin_fill_required">Please fill in all required fields</string>
+    <string name="native_admin_name_email_required">Name and email are required</string>
     <string name="native_admin_user_created">User created successfully!</string>
     <string name="native_admin_edit_user_title">Edit User</string>
     <string name="native_admin_reset_password_label">Reset password (leave empty to keep current)</string>
