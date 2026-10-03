@@ -623,7 +623,15 @@ export default function ModalFooter({
               onClick={onOpenCollaboration}
               data-tooltip={hasCollabs || !isDesktop ? t("collaborate") : undefined}
             >
-              <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} fill="currentColor" viewBox="0 0 20 20">
+              {/* 20px, not the 18px every other mobile footer icon here uses:
+                  this glyph's own ink only fills about 60% of its 20-unit
+                  viewBox (the two head circles and the body sit well
+                  inside the edges, unlike e.g. the tag icon's outline,
+                  which runs almost edge to edge), so at the same box size
+                  it reads visibly smaller than its neighbours. Sized up to
+                  match the footer's own bigger tier (trash/kebab/image are
+                  already 20px) instead of redrawing the glyph. */}
+              <svg className={isDesktop ? "w-4 h-4" : "w-[20px] h-[20px]"} fill="currentColor" viewBox="0 0 20 20">
                 <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
               </svg>
               {hasCollabs && isDesktop && (
