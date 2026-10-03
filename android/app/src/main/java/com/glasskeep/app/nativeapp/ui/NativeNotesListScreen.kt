@@ -761,12 +761,23 @@ fun NativeNotesListScreen(
         if (!refreshing) loadView(activeTagFilter)
     }
 
-    fun createNote(create: suspend () -> NoteDto) {
+    /** A new note keeps the tag filters on screen so it stays in the
+     *  list, except under the images and reminders lenses
+     *  (getInitialTagsForNewNote, App.jsx:5188-5207). */
+    fun tagsForNewNote(): List<String> =
+        if (activeTagFilter == SidebarAllImages || activeTagFilter == SidebarReminders) {
+            emptyList()
+        } else {
+            activeTagFilters.distinctBy { it.lowercase() }
+        }
+
+    fun createNote(create: suspend (List<String>) -> NoteDto) {
         if (creatingNote) return
         creatingNote = true
+        val tags = tagsForNewNote()
         scope.launch {
             try {
-                val note = create()
+                val note = create(tags)
                 NativeDebug.d("Created ${note.type} note id=${note.id}")
                 SyncQueueWorker.triggerNow(context)
                 onOpenNewNote(note.id)

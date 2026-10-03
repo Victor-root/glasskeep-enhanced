@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
+import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -349,7 +350,7 @@ private fun MiniCalendar(
     onNextMonth: () -> Unit,
     onPick: (Int, Int, Int) -> Unit,
 ) {
-    val locale = Locale.getDefault()
+    val locale = remember { if (AppLanguage.currentTag() == "fr") Locale.FRANCE else Locale.US }
     val monthTitle = remember(viewYear, viewMonth, locale) {
         val cal = Calendar.getInstance().apply { set(viewYear, viewMonth, 1) }
         SimpleDateFormat("LLLL yyyy", locale).format(cal.time)

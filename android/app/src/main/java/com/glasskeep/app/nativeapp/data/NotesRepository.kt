@@ -320,12 +320,13 @@ class NotesRepository(
         return local
     }
 
-    private suspend fun createBlankNote(type: String): NoteDto {
+    private suspend fun createBlankNote(type: String, tags: List<String>): NoteDto {
         val instant = nowIso()
         return createNoteQueued(
             CreateNoteRequest(
                 id = UUID.randomUUID().toString(),
                 type = type,
+                tags = tags,
                 position = System.currentTimeMillis().toDouble(),
                 timestamp = instant,
                 clientUpdatedAt = instant,
@@ -333,9 +334,9 @@ class NotesRepository(
         )
     }
 
-    suspend fun createTextNote(): NoteDto {
+    suspend fun createTextNote(tags: List<String> = emptyList()): NoteDto {
         NativeDebug.d("NotesRepository.createTextNote queued")
-        return createBlankNote("text")
+        return createBlankNote("text", tags)
     }
 
     /** Direct idempotent POST used only by [SyncQueueWorker]. */
@@ -353,24 +354,24 @@ class NotesRepository(
 
     /** Creates a new, empty checklist note (no seeded item: matches the
      *  web's own fresh checklist draft, see useDraftNote.js). */
-    suspend fun createChecklistNote(): NoteDto {
+    suspend fun createChecklistNote(tags: List<String> = emptyList()): NoteDto {
         NativeDebug.d("NotesRepository.createChecklistNote queued")
-        return createBlankNote("checklist")
+        return createBlankNote("checklist", tags)
     }
 
     /** Creates a new, empty drawing note (no content at all: DrawingEditor
      *  treats a blank canvas the same way DrawingContent.parse treats a
      *  blank/new note, no seeded strokes needed). */
-    suspend fun createDrawingNote(): NoteDto {
+    suspend fun createDrawingNote(tags: List<String> = emptyList()): NoteDto {
         NativeDebug.d("NotesRepository.createDrawingNote queued")
-        return createBlankNote("draw")
+        return createBlankNote("draw", tags)
     }
 
     /** Creates a new, empty audio note (no clips yet: AudioContent.parse
      *  treats a blank/new note the same way, no seeded content needed). */
-    suspend fun createAudioNote(): NoteDto {
+    suspend fun createAudioNote(tags: List<String> = emptyList()): NoteDto {
         NativeDebug.d("NotesRepository.createAudioNote queued")
-        return createBlankNote("audio")
+        return createBlankNote("audio", tags)
     }
 
     /**
