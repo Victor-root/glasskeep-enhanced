@@ -1346,9 +1346,7 @@ class NotesRepository(
      *  returns it again after this call, only its hash is kept. */
     suspend fun generateSecretKey(): String {
         NativeDebug.d("NotesRepository.generateSecretKey")
-        val request = "POST /api/secret-key"
-        return api.generateSecretKey().bodyOrRefusal(request).key
-            ?: throw IllegalStateException("$request: ok response with no key")
+        return api.generateSecretKey().bodyOrRefusal("POST /api/secret-key").key
     }
 
     /** Registered passkeys for this account and whether the instance can

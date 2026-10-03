@@ -263,7 +263,7 @@ fun NotificationCenter(
                         val localToast = localToasts[notification.id]
                         val actions = buildList {
                             if (notification.noteId != null && openLabel != null) {
-                                add(CardAction(stringResource(openLabel), primary = true) { notification.noteId?.let(onOpenNote) })
+                                add(CardAction(stringResource(openLabel), primary = true) { onOpenNote(notification.noteId) })
                             }
                             if (pendingId != null) {
                                 fun decide(approve: Boolean) {

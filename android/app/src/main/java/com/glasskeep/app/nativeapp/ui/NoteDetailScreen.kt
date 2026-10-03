@@ -1890,7 +1890,7 @@ fun NoteDetailScreen(
                 if (removeEmpty) {
                     cancelPendingAutosaves()
                     repository.removeEmptyNoteQueued(current.id)
-                    if (!isNew || workedOn || edit?.isDrawType == true) {
+                    if (!isNew || workedOn || edit.isDrawType) {
                         toasts.show(emptyRemovedMessage, NotifVariant.INFO, icon = "trash", durationMs = 3_000L)
                     }
                 } else {
