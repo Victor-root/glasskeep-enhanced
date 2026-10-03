@@ -51,7 +51,7 @@ function CopyRow({ label, value }) {
     <div className="space-y-1">
       <div className={LABEL_CLASSES}>{label}</div>
       <div className="flex items-center gap-2">
-        <code className="flex-1 min-w-0 text-xs font-mono text-gray-800 dark:text-gray-100 bg-white dark:bg-black/40 border border-[var(--border-light)] rounded-md px-2 py-1.5 whitespace-nowrap overflow-x-auto">
+        <code className="flex-1 min-w-0 text-xs font-mono text-gray-800 dark:text-gray-100 bg-white dark:bg-black/40 border border-[var(--border-light)] rounded-md px-2 py-1.5 break-all">
           {value}
         </code>
         <CopyButton value={value} />

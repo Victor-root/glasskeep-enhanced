@@ -84,9 +84,10 @@
       }
     }
 
-    document.title = t("meta.title");
+    // Sub-pages name their own title and description keys on <html>.
+    document.title = t(root.dataset.titleKey || "meta.title");
     var desc = document.querySelector('meta[name="description"]');
-    if (desc) desc.setAttribute("content", t("meta.desc"));
+    if (desc) desc.setAttribute("content", t(root.dataset.descKey || "meta.desc"));
 
     var label = document.getElementById("langCurrent");
     if (label) label.textContent = lang.toUpperCase();
@@ -324,13 +325,20 @@
   }
 
   /* ── Copy buttons ─────────────────────────────────────────────────── */
+  // `.copy-btn` swaps its own label; `.copy-chip` (inline values) only flashes.
   function initCopy() {
-    var buttons = document.querySelectorAll(".copy-btn");
+    var buttons = document.querySelectorAll(".copy-btn, .copy-chip");
     for (var i = 0; i < buttons.length; i++) {
-      buttons[i].addEventListener("click", function () {
+      var onCopy = function () {
         var btn = this;
         var text = btn.dataset.copy || "";
+        var chip = btn.classList.contains("copy-chip");
         var done = function () {
+          if (chip) {
+            btn.classList.add("copied");
+            setTimeout(function () { btn.classList.remove("copied"); }, 1000);
+            return;
+          }
           btn.textContent = t("copied");
           setTimeout(function () { btn.textContent = t("copy"); }, 1600);
         };
@@ -344,8 +352,64 @@
           try { document.execCommand("copy"); done(); } catch (e) { /* ignore */ }
           document.body.removeChild(ta);
         }
-      });
+      };
+      buttons[i].addEventListener("click", onCopy);
+      if (buttons[i].classList.contains("copy-chip")) {
+        buttons[i].addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onCopy.call(this); }
+        });
+      }
     }
+  }
+
+  /* ── Tabs ─────────────────────────────────────────────────────────── */
+  // Panels are all visible without JavaScript; here only the active one
+  // stays. A tab can be deep-linked with its #hash, and arrow keys move
+  // between tabs as the ARIA tabs pattern expects.
+  function initTabs() {
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+    if (!tabs.length) return;
+
+    function select(tab, focus) {
+      tabs.forEach(function (other) {
+        var on = other === tab;
+        other.setAttribute("aria-selected", on ? "true" : "false");
+        other.tabIndex = on ? 0 : -1;
+        document.getElementById(other.getAttribute("aria-controls")).hidden = !on;
+      });
+      if (focus) tab.focus();
+    }
+
+    function fromHash() {
+      var h = location.hash.replace("#", "");
+      for (var i = 0; i < tabs.length; i++) {
+        if (tabs[i].dataset.hash === h) return tabs[i];
+      }
+      return null;
+    }
+
+    tabs.forEach(function (tab, i) {
+      tab.addEventListener("click", function () {
+        select(tab, false);
+        if (history.replaceState) history.replaceState(null, "", "#" + tab.dataset.hash);
+      });
+      tab.addEventListener("keydown", function (e) {
+        var to = -1;
+        if (e.key === "ArrowRight") to = (i + 1) % tabs.length;
+        else if (e.key === "ArrowLeft") to = (i - 1 + tabs.length) % tabs.length;
+        else if (e.key === "Home") to = 0;
+        else if (e.key === "End") to = tabs.length - 1;
+        if (to < 0) return;
+        e.preventDefault();
+        select(tabs[to], true);
+      });
+    });
+
+    select(fromHash() || tabs[0], false);
+    window.addEventListener("hashchange", function () {
+      var tab = fromHash();
+      if (tab) select(tab, false);
+    });
   }
 
   /* ── Screenshot lightbox ──────────────────────────────────────────── */
@@ -364,10 +428,22 @@
 
   var lb, lbImg, lbBackdrop, lbMeta, lbCaption, lbCount, lbClose, lbPrev, lbNext;
 
+  // The variant the page is showing right now: CSS picks it from the mode
+  // and, for localized shots, the language, so ask which one is rendered.
   function activeImg(media) {
-    var wantDark = root.getAttribute("data-mode") === "dark";
-    var sel = wantDark ? ".shot-dark" : ".shot-light";
-    return media.querySelector(sel) || media.querySelector("img");
+    var imgs = media.querySelectorAll("img");
+    for (var i = 0; i < imgs.length; i++) {
+      if (imgs[i].getClientRects().length) return imgs[i];
+    }
+    return imgs[0];
+  }
+
+  // Screenshots inside a hidden tab panel are not part of the gallery.
+  function visibleMedia() {
+    return Array.prototype.filter.call(
+      document.querySelectorAll(".shot-media"),
+      function (m) { return m.getClientRects().length > 0; }
+    );
   }
 
   // Classic "object-fit: contain" math, capped at 1x so UI screenshots never
@@ -467,8 +543,10 @@
     }
   }
 
-  function open(index, media) {
+  function open(media) {
     if (!lb || lbIndex !== -1) return;
+    gallery = visibleMedia();
+    var index = gallery.indexOf(media);
     lbOpenerMedia = media;
     var openerImg = activeImg(media);
     var rect = openerImg.getBoundingClientRect();
@@ -592,13 +670,12 @@
     lbPrev = document.getElementById("lightboxPrev");
     lbNext = document.getElementById("lightboxNext");
 
-    gallery = Array.prototype.slice.call(document.querySelectorAll(".shot-media"));
-    gallery.forEach(function (media, index) {
+    Array.prototype.forEach.call(document.querySelectorAll(".shot-media"), function (media) {
       media.setAttribute("role", "button");
       media.setAttribute("tabindex", "0");
-      media.addEventListener("click", function () { open(index, media); });
+      media.addEventListener("click", function () { open(media); });
       media.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(index, media); }
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(media); }
       });
     });
 
@@ -621,6 +698,7 @@
   initNav();
   initReveal();
   initCopy();
+  initTabs();
   initLightbox();
 
   var year = document.getElementById("year");
