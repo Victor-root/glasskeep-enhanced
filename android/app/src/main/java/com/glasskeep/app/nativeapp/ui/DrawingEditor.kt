@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +23,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -86,6 +90,23 @@ private val QUICK_COLORS = listOf(
 
 /** SIZE_PRESETS (DrawingToolbar.jsx:18-23). */
 private val SIZE_PRESETS = listOf(2f, 5f, 12f, 24f)
+
+/** SIZE_PRESETS' names, in the same order. */
+private val SizeLabels = listOf(
+    R.string.native_drawing_size_fine,
+    R.string.native_drawing_size_medium,
+    R.string.native_drawing_size_thick,
+    R.string.native_drawing_size_large,
+)
+
+/** A size's dot and label: on a bg-gray-800 / dark:bg-white tile once
+ *  chosen, they invert. */
+private fun sizeInk(selected: Boolean, dark: Boolean): Color = when {
+    selected && dark -> Color(0xFF1E2939)
+    selected -> Color.White
+    dark -> Color(0xFF99A1AF)
+    else -> Color(0xFF6A7282)
+}
 
 /** What NoteModal.jsx hands DrawingCanvas: a drawing that stores no size
  *  reads as 1200 x 800, and 800 is one page wherever the drawing does not
@@ -451,7 +472,8 @@ private enum class DrawingPopover { Color, Size, Actions }
  * (while the pen is out), size and actions buttons, each opening its own
  * popover; opening one closes the others. "Clear all" asks once more
  * within three seconds and then closes its popover; every other action
- * leaves it open.
+ * leaves it open. From `md:` the colours, sizes and actions sit in the
+ * pill itself, set apart by rules, and "Clear all" asks again in place.
  */
 @Composable
 internal fun DrawingToolbar(
@@ -480,6 +502,17 @@ internal fun DrawingToolbar(
         open = if (open == popover) null else popover
     }
 
+    fun clear() {
+        if (clearArmed) {
+            clearArmed = false
+            open = null
+            onClear()
+        } else {
+            clearArmed = true
+        }
+    }
+
+    val desktop = windowWidth() >= MdBreakpoint
     val pill = RoundedCornerShape(12.dp)
     Row(
         modifier = Modifier
@@ -505,80 +538,102 @@ internal fun DrawingToolbar(
                 onClick = { tools.isEraser = true },
             ) { tint -> EraserIcon(size = 20.dp, tint = tint) }
         }
-        if (!tools.isEraser) {
+        if (desktop) {
+            DrawingSeparator(dark)
+            if (!tools.isEraser) {
+                DrawingInlineColors(
+                    current = tools.color,
+                    dark = dark,
+                    onSelect = { picked -> tools.color = picked },
+                    onCustom = { choosingColor = true },
+                )
+                DrawingSeparator(dark)
+            }
+            DrawingInlineSizes(current = tools.strokeSize, dark = dark, onSelect = { picked -> tools.strokeSize = picked })
+            DrawingSeparator(dark)
+            DrawingInlineActions(
+                dark = dark,
+                canUndo = canUndo,
+                canRedo = canRedo,
+                canClear = canClear,
+                canRemovePage = canRemovePage,
+                clearArmed = clearArmed,
+                showPageLines = tools.showPageLines,
+                onUndo = onUndo,
+                onRedo = onRedo,
+                onClear = { clear() },
+                onAddPage = onAddPage,
+                onRemovePage = onRemovePage,
+                onTogglePageLines = { tools.showPageLines = !tools.showPageLines },
+            )
+        } else {
+            if (!tools.isEraser) {
+                DrawingPopoverButton(
+                    dark = dark,
+                    label = stringResource(R.string.native_drawing_color),
+                    onClick = { toggle(DrawingPopover.Color) },
+                    glyph = { DrawingColorGlyph(parseHexColor(tools.color)) },
+                ) {
+                    if (open == DrawingPopover.Color) {
+                        ToolbarPopover(dark = dark, onDismiss = { open = null }) {
+                            DrawingColorPalette(
+                                current = tools.color,
+                                dark = dark,
+                                onSelect = { picked ->
+                                    tools.color = picked
+                                    open = null
+                                },
+                                // The popover stays under the system's colour
+                                // dialog, and goes once a colour is chosen there.
+                                onCustom = { choosingColor = true },
+                            )
+                        }
+                    }
+                }
+            }
             DrawingPopoverButton(
                 dark = dark,
-                label = stringResource(R.string.native_drawing_color),
-                onClick = { toggle(DrawingPopover.Color) },
-                glyph = { DrawingColorGlyph(parseHexColor(tools.color)) },
+                label = stringResource(R.string.native_drawing_size),
+                onClick = { toggle(DrawingPopover.Size) },
+                glyph = { DrawingSizeGlyph(parseHexColor(tools.color)) },
             ) {
-                if (open == DrawingPopover.Color) {
+                if (open == DrawingPopover.Size) {
                     ToolbarPopover(dark = dark, onDismiss = { open = null }) {
-                        DrawingColorPalette(
-                            current = tools.color,
+                        DrawingSizePalette(
+                            current = tools.strokeSize,
                             dark = dark,
                             onSelect = { picked ->
-                                tools.color = picked
+                                tools.strokeSize = picked
                                 open = null
                             },
-                            // The popover stays under the system's colour
-                            // dialog, and goes once a colour is chosen there.
-                            onCustom = { choosingColor = true },
                         )
                     }
                 }
             }
-        }
-        DrawingPopoverButton(
-            dark = dark,
-            label = stringResource(R.string.native_drawing_size),
-            onClick = { toggle(DrawingPopover.Size) },
-            glyph = { DrawingSizeGlyph(parseHexColor(tools.color)) },
-        ) {
-            if (open == DrawingPopover.Size) {
-                ToolbarPopover(dark = dark, onDismiss = { open = null }) {
-                    DrawingSizePalette(
-                        current = tools.strokeSize,
-                        dark = dark,
-                        onSelect = { picked ->
-                            tools.strokeSize = picked
-                            open = null
-                        },
-                    )
-                }
-            }
-        }
-        DrawingPopoverButton(
-            dark = dark,
-            label = stringResource(R.string.native_drawing_actions),
-            onClick = { toggle(DrawingPopover.Actions) },
-            glyph = { WrenchIcon(size = 18.dp, tint = if (dark) Color(0xFFE5E7EB) else Color(0xFF1F2937)) },
-        ) {
-            if (open == DrawingPopover.Actions) {
-                ToolbarPopover(dark = dark, onDismiss = { open = null }) {
-                    DrawingActionsGrid(
-                        dark = dark,
-                        canUndo = canUndo,
-                        canRedo = canRedo,
-                        canClear = canClear,
-                        canRemovePage = canRemovePage,
-                        clearArmed = clearArmed,
-                        showPageLines = tools.showPageLines,
-                        onUndo = onUndo,
-                        onRedo = onRedo,
-                        onClear = {
-                            if (clearArmed) {
-                                clearArmed = false
-                                open = null
-                                onClear()
-                            } else {
-                                clearArmed = true
-                            }
-                        },
-                        onAddPage = onAddPage,
-                        onRemovePage = onRemovePage,
-                        onTogglePageLines = { tools.showPageLines = !tools.showPageLines },
-                    )
+            DrawingPopoverButton(
+                dark = dark,
+                label = stringResource(R.string.native_drawing_actions),
+                onClick = { toggle(DrawingPopover.Actions) },
+                glyph = { WrenchIcon(size = 18.dp, tint = if (dark) Color(0xFFE5E7EB) else Color(0xFF1F2937)) },
+            ) {
+                if (open == DrawingPopover.Actions) {
+                    ToolbarPopover(dark = dark, onDismiss = { open = null }) {
+                        DrawingActionsGrid(
+                            dark = dark,
+                            canUndo = canUndo,
+                            canRedo = canRedo,
+                            canClear = canClear,
+                            canRemovePage = canRemovePage,
+                            clearArmed = clearArmed,
+                            showPageLines = tools.showPageLines,
+                            onUndo = onUndo,
+                            onRedo = onRedo,
+                            onClear = { clear() },
+                            onAddPage = onAddPage,
+                            onRemovePage = onRemovePage,
+                            onTogglePageLines = { tools.showPageLines = !tools.showPageLines },
+                        )
+                    }
                 }
             }
         }
@@ -833,12 +888,6 @@ private fun DrawingSwatch(
  */
 @Composable
 private fun DrawingSizePalette(current: Float, dark: Boolean, onSelect: (Float) -> Unit) {
-    val labels = listOf(
-        R.string.native_drawing_size_fine,
-        R.string.native_drawing_size_medium,
-        R.string.native_drawing_size_thick,
-        R.string.native_drawing_size_large,
-    )
     Row(
         modifier = Modifier.padding(horizontal = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -846,13 +895,7 @@ private fun DrawingSizePalette(current: Float, dark: Boolean, onSelect: (Float) 
     ) {
         SIZE_PRESETS.forEachIndexed { index, preset ->
             val selected = preset == current
-            // bg-gray-800 / dark:bg-white, with the dot and label inverted.
-            val ink = when {
-                selected && dark -> Color(0xFF1E2939)
-                selected -> Color.White
-                dark -> Color(0xFF99A1AF)
-                else -> Color(0xFF6A7282)
-            }
+            val ink = sizeInk(selected, dark)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -879,7 +922,7 @@ private fun DrawingSizePalette(current: Float, dark: Boolean, onSelect: (Float) 
                         .background(ink),
                 )
                 Text(
-                    stringResource(labels[index]),
+                    stringResource(SizeLabels[index]),
                     color = ink,
                     fontSize = 10.sp,
                     lineHeight = 15.sp,
@@ -1019,5 +1062,269 @@ private fun DrawingActionTile(
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+/** The toolbar's `Sep`: a 1dp rule, 24dp tall, with 2dp either side. */
+@Composable
+private fun DrawingSeparator(dark: Boolean) {
+    Box(
+        Modifier
+            .padding(horizontal = 2.dp)
+            .size(width = 1.dp, height = 24.dp)
+            .background(if (dark) Color(0xFF364153) else Color(0xFFE5E7EB)),
+    )
+}
+
+/**
+ * The inline palette (DrawingToolbar.jsx:348-389): the eight colours and
+ * the custom one as 28dp dots, 4dp apart, wrapping onto more lines when
+ * the pill has no room left for them.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RowScope.DrawingInlineColors(current: String, dark: Boolean, onSelect: (String) -> Unit, onCustom: () -> Unit) {
+    val isCustom = !QUICK_COLORS.contains(current)
+    FlowRow(
+        modifier = Modifier.weight(1f, fill = false),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        QUICK_COLORS.forEach { swatch ->
+            DrawingInlineSwatch(
+                fill = parseHexColor(swatch),
+                selected = swatch == current,
+                dark = dark,
+                label = swatch,
+                onClick = { onSelect(swatch) },
+            )
+        }
+        DrawingInlineSwatch(
+            fill = if (isCustom) parseHexColor(current) else null,
+            selected = isCustom,
+            dark = dark,
+            dashed = true,
+            label = stringResource(R.string.native_drawing_custom_color),
+            onClick = onCustom,
+        ) {
+            if (!isCustom) CustomColorIcon(size = 14.dp, tint = if (dark) Color(0xFF6A7282) else Color(0xFF99A1AF))
+        }
+    }
+}
+
+/** One 28dp dot of the inline palette: a 2dp gray border, or, for the
+ *  pen's own colour, a 3dp indigo one inside a 2dp ring of indigo at half
+ *  strength. The custom dot stays dashed either way. */
+@Composable
+private fun DrawingInlineSwatch(
+    fill: Color?,
+    selected: Boolean,
+    dark: Boolean,
+    label: String,
+    onClick: () -> Unit,
+    dashed: Boolean = false,
+    content: @Composable () -> Unit = {},
+) {
+    val borderWidth = if (selected) 3.dp else 2.dp
+    val borderColor = when {
+        selected -> if (dark) Color(0xFF7C86FF) else Color(0xFF615FFF)
+        dashed -> if (dark) Color(0xFF6A7282) else Color(0xFFD1D5DC)
+        else -> if (dark) Color(0xFF4A5565) else Color(0xFFE5E7EB)
+    }
+    Box(
+        modifier = Modifier
+            .size(28.dp)
+            .then(
+                if (selected) {
+                    Modifier.drawBehind { drawCircle(Color(0x806366F1), radius = size.minDimension / 2f + 2.dp.toPx()) }
+                } else {
+                    Modifier
+                },
+            )
+            .clip(CircleShape)
+            .then(if (fill != null) Modifier.background(fill) else Modifier)
+            .then(
+                if (dashed) {
+                    Modifier.dashedBorder(borderColor, CircleShape, width = borderWidth, dash = borderWidth * 3, gap = borderWidth * 2)
+                } else {
+                    Modifier.border(borderWidth, borderColor, CircleShape)
+                },
+            )
+            .semantics { contentDescription = label }
+            .gkTooltip(label)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
+    }
+}
+
+/** The inline sizes (DrawingToolbar.jsx:447-470): four 32dp buttons, 2dp
+ *  apart, each a dot of its own size, 3 to 18dp; the chosen one inverted. */
+@Composable
+private fun DrawingInlineSizes(current: Float, dark: Boolean, onSelect: (Float) -> Unit) {
+    val shape = RoundedCornerShape(8.dp)
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        SIZE_PRESETS.forEachIndexed { index, preset ->
+            val selected = preset == current
+            val label = stringResource(SizeLabels[index]) + " (${preset.toInt()}px)"
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(shape)
+                    .background(
+                        when {
+                            selected -> if (dark) Color.White else Color(0xFF1E2939)
+                            dark -> Color(0x991E2939)
+                            else -> Color(0xCCFFFFFF)
+                        },
+                    )
+                    .border(
+                        if (selected) 2.dp else 1.dp,
+                        when {
+                            selected -> if (dark) Color.White else Color(0xFF1E2939)
+                            dark -> Color(0x994A5565)
+                            else -> Color(0xCCE5E7EB)
+                        },
+                        shape,
+                    )
+                    .semantics { contentDescription = label }
+                    .gkTooltip(label)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onSelect(preset) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .size(preset.coerceIn(3f, 18f).dp)
+                        .clip(CircleShape)
+                        .background(sizeInk(selected, dark)),
+                )
+            }
+        }
+    }
+}
+
+/** The inline actions (DrawingToolbar.jsx:586-630): undo, redo, add and
+ *  remove a page, the guides and clear, as 36dp buttons 2dp apart. */
+@Composable
+private fun DrawingInlineActions(
+    dark: Boolean,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    canClear: Boolean,
+    canRemovePage: Boolean,
+    clearArmed: Boolean,
+    showPageLines: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onClear: () -> Unit,
+    onAddPage: () -> Unit,
+    onRemovePage: () -> Unit,
+    onTogglePageLines: () -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        DrawingActionButton(stringResource(R.string.native_drawing_undo), canUndo, onUndo) { tint ->
+            DrawingUndoIcon(size = 20.dp, tint = tint)
+        }
+        DrawingActionButton(stringResource(R.string.native_drawing_redo), canRedo, onRedo) { tint ->
+            DrawingUndoIcon(size = 20.dp, tint = tint, modifier = Modifier.scale(scaleX = -1f, scaleY = 1f))
+        }
+        DrawingActionButton(stringResource(R.string.native_drawing_add_page), true, onAddPage) { tint ->
+            FilePlusIcon(size = 20.dp, tint = tint)
+        }
+        DrawingActionButton(stringResource(R.string.native_drawing_remove_page), canRemovePage, onRemovePage) { tint ->
+            FileMinusIcon(size = 20.dp, tint = tint)
+        }
+        // Gradient while the guides show, a bare gray glyph once hidden.
+        DrawingToolbarButton(
+            label = stringResource(if (showPageLines) R.string.native_drawing_hide_guides else R.string.native_drawing_show_guides),
+            enabled = true,
+            fill = if (showPageLines) DrawingActiveGradient else null,
+            onClick = onTogglePageLines,
+        ) {
+            PageLinesIcon(
+                size = 20.dp,
+                tint = if (showPageLines) Color.White else if (dark) Color(0xFF6A7282) else Color(0xFF99A1AF),
+                dashed = !showPageLines,
+            )
+        }
+        DrawingToolbarButton(
+            label = stringResource(if (clearArmed) R.string.native_drawing_clear_confirm else R.string.native_drawing_clear),
+            enabled = canClear,
+            fill = DrawingDangerGradient,
+            onClick = onClear,
+        ) {
+            if (clearArmed) {
+                val pulse = rememberPulseAlpha()
+                Text(
+                    stringResource(R.string.native_drawing_clear_confirm),
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    softWrap = false,
+                    modifier = Modifier
+                        .wrapContentWidth(unbounded = true)
+                        .padding(horizontal = 2.dp)
+                        .graphicsLayer { alpha = pulse.value },
+                )
+            } else {
+                DeleteForeverIcon(size = 20.dp, tint = Color.White)
+            }
+        }
+    }
+}
+
+/** `from-indigo-400/50 to-violet-500/50`, the inline action buttons once
+ *  they cannot be used. */
+private val DrawingActionDisabledGradient = Brush.horizontalGradient(listOf(Color(0x807C86FF), Color(0x808E51FF)))
+
+/** A gradient inline action; [icon] gets its tint, white at 40% when the
+ *  action is unavailable. */
+@Composable
+private fun DrawingActionButton(label: String, enabled: Boolean, onClick: () -> Unit, icon: @Composable (Color) -> Unit) {
+    DrawingToolbarButton(
+        label = label,
+        enabled = enabled,
+        fill = if (enabled) DrawingActiveGradient else DrawingActionDisabledGradient,
+        onClick = onClick,
+    ) { icon(if (enabled) Color.White else Color.White.copy(alpha = 0.4f)) }
+}
+
+/** TBtn compact (DrawingToolbar.jsx:76-104) as an inline action: 36dp,
+ *  8dp corners, [fill] or none, the whole button at 35% when disabled. */
+@Composable
+private fun DrawingToolbarButton(
+    label: String,
+    enabled: Boolean,
+    fill: Brush?,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .alpha(if (enabled) 1f else 0.35f)
+            .clip(RoundedCornerShape(8.dp))
+            .then(if (fill != null) Modifier.background(fill) else Modifier)
+            .semantics { contentDescription = label }
+            .gkTooltip(label)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+            ) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }
