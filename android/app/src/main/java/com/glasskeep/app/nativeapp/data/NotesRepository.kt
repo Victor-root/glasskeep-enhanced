@@ -21,7 +21,6 @@ import com.glasskeep.app.nativeapp.data.network.FederatedUserDto
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.ImportNotesRequest
 import com.glasskeep.app.nativeapp.data.network.ImportNotesResponse
-import com.glasskeep.app.nativeapp.data.network.InstanceStatusResponse
 import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.NoteIconDto
@@ -1410,16 +1409,6 @@ class NotesRepository(
         NativeDebug.d("NotesRepository.disablePasskeyUnlock id=$credentialId")
         val response = api.disablePasskeyUnlock(credentialId)
         if (!response.isSuccessful) throw response.refusal("POST /api/passkeys/$credentialId/instance-unlock/disable")
-    }
-
-    /** Whether at-rest encryption is on and currently unlocked, or null
-     *  when the server could not say. */
-    suspend fun fetchInstanceStatus(): InstanceStatusResponse? = try {
-        val response = api.instanceStatus()
-        response.body().takeIf { response.isSuccessful }
-    } catch (t: Throwable) {
-        NativeDebug.e("NotesRepository.fetchInstanceStatus failed", t)
-        null
     }
 
     suspend fun fetchDeviceLinkInfo(token: String): DeviceLinkInfoResponse {

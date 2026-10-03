@@ -99,7 +99,6 @@ import com.glasskeep.app.nativeapp.PasskeyCeremonyResult
 import com.glasskeep.app.nativeapp.data.NotifCategory
 import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
 import com.glasskeep.app.nativeapp.data.TypographyPresets
-import com.glasskeep.app.nativeapp.data.network.InstanceStatusResponse
 import com.glasskeep.app.nativeapp.data.network.PasskeyDto
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
 import com.glasskeep.app.nativeapp.data.network.UserAiSettingsDto
@@ -178,6 +177,7 @@ internal fun SettingsScreen(
     serverUrl: String,
     actions: SettingsActions,
     aiSettingsPokes: Int,
+    preferencePokes: Int,
     onBack: () -> Unit,
     onOpenQrScanner: () -> Unit,
     onOpenPasskeyDomainSetting: () -> Unit,
@@ -208,7 +208,6 @@ internal fun SettingsScreen(
     var testingPasskeyId by remember { mutableStateOf<String?>(null) }
     // False while no admin has declared the instance's passkey domain.
     var passkeysAvailable by remember { mutableStateOf(true) }
-    var instanceStatus by remember { mutableStateOf<InstanceStatusResponse?>(null) }
 
     var showAddPasskeyDialog by remember { mutableStateOf(false) }
     var renamePasskeyTarget by remember { mutableStateOf<PasskeyDto?>(null) }
@@ -265,7 +264,7 @@ internal fun SettingsScreen(
         container.tokenStore.profile = next
     }
 
-    LaunchedEffect(serverUrl) {
+    LaunchedEffect(serverUrl, preferencePokes) {
         try {
             val fresh = repository.fetchProfile()
             profile = fresh
@@ -290,11 +289,9 @@ internal fun SettingsScreen(
 
     // Its own effect, not folded into the one above: a passkey-list
     // failure is a lot less important than the profile fetch above (the
-    // rest of the screen works fine without it). The encryption state
-    // decides whether an admin's keys offer the unlock right.
+    // rest of the screen works fine without it).
     LaunchedEffect(serverUrl) {
         refreshPasskeys()
-        instanceStatus = repository.fetchInstanceStatus()
     }
 
     /** The server always answers with its own public shape, so applying
@@ -846,8 +843,8 @@ internal fun SettingsScreen(
                                 passkeys = passkeys,
                                 available = passkeysAvailable,
                                 isAdmin = isAdmin,
-                                encryptionEnabled = instanceStatus?.enabled == true,
-                                instanceUnlocked = instanceStatus?.unlocked == true,
+                                encryptionEnabled = container.lockState.status?.enabled == true,
+                                instanceUnlocked = container.lockState.status?.unlocked == true,
                                 listOpen = passkeyListOpen,
                                 adding = addingPasskey,
                                 testingId = testingPasskeyId,

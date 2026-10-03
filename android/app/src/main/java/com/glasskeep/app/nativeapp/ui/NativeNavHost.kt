@@ -776,6 +776,7 @@ fun NativeNavHost(
                         serverUrl = serverUrl,
                         actions = settingsActions,
                         aiSettingsPokes = aiSettingsPokes,
+                        preferencePokes = preferencePokes,
                         onBack = { navController.popBackStack() },
                         onOpenQrScanner = { qrScannerOpen = true },
                         // The web closes the panel and opens the admin one
