@@ -3,6 +3,8 @@ package com.glasskeep.app.nativeapp
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Base64
@@ -16,6 +18,8 @@ import java.io.InputStream
  * the web's own default), encode as JPEG at jpegQuality (85% by default)
  * unless the source actually has real transparency (checked by sampling
  * pixels, not just "does this format support alpha"), in which case PNG.
+ * A photo is turned upright from its EXIF orientation, as a browser draws
+ * it on its canvas.
  * Same reasoning as the web: a data: URL is what the server stores
  * (server/index.js, images_json / avatar_url), so this produces exactly
  * that string, not a file path.
@@ -65,6 +69,7 @@ object ImageCompression {
             openStream()?.use { BitmapFactory.decodeStream(it, null, bounds) }
                 ?: return null
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+            val orientation = openStream()?.use { exifOrientation(it) } ?: ExifInterface.ORIENTATION_NORMAL
 
             val sampleSize = computeInSampleSize(bounds.outWidth, bounds.outHeight, maxDimension)
             val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
@@ -80,13 +85,15 @@ object ImageCompression {
                 sampled
             }
 
-            val usePng = resized.hasAlpha() && hasRealTransparency(resized)
+            val upright = uprightBitmap(resized, orientation)
+            val usePng = upright.hasAlpha() && hasRealTransparency(upright)
             val output = ByteArrayOutputStream()
             if (usePng) {
-                resized.compress(Bitmap.CompressFormat.PNG, 100, output)
+                upright.compress(Bitmap.CompressFormat.PNG, 100, output)
             } else {
-                resized.compress(Bitmap.CompressFormat.JPEG, jpegQuality, output)
+                upright.compress(Bitmap.CompressFormat.JPEG, jpegQuality, output)
             }
+            if (upright !== resized) upright.recycle()
             if (resized !== sampled) resized.recycle()
             sampled.recycle()
 
@@ -97,6 +104,40 @@ object ImageCompression {
             NativeDebug.e("ImageCompression.compressStream failed", t)
             null
         }
+    }
+
+    /** The orientation tag of a photo, [ExifInterface.ORIENTATION_NORMAL]
+     *  for an image with none or one that cannot be read. */
+    private fun exifOrientation(stream: InputStream): Int = try {
+        ExifInterface(stream).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+    } catch (_: Throwable) {
+        ExifInterface.ORIENTATION_NORMAL
+    }
+
+    /** [bitmap] turned and mirrored as its EXIF [orientation] says the
+     *  camera held it; the same bitmap when nothing has to change. */
+    private fun uprightBitmap(bitmap: Bitmap, orientation: Int): Bitmap {
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.setScale(-1f, 1f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.setRotate(180f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> {
+                matrix.setRotate(180f)
+                matrix.postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                matrix.setRotate(90f)
+                matrix.postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.setRotate(90f)
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                matrix.setRotate(-90f)
+                matrix.postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.setRotate(-90f)
+            else -> return bitmap
+        }
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
     /** The picked file's own display name (e.g. "photo.jpg"), same as
