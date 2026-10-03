@@ -209,6 +209,26 @@ private fun liftOutOfList(tr: PmTransaction, range: PmNodeRange): Boolean {
     return true
 }
 
+/** prosemirror-schema-list's sinkListItem(): the selected items go into a
+ *  list nested in the item before them, which the first item of a list has
+ *  none of. */
+internal fun sinkListItem(tr: PmTransaction, itemType: PmNodeType): Boolean {
+    val selection = tr.selection
+    val range = selection.rFrom.blockRange(selection.rTo) { it.childCount > 0 && it.firstChild!!.type === itemType } ?: return false
+    val startIndex = range.startIndex
+    if (startIndex == 0) return false
+    val parent = range.parent
+    val nodeBefore = parent.child(startIndex - 1)
+    if (nodeBefore.type !== itemType) return false
+    val nestedBefore = nodeBefore.lastChild?.type === parent.type
+    val inner = if (nestedBefore) PmFragment.from(itemType.create()) else PmFragment.Empty
+    val slice = PmSlice(PmFragment.from(itemType.create(null, PmFragment.from(parent.type.create(null, inner)))), if (nestedBefore) 3 else 1, 0)
+    val before = range.start
+    val after = range.end
+    tr.step(PmReplaceAroundStep(before - (if (nestedBefore) 3 else 1), after, before, after, slice, 1))
+    return true
+}
+
 /** Tiptap's joinListBackwards(): the list of [listType] holding the
  *  selection joins a list of its type right before it. */
 private fun joinListBackwards(tr: PmTransaction, listType: PmNodeType) {

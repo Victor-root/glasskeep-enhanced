@@ -15,6 +15,7 @@ import com.glasskeep.app.nativeapp.data.pm.setHorizontalRule
 import com.glasskeep.app.nativeapp.data.pm.setMark
 import com.glasskeep.app.nativeapp.data.pm.setNode
 import com.glasskeep.app.nativeapp.data.pm.setTextAlign
+import com.glasskeep.app.nativeapp.data.pm.sinkListItem
 import com.glasskeep.app.nativeapp.data.pm.smartToggleCodeBlock
 import com.glasskeep.app.nativeapp.data.pm.toggleList
 import com.glasskeep.app.nativeapp.data.pm.toggleWrap
@@ -22,7 +23,7 @@ import com.glasskeep.app.nativeapp.data.pm.unsetAllMarks
 import com.glasskeep.app.nativeapp.data.pm.unsetMark
 
 /** A command of the formatting bar, what a button of RichTextToolbar.jsx
- *  or LinkPopover.jsx runs. */
+ *  or LinkPopover.jsx runs, or a key of the list extensions' keymaps. */
 sealed interface RichCommand {
     /** The eraser: `clearNodes().unsetAllMarks()`. */
     data object ClearFormatting : RichCommand
@@ -41,6 +42,9 @@ sealed interface RichCommand {
 
     /** indent() with a [direction] of 1, outdent() with -1. */
     data class Indent(val direction: Int) : RichCommand
+
+    /** Tab in a list: sinkListItem for a list item, then for a task item. */
+    data object SinkListItem : RichCommand
 
     /** smartToggleCodeBlock. */
     data object CodeBlock : RichCommand
@@ -104,6 +108,7 @@ object RichCommands {
                 is RichCommand.Align -> setTextAlign(tr, command.align.name.lowercase())
                 RichCommand.Divider -> setHorizontalRule(tr)
                 is RichCommand.Indent -> indent(tr, command.direction)
+                RichCommand.SinkListItem -> sinkListItem(tr, PmSchema.listItem) || sinkListItem(tr, PmSchema.taskItem)
                 RichCommand.CodeBlock -> smartToggleCodeBlock(tr)
                 RichCommand.Quote -> toggleWrap(tr, PmSchema.blockquote)
                 is RichCommand.SetMark -> {

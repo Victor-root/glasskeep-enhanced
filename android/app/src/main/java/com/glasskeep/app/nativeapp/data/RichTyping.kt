@@ -125,6 +125,26 @@ object RichTyping {
         return keepMarks(state, block, at, split)
     }
 
+    /**
+     * Shift+Enter and Ctrl+Enter, Tiptap's setHardBreak: in a code block the
+     * way out of it (exitCode), an empty paragraph right under it in what
+     * holds the block; elsewhere a line break typed over the selection,
+     * which first goes when it runs over several lines.
+     */
+    fun lineBreak(state: RichEditing): RichEditing {
+        val current = state.copy(composition = null)
+        val span = current.span ?: return state
+        val block = current.blocks[span.start]
+        if (span.start == span.end && block.kind == RichBlockKind.CODE_BLOCK) {
+            val paragraph = RichDoc.newBlock().copy(nestLevel = block.nestLevel, quotes = block.quotes)
+            return RichEditing(current.blocks.replaceAt(span.start, listOf(block, paragraph)), RichSelection.caret(paragraph.id, 0))
+        }
+        val cleared = if (span.start == span.end) current else applied(current, RichEdits.deleteSelection(current.blocks, span))
+        val at = cleared.span ?: return state
+        if (!cleared.blocks[at.start].kind.hasText) return state
+        return typeInBlock(cleared, at, "\n", 1, composing = false)
+    }
+
     /** Backspace: right after an input rule, the text as typed comes back
      *  ([undoRule]); otherwise a selection goes, at a line's start the line
      *  joins the one above ([RichEdits.joinBackward]), elsewhere the

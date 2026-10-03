@@ -89,6 +89,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -377,6 +378,7 @@ fun NoteDetailScreen(
     val checklistPrefs = remember { context.getSharedPreferences("glasskeep_checklist", Context.MODE_PRIVATE) }
     var doneSectionCollapsed by remember(noteId) { mutableStateOf(checklistPrefs.getBoolean("ck-done-$noteId", false)) }
     val checklistFocusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
+    val titleFocusRequester = remember { FocusRequester() }
     var pendingChecklistFocus by remember { mutableStateOf<String?>(null) }
 
     // Rich-text blocks (RichDoc.parse-approved text notes only): live,
@@ -1637,10 +1639,9 @@ fun NoteDetailScreen(
         }
     }
 
-    fun undoNote() {
-        // The footer's undo and redo blur whatever has the focus first on a
-        // phone (ModalFooter.jsx): the keyboard goes.
-        focusManager.clearFocus()
+    /** The undo itself, as a hardware keyboard's Ctrl+Z in the body asks
+     *  for it, the focus staying where it is. */
+    fun stepBack() {
         // The web flushes its pending debounce first, so whatever was
         // typed in the last second becomes its own step instead of being
         // swallowed by the undo (useModalHistory.js's flush()).
@@ -1648,9 +1649,20 @@ fun NoteDetailScreen(
         history.undo()?.let { applySnapshot(it) }
     }
 
+    fun stepForward() {
+        history.redo()?.let { applySnapshot(it) }
+    }
+
+    fun undoNote() {
+        // The footer's undo and redo blur whatever has the focus first on a
+        // phone (ModalFooter.jsx): the keyboard goes.
+        focusManager.clearFocus()
+        stepBack()
+    }
+
     fun redoNote() {
         focusManager.clearFocus()
-        history.redo()?.let { applySnapshot(it) }
+        stepForward()
     }
 
     // Opening the sheet puts the keyboard away, the same intent as the
@@ -2173,6 +2185,9 @@ fun NoteDetailScreen(
                     minHeight = minHeight,
                     onBlocksChange = { richBlocks = it },
                     suppressKeyboard = showFormatSheet,
+                    onUndo = { stepBack() },
+                    onRedo = { stepForward() },
+                    onShiftTabExit = { runCatching { titleFocusRequester.requestFocus() } },
                 )
             }
 
@@ -2184,6 +2199,7 @@ fun NoteDetailScreen(
             fun NoteTitle(edit: Editability) {
                 NoteTitleField(
                     value = titleText,
+                    focusRequester = titleFocusRequester,
                     enabled = !isNoteReadOnly &&
                         (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType),
                     // The web drops the field entirely and prints the
@@ -3708,6 +3724,7 @@ private fun ModalSaveButton(
 @Composable
 private fun NoteTitleField(
     value: String,
+    focusRequester: FocusRequester,
     enabled: Boolean,
     asText: Boolean,
     titleColor: Color,
@@ -3753,7 +3770,7 @@ private fun NoteTitleField(
                 fontWeight = FontWeight.Bold,
             ),
             cursorBrush = SolidColor(titleColor),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
         )
     }
 }

@@ -208,7 +208,9 @@ private enum class RichSurface { EDITOR, READER, CARD }
  * the whole document ([richTextInput]); with the formatting sheet open
  * ([suppressKeyboard]) the text still takes the caret and selections but the
  * keyboard stays down, the web's inputmode="none". Its formatting bar is a
- * separate composable ([RichFormatToolbar]) sharing [state].
+ * separate composable ([RichFormatToolbar]) sharing [state]. A hardware
+ * keyboard's Ctrl+Z, Ctrl+Y and Shift+Tab are the note's: [onUndo], [onRedo]
+ * and [onShiftTabExit] (back to the title).
  *
  * With the read-mode preference off, the web's edit extras: a tapped link
  * offers Open and Edit, a tapped inline code or code block shows its copy
@@ -229,11 +231,17 @@ fun RichTextEditor(
     minHeight: Dp,
     onBlocksChange: (List<RichBlock>) -> Unit,
     suppressKeyboard: Boolean = false,
+    onUndo: () -> Unit = {},
+    onRedo: () -> Unit = {},
+    onShiftTabExit: (() -> Unit)? = null,
 ) {
     val paragraphEm = typography.p.size * RemPx
     val flow = remember(blocks, paragraphEm) { richFlow(blocks, RemPx, paragraphEm) }
     SideEffect {
         state.onBlocksChange = onBlocksChange
+        state.onUndo = onUndo
+        state.onRedo = onRedo
+        state.onShiftTabExit = onShiftTabExit
         state.keyboardSuppressed = suppressKeyboard
         state.plainPaste = plainPaste
         state.sync(blocks)
@@ -1053,10 +1061,11 @@ private class RichTextActions(
     }
 
     /**
-     * A key: Backspace, Delete and Enter as the keyboard's own, the arrows,
-     * Home and End moving the caret as a browser does (Shift extending the
-     * selection), Ctrl+A, C, X and V (with Shift, pasting plain text), and
-     * any other character typed in.
+     * A key: Backspace, Delete and Enter as the keyboard's own (with Shift
+     * or Ctrl, a line break), the arrows, Home and End moving the caret as a
+     * browser does (Shift extending the selection), Ctrl+A, C, X and V (with
+     * Shift, pasting plain text), Tab and Shift+Tab, the formatting
+     * [RichShortcuts], and any other character typed in.
      */
     fun handleKey(event: KeyEvent): Boolean {
         if (state.editing == null) return false
@@ -1066,7 +1075,8 @@ private class RichTextActions(
         when {
             event.keyCode == KeyEvent.KEYCODE_DEL -> state.ime.backspace()
             event.keyCode == KeyEvent.KEYCODE_FORWARD_DEL -> state.ime.deleteForward()
-            event.keyCode == KeyEvent.KEYCODE_ENTER || event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER -> state.ime.enter()
+            event.keyCode == KeyEvent.KEYCODE_ENTER || event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER ->
+                if (shift || ctrl) state.lineBreak() else state.ime.enter()
             event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> moved { state.moveCaret(forward = false, extend = shift) }
             event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT -> moved { state.moveCaret(forward = true, extend = shift) }
             event.keyCode == KeyEvent.KEYCODE_DPAD_UP -> moved { moveVertically(down = false, extend = shift) }
@@ -1077,12 +1087,24 @@ private class RichTextActions(
             ctrl && event.keyCode == KeyEvent.KEYCODE_C -> copy()
             ctrl && event.keyCode == KeyEvent.KEYCODE_X -> cut()
             ctrl && event.keyCode == KeyEvent.KEYCODE_V -> paste(asPlainText = event.isShiftPressed)
+            event.keyCode == KeyEvent.KEYCODE_TAB && !ctrl && !event.isAltPressed -> return tab(back = shift)
+            ctrl && RichShortcuts.handle(state, event) -> Unit
             else -> {
                 val char = event.unicodeChar
                 if (char == 0 || ctrl || event.isAltPressed || Character.isISOControl(char)) return false
                 state.ime.commitText(String(Character.toChars(char)), 1)
             }
         }
+        return true
+    }
+
+    /** Shift+Tab goes back to the title when the note has one to give the
+     *  focus to, Tab sinks the selected list items a level; otherwise the
+     *  key keeps its default, which moves the focus on. */
+    private fun tab(back: Boolean): Boolean {
+        if (!back) return state.sinkListItem()
+        val exit = state.onShiftTabExit ?: return false
+        exit()
         return true
     }
 

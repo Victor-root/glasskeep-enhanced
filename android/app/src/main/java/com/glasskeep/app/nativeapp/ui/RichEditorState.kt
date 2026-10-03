@@ -70,6 +70,12 @@ class RichEditorState {
     internal val layouts = RichTextLayouts()
     internal var onBlocksChange: (List<RichBlock>) -> Unit = {}
 
+    /** What the note around the editor does for Ctrl+Z, Ctrl+Y and Shift+Tab
+     *  (the web's RichTextEditor `onShiftTabExit`, back to the title). */
+    internal var onUndo: () -> Unit = {}
+    internal var onRedo: () -> Unit = {}
+    internal var onShiftTabExit: (() -> Unit)? = null
+
     /** Set while the formatting sheet keeps the keyboard down. */
     internal var keyboardSuppressed = false
 
@@ -162,6 +168,25 @@ class RichEditorState {
         RichCommands.run(current, command)?.let(::replace)
         requestFocus()
     }
+
+    /** Shift+Enter and Ctrl+Enter ([RichTyping.lineBreak]). */
+    internal fun lineBreak() {
+        val current = editing ?: return
+        replace(RichTyping.lineBreak(current))
+    }
+
+    /** Tab in a list: whether the selected items went one level deeper. */
+    internal fun sinkListItem(): Boolean {
+        val current = editing ?: return false
+        val next = RichCommands.run(current, RichCommand.SinkListItem) ?: return false
+        replace(next)
+        return true
+    }
+
+    /** toggleHeading: the paragraph style when the selection already has
+     *  that heading, else the heading. */
+    internal fun toggleHeading(kind: RichBlockKind) =
+        command(RichCommand.SetStyle(if (nodeActive { it.kind == kind }) RichBlockKind.PARAGRAPH else kind))
 
     /** The marks a collapsed selection types into, none over a range. */
     private fun caretMarks(): List<RichMark> {
