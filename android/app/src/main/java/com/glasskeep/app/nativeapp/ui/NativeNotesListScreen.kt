@@ -13,7 +13,6 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -70,9 +69,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -85,6 +84,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -201,6 +201,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -957,11 +958,14 @@ fun NativeNotesListScreen(
     val bannerSlotPx = if (showLockedBanner) bannerHeightPx else 0
     val statusBarTopPx = WindowInsets.statusBars.getTop(density)
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val headerHideFraction by animateFloatAsState(
-        targetValue = if (headerVisible) 0f else 1f,
-        animationSpec = tween(durationMillis = 300, easing = CssEase),
-        label = "headerHide",
-    )
+    // How far the header has slid away, 0 to 1: read where it is placed
+    // only, so the screen does not recompose when the scroll direction turns.
+    val headerHide = remember { Animatable(Snapshot.withoutReadObservation { if (headerVisible) 0f else 1f }) }
+    LaunchedEffect(Unit) {
+        snapshotFlow { headerVisible }.collectLatest { visible ->
+            headerHide.animateTo(if (visible) 0f else 1f, tween(durationMillis = 300, easing = CssEase))
+        }
+    }
     val pullToRefreshState = rememberPullToRefreshState()
     // Whether the focus is on this screen, whose one text field is the search.
     var fieldFocused by remember { mutableStateOf(false) }
@@ -1017,8 +1021,15 @@ fun NativeNotesListScreen(
                 if (selectionMode) Spacer(Modifier.height(SelectionShim))
                 val aiBoxShown = aiLoading || aiAnswer != null
                 // Under a finished answer only (NotesComposer.jsx:130).
-                val citedNotes = if (aiBoxShown && !aiLoading) shownNotes.filter { it.id in aiCitedNoteIds } else emptyList()
-                if (rawShown != null) SideEffect { cardsShown.update(NoteCardList.AI_CITED, listView = false, listOf(citedNotes)) }
+                val citedNotes = remember(shownNotes, aiBoxShown, aiLoading, aiCitedNoteIds) {
+                    if (aiBoxShown && !aiLoading) shownNotes.filter { it.id in aiCitedNoteIds } else emptyList()
+                }
+                if (rawShown != null) {
+                    DisposableEffect(citedNotes) {
+                        cardsShown.update(NoteCardList.AI_CITED, listView = false, listOf(citedNotes))
+                        onDispose {}
+                    }
+                }
                 if (aiBoxShown) {
                     AiAnswerCard(
                         answer = aiAnswer,
@@ -1050,9 +1061,10 @@ fun NativeNotesListScreen(
                 val otherNotes = remember(filteredNotes) { filteredNotes.filter { !it.pinned } }
                 val columnCount = if (listView) 1 else layout.columns
                 if (rawShown != null) {
-                    SideEffect {
+                    DisposableEffect(pinnedNotes, otherNotes, listView, columnCount) {
                         cardsShown.update(NoteCardList.PINNED, listView, masonryColumns(pinnedNotes, columnCount))
                         cardsShown.update(NoteCardList.OTHERS, listView, masonryColumns(otherNotes, columnCount))
+                        onDispose {}
                     }
                 }
                 // main.px-4.pb-12 (wider margins from 640), over the body's own bottom inset.
@@ -1154,7 +1166,7 @@ fun NativeNotesListScreen(
         }
 
         if (selectionMode) {
-            val visibleIds = filteredNotes.mapTo(linkedSetOf()) { it.id }
+            val visibleIds = remember(filteredNotes) { filteredNotes.mapTo(linkedSetOf()) { it.id } }
             val allVisibleSelected = visibleIds.isNotEmpty() && visibleIds.all { it in selectedIds }
             val inTrash = secondaryView == SidebarTrashed
             val canAct = !bulkActionRunning && selectedIds.isNotEmpty()
@@ -1305,7 +1317,7 @@ fun NativeNotesListScreen(
                 onClose = { exitSelection() },
                 dark = dark,
                 modifier = Modifier.align(Alignment.TopCenter),
-                headerVisible = headerVisible,
+                headerVisible = { headerVisible },
                 roomy = layout.roomy,
             )
         }
@@ -1379,7 +1391,7 @@ fun NativeNotesListScreen(
                     // away, and slid up by its own height while hidden.
                     .offset {
                         val sticky = max(0, bannerSlotPx - notesScrollState.value)
-                        IntOffset(0, statusBarTopPx + sticky - (headerHideFraction * headerHeightPx).roundToInt())
+                        IntOffset(0, statusBarTopPx + sticky - (headerHide.value * headerHeightPx).roundToInt())
                     },
             )
             Box(
@@ -2479,7 +2491,9 @@ private fun NotesMasonry(
     list: NoteCardList,
     renderNoteCard: @Composable (NoteEntity, NoteCardPlace) -> Unit,
 ) {
-    val columns = masonryColumns(notes.take(rememberCardsOnScreen(notes.size)), if (listView) 1 else layout.columns)
+    val onScreen = rememberCardsOnScreen(notes.size)
+    val columnCount = if (listView) 1 else layout.columns
+    val columns = remember(notes, onScreen, columnCount) { masonryColumns(notes.take(onScreen), columnCount) }
     if (listView) {
         Column(
             modifier = Modifier

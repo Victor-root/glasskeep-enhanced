@@ -215,7 +215,7 @@ internal fun SelectionActionBar(
     onClose: () -> Unit,
     dark: Boolean,
     modifier: Modifier = Modifier,
-    headerVisible: Boolean = true,
+    headerVisible: () -> Boolean = { true },
     /** From 640dp wide the counter spells out "Selected:" (`sm:inline`). */
     roomy: Boolean = false,
 ) {
@@ -233,7 +233,7 @@ internal fun SelectionActionBar(
         label = "multiDockIn",
     )
     val top by animateDpAsState(
-        targetValue = if (headerVisible) 80.dp else 8.dp,
+        targetValue = if (headerVisible()) 80.dp else 8.dp,
         animationSpec = tween(durationMillis = 180, easing = GkGlideEasing),
         label = "multiDockTop",
     )
