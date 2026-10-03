@@ -1256,7 +1256,7 @@ fun NoteDetailScreen(
             } else {
                 NoteExporter.exportTextFile(
                     context,
-                    NoteExporter.sanitizeFilename(live.title.ifBlank { "note" }) + ".md",
+                    NoteExporter.sanitizeFilename(live.title.ifBlank { "note-${live.id}" }) + ".md",
                     NoteExporter.noteMarkdown(live.toEntity()),
                     "text/markdown",
                 )
