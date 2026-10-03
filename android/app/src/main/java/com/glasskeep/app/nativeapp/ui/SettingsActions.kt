@@ -147,7 +147,7 @@ internal class SettingsActions(
                 if (!shared) alerts.show(context.getString(R.string.native_settings_export_failed))
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsActions exportAll failed", t)
-                alerts.show(context.getString(R.string.native_settings_export_failed))
+                alerts.show(context.localizedServerError(context.requestErrorText(t), R.string.native_settings_export_failed))
             } finally {
                 transferRunning = false
             }
@@ -176,7 +176,7 @@ internal class SettingsActions(
                 )
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsActions downloadSecretKey failed", t)
-                context.getString(R.string.native_settings_secret_key_failed)
+                context.localizedServerError(context.requestErrorText(t), R.string.native_settings_secret_key_failed)
             } finally {
                 transferRunning = false
             }
@@ -229,7 +229,7 @@ internal class SettingsActions(
                 }
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsActions import failed", t)
-                context.getString(failureMessage)
+                context.localizedServerError(context.requestErrorText(t), failureMessage)
             } finally {
                 transferRunning = false
             }

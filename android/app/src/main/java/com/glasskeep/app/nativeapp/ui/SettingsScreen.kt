@@ -250,9 +250,6 @@ internal fun SettingsScreen(
     val avatarUpdatedMessage = stringResource(R.string.native_settings_avatar_updated)
     val avatarRemovedMessage = stringResource(R.string.native_settings_avatar_removed)
     val avatarUploadFailedMessage = stringResource(R.string.native_settings_avatar_upload_failed)
-    val avatarRemoveFailedMessage = stringResource(R.string.native_settings_avatar_remove_failed)
-    val showOnLoginFailedMessage = stringResource(R.string.native_settings_show_on_login_failed)
-    val languageSaveErrorMessage = stringResource(R.string.native_settings_language_save_error)
     val themeSaveErrorMessage = stringResource(R.string.native_settings_theme_save_error)
 
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
@@ -522,7 +519,7 @@ internal fun SettingsScreen(
                     }
                 } catch (t: Throwable) {
                     NativeDebug.e("SettingsScreen setAvatar failed", t)
-                    toasts.error(avatarUploadFailedMessage)
+                    toasts.error(context.localizedServerError(context.requestErrorText(t), R.string.native_settings_avatar_upload_failed))
                 } finally {
                     changingAvatar = false
                 }
@@ -544,7 +541,7 @@ internal fun SettingsScreen(
                 toasts.show(avatarRemovedMessage, icon = "camera")
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen removeAvatar failed", t)
-                toasts.error(avatarRemoveFailedMessage)
+                toasts.error(context.localizedServerError(context.requestErrorText(t), R.string.native_settings_avatar_remove_failed))
             } finally {
                 changingAvatar = false
             }
@@ -564,7 +561,7 @@ internal fun SettingsScreen(
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen setShowOnLogin failed", t)
                 updateProfile { it.copy(showOnLogin = !value) }
-                toasts.error(showOnLoginFailedMessage)
+                toasts.error(context.localizedServerError(context.requestErrorText(t), R.string.native_settings_show_on_login_failed))
             } finally {
                 changingShowOnLogin = false
             }
@@ -588,7 +585,7 @@ internal fun SettingsScreen(
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen setLanguage failed", t)
                 updateProfile { it.copy(language = previous) }
-                toasts.error(languageSaveErrorMessage)
+                toasts.error(context.localizedServerError(context.requestErrorText(t), R.string.native_settings_language_save_error))
             } finally {
                 changingLanguage = false
             }

@@ -1077,14 +1077,7 @@ class NotesRepository(
     /** The whole account as one JSON document (GET /api/notes/export). */
     suspend fun exportNotes(): JsonElement {
         NativeDebug.d("NotesRepository.exportNotes")
-        val response = api.exportNotes()
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "GET /api/notes/export failed: HTTP ${response.code()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        return body
+        return api.exportNotes().bodyOrRefusal("GET /api/notes/export")
     }
 
     /** Sends [notes] to POST /api/notes/import and refreshes the local
@@ -1092,13 +1085,7 @@ class NotesRepository(
      *  list right after (useImportExport.js:207). */
     suspend fun importNotes(notes: JsonArray): ImportNotesResponse {
         NativeDebug.d("NotesRepository.importNotes count=${notes.size}")
-        val response = api.importNotes(ImportNotesRequest(notes))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "POST /api/notes/import failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        val body = api.importNotes(ImportNotesRequest(notes)).bodyOrRefusal("POST /api/notes/import")
         refresh()
         return body
     }
@@ -1299,26 +1286,12 @@ class NotesRepository(
      *  was requested: patchNote()'s "trust the response" convention. */
     suspend fun setShowOnLogin(value: Boolean): Boolean {
         NativeDebug.d("NotesRepository.setShowOnLogin value=$value")
-        val response = api.setShowOnLogin(SetShowOnLoginRequest(value))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "PATCH /api/user/profile (show_on_login) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        return body.showOnLogin
+        return api.setShowOnLogin(SetShowOnLoginRequest(value)).bodyOrRefusal("PATCH /api/user/profile (show_on_login)").showOnLogin
     }
 
     suspend fun setLanguage(value: String?): String? {
         NativeDebug.d("NotesRepository.setLanguage value=$value")
-        val response = api.setLanguage(SetLanguageRequest(value))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "PATCH /api/user/profile (language) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        return body.language
+        return api.setLanguage(SetLanguageRequest(value)).bodyOrRefusal("PATCH /api/user/profile (language)").language
     }
 
     /** [dataUrl] must already be a compressed image/jpeg or image/png data
@@ -1326,24 +1299,13 @@ class NotesRepository(
      *  anything else or over ~1.5MB decoded. Returns the confirmed URL. */
     suspend fun setAvatar(dataUrl: String): String? {
         NativeDebug.d("NotesRepository.setAvatar")
-        val response = api.setAvatar(SetAvatarRequest(dataUrl))
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            val error = "PUT /api/user/avatar failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        return body.avatarUrl
+        return api.setAvatar(SetAvatarRequest(dataUrl)).bodyOrRefusal("PUT /api/user/avatar").avatarUrl
     }
 
     suspend fun removeAvatar() {
         NativeDebug.d("NotesRepository.removeAvatar")
         val response = api.deleteAvatar()
-        if (!response.isSuccessful) {
-            val error = "DELETE /api/user/avatar failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
+        if (!response.isSuccessful) throw response.refusal("DELETE /api/user/avatar")
     }
 
     /** On success the server issues a fresh token and invalidates every
@@ -1363,14 +1325,9 @@ class NotesRepository(
      *  returns it again after this call, only its hash is kept. */
     suspend fun generateSecretKey(): String {
         NativeDebug.d("NotesRepository.generateSecretKey")
-        val response = api.generateSecretKey()
-        val key = response.body()?.key
-        if (!response.isSuccessful || key == null) {
-            val error = "POST /api/secret-key failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        return key
+        val request = "POST /api/secret-key"
+        return api.generateSecretKey().bodyOrRefusal(request).key
+            ?: throw IllegalStateException("$request: ok response with no key")
     }
 
     /** Registered passkeys for this account and whether the instance can
