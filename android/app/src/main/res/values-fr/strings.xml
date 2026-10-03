@@ -342,7 +342,7 @@
     <string name="native_settings_ai_api_key">Clé API</string>
     <string name="native_settings_ai_api_key_placeholder">Optionnelle, laisser vide pour les endpoints locaux</string>
     <string name="native_settings_ai_api_key_placeholder_set">•••• (une clé est enregistrée, saisissez-en une nouvelle pour la remplacer)</string>
-    <string name="native_settings_ai_api_key_hint">Requise uniquement pour les fournisseurs distants (OpenAI, OpenRouter, …). Stockée côté serveur, jamais renvoyée à l'application.</string>
+    <string name="native_settings_ai_api_key_hint">Requise uniquement pour les fournisseurs distants (OpenAI, OpenRouter, …). Stockée côté serveur, jamais renvoyée à l\'application.</string>
     <string name="native_settings_ai_api_key_clear">Supprimer la clé enregistrée</string>
     <string name="native_settings_ai_api_key_cleared">Clé API supprimée</string>
     <string name="native_settings_ai_temperature">Température</string>
@@ -1012,7 +1012,7 @@
     <string name="native_admin_restart_in_progress">Redémarrage en cours</string>
     <string name="native_admin_restart_waiting">En attente du retour du serveur…</string>
     <string name="native_admin_restart_done">Le serveur a bien été redémarré.</string>
-    <string name="native_admin_reload_in">L'application va être rechargée dans %1$d seconde(s).</string>
+    <string name="native_admin_reload_in">L\'application va être rechargée dans %1$d seconde(s).</string>
     <string name="native_admin_shutdown_title">Éteindre le serveur ?</string>
     <string name="native_admin_shutdown_confirm">Le service sera arrêté. Vous devrez le relancer manuellement.</string>
     <string name="native_admin_shutdown_confirm_btn">Éteindre</string>
@@ -1250,7 +1250,7 @@
     <string name="native_update_docker_hint_footnote">Après modification, lancez : docker compose up -d. Le bouton « Mettre à jour maintenant » apparaîtra ensuite ici.</string>
     <string name="native_update_docker_perm_intro">Le socket Docker est bien monté, mais GlassKeep n\'a pas encore la permission de l\'utiliser. C\'est fréquent sur Synology Container Manager, où le socket appartient à root. Recréez (ou redémarrez) le conteneur une fois, GlassKeep s\'accorde l\'accès au prochain démarrage et le bouton « Mettre à jour maintenant » apparaîtra ici.</string>
     <string name="native_update_docker_perm_footnote">Synology : arrêtez le projet dans Container Manager, puis relancez-le. En ligne de commande : docker compose up -d --force-recreate.</string>
-    <string name="native_update_docker_daemon_hint">Le socket Docker est monté mais le démon Docker n\'a pas répondu. Vérifiez que Docker tourne sur l\'hôte, puis relancez l'application.</string>
+    <string name="native_update_docker_daemon_hint">Le socket Docker est monté mais le démon Docker n\'a pas répondu. Vérifiez que Docker tourne sur l\'hôte, puis relancez l\'application.</string>
     <string name="native_update_method_terminal">Installation standard</string>
     <string name="native_update_method_terminal_description">Relancez le script et choisissez l\'option 2.</string>
     <string name="native_update_method_docker">Installation Docker</string>
@@ -1270,7 +1270,7 @@
     <string name="native_update_headline_cancelling">Annulation de la mise à jour...</string>
     <string name="native_update_subtext_running">Veuillez garder cette fenêtre ouverte jusqu\'à la fin de la mise à jour.</string>
     <string name="native_update_subtext_waiting">L\'application redémarre. Patientez, nous nous reconnectons automatiquement.</string>
-    <string name="native_update_subtext_success">GlassKeep a été mis à jour avec succès. Rechargez l'application pour utiliser la nouvelle version.</string>
+    <string name="native_update_subtext_success">GlassKeep a été mis à jour avec succès. Rechargez l\'application pour utiliser la nouvelle version.</string>
     <string name="native_update_subtext_error">La mise à jour n\'a pas pu aboutir. L\'application est peut-être toujours sur l\'ancienne version.</string>
     <string name="native_update_subtext_error_oom">La compilation a manqué de mémoire sur cette machine. L\'app est peut-être dans un état incohérent, restaurez une sauvegarde ou relancez le script d\'installation.</string>
     <string name="native_update_subtext_error_network">La mise à jour n\'a pas pu joindre le réseau et la restauration n\'a pas pu aboutir. Vérifiez l\'accès Internet du serveur, puis relancez le script d\'installation manuellement si besoin.</string>
