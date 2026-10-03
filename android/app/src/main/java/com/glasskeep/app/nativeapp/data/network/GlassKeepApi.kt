@@ -784,9 +784,10 @@ data class UserSettingsDto(
     val notificationsSound: Boolean? = null,
     val notificationsSoundTypes: Map<String, Boolean>? = null,
     val notificationsFilterTypes: Map<String, Boolean>? = null,
-    /** How long the pill stays, in milliseconds; null (or absent) means
-     *  it stays until dismissed. */
-    val notificationsDuration: Long? = null,
+    /** How long the pill stays, in milliseconds, or null (the JSON null)
+     *  for "until dismissed". [KeyAbsent] while the account never saved
+     *  one. */
+    val notificationsDuration: JsonElement? = KeyAbsent,
     /** Strike completed rich-text task rows, synced across devices. */
     val taskStrikeEnabled: Boolean? = null,
     val qrQuickEnabled: Boolean? = null,
@@ -799,6 +800,9 @@ data class UserSettingsDto(
      *  source's formatting) or "plain". */
     val pasteMode: String? = null,
 )
+
+/** What a [JsonElement] settings key holds while the server left it out. */
+internal val KeyAbsent: JsonElement = JsonObject(emptyMap())
 
 /** Body for a PATCH /api/user/settings that sets only the workspace theme.
  *  The server merges partial bodies into the existing settings blob, so

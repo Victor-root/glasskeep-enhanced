@@ -13,16 +13,16 @@ import com.glasskeep.app.nativeapp.data.network.ProfileDto
 data class WorkspacePreferences(
     val shellTheme: String?,
     val editorToolbarMode: String?,
-    val typography: TypographyPresets,
+    val typography: TypographyPresets?,
     /** The account itself, read alongside: its interface language ("en",
      *  "fr", or null to follow the device) and whether this user
      *  administers the instance live on the profile rather than the
      *  settings blob. Null when that read failed. */
     val profile: ProfileDto?,
-    /** Where the notification pill sits, and how long it stays (null =
-     *  until dismissed). */
+    /** Where the notification pill sits, and how long it stays, null
+     *  until the account saves one. */
     val toastPosition: String?,
-    val toastDurationMs: Long?,
+    val toastDuration: ToastDuration?,
     /** Whether notes open in read mode (the web's own default). */
     val readModeEnabled: Boolean?,
     val taskStrikeEnabled: Boolean?,
@@ -48,3 +48,6 @@ data class WorkspacePreferences(
     /** "rich" or "plain": what a plain paste keeps in the rich-text editor. */
     val pasteMode: String?,
 )
+
+/** A saved notification duration in milliseconds, null for "until dismissed". */
+data class ToastDuration(val ms: Long?)
