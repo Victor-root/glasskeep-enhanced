@@ -80,7 +80,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -164,8 +163,6 @@ import com.glasskeep.app.nativeapp.data.DrawingContentDto
 import com.glasskeep.app.nativeapp.data.DrawingStrokeDto
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.NoteContent
-import com.glasskeep.app.nativeapp.data.NoteImageData
-import com.glasskeep.app.nativeapp.data.NoteImages
 import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
@@ -205,8 +202,6 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 private val ErrorColor = Color(0xFFdc2626)
@@ -255,7 +250,7 @@ internal data class NotesLayout(val columns: Int, val sideMargin: Dp, val checkl
 }
 
 /** `max-w-2xl`: the list view's column and the assistant's answer. */
-private val ReadingColumnMaxWidth = 672.dp
+internal val ReadingColumnMaxWidth = 672.dp
 
 /** `mx-auto` on a column of at most [ReadingColumnMaxWidth]. */
 private fun Modifier.readingColumn(): Modifier =
@@ -303,14 +298,7 @@ fun NativeNotesListScreen(
     val dark = LocalGkDark.current
     val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
-    // Each card reads its own full copy, images and collaborators included:
-    // a few at a time, so a long list does not hold every note's payload in
-    // memory at once while the app starts.
-    val loadCardDetail = remember(repository) {
-        val gate = Semaphore(CardDetailLoads)
-        val load: suspend (String) -> NoteDto? = { id -> gate.withPermit { repository.cachedNoteDetailOrNull(id) } }
-        load
-    }
+    val cardDetails = remember(repository, density) { CardDetails(repository, density) }
     // null (as opposed to an actually-empty list) means Room's cold Flow
     // has not delivered its first emission yet, which is not instant: the
     // scrollable list below must not mount against that transient empty
@@ -813,6 +801,7 @@ fun NativeNotesListScreen(
                 if (reviveFailed) repository.resetFailedQueue()
                 SyncQueueWorker.triggerNow(context)
                 repository.refreshView(view)
+                cardDetails.invalidate()
                 container.syncStatus.recordReachable()
             } catch (t: CancellationException) {
                 throw t
@@ -1124,7 +1113,7 @@ fun NativeNotesListScreen(
                                     },
                                     typography = container.editorPrefs.typography.activeProfile,
                                     taskStrike = container.editorPrefs.taskStrike,
-                                    loadDetail = loadCardDetail,
+                                    details = cardDetails,
                                     themeId = themeId,
                                     layout = layout,
                                     dimmed = note.id == dimmedNoteId,
@@ -2524,9 +2513,6 @@ private fun NotesMasonry(
 // is the closest native equivalent, not a byte-for-byte port.
 private val CardShadowTint = Color(0xFF8B5CF6)
 
-/** How many cards read their full copy from the phone at once. */
-private const val CardDetailLoads = 4
-
 // useNoteTouchDrag.js's timings: hold 300ms (moving over 10px first gives
 // the touch to the scroll), then the drag is dropped when the finger has
 // not moved 600ms after it began, or 3s after its last move.
@@ -2581,7 +2567,7 @@ private fun ReorderableNoteCard(
     onToggleSelect: () -> Unit,
     typography: TypographyProfile,
     taskStrike: Boolean,
-    loadDetail: suspend (String) -> NoteDto?,
+    details: CardDetails,
     themeId: String?,
     layout: NotesLayout,
     dimmed: Boolean,
@@ -2663,7 +2649,7 @@ private fun ReorderableNoteCard(
             onToggleSelect = onToggleSelect,
             typography = typography,
             taskStrike = taskStrike,
-            loadDetail = loadDetail,
+            details = details,
             themeId = themeId,
             layout = layout,
         )
@@ -2784,19 +2770,17 @@ private fun NoteCard(
     onToggleSelect: (() -> Unit)? = null,
     typography: TypographyProfile = TypographyPresets.DEFAULT.activeProfile,
     taskStrike: Boolean = false,
-    loadDetail: (suspend (String) -> NoteDto?)? = null,
+    details: CardDetails? = null,
     themeId: String? = null,
     layout: NotesLayout,
 ) {
     val borderColor = if (dark) CardBorderDark else CardBorderLight
     // The list cache keeps only light columns; images and collaborators
     // live in the cached full note.
-    val detail by produceState<NoteDto?>(null, note.id, note.updatedAt, loadDetail) {
-        value = loadDetail?.invoke(note.id)
+    var detail by remember { mutableStateOf(details?.cached(note)) }
+    LaunchedEffect(note.id, note.updatedAt, details) {
+        details?.load(note)?.let { detail = it }
     }
-    val images = remember(detail) { detail?.let { NoteImages.parse(it.images) }.orEmpty() }
-    val collaborators = detail?.collaborators.orEmpty()
-    val showCollaborators = detail != null && (collaborators.isNotEmpty() || detail?.access != "owner")
     val shape = RoundedCornerShape(12.dp)
     Box(Modifier.fillMaxWidth().then(rememberFadeIn(fadeIn))) {
         Column(
@@ -2832,9 +2816,9 @@ private fun NoteCard(
             // into the footer's own mt-2 instead of adding both.
             var trailingMargin = if (note.title.isNotBlank()) 8.dp else 0.dp
 
-            if (images.isNotEmpty()) {
+            detail?.takeIf { it.images.isNotEmpty() }?.let { loaded ->
                 Spacer(Modifier.height(trailingMargin))
-                CardImageGrid(images = images, subtextColor = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282))
+                CardImageGrid(detail = loaded, subtextColor = if (dark) Color(0xFF99A1AF) else Color(0xFF6A7282))
                 trailingMargin = 12.dp
             }
 
@@ -2872,7 +2856,8 @@ private fun NoteCard(
             }
 
             val tags = remember(note.tagsJson) { TagsJson.parse(note.tagsJson) }
-            if (note.reminderAt != null || tags.isNotEmpty() || showCollaborators) {
+            val people = detail?.takeIf { it.showCollaborators }
+            if (note.reminderAt != null || tags.isNotEmpty() || people != null) {
                 // .note-card-footer (NoteCardFooter.jsx:40): mt-2 pt-1, rows
                 // space-y-2 in the order reminder, tags.
                 Column(
@@ -2883,7 +2868,7 @@ private fun NoteCard(
                         ReminderChip(reminderAt = reminderAt, dark = dark, accent = WorkspaceTheme.accent(themeId, false))
                     }
                     if (tags.isNotEmpty()) CardTagChips(tags = tags, dark = dark)
-                    if (showCollaborators) CardCollaborators(collaborators = collaborators, dark = dark)
+                    if (people != null) CardCollaborators(collaborators = people.collaborators, dark = dark)
                 }
             } else {
                 Spacer(Modifier.height(trailingMargin))
@@ -3093,8 +3078,8 @@ private fun AudioCardPreview(note: NoteEntity, dark: Boolean, titleColor: Color)
 /** NoteCard.jsx:280-304: up to six thumbnails, one full width or two per
  *  row, each capped at 200dp high and letterboxed, then a "+N" line. */
 @Composable
-private fun CardImageGrid(images: List<NoteImageData>, subtextColor: Color) {
-    val shown = images.take(6)
+private fun CardImageGrid(detail: CardDetail, subtextColor: Color) {
+    val shown = detail.images
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         shown.chunked(if (shown.size == 1) 1 else 2).forEach { row ->
             Row(
@@ -3102,31 +3087,28 @@ private fun CardImageGrid(images: List<NoteImageData>, subtextColor: Color) {
                 modifier = Modifier.height(IntrinsicSize.Max),
             ) {
                 row.forEach { image ->
-                    val bitmap = rememberDecodedImageAsync(image.src)
                     Box(
                         Modifier
                             .weight(1f)
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(8.dp)),
                     ) {
-                        if (bitmap != null) {
-                            Image(
-                                bitmap = bitmap,
-                                contentDescription = image.name,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 200.dp)
-                                    .aspectRatio(bitmap.width.toFloat() / bitmap.height, matchHeightConstraintsFirst = false),
-                            )
-                        }
+                        Image(
+                            bitmap = image.bitmap,
+                            contentDescription = image.name,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = CardImageMaxHeight)
+                                .aspectRatio(image.bitmap.width.toFloat() / image.bitmap.height, matchHeightConstraintsFirst = false),
+                        )
                     }
                 }
                 if (row.size == 1 && shown.size > 1) Spacer(Modifier.weight(1f))
             }
         }
-        if (images.size > 6) {
-            val extra = images.size - 6
+        if (detail.imageCount > shown.size) {
+            val extra = detail.imageCount - shown.size
             Text(
                 stringResource(if (extra == 1) R.string.native_card_more_image else R.string.native_card_more_images, extra),
                 color = subtextColor,

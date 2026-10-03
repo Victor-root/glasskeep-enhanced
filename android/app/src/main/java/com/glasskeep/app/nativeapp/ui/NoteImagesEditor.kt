@@ -353,14 +353,45 @@ private val decodedImages = object : LruCache<String, ImageBitmap>((Runtime.getR
 private fun decodeDataImage(dataUrl: String): ImageBitmap? {
     decodedImages.get(dataUrl)?.let { return it }
     return try {
-        val base64 = dataUrl.substringAfter("base64,", "")
-        if (base64.isEmpty()) return null
-        val bytes = Base64.decode(base64, Base64.DEFAULT)
+        val bytes = dataUrlBytes(dataUrl) ?: return null
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()?.also { decodedImages.put(dataUrl, it) }
     } catch (t: Throwable) {
         NativeDebug.e("Failed to decode note image", t)
         null
     }
+}
+
+private fun dataUrlBytes(dataUrl: String): ByteArray? {
+    val base64 = dataUrl.substringAfter("base64,", "")
+    return if (base64.isEmpty()) null else Base64.decode(base64, Base64.DEFAULT)
+}
+
+/** [dataUrl] decoded no bigger than is needed to draw it fitted into
+ *  [maxWidthPx] by [maxHeightPx], and not kept in [decodedImages]: the
+ *  caller keeps the result. A 1600px photo costs 7.7MB decoded in full. */
+internal fun decodeDataImageFitting(dataUrl: String, maxWidthPx: Int, maxHeightPx: Int): ImageBitmap? = try {
+    dataUrlBytes(dataUrl)?.let { bytes ->
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = fittingSampleSize(bounds.outWidth, bounds.outHeight, maxWidthPx, maxHeightPx)
+        }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
+    }
+} catch (t: Throwable) {
+    NativeDebug.e("Failed to decode note image", t)
+    null
+}
+
+/** The biggest power of two, as [BitmapFactory.Options.inSampleSize], that
+ *  still leaves a [width] by [height] image at least as big as it is drawn
+ *  when fitted into [maxWidth] by [maxHeight] (never enlarged). */
+internal fun fittingSampleSize(width: Int, height: Int, maxWidth: Int, maxHeight: Int): Int {
+    if (width <= 0 || height <= 0 || maxWidth <= 0 || maxHeight <= 0) return 1
+    val drawnScale = minOf(maxWidth.toFloat() / width, maxHeight.toFloat() / height, 1f)
+    var sample = 1
+    while (drawnScale * sample * 2 <= 1f) sample *= 2
+    return sample
 }
 
 // internal, not private: SettingsScreen.kt (same package, different file)
