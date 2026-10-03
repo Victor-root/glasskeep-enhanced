@@ -27,6 +27,13 @@ class NoteSearchTest {
 
     @Test fun searchMatchesImageName() = assertTrue(note.matchesSearchQuery("facture-super"))
 
+    @Test fun searchKeepsTheSpacesTyped() {
+        assertTrue(note.matchesSearchQuery("Maison "))
+        assertTrue(note.matchesSearchQuery("Lait d"))
+        assertFalse(note.matchesSearchQuery("Courses "))
+        assertFalse(note.matchesSearchQuery("  "))
+    }
+
     @Test fun searchRejectsAbsentValue() = assertFalse(note.matchesSearchQuery("introuvable"))
 
     @Test fun multiTagUsesCaseInsensitiveOrSemantics() {

@@ -3,17 +3,17 @@ package com.glasskeep.app.nativeapp.data
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 
 /** List-screen search parity with App.jsx: title, body, tags, checklist
- * item text, and image display names all participate case-insensitively. */
+ * item text, and image display names all participate case-insensitively.
+ * The query is taken as typed, spaces included. */
 internal fun NoteEntity.matchesSearchQuery(query: String): Boolean {
-    val needle = query.trim()
-    if (needle.isEmpty()) return true
+    if (query.isEmpty()) return true
     return sequenceOf(
         title,
         NoteContent.previewPlainText(content, Int.MAX_VALUE),
         TagsJson.parse(tagsJson).joinToString(" "),
         ChecklistPreview.parse(itemsJson).joinToString(" ") { it.text },
         TagsJson.parse(imageNamesJson).joinToString(" "),
-    ).any { it.contains(needle, ignoreCase = true) }
+    ).any { it.contains(query, ignoreCase = true) }
 }
 
 /** The web combines selected tag filters with OR semantics. Tag identity
