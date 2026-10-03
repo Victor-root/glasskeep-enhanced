@@ -2795,6 +2795,7 @@ private fun PasskeyNameDialog(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
             background = if (dark) Color(0xFF1F1F1F) else Color.White,
+            selectAllInitially = true,
         )
         Spacer(Modifier.height(20.dp))
         Row(

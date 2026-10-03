@@ -1279,7 +1279,8 @@ internal fun GkSolidButton(
  * is `text-sm`, the caret the text colour since the web never sets one.
  * With [stretch] the box fills the height its caller gives it, the text
  * kept centred, the way a flex row stretches an input. Like a browser's
- * input, a field focused without a tap has its caret after the text.
+ * input, a field focused without a tap has its caret after the text, or
+ * the whole text selected with [selectAllInitially] (`el.select()`).
  */
 @Composable
 internal fun GkTextField(
@@ -1308,9 +1309,12 @@ internal fun GkTextField(
     fontFamily: FontFamily? = null,
     enabled: Boolean = true,
     contentType: ContentType? = null,
+    selectAllInitially: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
-    var fieldState by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+    var fieldState by remember {
+        mutableStateOf(TextFieldValue(value, TextRange(if (selectAllInitially) 0 else value.length, value.length)))
+    }
     val fieldValue = fieldState.copy(text = value)
     Column(modifier) {
         if (label != null) {
