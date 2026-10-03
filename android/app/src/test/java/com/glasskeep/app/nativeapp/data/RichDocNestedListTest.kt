@@ -113,14 +113,18 @@ class RichDocNestedListTest {
     }
 
     @Test
-    fun listStyleTheEditorCannotKeepLeavesTheNoteReadOnly() {
+    fun aListStyleStaysEditableAndIsNotKept() {
+        // Pasted from a word processor: the web draws its own numbers over it.
         val content = envelope(
             """{"type":"orderedList","attrs":{"start":1,"type":"a"},"content":[
                 {"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"Alpha"}]}]}
             ]}""",
         )
 
-        assertEquals(null, RichDoc.parse(content))
+        val blocks = requireNotNull(RichDoc.parse(content))
+
+        assertEquals(listOf("Alpha"), blocks.map { it.text })
+        assertEquals(false, RichDoc.encode(blocks).contains("\"type\":\"a\""))
     }
 
     private fun envelope(node: String): String =

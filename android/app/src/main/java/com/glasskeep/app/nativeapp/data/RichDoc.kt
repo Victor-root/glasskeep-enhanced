@@ -215,7 +215,9 @@ object RichDoc {
         nestingDepth: Int,
     ): List<RichBlock>? {
         val attrs = node["attrs"] as? JsonObject
-        if (!attrsAreKnown(attrs, extraAllowedKeys = setOf("start"))) return null
+        // An ordered list's `type` (a, i...) is read and not kept: nothing on
+        // the web uses it, its numbers being its own CSS counter.
+        if (!attrsAreKnown(attrs, extraAllowedKeys = setOf("start", "type"))) return null
         val start = (attrs?.get("start") as? JsonPrimitive)?.intOrNull?.takeIf { itemKind == RichBlockKind.NUMBERED_ITEM && it != 1 }
         val items = node["content"] as? JsonArray ?: return null
         val listId = UUID.randomUUID().toString()

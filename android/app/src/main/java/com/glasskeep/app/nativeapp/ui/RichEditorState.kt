@@ -344,10 +344,12 @@ class RichEditorState {
         RichPaste.paste(current, text, html, plainPaste, asPlainText)?.let(::replace)
     }
 
-    /** A task item's checkbox ticked or unticked. */
+    /** A task item's checkbox ticked or unticked, the text taking the focus
+     *  as TaskItem's node view has the editor do. */
     internal fun toggleChecked(id: String) {
         val current = editing ?: return
         replace(current.copy(blocks = current.blocks.map { if (it.id == id) it.copy(checked = !it.checked) else it }))
+        requestFocus()
     }
 
     /** An arrow key: the caret a character on (over a line break to the
