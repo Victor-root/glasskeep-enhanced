@@ -10,7 +10,7 @@
 // identity is theirs; nothing is ever joined on a matching email.
 //
 // Signing in is identifier first. The login screen sends the account's
-// email (or the profile picked on screen), the server looks up the
+// username or email (or the profile picked on screen), the server looks up the
 // provider that account declared, and the whole flow runs on the server;
 // the browser only follows redirects and never sees the client secret or
 // a provider token:
