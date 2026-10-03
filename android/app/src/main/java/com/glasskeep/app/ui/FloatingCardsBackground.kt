@@ -66,11 +66,7 @@ private data class DecoCard(
     val lines: List<Float>,
 )
 
-/**
- * The six cards AuthShell.jsx renders on a phone (:138-170). The other
- * four it declares carry `hidden md:block`, so they never appear on the
- * only screen size this app targets and are not ported.
- */
+/** The six cards AuthShell.jsx renders at every width (:138-170). */
 private val LoginDecoCards = listOf(
     DecoCard(0.06f, null, 0.08f, null, -12f, 7000, 0, Color(0xFF6366F1), listOf(0.90f, 0.75f, 0.60f)),
     DecoCard(0.03f, null, 0.42f, null, 5f, 9000, 2000, Color(0xFFA855F7), listOf(0.85f, 0.55f)),
@@ -79,6 +75,16 @@ private val LoginDecoCards = listOf(
     DecoCard(null, 0.04f, 0.38f, null, -8f, 7500, 3000, Color(0xFFEC4899), listOf(0.90f, 0.60f, 0.78f)),
     DecoCard(null, 0.08f, null, 0.08f, -15f, 11000, 5000, Color(0xFF14B8A6), listOf(0.75f, 0.50f)),
 )
+
+/** The four more it declares with `hidden md:block` (:172-193), from 768px. */
+private val LoginDecoCardsFromMd = listOf(
+    DecoCard(0.22f, null, 0.18f, null, 10f, 8500, 1500, Color(0xFFF97316), listOf(0.82f, 0.64f, 0.50f)),
+    DecoCard(0.20f, null, null, 0.20f, -6f, 9500, 6000, Color(0xFF0EA5E9), listOf(0.88f, 0.58f)),
+    DecoCard(null, 0.20f, 0.14f, null, -9f, 10500, 2500, Color(0xFF84CC16), listOf(0.76f, 0.92f, 0.55f)),
+    DecoCard(null, 0.18f, null, 0.18f, 7f, 8000, 7000, Color(0xFFF43F5E), listOf(0.80f, 0.62f)),
+)
+
+private val LoginDecoCardsAtMd = LoginDecoCards + LoginDecoCardsFromMd
 
 /** The six cards that remain visible below 640px in the signed-in web
  * workspace (`FloatingCardsBackground.jsx` + globalCSS.js:2750-2755).
@@ -103,7 +109,8 @@ private val WorkspaceDecoCards = listOf(
  * Anchored to whatever box [modifier] gives it, and clipped to it: the
  * sign-in screens lay it over their scrolling page like the web's
  * `overflow-hidden` root. [fadeIn] is `.floating-cards-bg`'s reveal,
- * which the sign-in decoration does not carry.
+ * which the sign-in decoration does not carry. [md] adds the sign-in
+ * decoration's four wide-screen cards.
  *
  * Deliberately not backdrop-blurred, exactly like the web: the stylesheet
  * calls that out as a GPU cost it refuses to pay for decoration.
@@ -114,6 +121,7 @@ internal fun FloatingCardsBackground(
     modifier: Modifier = Modifier,
     workspace: Boolean = false,
     fadeIn: Boolean = true,
+    md: Boolean = false,
 ) {
     var revealed by remember { mutableStateOf(!fadeIn) }
     LaunchedEffect(Unit) {
@@ -127,7 +135,11 @@ internal fun FloatingCardsBackground(
         label = "floatingCardsFade",
     )
     DecoCards(
-        cards = if (workspace) WorkspaceDecoCards else LoginDecoCards,
+        cards = when {
+            workspace -> WorkspaceDecoCards
+            md -> LoginDecoCardsAtMd
+            else -> LoginDecoCards
+        },
         dark = dark,
         modifier = modifier.fillMaxSize().clipToBounds().alpha(revealAlpha),
     )

@@ -338,9 +338,10 @@ private fun passkeyUnlockError(context: Context, name: String?, message: String)
  * screen, since their local cache is still perfectly readable. The notes
  * list draws it at the top of its own scrolling page, above the header, so
  * it scrolls away with the notes exactly like the web's in-flow banner
- * (App.jsx:7495). On a phone the web stacks glyph, message and buttons,
- * and tops the banner with its own `max(safe-top, 12px)` padding even
- * though the page already starts under the status bar.
+ * (App.jsx:7495). Below 640dp the web stacks glyph, message and buttons
+ * (one row from there on), and tops the banner with its own
+ * `max(safe-top, 12px)` padding even though the page already starts under
+ * the status bar.
  */
 @Composable
 internal fun LockedBanner(dark: Boolean, onUnlock: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
@@ -354,19 +355,19 @@ internal fun LockedBanner(dark: Boolean, onUnlock: () -> Unit, onDismiss: () -> 
             .tailwindShadowMd(RectangleShape)
             .background(if (dark) BannerBgDark else BannerBgLight),
     ) {
-        Column(
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = maxOf(safeTop, 12.dp), bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            PadlockIcon(size = 20.dp, tint = textColor)
+        val glyph: @Composable () -> Unit = { PadlockIcon(size = 20.dp, tint = textColor) }
+        val message: @Composable (Modifier) -> Unit = { messageModifier ->
             Text(
                 stringResource(R.string.native_locked_banner_message),
                 fontSize = 14.sp,
                 lineHeight = 19.25.sp,
                 color = textColor,
+                modifier = messageModifier,
             )
+        }
+        val actions: @Composable (Modifier) -> Unit = { actionsModifier ->
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = actionsModifier,
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             ) {
                 Text(
@@ -399,6 +400,26 @@ internal fun LockedBanner(dark: Boolean, onUnlock: () -> Unit, onDismiss: () -> 
                         ) { onDismiss() }
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 )
+            }
+        }
+        if (windowWidth() >= 640.dp) {
+            Row(
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = maxOf(safeTop, 12.dp), bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                glyph()
+                message(Modifier.weight(1f))
+                actions(Modifier)
+            }
+        } else {
+            Column(
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = maxOf(safeTop, 12.dp), bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                glyph()
+                message(Modifier)
+                actions(Modifier.fillMaxWidth())
             }
         }
         // border-b-2, thicker than the hairline every other rule here uses.

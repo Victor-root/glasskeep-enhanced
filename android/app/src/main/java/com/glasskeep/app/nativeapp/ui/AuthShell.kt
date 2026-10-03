@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.windowInsetsTopHeight
@@ -64,6 +65,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -109,6 +111,16 @@ internal data class AuthShellColors(
 
 private val AuthCardShape = RoundedCornerShape(12.dp)
 
+/** `max-w-md`: the widest the logo, the card and the rows below go. */
+private val AuthMaxWidth = 448.dp
+
+/** Tailwind's `md:`, from which the sign-in decoration gets four more cards. */
+private val AuthShellMdBreakpoint = 768.dp
+
+/** The window's width, which the web's `sm:` and `md:` breakpoints read. */
+@Composable
+internal fun windowWidth(): Dp = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+
 /** The WebView's pull-to-refresh on the signed-out pages, which reloaded
  *  them: [onRefresh] rereads what they show and resets their forms, the
  *  disc spinning while [refreshing]. */
@@ -129,10 +141,10 @@ internal fun Modifier.authCard(colors: AuthShellColors): Modifier = this
 internal fun glassFill(dark: Boolean): Color = if (dark) Color(0xEB282828) else Color(0xEBFFFFFF)
 
 /**
- * AuthShell.jsx, the frame shared by every signed-out screen, at phone
- * width: the page is one screen tall below the status bar (`min-h-screen`
- * under the body's top inset), the logo, card and trailing rows sit centred
- * in it and the credits line closes it, then the navigation bar's inset.
+ * AuthShell.jsx, the frame shared by every signed-out screen: the page is
+ * one screen tall below the status bar (`min-h-screen` under the body's top
+ * inset), the logo, card and trailing rows sit centred in it, at most 448dp
+ * wide, and the credits line closes it, then the navigation bar's inset.
  * The drifting cards scroll with that page, as they do on the web; a login
  * background configured by the admin replaces them, pulls the logo and the
  * name into the card and turns the toggle and the credits into pills.
@@ -234,7 +246,7 @@ internal fun AuthShell(
             Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
             Box(Modifier.fillMaxWidth().heightIn(min = screenHeight)) {
                 if (customBackground == null) {
-                    FloatingCardsBackground(dark, Modifier.matchParentSize(), fadeIn = false)
+                    FloatingCardsBackground(dark, Modifier.matchParentSize(), fadeIn = false, md = windowWidth() >= AuthShellMdBreakpoint)
                 }
                 Column(
                     modifier = Modifier
@@ -245,7 +257,7 @@ internal fun AuthShell(
                 ) {
                     Spacer(Modifier.weight(1f))
                     Column(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                        modifier = Modifier.widthIn(max = AuthMaxWidth).fillMaxWidth().padding(vertical = 32.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         if (customBackground == null) {
