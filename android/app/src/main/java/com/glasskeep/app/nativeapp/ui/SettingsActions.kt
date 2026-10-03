@@ -320,10 +320,6 @@ internal class SettingsActions(
         changePasswordOpen = false
     }
 
-    fun clearPasswordError() {
-        passwordError = null
-    }
-
     /** ChangePasswordModal.jsx's own checks, then the change itself. It
      *  runs here rather than in the dialog: the server signs every other
      *  session out on success, so the fresh token must be stored even when
@@ -442,7 +438,7 @@ private fun ChangePasswordDialog(
         if (!forced) {
             GkTextField(
                 value = current,
-                onValueChange = { current = it; actions.clearPasswordError() },
+                onValueChange = { current = it },
                 label = stringResource(R.string.native_settings_password_current),
                 placeholder = stringResource(R.string.native_settings_password_current),
                 themeId = themeId,
@@ -457,7 +453,7 @@ private fun ChangePasswordDialog(
         }
         GkTextField(
             value = new,
-            onValueChange = { new = it; actions.clearPasswordError() },
+            onValueChange = { new = it },
             label = stringResource(R.string.native_settings_password_new),
             placeholder = stringResource(R.string.native_settings_password_new_placeholder),
             themeId = themeId,
@@ -472,7 +468,7 @@ private fun ChangePasswordDialog(
         Spacer(Modifier.height(16.dp))
         GkTextField(
             value = confirm,
-            onValueChange = { confirm = it; actions.clearPasswordError() },
+            onValueChange = { confirm = it },
             label = stringResource(R.string.native_settings_password_confirm),
             placeholder = stringResource(R.string.native_settings_password_confirm_placeholder),
             themeId = themeId,
