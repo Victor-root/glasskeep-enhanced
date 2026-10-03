@@ -135,8 +135,10 @@ GlassKeep reads it from there.
    typed differs from the one the provider publishes (the trailing
    slash, typically), the test shows the right value with a button to
    use it.
-4. **Save**, then **Link my account**. You sign in at your provider once
-   and come back with *"Your account is now linked"*.
+4. **Save**, then **Link my account**. GlassKeep asks for your password
+   (linking adds a way into your account, so a stolen session alone
+   cannot do it), you sign in at your provider once and come back with
+   *"Your account is now linked"*.
 
 The client secret stays on the server; leave the field empty to keep the
 saved one. Changing the issuer or the client ID unlinks the account,
@@ -158,9 +160,11 @@ someone else, even with the same email, is refused.
 
 ## 📱 Android app
 
-The app signs in through the provider inside its own window, then comes
-back to GlassKeep by itself. Use the same server address in the app as
-the one you set up your provider from.
+The app opens the provider in a separate screen, then comes back to
+GlassKeep by itself. That screen shares nothing with the app but its
+cookies: the provider's pages never get access to the app's native
+features (passkeys, files, reminders). Use the same server address in
+the app as the one you set up your provider from.
 
 ---
 
@@ -200,5 +204,7 @@ It never logs tokens or secrets.
   one minute, traded for the usual GlassKeep session.
 - An unknown email and an account without a provider get the same
   answer, and both count towards the usual sign-in throttle.
+- Every answer from a provider is size-capped and time-limited, so a
+  provider cannot exhaust the server's memory or hold it waiting.
 - Storage: `oidc_providers` (one row per account's provider) and
   `user_external_identities` (`issuer` + `subject`, unique).
