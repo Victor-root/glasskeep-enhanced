@@ -119,6 +119,8 @@ export default function OidcSettingsSection({ token, isAdmin, showToast, showGen
   const [clientId, setClientId] = useState("");
   const [secretDraft, setSecretDraft] = useState("");
   const [showSecret, setShowSecret] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const [linkPassword, setLinkPassword] = useState("");
 
   const origin = window.location.origin;
   const callbackUrl = `${origin}/api/auth/oidc/callback`;
@@ -182,12 +184,13 @@ export default function OidcSettingsSection({ token, isAdmin, showToast, showGen
     }
   };
 
-  const onLink = async () => {
+  const onLink = async (e) => {
+    e.preventDefault();
     setBusy(true);
     try {
-      await startOidcLink(token);
-    } catch (e) {
-      showToast?.(oidcErrorMessage(e), "error");
+      await startOidcLink(token, linkPassword);
+    } catch (err) {
+      showToast?.(oidcErrorMessage(err), "error");
       setBusy(false);
     }
   };
@@ -232,9 +235,29 @@ export default function OidcSettingsSection({ token, isAdmin, showToast, showGen
           {provider.publicOrigin !== origin && (
             <Warning>{t("oidcOriginChanged", { saved: provider.publicOrigin })}</Warning>
           )}
+          {linking && (
+            <form onSubmit={onLink} className="space-y-2">
+              <p className="text-xs text-gray-500">{t("oidcLinkPasswordHint")}</p>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  autoFocus
+                  autoComplete="current-password"
+                  placeholder={t("oidcLinkPasswordPlaceholder")}
+                  value={linkPassword}
+                  onChange={(e) => setLinkPassword(e.target.value)}
+                  disabled={busy}
+                  className={`${FIELD_INPUT_CLASSES} min-w-0`}
+                />
+                <button type="submit" disabled={busy || !linkPassword} className={`${PRIMARY_BTN} shrink-0`}>
+                  {t("oidcSignInContinue")}
+                </button>
+              </div>
+            </form>
+          )}
           <div className="flex flex-wrap gap-2">
-            {allowed && !identity && (
-              <button type="button" onClick={onLink} disabled={busy} className={PRIMARY_BTN}>
+            {allowed && !identity && !linking && (
+              <button type="button" onClick={() => { setLinkPassword(""); setLinking(true); }} disabled={busy} className={PRIMARY_BTN}>
                 {t("oidcLinkAccount")}
               </button>
             )}

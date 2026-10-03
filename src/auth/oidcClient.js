@@ -33,8 +33,10 @@ export async function startOidcSignIn(who) {
   goToProvider(authorizationUrl);
 }
 
-export async function startOidcLink(token) {
-  const { authorizationUrl } = await api("/auth/oidc/link", { method: "POST", token, body: {} });
+// Linking adds a way into the account, so the server asks for the
+// password first.
+export async function startOidcLink(token, password) {
+  const { authorizationUrl } = await api("/auth/oidc/link", { method: "POST", token, body: { password } });
   goToProvider(authorizationUrl);
 }
 
