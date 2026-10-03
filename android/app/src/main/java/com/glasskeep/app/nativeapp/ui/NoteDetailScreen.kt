@@ -1185,6 +1185,16 @@ fun NoteDetailScreen(
         }
     }
 
+    /** The body as the AI and a conversion to a checklist read it: a legacy
+     *  note nobody changed gives its Markdown as it is, as the web hands over
+     *  its `mBody`, any other body its blocks as plain text. */
+    fun richBodyText(edit: Editability): String =
+        if (edit.legacyReadBlocks != null && richBlocks == edit.originalRichBlocks) {
+            note?.content.orEmpty()
+        } else {
+            NoteConversion.richBlocksToPlainText(richBlocks ?: edit.originalRichBlocks.orEmpty())
+        }
+
     /** The note as the AI should see it: the live editor state, not the
      *  last-saved copy, so a question is asked about what is on screen
      *  (App.jsx:2734-2754). */
@@ -1195,9 +1205,7 @@ fun NoteDetailScreen(
             edit.isChecklistType -> edit.checklistItems.orEmpty()
                 .filterIsInstance<ChecklistItemData>()
                 .joinToString("\n") { "- ${if (it.done) "[x]" else "[ ]"} ${it.text}" }
-            edit.isRichEditableType -> NoteConversion.richBlocksToPlainText(
-                richBlocks ?: edit.originalRichBlocks.orEmpty(),
-            )
+            edit.isRichEditableType -> richBodyText(edit)
             edit.isDrawType -> NoteConversion.richBlocksToPlainText(richBlocks.orEmpty())
             else -> bodyText
         }
@@ -1736,8 +1744,7 @@ fun NoteDetailScreen(
             try {
                 if (toChecklist) {
                     val text = when {
-                        edit.isRichEditableType ->
-                            NoteConversion.richBlocksToPlainText(richBlocks ?: edit.originalRichBlocks.orEmpty())
+                        edit.isRichEditableType -> richBodyText(edit)
                         edit.bodyEditable -> bodyText
                         else -> edit.bodyPlainText
                     }
