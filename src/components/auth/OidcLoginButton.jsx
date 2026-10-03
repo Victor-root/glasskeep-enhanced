@@ -2,8 +2,9 @@
 //
 // "Sign in with my provider" on the login screen. Each account declares
 // its own provider, so the server needs to know whose it is first: from
-// the profile picked on screen (`userId`), or from the email typed in the
-// small field this button opens. Then it leaves for the provider. The
+// the profile picked on screen (`userId`), or from the username or email
+// typed in the small field this button opens, the same identifier the
+// password form takes. Then it leaves for the provider. The
 // error line belongs to LoginView, so a failure reported on the way back
 // survives switching login modes.
 
@@ -57,7 +58,7 @@ export default function OidcLoginButton({ userId, defaultEmail = "", error, onEr
             autoFocus
             autoComplete="username"
             className="flex-1 min-w-0 bg-transparent border border-[var(--border-light)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-            placeholder={t("oidcSignInEmailPlaceholder")}
+            placeholder={t("oidcSignInIdentifierPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={busy}

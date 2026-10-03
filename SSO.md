@@ -31,7 +31,7 @@ one of them.
   settings, then **links** their GlassKeep account by signing in there
   once.
 - On the login screen, **"Sign in with my provider"** asks for the
-  GlassKeep email, sends you to that account's provider, and brings you
+  GlassKeep username or email, sends you to that account's provider, and brings you
   back signed in. From then on GlassKeep works exactly as with a
   password.
 
@@ -149,8 +149,8 @@ since it is no longer the same provider: link it again.
 ## 🔑 Signing in
 
 On the login screen, **Sign in with my provider**, type your GlassKeep
-email, **Continue**. From the profile picker, choosing your profile is
-enough: the button then needs no email.
+username or email, **Continue**. From the profile picker, choosing your profile is
+enough: the button then asks for nothing.
 
 GlassKeep only opens your account if your provider vouches for **the
 identity you linked** (issuer + subject). Signing in at the provider as
@@ -173,7 +173,7 @@ the app as the one you set up your provider from.
 | What you see | What it means |
 |---|---|
 | No "Sign in with my provider" button | The admin has not allowed SSO, or no account has linked a provider yet. |
-| *"No provider is linked to this account"* | Wrong email, or the account has no linked provider: sign in another way and set it up in Settings → Security. |
+| *"No provider is linked to this account"* | Wrong username or email, or the account has no linked provider: sign in another way and set it up in Settings → Security. |
 | *"This provider is on a local network address"* | Only an admin's provider may be on the LAN. Expose the provider at a public address. |
 | *"The provider publishes a different issuer"* | Use exactly the issuer the provider publishes (the test offers it). |
 | *"The provider could not be reached"* | The GlassKeep **server** must reach the issuer, not only your browser. Check DNS, firewall, and that a self-signed provider certificate is trusted by Node (`NODE_EXTRA_CA_CERTS`). |
@@ -202,7 +202,7 @@ It never logs tokens or secrets.
 - The attempt is bound to the browser that started it by an HttpOnly
   cookie, and the way back into the app is a one-time ticket valid for
   one minute, traded for the usual GlassKeep session.
-- An unknown email and an account without a provider get the same
+- An unknown identifier and an account without a provider get the same
   answer, and both count towards the usual sign-in throttle.
 - Every answer from a provider is size-capped and time-limited, so a
   provider cannot exhaust the server's memory or hold it waiting.

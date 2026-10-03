@@ -1625,7 +1625,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   oidcDeleteConfirm: "La configuration de {provider} est supprimée et vous ne pourrez plus vous connecter avec.",
   oidcDeletedToast: "Fournisseur supprimé",
   oidcSignIn: "Se connecter avec mon fournisseur",
-  oidcSignInEmailPlaceholder: "Votre e-mail GlassKeep",
+  oidcSignInIdentifierPlaceholder: "Pseudo ou e-mail GlassKeep",
   oidcSignInContinue: "Continuer",
   oidcSignInProgress: "Redirection…",
   oidcErrFailed: "La connexion avec le fournisseur a échoué. Réessayez.",
