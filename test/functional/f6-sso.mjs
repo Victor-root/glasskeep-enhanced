@@ -312,6 +312,12 @@ try {
   t.check("depuis un profil choisi à l'écran, le compte est connu sans le taper",
     sessionProfil.json?.user?.id === chef.id, j(sessionProfil.json?.user));
 
+  const ailleurs = await inst.call("POST", "/api/auth/oidc/login", {
+    body: { email: "chef@glasskeep.test" }, headers: { origin: "https://autre-adresse.test" },
+  });
+  t.check("depuis une autre adresse que celle de la configuration, on le dit tout de suite",
+    ailleurs.status === 409 && ailleurs.json?.error === "oidc_wrong_origin", ailleurs.text);
+
   const inconnu = await inst.call("POST", "/api/auth/oidc/login", { body: { email: "personne@glasskeep.test" } });
   const sansFournisseur = await inst.call("POST", "/api/auth/oidc/login", { body: { email: "simple@glasskeep.test" } });
   t.check("un compte inconnu et un compte sans fournisseur reçoivent la même réponse",

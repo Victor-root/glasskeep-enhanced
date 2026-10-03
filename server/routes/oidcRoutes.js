@@ -159,8 +159,15 @@ function attachOidcRoutes(app, deps) {
     isSsoAllowed() ? next() : res.status(403).json({ error: "oidc_not_allowed" })
   );
 
+  // The provider sends the browser back to the address the configuration
+  // was saved from, and the cookie tying the attempt to this browser lives
+  // on the address it starts from. A mismatch can only end in an expired
+  // attempt, so it is said up front.
   async function startFlow(req, res, provider, purpose) {
     const userId = provider.owner_user_id;
+    if (req.headers.origin && req.headers.origin !== provider.public_origin) {
+      return res.status(409).json({ error: "oidc_wrong_origin" });
+    }
     try {
       const { url, state, nonce, codeVerifier } = await beginAuthorization(provider, accessForUser(userId));
       const binding = bindBrowser(req, res, provider.public_origin);
