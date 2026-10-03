@@ -784,9 +784,23 @@
     <string name="native_err_plaintext_http">Refus d\'envoyer le secret de d\u00e9verrouillage en HTTP non chiffr\u00e9. Utilisez HTTPS, posez TRUST_PROXY=true si vous avez un reverse proxy, ou d\u00e9verrouillez depuis localhost.</string>
     <string name="native_err_encryption_not_enabled">Le chiffrement au repos n\'est pas activ\u00e9.</string>
     <string name="native_err_note_not_found">Note introuvable.</string>
+    <string name="native_err_note_not_in_trash">La note doit être dans la corbeille avant d\'être supprimée définitivement.</string>
+    <string name="native_err_client_updated_at_required">Horodatage de mise à jour client manquant.</string>
+    <string name="native_err_client_reordered_at_required">Horodatage de réorganisation client manquant.</string>
+    <string name="native_err_reorder_forbidden">La réorganisation contient des notes auxquelles vous n\'avez pas accès.</string>
+    <string name="native_err_invalid_timestamp">Format d\'horodatage invalide.</string>
+    <string name="native_err_timestamp_future">L\'horodatage est trop loin dans le futur.</string>
+    <string name="native_err_no_notes_to_import">Aucune note à importer.</string>
+    <string name="native_err_import_failed">Échec de l\'import.</string>
+    <string name="native_err_invalid_settings">Paramètres invalides.</string>
     <string name="native_err_user_not_found">Utilisateur introuvable.</string>
+    <string name="native_err_username_required">Le nom d\'utilisateur est requis.</string>
+    <string name="native_err_cant_collab_self">Vous ne pouvez pas collaborer avec vous-même.</string>
+    <string name="native_err_already_collaborator">Cet utilisateur est déjà collaborateur.</string>
     <string name="native_err_add_collaborator_failed">Échec de l\'ajout du collaborateur.</string>
     <string name="native_err_collaborator_not_found">Collaborateur introuvable.</string>
+    <string name="native_err_only_owner_can_remove">Seul le propriétaire de la note peut retirer d\'autres collaborateurs.</string>
+    <string name="native_err_only_owner_can_delete_all">Seul le propriétaire peut supprimer la note pour tout le monde.</string>
     <string name="native_err_peer_not_paired">Ce serveur n’est plus lié au vôtre. Un administrateur doit rétablir la liaison avant de partager.</string>
     <string name="native_err_peer_clock_skew">Les horloges des deux serveurs ne concordent pas, le partage est refusé. Un administrateur doit synchroniser l’heure (NTP).</string>
     <string name="native_err_peer_note_id_conflict">Le serveur de destination a refusé le partage : une autre note y porte déjà cet identifiant.</string>
@@ -797,6 +811,10 @@
     <string name="native_err_peer_unreachable">Le serveur distant est injoignable. Réessayez quand il sera de retour en ligne.</string>
     <string name="native_err_note_access_denied">Note introuvable ou accès refusé.</string>
     <string name="native_err_unlock_first">Déverrouillez l\'instance d\'abord.</string>
+    <string name="native_err_avatar_required">Une image d\'avatar est requise.</string>
+    <string name="native_err_avatar_invalid_format">L\'avatar doit être une data URL PNG, JPEG ou WebP.</string>
+    <string name="native_err_avatar_too_large">L\'image d\'avatar est trop volumineuse (max ~1,5 Mo).</string>
+    <string name="native_err_show_on_login_boolean">show_on_login doit être un booléen.</string>
     <string name="native_err_ai_disabled">L\'assistant IA est désactivé.</string>
     <string name="native_err_ai_not_configured">L\'assistant IA n\'est pas configuré. Contactez un administrateur.</string>
     <string name="native_err_ai_base_url_missing">L\'URL de base de l\'IA n\'est pas définie.</string>
@@ -808,6 +826,7 @@
     <string name="native_err_ai_model_missing">Le modèle IA n\'est pas défini.</string>
     <string name="native_err_ai_unreachable">Impossible de joindre le fournisseur IA.</string>
     <string name="native_err_ai_provider">Le fournisseur IA a renvoyé une erreur.</string>
+    <string name="native_err_ai_missing_prompt">Question ou messages manquants.</string>
     <string name="native_err_passkey_domain_not_set">Les passkeys ne sont pas encore disponibles sur cette instance : un administrateur doit d\'abord en renseigner le domaine.</string>
     <string name="native_err_passkey_not_authorised_unlock">Cette clé d\'accès n\'est pas autorisée à déverrouiller l\'instance.</string>
     <string name="native_err_passkey_only_admin_unlock">Seules les clés d\'accès administrateur peuvent déverrouiller l\'instance.</string>

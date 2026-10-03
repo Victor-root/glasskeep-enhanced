@@ -795,9 +795,23 @@
     <string name="native_err_plaintext_http">Refusing to send the unlock secret over plaintext HTTP. Use HTTPS, set TRUST_PROXY=true if you have a reverse proxy, or unlock from localhost.</string>
     <string name="native_err_encryption_not_enabled">At-rest encryption is not enabled.</string>
     <string name="native_err_note_not_found">Note not found.</string>
+    <string name="native_err_note_not_in_trash">The note must be in the trash before being permanently deleted.</string>
+    <string name="native_err_client_updated_at_required">Missing client update timestamp.</string>
+    <string name="native_err_client_reordered_at_required">Missing client reorder timestamp.</string>
+    <string name="native_err_reorder_forbidden">The reorder payload contains notes you cannot access.</string>
+    <string name="native_err_invalid_timestamp">Invalid timestamp format.</string>
+    <string name="native_err_timestamp_future">Timestamp is too far in the future.</string>
+    <string name="native_err_no_notes_to_import">No notes to import.</string>
+    <string name="native_err_import_failed">Import failed.</string>
+    <string name="native_err_invalid_settings">Invalid settings.</string>
     <string name="native_err_user_not_found">User not found.</string>
+    <string name="native_err_username_required">Username is required.</string>
+    <string name="native_err_cant_collab_self">You cannot collaborate with yourself.</string>
+    <string name="native_err_already_collaborator">This user is already a collaborator.</string>
     <string name="native_err_add_collaborator_failed">Failed to add the collaborator.</string>
     <string name="native_err_collaborator_not_found">Collaborator not found.</string>
+    <string name="native_err_only_owner_can_remove">Only the note owner can remove other collaborators.</string>
+    <string name="native_err_only_owner_can_delete_all">Only the owner can delete the note for everyone.</string>
     <string name="native_err_peer_not_paired">That server is no longer linked to yours. An admin needs to restore the link before you can share.</string>
     <string name="native_err_peer_clock_skew">The two servers\' clocks do not agree, so the share was refused. An admin needs to sync the time (NTP).</string>
     <string name="native_err_peer_note_id_conflict">The destination server refused the share: another note there already uses this identifier.</string>
@@ -808,6 +822,10 @@
     <string name="native_err_peer_unreachable">The remote server is unreachable. Try again once it is back online.</string>
     <string name="native_err_note_access_denied">Note not found or access denied.</string>
     <string name="native_err_unlock_first">Unlock the instance first.</string>
+    <string name="native_err_avatar_required">An avatar image is required.</string>
+    <string name="native_err_avatar_invalid_format">The avatar must be a PNG, JPEG or WebP data URL.</string>
+    <string name="native_err_avatar_too_large">The avatar image is too large (max ~1.5 MB).</string>
+    <string name="native_err_show_on_login_boolean">show_on_login must be a boolean.</string>
     <string name="native_err_ai_disabled">The AI Assistant is disabled.</string>
     <string name="native_err_ai_not_configured">The AI Assistant is not configured. Ask an administrator.</string>
     <string name="native_err_ai_base_url_missing">The AI base URL is not set.</string>
@@ -819,6 +837,7 @@
     <string name="native_err_ai_model_missing">The AI model is not set.</string>
     <string name="native_err_ai_unreachable">Could not reach the AI provider.</string>
     <string name="native_err_ai_provider">The AI provider returned an error.</string>
+    <string name="native_err_ai_missing_prompt">Missing question or messages.</string>
     <string name="native_err_passkey_domain_not_set">Passkeys are not available on this instance yet: an administrator has to set its passkey domain first.</string>
     <string name="native_err_passkey_not_authorised_unlock">This passkey is not authorised to unlock the instance.</string>
     <string name="native_err_passkey_only_admin_unlock">Only admin passkeys can unlock the instance.</string>
