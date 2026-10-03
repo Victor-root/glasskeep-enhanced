@@ -102,7 +102,7 @@ class RealtimeClient(
     fun start() {
         if (scope != null) return
         NativeDebug.d("RealtimeClient.start")
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + backgroundErrorHandler)
         connect()
     }
 

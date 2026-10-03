@@ -146,7 +146,7 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
         }
 
         private val drainLock = Mutex()
-        private val drainScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val drainScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + backgroundErrorHandler)
 
         /**
          * Replays the queue, oldest first, one drain at a time: the worker's
