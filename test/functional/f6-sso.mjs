@@ -76,6 +76,10 @@ const serveurIdp = http.createServer(async (req, res) => {
       token_endpoint_auth_methods_supported: ["client_secret_basic"],
     });
   }
+  if (url.pathname === "/enorme/.well-known/openid-configuration") {
+    res.writeHead(200, { "content-type": "application/json" });
+    return res.end(JSON.stringify({ issuer: `http://127.0.0.1:${IDP_PORT}/enorme/`, remplissage: "x".repeat(3 * 1024 * 1024) }));
+  }
   if (url.pathname === "/realm/jwks") {
     return json(200, { keys: [{ ...keys.publicKey.export({ format: "jwk" }), kid: KID, use: "sig", alg: "RS256" }] });
   }
@@ -242,6 +246,13 @@ try {
   t.check("le test lit la découverte et les clés de signature, et prévient pour le http",
     test.json?.ok === true && test.json.keyCount === 1 && test.json.warnings?.includes("issuer_not_https"), test.text);
 
+  const enorme = await inst.call("POST", "/api/auth/oidc/me/test", {
+    token: chef.token, body: { issuer: `http://127.0.0.1:${IDP_PORT}/enorme/`, clientId: CLIENT_ID },
+  });
+  const vivant = await inst.call("GET", "/api/health");
+  t.check("une réponse démesurée du fournisseur est coupée, le serveur reste debout",
+    enorme.json?.ok === false && enorme.json.error === "oidc_discovery_failed" && vivant.ok, enorme.text.slice(0, 200));
+
   const incomplet = await inst.call("PUT", "/api/auth/oidc/me", { token: chef.token, body: config({ clientSecret: "" }) });
   const injoignable = await inst.call("PUT", "/api/auth/oidc/me", {
     token: chef.token, body: config({ issuer: "http://127.0.0.1:1/absent/" }),
@@ -272,10 +283,16 @@ try {
   // ───────────────────────────────────────────────────────────────────
   const sansSession = await inst.call("POST", "/api/auth/oidc/link", { body: {} });
   t.check("associer demande d'être connecté", sansSession.status === 401);
+  const sansMotDePasse = await inst.call("POST", "/api/auth/oidc/link", { token: chef.token, body: {} });
+  const mauvaisMotDePasse = await inst.call("POST", "/api/auth/oidc/link", { token: chef.token, body: { password: "faux" } });
+  const toujoursConnecte = await inst.call("GET", "/api/user/me", { token: chef.token });
+  t.check("associer demande aussi le mot de passe, sans couper la session quand il est faux",
+    sansMotDePasse.status === 403 && mauvaisMotDePasse.status === 403 && toujoursConnecte.ok,
+    `${sansMotDePasse.text} ${mauvaisMotDePasse.text}`);
 
   idp.personne = { sub: "u-chef", email: "chef@authentik.test", name: "Chef" };
   idp.emailSeulementDansUserinfo = true;
-  const association = await parcours(inst, nav, { chemin: "/api/auth/oidc/link", token: chef.token });
+  const association = await parcours(inst, nav, { chemin: "/api/auth/oidc/link", token: chef.token, corps: { password: chef.password } });
   idp.emailSeulementDansUserinfo = false;
   const apresLien = await inst.call("GET", "/api/auth/oidc/me", { token: chef.token });
   const disponible = await inst.call("GET", "/api/auth/oidc/status");
@@ -365,7 +382,7 @@ try {
   // ───────────────────────────────────────────────────────────────────
   await inst.call("PUT", "/api/auth/oidc/me", { token: second.token, body: config() });
   const navSecond = navigateur();
-  const dejaPrise = await parcours(inst, navSecond, { chemin: "/api/auth/oidc/link", token: second.token });
+  const dejaPrise = await parcours(inst, navSecond, { chemin: "/api/auth/oidc/link", token: second.token, corps: { password: second.password } });
   t.check("une identité déjà associée à un autre compte ne change pas de compte",
     dejaPrise.params.oidc_error === "oidc_identity_in_use", dejaPrise.location);
 
@@ -377,7 +394,7 @@ try {
     !!memeConfig.json?.identity && autreClient.json?.identity === null, `${memeConfig.text} ${autreClient.text}`);
 
   await inst.call("PUT", "/api/auth/oidc/me", { token: chef.token, body: config() });
-  await parcours(inst, nav, { chemin: "/api/auth/oidc/link", token: chef.token });
+  await parcours(inst, nav, { chemin: "/api/auth/oidc/link", token: chef.token, corps: { password: chef.password } });
   const dissocie = await inst.call("DELETE", "/api/auth/oidc/me/identity", { token: chef.token });
   const apresDissociation = await parcours(inst, nav, { corps: { email: "chef@glasskeep.test" } });
   t.check("après la dissociation, le fournisseur n'ouvre plus le compte",
@@ -391,8 +408,12 @@ try {
   // 7. Refermé par l'administrateur, plus rien ne passe.
   // ───────────────────────────────────────────────────────────────────
   await inst.call("PUT", "/api/auth/oidc/me", { token: chef.token, body: config() });
-  await parcours(inst, nav, { chemin: "/api/auth/oidc/link", token: chef.token });
+  await parcours(inst, nav, { chemin: "/api/auth/oidc/link", token: chef.token, corps: { password: chef.password } });
+  const enAttente = await parcours(inst, nav, { corps: { email: "chef@glasskeep.test" } });
   await inst.call("PATCH", "/api/admin/settings", { token: chef.token, body: { ssoAllowed: false } });
+  const ticketApresFermeture = await echanger(inst, nav, enAttente.params.oidc_ticket);
+  t.check("un ticket obtenu juste avant la fermeture ne s'échange plus",
+    !!enAttente.params.oidc_ticket && ticketApresFermeture.status === 401, ticketApresFermeture.text);
   const statut = await inst.call("GET", "/api/auth/oidc/status");
   const tentative = await inst.call("POST", "/api/auth/oidc/login", { body: { email: "chef@glasskeep.test" } });
   const lien = await inst.call("POST", "/api/auth/oidc/link", { token: chef.token, body: {} });

@@ -33,6 +33,7 @@
 // only opens the account that linked it.
 
 const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const {
   normalizeIssuer,
   normalizeOrigin,
@@ -159,6 +160,16 @@ function attachOidcRoutes(app, deps) {
     isSsoAllowed() ? next() : res.status(403).json({ error: "oidc_not_allowed" })
   );
 
+  // Express 4 does not catch a rejected promise, and an unhandled
+  // rejection stops the whole server. Every async handler here goes
+  // through this, so a database error mid-flow fails one request only.
+  const safely = (handler, fail = (res) => res.status(500).json({ error: "oidc_failed" })) =>
+    (req, res, next) => Promise.resolve(handler(req, res, next)).catch((err) => {
+      log.error?.(`[oidc] ${req.method} ${req.path} failed: ${err?.message}`);
+      if (!res.headersSent) fail(res);
+    });
+  const backToApp = (res, params) => res.redirect(`/?${new URLSearchParams(params)}`);
+
   // The provider sends the browser back to the address the configuration
   // was saved from, and the cookie tying the attempt to this browser lives
   // on the address it starts from. A mismatch can only end in an expired
@@ -207,7 +218,7 @@ function attachOidcRoutes(app, deps) {
   // Identifier first. Every miss answers the same thing and costs the
   // same throttle as a wrong password, so the button cannot be used to
   // sort accounts with a provider from the rest at speed.
-  app.post("/api/auth/oidc/login", (req, res) => {
+  app.post("/api/auth/oidc/login", safely((req, res) => {
     if (!isSsoAllowed()) return res.status(404).json({ error: "oidc_unavailable" });
     const { email, userId } = req.body || {};
     const user = Number.isInteger(userId)
@@ -220,10 +231,10 @@ function attachOidcRoutes(app, deps) {
       return denySignIn(req, res, { accountId: candidate?.id, error: "oidc_not_configured" });
     }
     return startFlow(req, res, provider, "login");
-  });
+  }));
 
-  app.get("/api/auth/oidc/callback", async (req, res) => {
-    const back = (params) => res.redirect(`/?${new URLSearchParams(params)}`);
+  app.get("/api/auth/oidc/callback", safely(async (req, res) => {
+    const back = (params) => backToApp(res, params);
     const flow = flows.take(req.query.state);
     if (!flow || !browserMatches(req, flow.binding)) {
       return back({ oidc_error: "oidc_expired" });
@@ -260,11 +271,11 @@ function attachOidcRoutes(app, deps) {
     tickets.put(ticket, { userId: flow.userId, binding: flow.binding });
     log.info?.(`[oidc] sign-in user=${flow.userId}`);
     return back({ oidc_ticket: ticket });
-  });
+  }, (res) => backToApp(res, { oidc_error: "oidc_failed" })));
 
   app.post("/api/auth/oidc/exchange", (req, res) => {
     const ticket = tickets.take(req.body?.ticket);
-    if (!ticket || !browserMatches(req, ticket.binding)) {
+    if (!isSsoAllowed() || !ticket || !browserMatches(req, ticket.binding)) {
       return res.status(401).json({ error: "oidc_expired" });
     }
     const user = getUserById.get(ticket.userId);
@@ -283,7 +294,7 @@ function attachOidcRoutes(app, deps) {
   // The secret is write-only: an empty one keeps what is stored. The
   // provider has to answer before it is saved, so the account never holds
   // a configuration that cannot work.
-  app.put("/api/auth/oidc/me", auth, requireAllowed, async (req, res) => {
+  app.put("/api/auth/oidc/me", auth, requireAllowed, safely(async (req, res) => {
     const body = req.body || {};
     const current = store.getProviderForUser(req.user.id);
     const displayName = typeof body.displayName === "string"
@@ -314,7 +325,7 @@ function attachOidcRoutes(app, deps) {
     });
     log.info?.(`[oidc] provider saved by user=${req.user.id}`);
     res.json(ownerView(saved, store.getIdentityForProvider(saved.id)));
-  });
+  }));
 
   app.delete("/api/auth/oidc/me", auth, (req, res) => {
     const provider = store.getProviderForUser(req.user.id);
@@ -324,7 +335,7 @@ function attachOidcRoutes(app, deps) {
 
   // A diagnosis rather than an action: a provider that does not answer
   // is a result to show the user, with the details needed to fix it.
-  app.post("/api/auth/oidc/me/test", auth, requireAllowed, async (req, res) => {
+  app.post("/api/auth/oidc/me/test", auth, requireAllowed, safely(async (req, res) => {
     const issuer = normalizeIssuer(req.body?.issuer);
     const clientId = typeof req.body?.clientId === "string" ? req.body.clientId.trim() : "";
     if (!issuer) return res.status(400).json({ error: "oidc_issuer_invalid" });
@@ -335,13 +346,22 @@ function attachOidcRoutes(app, deps) {
       const e = asProviderError(err);
       res.json({ ok: false, error: e.code, detail: e.detail, advertisedIssuer: e.advertisedIssuer || null });
     }
-  });
+  }));
 
-  app.post("/api/auth/oidc/link", auth, requireAllowed, (req, res) => {
+  // Linking adds a way into the account, so it asks for the password, as
+  // changing the password does: a stolen session alone must not be able
+  // to plant its own provider identity and keep a door open after the
+  // password is changed. 403, not 401: the session itself is fine.
+  app.post("/api/auth/oidc/link", auth, requireAllowed, safely((req, res) => {
     const provider = store.getProviderForUser(req.user.id);
     if (!provider) return res.status(404).json({ error: "oidc_not_configured" });
+    const user = getUserById.get(req.user.id);
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    if (!user?.password_hash || !bcrypt.compareSync(password, user.password_hash)) {
+      return res.status(403).json({ error: "Current password is incorrect." });
+    }
     return startFlow(req, res, provider, "link");
-  });
+  }));
 
   app.delete("/api/auth/oidc/me/identity", auth, (req, res) => {
     const provider = store.getProviderForUser(req.user.id);
