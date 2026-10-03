@@ -252,4 +252,11 @@ dependencies {
     // draws with the qrcode package: a small pure Java encoder (MIT),
     // called directly, so R8 needs no rule for it.
     implementation("io.nayuki:qrcodegen:1.8.0")
+
+    // Installs the baseline profile (src/main/baseline-prof.txt) on the
+    // first launch of an APK that did not come from the Play Store, which
+    // would otherwise compile it in the cloud: the first scroll starts
+    // already compiled. Already pulled in by Compose; declared so its
+    // version is ours. Its consumer R8 rules ship with the library.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 }
