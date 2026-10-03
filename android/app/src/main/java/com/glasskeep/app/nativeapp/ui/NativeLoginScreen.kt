@@ -26,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
@@ -37,8 +38,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
@@ -68,33 +71,21 @@ import retrofit2.Response
 fun NativeLoginScreen(
     container: NativeAppContainer,
     serverUrl: String,
+    profiles: List<LoginProfileDto>,
+    registrationAllowed: Boolean,
     onLoggedIn: (mustChangePassword: Boolean) -> Unit,
     onForgotPassword: () -> Unit,
     onRegister: () -> Unit,
 ) {
     val context = LocalContext.current
-    var profiles by remember { mutableStateOf<List<LoginProfileDto>>(emptyList()) }
     var mode by remember { mutableStateOf(LoginMode.PROFILES) }
     var selectedProfile by remember { mutableStateOf<LoginProfileDto?>(null) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
-    // App.jsx assumes registration is open until the server says otherwise.
-    var registrationAllowed by remember { mutableStateOf(true) }
     var qrOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-
-    LaunchedEffect(serverUrl) {
-        val api = container.api(serverUrl)
-        profiles = try {
-            api.getLoginProfiles().body().orEmpty()
-        } catch (t: Throwable) {
-            NativeDebug.e("Login profiles fetch failed", t)
-            emptyList()
-        }
-        registrationAllowed = runCatching { api.allowRegistration().body()?.allowNewAccounts == true }.getOrDefault(false)
-    }
 
     suspend fun completeLogin(token: String, mustChangePassword: Boolean) {
         container.startSession(serverUrl, token)
@@ -122,7 +113,8 @@ fun NativeLoginScreen(
     }
 
     fun submitManual() {
-        if (email.isBlank() || password.isEmpty()) return
+        // The fields the web marks `required` never reach its handler empty.
+        if (email.isEmpty() || password.isEmpty()) return
         signIn("POST /api/login") { container.api(serverUrl).login(LoginRequest(email.trim(), password)) }
     }
 
@@ -165,9 +157,8 @@ fun NativeLoginScreen(
                     error = ""
                     mode = LoginMode.PASSWORD
                 })
-                // The grid's mb-4, then the passkey button's own mt-3.
-                Spacer(Modifier.height(16.dp))
-                SignInShortcuts(container, serverUrl, colors, qrOpen, onToggleQr = { qrOpen = it }, onLoggedIn = ::completeLogin)
+                // The grid's mb-4 swallows the passkey button's own mt-3.
+                SignInShortcuts(container, serverUrl, colors, qrOpen, onToggleQr = { qrOpen = it }, onLoggedIn = ::completeLogin, topGap = 16.dp)
                 Spacer(Modifier.height(16.dp))
                 AuthLink(stringResource(R.string.native_login_manual), Modifier.fillMaxWidth()) {
                     mode = LoginMode.MANUAL
@@ -199,6 +190,7 @@ fun NativeLoginScreen(
                     placeholder = stringResource(R.string.native_login_enter_password),
                     colors = colors,
                     password = true,
+                    contentType = ContentType.Password,
                     focusRequester = focus,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
                     keyboardActions = KeyboardActions(onGo = { submitProfile() }),
@@ -229,7 +221,12 @@ fun NativeLoginScreen(
                     onValueChange = { email = it },
                     placeholder = stringResource(R.string.native_login_username),
                     colors = colors,
-                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                    contentType = ContentType.Username,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Next,
+                    ),
                     keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 )
                 Spacer(Modifier.height(16.dp))
@@ -239,6 +236,7 @@ fun NativeLoginScreen(
                     placeholder = stringResource(R.string.native_login_password),
                     colors = colors,
                     password = true,
+                    contentType = ContentType.Password,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
                     keyboardActions = KeyboardActions(onGo = { submitManual() }),
                 )
@@ -344,6 +342,7 @@ private fun SignInShortcuts(
     qrOpen: Boolean,
     onToggleQr: (Boolean) -> Unit,
     onLoggedIn: suspend (token: String, mustChangePassword: Boolean) -> Unit,
+    topGap: Dp = 12.dp,
 ) {
     val context = LocalContext.current
     val activity = LocalView.current.context as Activity
@@ -397,7 +396,7 @@ private fun SignInShortcuts(
         }
     }
 
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(topGap))
     AuthOutlineButton(
         label = stringResource(if (loading) R.string.native_login_passkey_in_progress else R.string.native_login_passkey_signin),
         colors = colors,

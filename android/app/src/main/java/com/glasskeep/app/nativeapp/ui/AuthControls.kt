@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -73,6 +74,7 @@ internal fun AuthTextField(
     fill: Color = Color.Transparent,
     preflightPlaceholder: Boolean = false,
     enabled: Boolean = true,
+    contentType: ContentType? = null,
 ) {
     val dark = LocalGkDark.current
     val textColor = if (dark) Color(0xFFF3F4F6) else Color(0xFF101828)
@@ -97,6 +99,7 @@ internal fun AuthTextField(
             .fillMaxWidth()
             .then(if (minHeight != null) Modifier.heightIn(min = minHeight) else Modifier)
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .autofillAs(contentType)
             .onFocusChanged { focused = it.isFocused }
             .focusRing(focused, WorkspaceTheme.fieldFocusRing(colors.themeId, dark))
             .background(fill, RoundedCornerShape(8.dp))

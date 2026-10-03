@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -448,6 +449,7 @@ private fun ChangePasswordDialog(
                 focusRingColor = focusRing,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
                 visualTransformation = PasswordVisualTransformation(),
+                contentType = ContentType.Password,
             )
             Spacer(Modifier.height(16.dp))
         }
@@ -464,6 +466,7 @@ private fun ChangePasswordDialog(
             focusRequester = newFocus,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
             visualTransformation = PasswordVisualTransformation(),
+            contentType = ContentType.NewPassword,
         )
         Spacer(Modifier.height(16.dp))
         GkTextField(
@@ -479,6 +482,7 @@ private fun ChangePasswordDialog(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
             keyboardActions = KeyboardActions(onGo = { actions.changePassword(current, new, confirm) }),
             visualTransformation = PasswordVisualTransformation(),
+            contentType = ContentType.NewPassword,
         )
         actions.passwordError?.let {
             Spacer(Modifier.height(16.dp))

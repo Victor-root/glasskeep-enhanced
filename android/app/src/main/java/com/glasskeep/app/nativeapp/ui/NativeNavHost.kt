@@ -71,6 +71,7 @@ import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
 import com.glasskeep.app.nativeapp.data.RealtimeClient
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
+import com.glasskeep.app.nativeapp.data.network.LoginProfileDto
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.data.renewSessionTokenIfStale
@@ -517,6 +518,31 @@ fun NativeNavHost(
     }
     val lock = container.lockState
     val showUnlockScreen = lock.isLocked && (!signedIn || lock.overlayOpen)
+    // The sign-in screen's profile picker and its "Create an account" link
+    // (App.jsx:2082-2084, read at :3211), kept above the screens so coming
+    // back to the sign-in does not read them again. The web assumes
+    // registration is open until the server says otherwise; a pull-down
+    // reload starts both over, and a locked server answers neither.
+    var loginProfiles by remember(serverUrl, signedOutReloads) { mutableStateOf<List<LoginProfileDto>>(emptyList()) }
+    var registrationAllowed by remember(serverUrl, signedOutReloads) { mutableStateOf(true) }
+    LaunchedEffect(serverUrl, signedOutReloads, signedIn, lock.isLocked) {
+        if (signedIn || lock.isLocked) return@LaunchedEffect
+        loginProfiles = try {
+            api.getLoginProfiles().body().orEmpty()
+        } catch (t: CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            NativeDebug.e("Login profiles fetch failed", t)
+            emptyList()
+        }
+        registrationAllowed = try {
+            api.allowRegistration().body()?.allowNewAccounts == true
+        } catch (t: CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            false
+        }
+    }
     fun onUnlockSucceeded() {
         lock.bannerDismissed = true
         lock.overlayOpen = false
@@ -659,6 +685,8 @@ fun NativeNavHost(
                         NativeLoginScreen(
                             container = container,
                             serverUrl = serverUrl,
+                            profiles = loginProfiles,
+                            registrationAllowed = registrationAllowed,
                             onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
                             onForgotPassword = { navController.navigate("login-secret") },
                             onRegister = { navController.navigate("register") },

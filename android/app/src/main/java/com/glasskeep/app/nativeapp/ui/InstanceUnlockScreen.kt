@@ -33,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
@@ -279,6 +280,7 @@ fun InstanceUnlockScreen(
                     placeholder = if (recovery) RecoveryKeyPlaceholder else stringResource(R.string.native_instance_locked_passphrase_placeholder),
                     colors = colors,
                     password = !recovery,
+                    contentType = if (recovery) null else ContentType.Password,
                     focusRequester = focus,
                     keyboardOptions = if (recovery) {
                         KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Go)
