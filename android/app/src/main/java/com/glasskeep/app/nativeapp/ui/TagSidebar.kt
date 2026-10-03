@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
+import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightTitleColor
 
@@ -71,6 +72,14 @@ internal const val SidebarAllImages = "__ALL_IMAGES__"
 internal const val SidebarReminders = "__REMINDERS__"
 internal const val SidebarArchived = "ARCHIVED"
 internal const val SidebarTrashed = "TRASHED"
+
+/** Reads the list [view] shows from the server: the archive, the trash or
+ *  the plain notes (reloadCurrentView, App.jsx:3171-3185). */
+internal suspend fun NotesRepository.refreshView(view: String?) = when (view) {
+    SidebarArchived -> refreshArchived()
+    SidebarTrashed -> refreshTrashed()
+    else -> refresh()
+}
 
 /**
  * Notes drawer, ported from TagSidebar.jsx's own non-permanent (mobile)

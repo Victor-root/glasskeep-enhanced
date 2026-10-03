@@ -738,11 +738,7 @@ fun NativeNotesListScreen(
             try {
                 if (reviveFailed) repository.resetFailedQueue()
                 SyncQueueWorker.triggerNow(context)
-                when (view) {
-                    SidebarArchived -> repository.refreshArchived()
-                    SidebarTrashed -> repository.refreshTrashed()
-                    else -> repository.refresh()
-                }
+                repository.refreshView(view)
                 container.syncStatus.recordReachable()
             } catch (t: CancellationException) {
                 throw t

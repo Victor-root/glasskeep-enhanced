@@ -75,9 +75,11 @@ import com.glasskeep.app.nativeapp.data.RealtimeClient
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.network.LoginProfileDto
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
+import com.glasskeep.app.nativeapp.data.network.ProfileDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.data.renewSessionTokenIfStale
 import com.glasskeep.app.nativeapp.restartApp
+import com.glasskeep.app.nativeapp.signalsServerDown
 import com.glasskeep.app.nativeapp.syncErrorKindOf
 import com.glasskeep.app.nativeapp.syncReminderAlarms
 import com.glasskeep.app.nativeapp.watchNetworkLoss
@@ -221,16 +223,6 @@ fun NativeNavHost(
     // cached copy already painted the right one on the first frame, this
     // just reconciles it (BrandingContext.jsx's own load-then-cache shape).
     LaunchedEffect(serverUrl, brandingPokes) { reloadBranding(container, serverUrl) }
-
-    // Trade an ageing token for a fresh one whenever the app comes back to
-    // the foreground, which is this app's own "window focus" (App.jsx:207).
-    // Skipped while signed out, and a no-op on a token younger than a day.
-    LaunchedEffect(lifecycleOwner, startDestination) {
-        if (startDestination == "login") return@LaunchedEffect
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            renewSessionTokenIfStale(container.api(serverUrl), container.tokenStore)
-        }
-    }
 
     // The one read this app makes on its own schedule, doing both jobs the
     // web splits across two: it reports the lock state AND, by answering at
@@ -511,6 +503,20 @@ fun NativeNavHost(
     var notesView by rememberSaveable(signedIn) { mutableStateOf<String?>(null) }
     fun onNoteUnarchived() {
         if (notesView == SidebarArchived) notesView = null
+    }
+    // Back in the foreground, which is this app's own "window focus"
+    // (App.jsx:162-213, 3458-3506): an ageing token is traded for a fresh
+    // one, and from the second start on the queue is sent before the view on
+    // screen and the profile are read again. The first start has just read
+    // both itself. Skipped while signed out.
+    LaunchedEffect(lifecycleOwner, startDestination) {
+        if (startDestination == "login") return@LaunchedEffect
+        var firstStart = true
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            renewSessionTokenIfStale(container.api(serverUrl), container.tokenStore)
+            if (!firstStart) catchUpAfterBackground(context, container, repository, notesView)
+            firstStart = false
+        }
     }
     // api.js's auth-expired (App.jsx's cleanupClientSession, which keeps
     // the queue): back to sign-in from wherever the app is, over nothing
@@ -971,6 +977,34 @@ private suspend fun sendQueueAfterHealthyCheck(context: Context, repository: Not
     }
 }
 
+/** The app looked at again: what waits in the queue is sent, then the view
+ *  on screen and the profile are read again. Best-effort like the web's
+ *  silent catches: a failure keeps what the phone already shows. */
+private suspend fun catchUpAfterBackground(context: Context, container: NativeAppContainer, repository: NotesRepository, view: String?) {
+    try {
+        SyncQueueWorker.drainNow(context)
+        container.syncStatus.markPulling(true)
+        try {
+            repository.refreshView(view)
+            container.syncStatus.recordReachable()
+        } finally {
+            container.syncStatus.markPulling(false)
+        }
+        applyProfile(container, repository.fetchProfile())
+    } catch (t: CancellationException) {
+        throw t
+    } catch (t: Throwable) {
+        NativeDebug.e("Catching up after the background failed", t)
+        if (t.signalsServerDown()) container.syncStatus.recordUnreachable(syncErrorKindOf(t))
+    }
+}
+
+private fun applyProfile(container: NativeAppContainer, profile: ProfileDto) {
+    profile.language?.let { AppLanguage.apply(it) }
+    container.shellPrefs.applyIsAdmin(profile.isAdmin)
+    container.tokenStore.profile = profile
+}
+
 /** One settings read, applied to both live states. Best-effort: a failure
  *  leaves whatever the local cache already made live, which is the right
  *  behaviour for a look-and-feel read on a phone that may be offline. */
@@ -979,11 +1013,7 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     prefs.shellTheme?.let { container.themeState.apply(it) }
     prefs.editorToolbarMode?.let { container.editorPrefs.applyToolbarMode(it) }
     prefs.typography?.let { container.editorPrefs.applyTypography(it) }
-    prefs.profile?.language?.let { AppLanguage.apply(it) }
-    prefs.profile?.let {
-        container.shellPrefs.applyIsAdmin(it.isAdmin)
-        container.tokenStore.profile = it
-    }
+    prefs.profile?.let { applyProfile(container, it) }
     prefs.toastPosition?.let { container.editorPrefs.applyToastPosition(it) }
     prefs.toastDuration?.let { container.editorPrefs.applyToastDuration(it.ms) }
     prefs.readModeEnabled?.let { container.editorPrefs.applyReadMode(it) }

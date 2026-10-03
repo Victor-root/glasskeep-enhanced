@@ -310,6 +310,12 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
             anyOutstanding
         }
 
+        /** Sends the queue and returns once that is done, for a caller that
+         *  reads the server right after (App.jsx:3463-3470). */
+        suspend fun drainNow(context: Context) {
+            drainQueue(context.applicationContext, countFailures = false)
+        }
+
         /** Call right after enqueueing an edit, so it reaches the server
          *  within seconds rather than waiting for the periodic safety net.
          *  ExistingWorkPolicy.KEEP (not REPLACE): if a drain is already
