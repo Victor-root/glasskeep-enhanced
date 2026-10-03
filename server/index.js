@@ -682,6 +682,11 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
       if (!names.has("webauthn_rp_id")) {
         db.exec(`ALTER TABLE app_settings ADD COLUMN webauthn_rp_id TEXT NOT NULL DEFAULT ''`);
       }
+      // Whether users may sign in through an OpenID Connect provider they
+      // declare in their own settings. Off until an admin allows it.
+      if (!names.has("sso_allowed")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN sso_allowed INTEGER NOT NULL DEFAULT 0`);
+      }
     });
     tx();
   } catch {
@@ -2407,18 +2412,18 @@ app.get("/api/auth/renew", auth, (req, res) => {
   });
 });
 
-// Sign-in through the admin-configured OpenID Connect provider, and the
-// identities a user has linked to their account. Registered after the
-// lock gate, like the password sign-in: a locked instance opens no
-// session either way.
+// Sign-in through the OpenID Connect provider each user may declare in
+// their settings, once an admin allows it. Registered after the lock
+// gate, like the password sign-in: a locked instance opens no session
+// either way. adminSettings is read at request time, it is set up below.
 attachOidcRoutes(app, {
   db,
   auth,
-  adminOnly,
   getUserById,
-  insertUser,
-  isEmailTaken: (email) => !!(getUserByEmail.get(email) || getPendingByEmail.get(email)),
-  isAdminEmail: (email) => ADMIN_EMAILS.includes(String(email).toLowerCase()),
+  getUserByEmail,
+  isSsoAllowed: () => adminSettings.ssoAllowed,
+  signInOnHold,
+  denySignIn,
   sessionResponse,
   log: console,
 });
@@ -4712,10 +4717,10 @@ app.delete("/api/logos/:id", auth, (req, res) => {
 // on every login page hit, allowNewAccounts on every signup attempt)
 // don't hit SQLite repeatedly. The mirror is updated on every PATCH so
 // it stays in sync.
-const getAppSettingsRow = db.prepare(`SELECT allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme, webauthn_rp_id FROM app_settings WHERE id = 1`);
+const getAppSettingsRow = db.prepare(`SELECT allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme, webauthn_rp_id, sso_allowed FROM app_settings WHERE id = 1`);
 const upsertAppSettings = db.prepare(
-  `INSERT INTO app_settings (id, allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme, webauthn_rp_id) VALUES (1, ?, ?, ?, ?, ?, ?)
-   ON CONFLICT(id) DO UPDATE SET allow_new_accounts=excluded.allow_new_accounts, login_slogan=excluded.login_slogan, custom_app_name=excluded.custom_app_name, login_bg_blur=excluded.login_bg_blur, login_theme=excluded.login_theme, webauthn_rp_id=excluded.webauthn_rp_id`,
+  `INSERT INTO app_settings (id, allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme, webauthn_rp_id, sso_allowed) VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+   ON CONFLICT(id) DO UPDATE SET allow_new_accounts=excluded.allow_new_accounts, login_slogan=excluded.login_slogan, custom_app_name=excluded.custom_app_name, login_bg_blur=excluded.login_bg_blur, login_theme=excluded.login_theme, webauthn_rp_id=excluded.webauthn_rp_id, sso_allowed=excluded.sso_allowed`,
 );
 // Branding images live in their own read/write statements so the
 // (potentially multi-MB) data URLs never get held in the in-memory
@@ -4760,6 +4765,7 @@ let adminSettings = (function loadAdminSettings() {
       loginBackgroundBlur: row.login_bg_blur || 0,
       loginTheme: VALID_LOGIN_THEMES.has(row.login_theme) ? row.login_theme : "glasskeep",
       passkeyDomain: row.webauthn_rp_id || "",
+      ssoAllowed: !!row.sso_allowed,
     };
   }
   // Fresh install — seed the row from the env var default so subsequent
@@ -4771,8 +4777,9 @@ let adminSettings = (function loadAdminSettings() {
     loginBackgroundBlur: 0,
     loginTheme: "glasskeep",
     passkeyDomain: "",
+    ssoAllowed: false,
   };
-  upsertAppSettings.run(seed.allowNewAccounts ? 1 : 0, seed.loginSlogan, seed.appName, seed.loginBackgroundBlur, seed.loginTheme, seed.passkeyDomain);
+  upsertAppSettings.run(seed.allowNewAccounts ? 1 : 0, seed.loginSlogan, seed.appName, seed.loginBackgroundBlur, seed.loginTheme, seed.passkeyDomain, 0);
   return seed;
 })();
 
@@ -4834,10 +4841,13 @@ app.get("/api/admin/settings", auth, adminOnly, (req, res) => {
 
 // Update admin settings
 app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
-  const { allowNewAccounts, loginSlogan, appName, loginBackgroundBlur, loginTheme, passkeyDomain, logo, logoPwa, loginBackground, loginBackgroundColor, loginBackgroundHash } = req.body || {};
+  const { allowNewAccounts, ssoAllowed, loginSlogan, appName, loginBackgroundBlur, loginTheme, passkeyDomain, logo, logoPwa, loginBackground, loginBackgroundColor, loginBackgroundHash } = req.body || {};
 
   if (typeof allowNewAccounts === 'boolean') {
     adminSettings.allowNewAccounts = allowNewAccounts;
+  }
+  if (typeof ssoAllowed === 'boolean') {
+    adminSettings.ssoAllowed = ssoAllowed;
   }
   if (typeof loginSlogan === 'string') {
     adminSettings.loginSlogan = loginSlogan.slice(0, 200);
@@ -4927,6 +4937,7 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
     adminSettings.loginBackgroundBlur,
     adminSettings.loginTheme,
     adminSettings.passkeyDomain,
+    adminSettings.ssoAllowed ? 1 : 0,
   );
   // Live-sync the scalar settings to every other admin so their
   // AdminPanel toggles / slogan / app name / blur reflect the change

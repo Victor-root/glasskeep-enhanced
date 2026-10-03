@@ -6,12 +6,13 @@
 // Le scénario peut lui faire mentir sur un point précis (signature,
 // nonce) pour vérifier que GlassKeep refuse.
 //
-// Ce qui est vérifié: la configuration réservée à l'administrateur et
-// son secret qui ne ressort jamais, le parcours complet jusqu'à une
-// session GlassKeep ordinaire, l'identité tenue par issuer + sub et non
-// par l'email, l'absence de droits d'administrateur venus du
-// fournisseur, l'association d'un compte existant, et chaque refus:
-// navigateur différent, ticket rejoué, état rejoué, jeton falsifié.
+// Ce qui est vérifié: l'interrupteur de l'administrateur, le fournisseur
+// que chaque compte déclare pour lui-même et son secret qui ne ressort
+// jamais, l'adresse privée refusée à un compte ordinaire, l'association
+// qui seule fait le lien, la connexion par identifiant jusqu'à une
+// session GlassKeep ordinaire, l'identité tenue par issuer + sub, et
+// chaque refus: autre identité, autre navigateur, ticket ou état rejoué,
+// jeton falsifié, nonce faux.
 import http from "node:http";
 import crypto from "node:crypto";
 import { startInstance, createAndLogin, runner } from "./lab.mjs";
@@ -149,7 +150,6 @@ await new Promise((r) => serveurIdp.listen(IDP_PORT, "127.0.0.1", r));
 function navigateur() {
   let cookie = null;
   return {
-    cookie: () => cookie,
     oublierCookie() { cookie = null; },
     retenir(res) {
       for (const c of res.headers.getSetCookie?.() || []) {
@@ -162,29 +162,27 @@ function navigateur() {
 }
 
 // Va jusqu'au retour dans l'application et rend ses paramètres.
-async function parcours(inst, nav, { chemin = "/api/auth/oidc/login", token, providerId, avantRappel } = {}) {
+async function parcours(inst, nav, { chemin = "/api/auth/oidc/login", token, corps = {}, avantRappel } = {}) {
   const headers = { "content-type": "application/json", ...nav.entetes() };
   if (token) headers.authorization = "Bearer " + token;
-  const depart = await fetch(inst.base + chemin, { method: "POST", headers, body: JSON.stringify({ providerId }) });
+  const depart = await fetch(inst.base + chemin, { method: "POST", headers, body: JSON.stringify(corps) });
   nav.retenir(depart);
-  const corps = await depart.json();
-  if (!corps.authorizationUrl) return { refus: corps.error, status: depart.status };
-  const chezIdp = await fetch(corps.authorizationUrl, { redirect: "manual" });
+  const reponse = await depart.json();
+  if (!reponse.authorizationUrl) return { refus: reponse.error, status: depart.status, params: {} };
+  const chezIdp = await fetch(reponse.authorizationUrl, { redirect: "manual" });
   const rappel = chezIdp.headers.get("location");
   if (avantRappel) await avantRappel(rappel);
   const retour = await fetch(rappel, { redirect: "manual", headers: nav.entetes() });
   const location = retour.headers.get("location") || "";
   return {
-    authorizationUrl: new URL(corps.authorizationUrl),
-    rappel,
+    authorizationUrl: new URL(reponse.authorizationUrl),
     location,
     params: Object.fromEntries(new URL(location, inst.base).searchParams),
   };
 }
 
-async function echanger(inst, nav, ticket) {
-  return inst.call("POST", "/api/auth/oidc/exchange", { body: { ticket }, headers: nav.entetes() });
-}
+const echanger = (inst, nav, ticket) =>
+  inst.call("POST", "/api/auth/oidc/exchange", { body: { ticket }, headers: nav.entetes() });
 
 const inst = await startInstance({ port: PORT });
 
@@ -192,96 +190,105 @@ try {
   const chef = await createAndLogin(inst, {
     name: "Chef", email: "chef@glasskeep.test", password: "Passw0rd-chef", isAdmin: true,
   });
+  const second = await createAndLogin(inst, {
+    name: "Second", email: "second@glasskeep.test", password: "Passw0rd-second", isAdmin: true,
+  });
   const simple = await createAndLogin(inst, {
     name: "Simple", email: "simple@glasskeep.test", password: "Passw0rd-simple",
   });
+  const config = (extra = {}) => ({
+    displayName: "Authentik", issuer: ISSUER, clientId: CLIENT_ID, clientSecret: CLIENT_SECRET,
+    publicOrigin: inst.base, ...extra,
+  });
 
   // ───────────────────────────────────────────────────────────────────
-  // 1. La configuration est l'affaire de l'administrateur seul.
+  // 1. L'interrupteur de l'administrateur.
   // ───────────────────────────────────────────────────────────────────
-  const vide = await inst.call("GET", "/api/auth/oidc/providers");
-  t.check("sans configuration, la page de connexion ne propose rien",
-    vide.ok && Array.isArray(vide.json.providers) && vide.json.providers.length === 0, vide.text);
+  const ferme = await inst.call("GET", "/api/auth/oidc/status");
+  const moiFerme = await inst.call("GET", "/api/auth/oidc/me", { token: chef.token });
+  const refusFerme = await inst.call("PUT", "/api/auth/oidc/me", { token: chef.token, body: config() });
+  t.check("sur une instance neuve, le SSO est fermé et ne se configure pas",
+    ferme.json?.available === false && moiFerme.json?.allowed === false
+      && refusFerme.status === 403 && refusFerme.json?.error === "oidc_not_allowed",
+    `${ferme.text} ${moiFerme.text} ${refusFerme.text}`);
 
-  const codes = [
-    (await inst.call("GET", "/api/admin/oidc", { token: simple.token })).status,
-    (await inst.call("PUT", "/api/admin/oidc", { token: simple.token, body: {} })).status,
-    (await inst.call("POST", "/api/admin/oidc/test", { token: simple.token, body: {} })).status,
-    (await inst.call("GET", "/api/admin/oidc")).status,
-  ];
-  t.check("un utilisateur ordinaire ne voit ni ne règle le fournisseur",
-    j(codes) === j([403, 403, 403, 401]), j(codes));
+  const parSimple = await inst.call("PATCH", "/api/admin/settings", { token: simple.token, body: { ssoAllowed: true } });
+  const ouverture = await inst.call("PATCH", "/api/admin/settings", { token: chef.token, body: { ssoAllowed: true } });
+  t.check("seul un administrateur ouvre le SSO",
+    parSimple.status === 403 && ouverture.ok && ouverture.json?.ssoAllowed === true, `${parSimple.status} ${ouverture.text.slice(0, 120)}`);
 
-  const sansSlash = await inst.call("POST", "/api/admin/oidc/test", {
+  // ───────────────────────────────────────────────────────────────────
+  // 2. Chacun déclare son fournisseur, dans ses réglages.
+  // ───────────────────────────────────────────────────────────────────
+  const prive = await inst.call("POST", "/api/auth/oidc/me/test", {
+    token: simple.token, body: { issuer: ISSUER, clientId: CLIENT_ID },
+  });
+  const privePut = await inst.call("PUT", "/api/auth/oidc/me", { token: simple.token, body: config() });
+  t.check("un compte ordinaire ne fait pas aller le serveur sur le réseau local",
+    prive.json?.ok === false && prive.json.error === "oidc_private_forbidden"
+      && privePut.status === 400 && privePut.json?.error === "oidc_private_forbidden",
+    `${prive.text} ${privePut.text}`);
+
+  const sansSlash = await inst.call("POST", "/api/auth/oidc/me/test", {
     token: chef.token, body: { issuer: ISSUER.slice(0, -1), clientId: CLIENT_ID },
   });
   t.check("un issuer qui ne correspond pas exactement est signalé avec la bonne valeur",
     sansSlash.json?.ok === false && sansSlash.json.error === "oidc_issuer_mismatch"
       && sansSlash.json.advertisedIssuer === ISSUER, sansSlash.text);
 
-  const test = await inst.call("POST", "/api/admin/oidc/test", {
+  const test = await inst.call("POST", "/api/auth/oidc/me/test", {
     token: chef.token, body: { issuer: ISSUER, clientId: CLIENT_ID },
   });
-  t.check("le test lit la découverte et les clés de signature",
-    test.json?.ok === true && test.json.keyCount === 1 && test.json.issuer === ISSUER, test.text);
-  t.check("le test prévient qu'un issuer en http n'est pas chiffré",
-    test.json?.warnings?.includes("issuer_not_https"), j(test.json?.warnings));
+  t.check("le test lit la découverte et les clés de signature, et prévient pour le http",
+    test.json?.ok === true && test.json.keyCount === 1 && test.json.warnings?.includes("issuer_not_https"), test.text);
 
-  const incomplet = await inst.call("PUT", "/api/admin/oidc", {
-    token: chef.token,
-    body: { displayName: "Authentik", issuer: ISSUER, clientId: CLIENT_ID, publicOrigin: inst.base, enabled: true },
+  const incomplet = await inst.call("PUT", "/api/auth/oidc/me", { token: chef.token, body: config({ clientSecret: "" }) });
+  const injoignable = await inst.call("PUT", "/api/auth/oidc/me", {
+    token: chef.token, body: config({ issuer: "http://127.0.0.1:1/absent/" }),
   });
-  t.check("on n'active pas un fournisseur sans secret client",
-    incomplet.status === 400 && incomplet.json?.error === "oidc_incomplete", incomplet.text);
+  t.check("on n'enregistre ni un fournisseur incomplet, ni un fournisseur qui ne répond pas",
+    incomplet.json?.error === "oidc_incomplete" && injoignable.json?.error === "oidc_discovery_failed",
+    `${incomplet.text} ${injoignable.text}`);
 
-  const injoignable = await inst.call("PUT", "/api/admin/oidc", {
-    token: chef.token,
-    body: {
-      displayName: "Authentik", issuer: "http://127.0.0.1:1/absent/", clientId: CLIENT_ID,
-      clientSecret: CLIENT_SECRET, publicOrigin: inst.base, enabled: true,
-    },
-  });
-  t.check("on n'active pas un fournisseur qui ne répond pas",
-    injoignable.status === 400 && injoignable.json?.error === "oidc_discovery_failed", injoignable.text);
-
-  const enregistre = await inst.call("PUT", "/api/admin/oidc", {
-    token: chef.token,
-    body: {
-      displayName: "Authentik", issuer: ISSUER, clientId: CLIENT_ID, clientSecret: CLIENT_SECRET,
-      publicOrigin: inst.base, enabled: true, autoCreateAccounts: true,
-    },
-  });
-  const relu = await inst.call("GET", "/api/admin/oidc", { token: chef.token });
-  t.check("la configuration est enregistrée avec l'adresse de retour à déclarer",
-    enregistre.ok && relu.json?.provider?.enabled === true
-      && relu.json.provider.callbackUrl === `${inst.base}/api/auth/oidc/callback`
-      && relu.json.provider.hasClientSecret === true, relu.text);
+  const enregistre = await inst.call("PUT", "/api/auth/oidc/me", { token: chef.token, body: config() });
+  const relu = await inst.call("GET", "/api/auth/oidc/me", { token: chef.token });
+  t.check("le fournisseur est enregistré avec l'adresse de retour à déclarer",
+    enregistre.ok && relu.json?.allowed === true
+      && relu.json.provider?.callbackUrl === `${inst.base}/api/auth/oidc/callback`
+      && relu.json.identity === null, relu.text);
   t.check("le secret client ne ressort jamais du serveur",
     !enregistre.text.includes(CLIENT_SECRET) && !relu.text.includes(CLIENT_SECRET));
+  const autreCompte = await inst.call("GET", "/api/auth/oidc/me", { token: second.token });
+  t.check("le fournisseur d'un compte n'apparaît pas chez un autre", autreCompte.json?.provider === null, autreCompte.text);
 
-  const sansNouveauSecret = await inst.call("PUT", "/api/admin/oidc", {
-    token: chef.token,
-    body: { displayName: "Authentik", issuer: ISSUER, clientId: CLIENT_ID, publicOrigin: inst.base, enabled: true },
-  });
-  t.check("réenregistrer sans retaper le secret le conserve",
-    sansNouveauSecret.ok && sansNouveauSecret.json.provider.hasClientSecret === true, sansNouveauSecret.text);
-
-  const liste = await inst.call("GET", "/api/auth/oidc/providers");
-  const fournisseur = liste.json?.providers?.[0];
-  t.check("la page de connexion propose le fournisseur, et rien de sensible",
-    liste.json?.providers?.length === 1 && fournisseur.name === "Authentik"
-      && fournisseur.origin === inst.base && !liste.text.includes(CLIENT_SECRET)
-      && !liste.text.includes(CLIENT_ID), liste.text);
-  const providerId = fournisseur?.id;
-  const malforme = await inst.call("POST", "/api/auth/oidc/login", { body: { providerId: { id: providerId } } });
-  t.check("un identifiant de fournisseur malformé est refusé proprement",
-    malforme.status === 404 && malforme.json?.error === "oidc_unavailable", malforme.text);
-
-  // ───────────────────────────────────────────────────────────────────
-  // 2. Le parcours complet, jusqu'à une session GlassKeep ordinaire.
-  // ───────────────────────────────────────────────────────────────────
+  const avantLien = await inst.call("GET", "/api/auth/oidc/status");
   const nav = navigateur();
-  const premier = await parcours(inst, nav, { providerId });
+  const tropTot = await parcours(inst, nav, { corps: { email: "chef@glasskeep.test" } });
+  t.check("tant que le compte n'est pas associé, rien ne s'ouvre par le fournisseur",
+    avantLien.json?.available === false && tropTot.refus === "oidc_not_configured", `${avantLien.text} ${j(tropTot)}`);
+
+  // ───────────────────────────────────────────────────────────────────
+  // 3. L'association, la seule chose qui fait le lien.
+  // ───────────────────────────────────────────────────────────────────
+  const sansSession = await inst.call("POST", "/api/auth/oidc/link", { body: {} });
+  t.check("associer demande d'être connecté", sansSession.status === 401);
+
+  idp.personne = { sub: "u-chef", email: "chef@authentik.test", name: "Chef" };
+  idp.emailSeulementDansUserinfo = true;
+  const association = await parcours(inst, nav, { chemin: "/api/auth/oidc/link", token: chef.token });
+  idp.emailSeulementDansUserinfo = false;
+  const apresLien = await inst.call("GET", "/api/auth/oidc/me", { token: chef.token });
+  const disponible = await inst.call("GET", "/api/auth/oidc/status");
+  t.check("l'association revient dans l'application sans ouvrir de session",
+    association.params.oidc_linked === "1" && !association.params.oidc_ticket, association.location);
+  t.check("le compte voit son identité, avec l'email lu sur userinfo quand le jeton n'en porte pas",
+    apresLien.json?.identity?.email === "chef@authentik.test", apresLien.text);
+  t.check("la page de connexion propose maintenant le bouton", disponible.json?.available === true, disponible.text);
+
+  // ───────────────────────────────────────────────────────────────────
+  // 4. La connexion par identifiant, jusqu'à une session ordinaire.
+  // ───────────────────────────────────────────────────────────────────
+  const premier = await parcours(inst, nav, { corps: { email: "chef@glasskeep.test" } });
   const demande = premier.authorizationUrl?.searchParams;
   t.check("la demande au fournisseur est un code avec PKCE S256, state et nonce",
     demande?.get("response_type") === "code" && demande.get("code_challenge_method") === "S256"
@@ -295,138 +302,100 @@ try {
 
   const session = await echanger(inst, nav, premier.params.oidc_ticket);
   const moi = await inst.call("GET", "/api/user/me", { token: session.json?.token });
-  t.check("le ticket donne une session GlassKeep qui ouvre l'application",
-    session.ok && moi.ok && moi.json.email === "nouveau@sso.test" && moi.json.name === "Nouveau", moi.text);
-  t.check("les groupes et revendications du fournisseur ne donnent aucun droit d'administrateur",
-    session.json?.user?.is_admin === false && moi.json?.is_admin === false
-      && (await inst.call("GET", "/api/admin/users", { token: session.json?.token })).status === 403);
-  const idNouveau = moi.json?.id;
-
+  t.check("le ticket donne une session GlassKeep qui ouvre le bon compte",
+    session.ok && moi.ok && moi.json.id === chef.id, moi.text);
   const rejoue = await echanger(inst, nav, premier.params.oidc_ticket);
   t.check("un ticket ne sert qu'une fois", rejoue.status === 401, rejoue.text);
 
-  // L'email change chez le fournisseur: c'est toujours la même personne.
-  idp.personne = { sub: "u-1", email: "change@sso.test", name: "Nouveau" };
-  const deuxieme = await parcours(inst, nav, { providerId });
-  const session2 = await echanger(inst, nav, deuxieme.params.oidc_ticket);
-  t.check("la même identité rouvre le même compte, quel que soit son email",
-    session2.json?.user?.id === idNouveau, j(session2.json?.user));
+  const parProfil = await parcours(inst, nav, { corps: { userId: chef.id } });
+  const sessionProfil = await echanger(inst, nav, parProfil.params.oidc_ticket);
+  t.check("depuis un profil choisi à l'écran, le compte est connu sans le taper",
+    sessionProfil.json?.user?.id === chef.id, j(sessionProfil.json?.user));
 
-  // Une identité inconnue qui porte l'email d'un compte existant.
-  idp.personne = { sub: "u-intrus", email: "simple@glasskeep.test", name: "Intrus" };
-  const usurpation = await parcours(inst, nav, { providerId });
-  t.check("un email déjà pris n'ouvre pas le compte qui le porte",
-    usurpation.params.oidc_error === "oidc_account_exists" && !usurpation.params.oidc_ticket,
-    usurpation.location);
+  const inconnu = await inst.call("POST", "/api/auth/oidc/login", { body: { email: "personne@glasskeep.test" } });
+  const sansFournisseur = await inst.call("POST", "/api/auth/oidc/login", { body: { email: "simple@glasskeep.test" } });
+  t.check("un compte inconnu et un compte sans fournisseur reçoivent la même réponse",
+    inconnu.status === sansFournisseur.status && inconnu.text === sansFournisseur.text
+      && inconnu.json?.error === "oidc_not_configured", `${inconnu.status} ${inconnu.text} / ${sansFournisseur.text}`);
+
+  idp.personne = { sub: "u-intrus", email: "chef@glasskeep.test", name: "Intrus" };
+  const intrus = await parcours(inst, nav, { corps: { email: "chef@glasskeep.test" } });
+  t.check("une autre identité chez le même fournisseur n'ouvre pas le compte, même avec son email",
+    intrus.params.oidc_error === "oidc_identity_mismatch" && !intrus.params.oidc_ticket, intrus.location);
 
   // ───────────────────────────────────────────────────────────────────
-  // 3. Les refus: autre navigateur, état rejoué, jeton falsifié.
+  // 5. Les refus: autre navigateur, état rejoué, jeton falsifié.
   // ───────────────────────────────────────────────────────────────────
-  idp.personne = { sub: "u-1", email: "change@sso.test", name: "Nouveau" };
+  idp.personne = { sub: "u-chef", email: "chef@authentik.test", name: "Chef" };
   const autreNavigateur = navigateur();
   const vole = await parcours(inst, autreNavigateur, {
-    providerId,
+    corps: { email: "chef@glasskeep.test" },
     avantRappel: () => autreNavigateur.oublierCookie(),
   });
   t.check("un lien de retour ouvert dans un autre navigateur est refusé",
     vole.params.oidc_error === "oidc_expired", vole.location);
 
   let rappelRejoue = null;
-  const unique = await parcours(inst, nav, { providerId, avantRappel: (r) => { rappelRejoue = r; } });
+  const unique = await parcours(inst, nav, {
+    corps: { email: "chef@glasskeep.test" },
+    avantRappel: (r) => { rappelRejoue = r; },
+  });
   const encore = await fetch(rappelRejoue, { redirect: "manual", headers: nav.entetes() });
   t.check("un retour du fournisseur ne sert qu'une fois",
     !!unique.params.oidc_ticket
       && new URL(encore.headers.get("location"), inst.base).searchParams.get("oidc_error") === "oidc_expired");
-
-  const ticketSansCookie = await inst.call("POST", "/api/auth/oidc/exchange", {
-    body: { ticket: unique.params.oidc_ticket },
-  });
+  const ticketSansCookie = await inst.call("POST", "/api/auth/oidc/exchange", { body: { ticket: unique.params.oidc_ticket } });
   t.check("un ticket présenté sans le cookie du navigateur est refusé", ticketSansCookie.status === 401);
 
   idp.signerAvecAutreCle = true;
-  const falsifie = await parcours(inst, nav, { providerId });
+  const falsifie = await parcours(inst, nav, { corps: { email: "chef@glasskeep.test" } });
   t.check("un jeton signé par une autre clé est refusé", falsifie.params.oidc_error === "oidc_failed", falsifie.location);
-
   idp.mauvaisNonce = true;
-  const nonce = await parcours(inst, nav, { providerId });
+  const nonce = await parcours(inst, nav, { corps: { email: "chef@glasskeep.test" } });
   t.check("un jeton qui ne porte pas le nonce attendu est refusé", nonce.params.oidc_error === "oidc_failed", nonce.location);
 
   // ───────────────────────────────────────────────────────────────────
-  // 4. Un compte existant associe son identité depuis ses réglages.
+  // 6. Une identité n'appartient qu'à un compte, et suit la configuration.
   // ───────────────────────────────────────────────────────────────────
-  idp.personne = { sub: "u-simple", email: "simple@glasskeep.test", name: "Simple" };
-  const navSimple = navigateur();
-  const sansSession = await inst.call("POST", "/api/auth/oidc/link", { body: { providerId } });
-  t.check("associer une identité demande d'être connecté", sansSession.status === 401);
-
-  const association = await parcours(inst, navSimple, { chemin: "/api/auth/oidc/link", token: simple.token, providerId });
-  t.check("l'association revient dans l'application sans ouvrir de session",
-    association.params.oidc_linked === "1" && !association.params.oidc_ticket, association.location);
-  const viaSso = await parcours(inst, navSimple, { providerId });
-  const sessionSimple = await echanger(inst, navSimple, viaSso.params.oidc_ticket);
-  t.check("ensuite, le fournisseur ouvre ce compte-là",
-    sessionSimple.json?.user?.id === simple.id, j(sessionSimple.json?.user));
-
-  idp.personne = { sub: "u-1", email: "change@sso.test", name: "Nouveau" };
-  const dejaPrise = await parcours(inst, navSimple, { chemin: "/api/auth/oidc/link", token: simple.token, providerId });
+  await inst.call("PUT", "/api/auth/oidc/me", { token: second.token, body: config() });
+  const navSecond = navigateur();
+  const dejaPrise = await parcours(inst, navSecond, { chemin: "/api/auth/oidc/link", token: second.token });
   t.check("une identité déjà associée à un autre compte ne change pas de compte",
     dejaPrise.params.oidc_error === "oidc_identity_in_use", dejaPrise.location);
 
-  const identites = await inst.call("GET", "/api/auth/oidc/identities", { token: simple.token });
-  t.check("le compte voit son identité associée",
-    identites.json?.identities?.length === 1 && identites.json.identities[0].providerName === "Authentik"
-      && identites.json.hasPassword === true, identites.text);
+  await inst.call("PUT", "/api/auth/oidc/me", { token: chef.token, body: config({ clientSecret: "" }) });
+  const memeConfig = await inst.call("GET", "/api/auth/oidc/me", { token: chef.token });
+  await inst.call("PUT", "/api/auth/oidc/me", { token: chef.token, body: config({ clientId: "autre-client" }) });
+  const autreClient = await inst.call("GET", "/api/auth/oidc/me", { token: chef.token });
+  t.check("réenregistrer à l'identique garde l'association, changer de client l'efface",
+    !!memeConfig.json?.identity && autreClient.json?.identity === null, `${memeConfig.text} ${autreClient.text}`);
 
-  const identitesSso = await inst.call("GET", "/api/auth/oidc/identities", { token: session.json?.token });
-  const retraitSansMotDePasse = await inst.call(
-    "DELETE", `/api/auth/oidc/identities/${identitesSso.json?.identities?.[0]?.id}`, { token: session.json?.token },
-  );
-  t.check("un compte sans mot de passe ne peut pas se couper de son seul accès",
-    identitesSso.json?.hasPassword === false && retraitSansMotDePasse.status === 409, retraitSansMotDePasse.text);
-  const retraitAutrui = await inst.call(
-    "DELETE", `/api/auth/oidc/identities/${identitesSso.json?.identities?.[0]?.id}`, { token: simple.token },
-  );
-  t.check("on ne retire pas l'identité d'un autre compte", retraitAutrui.status === 404, retraitAutrui.text);
+  await inst.call("PUT", "/api/auth/oidc/me", { token: chef.token, body: config() });
+  await parcours(inst, nav, { chemin: "/api/auth/oidc/link", token: chef.token });
+  const dissocie = await inst.call("DELETE", "/api/auth/oidc/me/identity", { token: chef.token });
+  const apresDissociation = await parcours(inst, nav, { corps: { email: "chef@glasskeep.test" } });
+  t.check("après la dissociation, le fournisseur n'ouvre plus le compte",
+    dissocie.ok && dissocie.json?.identity === null && !!dissocie.json?.provider
+      && apresDissociation.refus === "oidc_not_configured", `${dissocie.text} ${j(apresDissociation)}`);
 
-  const retrait = await inst.call(
-    "DELETE", `/api/auth/oidc/identities/${identites.json?.identities?.[0]?.id}`, { token: simple.token },
-  );
-  idp.personne = { sub: "u-simple", email: "simple@glasskeep.test", name: "Simple" };
-  const apresRetrait = await parcours(inst, navSimple, { providerId });
-  t.check("après le retrait, l'identité n'ouvre plus le compte",
-    retrait.ok && apresRetrait.params.oidc_error === "oidc_account_exists", apresRetrait.location);
+  const supprime = await inst.call("DELETE", "/api/auth/oidc/me", { token: chef.token });
+  t.check("le compte peut retirer son fournisseur", supprime.ok && supprime.json?.provider === null, supprime.text);
 
   // ───────────────────────────────────────────────────────────────────
-  // 5. Les réglages de l'administrateur s'appliquent.
+  // 7. Refermé par l'administrateur, plus rien ne passe.
   // ───────────────────────────────────────────────────────────────────
-  idp.personne = { sub: "u-userinfo", email: "userinfo@sso.test", name: "Userinfo" };
-  idp.emailSeulementDansUserinfo = true;
-  const viaUserinfo = await parcours(inst, nav, { providerId });
-  const sessionUserinfo = await echanger(inst, nav, viaUserinfo.params.oidc_ticket);
-  idp.emailSeulementDansUserinfo = false;
-  t.check("un email absent du jeton est lu sur userinfo",
-    sessionUserinfo.json?.user?.email === "userinfo@sso.test", j(sessionUserinfo.json?.user));
-
-  await inst.call("PUT", "/api/admin/oidc", {
-    token: chef.token,
-    body: {
-      displayName: "Authentik", issuer: ISSUER, clientId: CLIENT_ID, publicOrigin: inst.base,
-      enabled: true, autoCreateAccounts: false,
-    },
-  });
-  idp.personne = { sub: "u-inconnu", email: "inconnu@sso.test", name: "Inconnu" };
-  const fermeture = await parcours(inst, nav, { providerId });
-  t.check("sans création automatique, une identité inconnue n'ouvre rien",
-    fermeture.params.oidc_error === "oidc_no_account", fermeture.location);
-
-  await inst.call("PUT", "/api/admin/oidc", {
-    token: chef.token,
-    body: { displayName: "Authentik", issuer: ISSUER, clientId: CLIENT_ID, publicOrigin: inst.base, enabled: false },
-  });
-  const desactive = await inst.call("GET", "/api/auth/oidc/providers");
-  const tentative = await inst.call("POST", "/api/auth/oidc/login", { body: { providerId } });
-  t.check("désactivé, le fournisseur disparaît de la connexion et ne démarre plus rien",
-    desactive.json?.providers?.length === 0 && tentative.status === 404, `${desactive.text} ${tentative.text}`);
+  await inst.call("PUT", "/api/auth/oidc/me", { token: chef.token, body: config() });
+  await parcours(inst, nav, { chemin: "/api/auth/oidc/link", token: chef.token });
+  await inst.call("PATCH", "/api/admin/settings", { token: chef.token, body: { ssoAllowed: false } });
+  const statut = await inst.call("GET", "/api/auth/oidc/status");
+  const tentative = await inst.call("POST", "/api/auth/oidc/login", { body: { email: "chef@glasskeep.test" } });
+  const lien = await inst.call("POST", "/api/auth/oidc/link", { token: chef.token, body: {} });
+  const garde = await inst.call("GET", "/api/auth/oidc/me", { token: chef.token });
+  t.check("refermé, le SSO disparaît de la connexion et ne démarre plus rien",
+    statut.json?.available === false && tentative.status === 404 && lien.status === 403,
+    `${statut.text} ${tentative.text} ${lien.text}`);
+  t.check("la configuration de chacun est gardée pour une réouverture",
+    garde.json?.allowed === false && !!garde.json?.provider && !!garde.json?.identity, garde.text);
 } finally {
   inst.stop();
   serveurIdp.close();
