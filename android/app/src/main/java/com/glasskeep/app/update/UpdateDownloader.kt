@@ -1,7 +1,7 @@
 package com.glasskeep.app.update
 
 import android.content.Context
-import android.util.Log
+import com.glasskeep.app.nativeapp.NativeDebug
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -19,7 +19,6 @@ import java.net.URL
  */
 internal object UpdateDownloader {
 
-    private const val TAG = "GK-Updater"
     private const val UPDATES_DIR = "updates"
     private const val PART_SUFFIX = ".part"
 
@@ -52,7 +51,7 @@ internal object UpdateDownloader {
                 instanceFollowRedirects = true
             }
             if (conn.responseCode !in 200..299) {
-                Log.w(TAG, "Download HTTP ${conn.responseCode} for $url")
+                NativeDebug.e("Download HTTP ${conn.responseCode} for $url")
                 return null
             }
             conn.inputStream.use { input ->
@@ -73,7 +72,7 @@ internal object UpdateDownloader {
             }
             finalFile
         } catch (e: Exception) {
-            Log.w(TAG, "Download failed: ${e.message}")
+            NativeDebug.e("Download failed", e)
             partFile.delete()
             null
         } finally {

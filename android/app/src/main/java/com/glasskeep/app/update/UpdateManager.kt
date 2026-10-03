@@ -4,8 +4,8 @@ import android.content.Context
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import com.glasskeep.app.BuildConfig
+import com.glasskeep.app.nativeapp.NativeDebug
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -28,7 +28,6 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object UpdateManager {
 
-    private const val TAG = "GK-Updater"
     private const val GITHUB_REPO = "Victor-root/glasskeep-enhanced"
     internal const val PREFS = "glasskeep_updater"
     private const val KEY_LAST_CHECK = "lastCheckMs"
@@ -85,14 +84,14 @@ object UpdateManager {
      * checks and SharedPreferences throttles repeat HTTP calls.
      */
     fun checkInBackground(context: Context, onAvailable: (ReleaseInfo) -> Unit) {
-        Log.i(TAG, "checkInBackground() — running version ${BuildConfig.VERSION_NAME}")
+        NativeDebug.d("checkInBackground() running version ${BuildConfig.VERSION_NAME}")
         val appCtx = context.applicationContext
         if (isFdroidInstall(appCtx)) {
-            Log.i(TAG, "skip — installed via F-Droid, updates handled there")
+            NativeDebug.d("skip, installed via F-Droid, updates handled there")
             return
         }
         if (!checking.compareAndSet(false, true)) {
-            Log.i(TAG, "skip — another check already running")
+            NativeDebug.d("skip, another check already running")
             return
         }
         val mainHandler = Handler(Looper.getMainLooper())
@@ -100,10 +99,10 @@ object UpdateManager {
         Thread({
             try {
                 val release = doCheck(appCtx) ?: return@Thread
-                Log.i(TAG, "newer APK detected: ${release.assetName}")
+                NativeDebug.d("newer APK detected: ${release.assetName}")
                 mainHandler.post { onAvailable(release) }
             } catch (t: Throwable) {
-                Log.w(TAG, "check crashed: ${t.message}", t)
+                NativeDebug.e("check crashed", t)
             } finally {
                 checking.set(false)
             }
@@ -137,10 +136,10 @@ object UpdateManager {
             try {
                 val apk = UpdateDownloader.downloadTo(appCtx, release.downloadUrl, release.assetName)
                 if (apk == null) {
-                    Log.w(TAG, "download failed")
+                    NativeDebug.e("download failed")
                     return@Thread
                 }
-                Log.i(TAG, "downloaded to ${apk.absolutePath} (${apk.length()} bytes)")
+                NativeDebug.d("downloaded to ${apk.absolutePath} (${apk.length()} bytes)")
                 // Fire the install intent regardless of the current
                 // "install unknown apps" toggle state. On Android 8+
                 // the system handles the missing-permission case
@@ -148,9 +147,9 @@ object UpdateManager {
                 // the user enables it the install dialog pops by
                 // itself — no need to back-out + re-trigger from us.
                 ok = UpdateInstaller.install(appCtx, apk)
-                Log.i(TAG, "install intent launched=$ok")
+                NativeDebug.d("install intent launched=$ok")
             } catch (t: Throwable) {
-                Log.w(TAG, "downloadAndInstall crashed: ${t.message}", t)
+                NativeDebug.e("downloadAndInstall crashed", t)
             } finally {
                 downloading.set(false)
                 mainHandler.post { onResult(ok) }
@@ -168,7 +167,7 @@ object UpdateManager {
     fun forceCheck(context: Context, onResult: (ReleaseInfo?) -> Unit) {
         val appCtx = context.applicationContext
         if (isFdroidInstall(appCtx)) {
-            Log.i(TAG, "skip force check — installed via F-Droid")
+            NativeDebug.d("skip force check, installed via F-Droid")
             onResult(null)
             return
         }
@@ -192,9 +191,9 @@ object UpdateManager {
                     .putLong(KEY_LAST_CHECK, System.currentTimeMillis())
                     .apply()
                 storeAvailableRelease(appCtx, result)
-                Log.i(TAG, "force check: ${result?.assetName ?: "already up to date"}")
+                NativeDebug.d("force check: ${result?.assetName ?: "already up to date"}")
             } catch (t: Throwable) {
-                Log.w(TAG, "force check crashed: ${t.message}", t)
+                NativeDebug.e("force check crashed", t)
             } finally {
                 checking.set(false)
                 val r = result
@@ -264,7 +263,7 @@ object UpdateManager {
         val now = System.currentTimeMillis()
         val lastCheck = prefs.getLong(KEY_LAST_CHECK, 0L)
         if (lastCheck > 0 && now - lastCheck < CHECK_INTERVAL_MS) {
-            Log.i(TAG, "throttled — last check ${now - lastCheck}ms ago")
+            NativeDebug.d("throttled, last check ${now - lastCheck}ms ago")
             return null
         }
 
@@ -277,7 +276,7 @@ object UpdateManager {
         prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
         storeAvailableRelease(context, release)
         if (release == null) {
-            Log.i(TAG, "no newer APK published (or check failed)")
+            NativeDebug.d("no newer APK published (or check failed)")
             return null
         }
         return release
