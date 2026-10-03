@@ -341,6 +341,9 @@ fun NoteDetailScreen(
     var showColorPicker by remember { mutableStateOf(false) }
     var changingColor by remember { mutableStateOf(false) }
     var duplicating by remember { mutableStateOf(false) }
+    // Set once the screen is on its way out, whichever path takes it: the
+    // note's own actions and the cache losing it must not both pop it.
+    var leaving by remember { mutableStateOf(false) }
     var showTagsPicker by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
     var changingTags by remember { mutableStateOf(false) }
@@ -684,6 +687,12 @@ fun NoteDetailScreen(
         }
     }
 
+    fun leave() {
+        if (leaving) return
+        leaving = true
+        onBack()
+    }
+
     /** The trash button's confirm: permanent delete for a note already in
      *  the trash, else the move to the trash. */
     fun askTrash() {
@@ -705,7 +714,7 @@ fun NoteDetailScreen(
                 NativeDebug.d("NoteDetailScreen toggleArchive queued id=${current.id}")
                 toasts.success(if (archive) archivedMessage else unarchivedMessage, if (archive) "archive" else "archive-off")
                 if (archive) {
-                    onBack()
+                    leave()
                 } else {
                     note = note?.copy(archived = false)
                     onUnarchived()
@@ -732,7 +741,7 @@ fun NoteDetailScreen(
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen restoreNote queued id=${current.id}")
                 toasts.success(restoredMessage, "restore")
-                onBack()
+                leave()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen restoreNote failed", t)
                 toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
@@ -757,7 +766,7 @@ fun NoteDetailScreen(
                     if (mode == "delete_for_all") deletedForAllMessage else movedToTrashMessage,
                     if (mode == "delete_for_all") "trash-x" else "trash",
                 )
-                onBack()
+                leave()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen trash failed", t)
                 toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
@@ -781,7 +790,7 @@ fun NoteDetailScreen(
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen deleteNotePermanently queued id=${current.id}")
                 toasts.success(deletedPermanentlyMessage, "trash-x")
-                onBack()
+                leave()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen deleteNotePermanently failed", t)
                 toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
@@ -914,7 +923,9 @@ fun NoteDetailScreen(
         checklistSaveJob?.cancel()
         scope.launch {
             try {
-                repository.setChecklistItemsQueued(current.id, ChecklistItems.encode(newItems))
+                val encoded = ChecklistItems.encode(newItems)
+                repository.setChecklistItemsQueued(current.id, encoded)
+                note = note?.copy(items = encoded)
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen saveChecklistItems queued id=${current.id}")
             } catch (t: Throwable) {
@@ -1167,7 +1178,7 @@ fun NoteDetailScreen(
                 NativeDebug.d("NoteDetailScreen duplicateNote OK newId=${created.id}")
                 SyncQueueWorker.triggerNow(context)
                 toasts.success(duplicatedMessage, "copy")
-                onBack()
+                leave()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen duplicateNote failed", t)
                 toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
@@ -1525,6 +1536,37 @@ fun NoteDetailScreen(
             }
         }
         loadSettled = true
+
+        // The server's changes reach the cache, and the note follows them
+        // (App.jsx:5901-5941, 3797-3811, 4379-4391): never over what is
+        // being typed, drawn or recorded, and closed without saving once the
+        // note is gone from the account.
+        fun followStoredNote(stored: NoteDto) {
+            val current = note ?: return
+            // The roster is read on its own.
+            val incoming = stored.copy(collaborators = current.collaborators)
+            if (incoming == current) return
+            val live = liveNoteSnapshot() ?: return
+            val editing = live.title != current.title || live.content != current.content || live.items != current.items
+            val editorsDiffer = incoming.title != current.title || incoming.content != current.content ||
+                incoming.items != current.items
+            if (!editing && editorsDiffer) {
+                applyFetchedNote(incoming)
+                return
+            }
+            note = incoming.copy(title = current.title, content = current.content, items = current.items)
+            if (!changingImages && incoming.images != current.images) images = NoteImages.parse(incoming.images)
+        }
+        var wasStored = false
+        repository.observeNote(noteId).collect { stored ->
+            if (leaving) return@collect
+            if (stored == null) {
+                if (wasStored && repository.isNoteGone(noteId)) leave()
+                return@collect
+            }
+            wasStored = true
+            persistLock.withLock { followStoredNote(stored) }
+        }
     }
 
     // useCollaboration.js reads the roster as soon as a note opens, then
@@ -1829,7 +1871,7 @@ fun NoteDetailScreen(
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen goBack: flush failed, leaving anyway", t)
             }
-            onBack()
+            leave()
         }
     }
 

@@ -191,6 +191,9 @@ private class InMemoryNoteDao : NoteDao {
         details += notes.associateBy { it.noteId }
     }
 
+    override fun observeDetail(id: String): Flow<NoteDetailEntity?> =
+        notes.map { all -> if (id in all) details[id] else null }
+
     override suspend fun getById(id: String) = notes.value[id]
 
     override suspend fun getDetailById(id: String) = details[id]

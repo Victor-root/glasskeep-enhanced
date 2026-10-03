@@ -35,6 +35,14 @@ interface NoteDao {
         upsertDetails(details)
     }
 
+    /** One note's full cached copy each time it changes, null once its list
+     *  row is gone: the detail row of a removed note is left behind. */
+    @Query(
+        "SELECT note_details.* FROM note_details INNER JOIN notes ON notes.id = note_details.noteId " +
+            "WHERE note_details.noteId = :id",
+    )
+    fun observeDetail(id: String): Flow<NoteDetailEntity?>
+
     /** One cached note, for the few writes that touch a single field and
      *  have to keep the rest of the row as-is (see the note-icon path in
      *  NotesRepository). */

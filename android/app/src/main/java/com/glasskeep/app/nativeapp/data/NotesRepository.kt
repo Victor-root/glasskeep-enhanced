@@ -77,8 +77,10 @@ import com.glasskeep.app.nativeapp.data.network.UserAiSettingsRequest
 import com.glasskeep.app.nativeapp.data.network.UserAiTestRequest
 import com.glasskeep.app.nativeapp.data.network.UserAiTestResponse
 import com.glasskeep.app.nativeapp.data.network.UserDto
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -218,6 +220,26 @@ class NotesRepository(
     fun observeArchivedNotes(): Flow<List<NoteEntity>> = noteDao.observeArchived()
 
     fun observeTrashedNotes(): Flow<List<NoteEntity>> = noteDao.observeTrashed()
+
+    /** One note as the cache holds it each time it changes, so an open note
+     *  can follow what the server sends; null once it has left the cache. */
+    fun observeNote(id: String): Flow<NoteDto?> = noteDao.observeDetail(id).distinctUntilChanged().map { detail ->
+        detail?.let { entity -> withContext(Dispatchers.Default) { runCatching { entity.toNoteDto() }.getOrNull() } }
+    }
+
+    /** Whether the server no longer knows this note for this user: deleted,
+     *  or no longer shared with them. A note whose creation is still queued,
+     *  or a server that cannot answer, says nothing. */
+    suspend fun isNoteGone(id: String): Boolean {
+        if (syncQueueDao.hasQueuedCreate(id)) return false
+        return try {
+            api.getNote(id).code() == 404
+        } catch (t: CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            false
+        }
+    }
 
     /** The list rows and the full detail rows of [notes], built off the main
      *  thread: a detail row holds its note whole, images included. */
