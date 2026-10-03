@@ -22,6 +22,8 @@ import com.glasskeep.app.nativeapp.ui.NativeNavHost
 import com.glasskeep.app.nativeapp.ui.WorkspaceTheme
 import com.glasskeep.app.ui.applyThemedSystemBars
 import com.glasskeep.app.ui.theme.GlassKeepWebTheme
+import com.glasskeep.app.update.UpdateManager
+import com.glasskeep.app.update.UpdateNotifier
 
 /**
  * Entry point for the native app: every screen in
@@ -56,6 +58,8 @@ class NativeAppActivity : ComponentActivity() {
 
         val container = NativeAppContainer(applicationContext)
         NativeDebug.boot("container ready (session store, databases)")
+
+        UpdateManager.checkInBackground(this) { UpdateNotifier.show(applicationContext, it) }
 
         setContent {
             // The device setting, unless the header menu's light/dark entry
