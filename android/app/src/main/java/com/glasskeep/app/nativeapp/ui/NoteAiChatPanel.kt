@@ -10,6 +10,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +33,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -46,6 +49,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -60,6 +64,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -125,17 +130,17 @@ fun NoteAiChatPanel(
     }
 
     // Stick to the bottom while the answer grows, unless the reader has
-    // scrolled up: the last item being on screen is what says so.
+    // scrolled up: more than 32px short of the end says so, the slack the
+    // web allows (NoteAiChatPanel.jsx:59).
+    val bottomSlack = with(LocalDensity.current) { 32.dp.roundToPx() }
     val atBottom by remember {
-        derivedStateOf {
-            val info = listState.layoutInfo
-            val last = info.visibleItemsInfo.lastOrNull()
-            last == null || last.index >= info.totalItemsCount - 1
-        }
+        derivedStateOf { listState.distanceToEnd()?.let { it < bottomSlack } ?: false }
     }
     LaunchedEffect(messages.size, messages.lastOrNull()?.content, loading) {
         if (messages.isNotEmpty() && atBottom) {
-            listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
+            // The new text is laid out a frame later.
+            withFrameNanos { }
+            listState.scrollToEnd(animate = false)
         }
     }
 
@@ -294,9 +299,7 @@ fun NoteAiChatPanel(
                                 indication = null,
                                 role = Role.Button,
                             ) {
-                                scope.launch {
-                                    listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
-                                }
+                                scope.launch { listState.scrollToEnd(animate = true) }
                             },
                         contentAlignment = Alignment.Center,
                     ) {
@@ -378,6 +381,27 @@ fun NoteAiChatPanel(
             }
         }
     }
+}
+
+/** How far the content still runs below the visible list, or null while
+ *  the last item is not even laid out. */
+private fun LazyListState.distanceToEnd(): Int? {
+    val info = layoutInfo
+    val last = info.visibleItemsInfo.lastOrNull() ?: return 0
+    if (last.index != info.totalItemsCount - 1) return null
+    return last.offset + last.size - (info.viewportEndOffset - info.afterContentPadding)
+}
+
+/** Scrolls to the very end of the content, scrollToItem alone lining up
+ *  the top of the last item, which leaves a tall answer's end below the
+ *  fold (scrollIntoView with block: "end" on the web). */
+private suspend fun LazyListState.scrollToEnd(animate: Boolean) {
+    if (distanceToEnd() == null) {
+        val lastIndex = layoutInfo.totalItemsCount - 1
+        if (animate) animateScrollToItem(lastIndex) else scrollToItem(lastIndex)
+    }
+    val remaining = distanceToEnd()?.takeIf { it > 0 }?.toFloat() ?: return
+    if (animate) animateScrollBy(remaining) else scrollBy(remaining)
 }
 
 /** The header's own square gradient button (save / clear), popping in
