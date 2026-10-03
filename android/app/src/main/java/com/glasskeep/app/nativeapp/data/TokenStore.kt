@@ -208,10 +208,12 @@ class TokenStore(context: Context) {
             prefs.edit().putBoolean(KEY_AI_ASSISTANT, value).apply()
         }
 
-    /** The instance's own name, logo (a data URL) and sign-in theme, as an
-     *  admin set them. Cached for the same first-frame reason as the rest:
-     *  the sign-in screen must not flash the bundled defaults before the
-     *  branding read comes back (see BrandingState). */
+    /** The instance's own name, logo (a data URL), sign-in theme and sign-in
+     *  background (its versioned URL and the two placeholders painted before
+     *  the photo, never the photo), as an admin set them. Cached for the same
+     *  first-frame reason as the rest: the sign-in screen must not flash the
+     *  bundled defaults before the branding read comes back (see
+     *  BrandingState). */
     var brandingAppName: String?
         get() = prefs.getString(KEY_BRANDING_APP_NAME, null)
         set(value) {
@@ -228,6 +230,24 @@ class TokenStore(context: Context) {
         get() = prefs.getString(KEY_BRANDING_LOGIN_THEME, null)
         set(value) {
             prefs.edit().putString(KEY_BRANDING_LOGIN_THEME, value).apply()
+        }
+
+    var brandingLoginBackground: String?
+        get() = prefs.getString(KEY_BRANDING_LOGIN_BACKGROUND, null)
+        set(value) {
+            prefs.edit().putString(KEY_BRANDING_LOGIN_BACKGROUND, value).apply()
+        }
+
+    var brandingLoginBackgroundColor: String?
+        get() = prefs.getString(KEY_BRANDING_LOGIN_BACKGROUND_COLOR, null)
+        set(value) {
+            prefs.edit().putString(KEY_BRANDING_LOGIN_BACKGROUND_COLOR, value).apply()
+        }
+
+    var brandingLoginBackgroundHash: String?
+        get() = prefs.getString(KEY_BRANDING_LOGIN_BACKGROUND_HASH, null)
+        set(value) {
+            prefs.edit().putString(KEY_BRANDING_LOGIN_BACKGROUND_HASH, value).apply()
         }
 
     /** Set by the update window's Reload just before the app starts over,
@@ -318,6 +338,9 @@ class TokenStore(context: Context) {
         private const val KEY_BRANDING_APP_NAME = "branding_app_name"
         private const val KEY_BRANDING_LOGO = "branding_logo"
         private const val KEY_BRANDING_LOGIN_THEME = "branding_login_theme"
+        private const val KEY_BRANDING_LOGIN_BACKGROUND = "branding_login_background"
+        private const val KEY_BRANDING_LOGIN_BACKGROUND_COLOR = "branding_login_background_color"
+        private const val KEY_BRANDING_LOGIN_BACKGROUND_HASH = "branding_login_background_hash"
         private const val KEY_SHOW_CHANGELOG = "show_changelog_on_launch"
         private const val KEY_STAR_PROMPT_DISMISSED = "star_prompt_dismissed"
 

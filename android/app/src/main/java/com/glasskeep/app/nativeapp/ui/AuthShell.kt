@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -79,6 +80,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
+import com.glasskeep.app.nativeapp.BrandingImages
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.network.ApiClientFactory
@@ -188,8 +190,10 @@ internal fun AuthShell(
             }
         }
     }
-    val pageBackground = if (customBackground != null && placeholder != null && placeholderShown) {
-        Modifier.background(placeholder)
+    val shownPlaceholder = placeholder.takeIf { customBackground != null && placeholderShown }
+    val blurHashImage = rememberBlurHashImage(branding.loginBackgroundHash)
+    val pageBackground = if (shownPlaceholder != null) {
+        Modifier.background(shownPlaceholder)
     } else {
         Modifier.background(WorkspaceTheme.appBackground(colors.themeId, dark))
     }
@@ -214,6 +218,9 @@ internal fun AuthShell(
             ),
     ) {
         val screenHeight = maxHeight
+        if (shownPlaceholder != null && blurHashImage != null) {
+            Image(bitmap = blurHashImage, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        }
         if (background != null) {
             LoginBackgroundLayer(background.bitmap, hasPlaceholder = placeholder != null, blur = branding.loginBackgroundBlur, dark = dark)
         }
@@ -484,6 +491,16 @@ internal fun rememberLoginBackground(container: NativeAppContainer, ref: String)
         state = LoginBackground(bitmap, failed = bitmap == null)
     }
     return state
+}
+
+/** The login background's BlurHash, decoded off the main thread: painted over
+ *  the mean colour until the photo is in (index.html's boot placeholder). */
+@Composable
+private fun rememberBlurHashImage(hash: String?): ImageBitmap? {
+    val image by produceState<ImageBitmap?>(initialValue = null, hash) {
+        value = hash?.let { withContext(Dispatchers.Default) { BrandingImages.blurHashBitmap(it)?.asImageBitmap() } }
+    }
+    return image
 }
 
 private fun decodeDataUrl(dataUrl: String): ImageBitmap? = runCatching {

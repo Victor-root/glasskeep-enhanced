@@ -66,6 +66,51 @@ object BrandingImages {
         return color to blurHash(pixels, w, h, componentsX = 4, componentsY = 3)
     }
 
+    /** The blurhash package's decode(): [hash] drawn on a [size] square, or
+     *  null when it is not a BlurHash. Off the main thread. */
+    fun blurHashBitmap(hash: String, size: Int = 32): Bitmap? {
+        if (hash.length < 6 || hash.any { Base83.indexOf(it) < 0 }) return null
+        val sizeFlag = decode83(hash, 0, 1)
+        val componentsY = sizeFlag / 9 + 1
+        val componentsX = sizeFlag % 9 + 1
+        if (hash.length != 4 + 2 * componentsX * componentsY) return null
+        val maximumValue = (decode83(hash, 1, 2) + 1) / 166.0
+        val colors = Array(componentsX * componentsY) { i ->
+            if (i == 0) {
+                val dc = decode83(hash, 2, 6)
+                doubleArrayOf(srgbToLinear(dc shr 16), srgbToLinear((dc shr 8) and 255), srgbToLinear(dc and 255))
+            } else {
+                val ac = decode83(hash, 4 + i * 2, 6 + i * 2)
+                doubleArrayOf(
+                    signPow((ac / (19 * 19) - 9) / 9.0, 2.0) * maximumValue,
+                    signPow((ac / 19 % 19 - 9) / 9.0, 2.0) * maximumValue,
+                    signPow((ac % 19 - 9) / 9.0, 2.0) * maximumValue,
+                )
+            }
+        }
+        val cosX = Array(componentsX) { k -> DoubleArray(size) { x -> cos(Math.PI * x * k / size) } }
+        val cosY = Array(componentsY) { j -> DoubleArray(size) { y -> cos(Math.PI * y * j / size) } }
+        val pixels = IntArray(size * size)
+        for (y in 0 until size) {
+            for (x in 0 until size) {
+                var r = 0.0
+                var g = 0.0
+                var b = 0.0
+                for (j in 0 until componentsY) {
+                    for (k in 0 until componentsX) {
+                        val basis = cosX[k][x] * cosY[j][y]
+                        val color = colors[k + j * componentsX]
+                        r += color[0] * basis
+                        g += color[1] * basis
+                        b += color[2] * basis
+                    }
+                }
+                pixels[x + y * size] = Color.rgb(linearToSrgb(r), linearToSrgb(g), linearToSrgb(b))
+            }
+        }
+        return Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
+    }
+
     private fun decode(dataUrl: String): Bitmap? = runCatching {
         val bytes = Base64.decode(dataUrl.substringAfter("base64,", ""), Base64.DEFAULT)
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
@@ -135,6 +180,12 @@ object BrandingImages {
     private fun signPow(value: Double, exponent: Double): Double = (if (value < 0) -1.0 else 1.0) * abs(value).pow(exponent)
 
     private const val Base83 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~"
+
+    private fun decode83(text: String, from: Int, to: Int): Int {
+        var value = 0
+        for (i in from until to) value = value * 83 + Base83.indexOf(text[i])
+        return value
+    }
 
     private fun encode83(value: Int, length: Int): String = buildString {
         for (i in 1..length) {

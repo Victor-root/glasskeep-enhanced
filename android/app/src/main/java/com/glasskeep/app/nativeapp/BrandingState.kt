@@ -14,8 +14,10 @@ import com.glasskeep.app.nativeapp.data.network.BrandingDto
  * Cached in TokenStore for the same reason the web caches its own copy in
  * localStorage: the sign-in screen must paint the right name and logo on
  * the very first frame rather than flashing the defaults until the read
- * comes back. The background URL and its placeholder stay in live state
- * only: the multi-megabyte image itself never enters preferences.
+ * comes back. The login background's versioned URL and its two placeholders
+ * (mean colour and BlurHash) are cached too, a few bytes the sign-in screen
+ * paints while the photo loads; the multi-megabyte image itself never enters
+ * preferences.
  */
 class BrandingState(private val tokenStore: TokenStore) {
     /** Null (or blank) means the bundled wordmark. */
@@ -30,10 +32,13 @@ class BrandingState(private val tokenStore: TokenStore) {
     var loginThemeId: String? by mutableStateOf(tokenStore.brandingLoginTheme)
         private set
 
-    var loginBackground: String? by mutableStateOf(null)
+    var loginBackground: String? by mutableStateOf(tokenStore.brandingLoginBackground)
         private set
 
-    var loginBackgroundColor: String? by mutableStateOf(null)
+    var loginBackgroundColor: String? by mutableStateOf(tokenStore.brandingLoginBackgroundColor)
+        private set
+
+    var loginBackgroundHash: String? by mutableStateOf(tokenStore.brandingLoginBackgroundHash)
         private set
 
     var loginBackgroundBlur: Int by mutableStateOf(0)
@@ -49,9 +54,13 @@ class BrandingState(private val tokenStore: TokenStore) {
         loginThemeId = branding.loginTheme
         loginBackground = branding.loginBackground?.takeIf { it.isNotBlank() }
         loginBackgroundColor = branding.loginBackgroundColor
+        loginBackgroundHash = branding.loginBackgroundHash
         loginBackgroundBlur = branding.loginBackgroundBlur.coerceIn(0, 20)
         tokenStore.brandingAppName = appName
         tokenStore.brandingLogo = logo
         tokenStore.brandingLoginTheme = loginThemeId
+        tokenStore.brandingLoginBackground = loginBackground
+        tokenStore.brandingLoginBackgroundColor = loginBackgroundColor
+        tokenStore.brandingLoginBackgroundHash = loginBackgroundHash
     }
 }
