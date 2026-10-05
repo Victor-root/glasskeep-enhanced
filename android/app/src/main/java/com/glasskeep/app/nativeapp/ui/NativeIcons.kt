@@ -1755,6 +1755,15 @@ fun ArrowsSortIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color 
     modifier, size, tint,
 )
 
+/** tabler/device-mobile.svg. */
+@Composable
+fun DeviceMobileIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-14z " +
+        "M11 4h2 " +
+        "M12 17v.01",
+    modifier, size, tint,
+)
+
 /** tabler/device-mobile-rotated.svg. */
 @Composable
 fun DeviceMobileRotatedIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(

@@ -936,6 +936,16 @@ internal fun SettingsScreen(
                                 },
                             )
                             SettingsSwitchRow(
+                                title = stringResource(R.string.native_settings_edge_to_edge_bars),
+                                subtitle = stringResource(R.string.native_settings_edge_to_edge_bars_desc),
+                                checked = shellPrefs.edgeToEdgeBars,
+                                themeId = themeId,
+                                dark = dark,
+                                titleColor = titleColor,
+                                icon = { tint -> DeviceMobileIcon(size = 20.dp, tint = tint) },
+                                onCheckedChange = shellPrefs::applyEdgeToEdgeBars,
+                            )
+                            SettingsSwitchRow(
                                 title = stringResource(R.string.native_settings_animations),
                                 subtitle = stringResource(R.string.native_settings_animations_desc),
                                 checked = shellPrefs.floatingCards,

@@ -281,6 +281,8 @@
     <string name="native_settings_sidebar_breakpoint_custom">≥ %1$d px</string>
     <string name="native_settings_edge_to_edge_landscape">Bord à bord en paysage</string>
     <string name="native_settings_edge_to_edge_landscape_desc">Étend le contenu sous la barre d\'état en mode paysage. Désactiver si l\'encoche gêne l\'affichage.</string>
+    <string name="native_settings_edge_to_edge_bars">Affichage bord à bord</string>
+    <string name="native_settings_edge_to_edge_bars_desc">La liste des notes s\'affiche derrière les barres d\'état et de navigation, en portrait comme en paysage. Désactiver pour garder les barres sur un fond uni.</string>
     <string name="native_settings_animations">Activer les animations de fond</string>
     <string name="native_settings_animations_desc">Affiche les animations de cartes flottantes en arrière-plan. Peut ralentir les équipements moins performants.</string>
     <string name="native_settings_theme_title">Thème de l\'interface</string>

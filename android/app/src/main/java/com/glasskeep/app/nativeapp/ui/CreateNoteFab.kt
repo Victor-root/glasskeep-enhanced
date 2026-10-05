@@ -69,7 +69,7 @@ fun animateCreateNoteVeil(open: Boolean): State<Float> =
  * MobileCreateFab.jsx's backdrop, [veil] of the way in: black at 30%,
  * over what [createNoteBlur] blurs by 2px under it. The web stacks it
  * under its header (z-30 against z-40); here it covers the header too,
- * and the system bars dim with it ([CreateNoteSystemBars]). Taps are
+ * and the system bars dim with it ([NotesListSystemBars]). Taps are
  * caught by the caller.
  */
 @Composable
@@ -83,17 +83,23 @@ fun Modifier.createNoteBlur(veil: () -> Float): Modifier = graphicsLayer {
     renderEffect = if (radius > 0f) BlurEffect(radius, radius, TileMode.Clamp) else null
 }
 
-/** The system bars under the backdrop, [veil] of the way in: their [base]
- *  colour with its black laid over it. */
+/** The system bars over the notes list: see-through when the list shows
+ *  behind them (the backdrop already dims what lies there), else their [base]
+ *  colour with the backdrop's black laid over it, [veil] of the way in. */
 @Composable
-fun CreateNoteSystemBars(override: StatusBarOverride, base: Color, veil: () -> Float) {
+fun NotesListSystemBars(override: StatusBarOverride, base: Color, edgeToEdge: Boolean, veil: () -> Float) {
     val claim = rememberSystemBarsClaim(override)
     val currentBase by rememberUpdatedState(base)
+    val currentEdgeToEdge by rememberUpdatedState(edgeToEdge)
     val currentVeil by rememberUpdatedState(veil)
     LaunchedEffect(claim) {
         snapshotFlow {
             val shown = currentVeil()
-            if (shown > 0f) createNoteScrimColor(shown).compositeOver(currentBase).toArgb() else null
+            when {
+                currentEdgeToEdge -> Color.Transparent.toArgb()
+                shown > 0f -> createNoteScrimColor(shown).compositeOver(currentBase).toArgb()
+                else -> null
+            }
         }.collect { claim.argb = it }
     }
 }

@@ -286,6 +286,8 @@
     <string name="native_settings_sidebar_breakpoint_custom">≥ %1$d px</string>
     <string name="native_settings_edge_to_edge_landscape">Edge-to-edge in landscape</string>
     <string name="native_settings_edge_to_edge_landscape_desc">Extend content under the status bar in landscape mode. Disable if the notch interferes with the display.</string>
+    <string name="native_settings_edge_to_edge_bars">Edge-to-edge display</string>
+    <string name="native_settings_edge_to_edge_bars_desc">The notes list shows behind the status and navigation bars, in portrait and landscape. Disable to keep the bars on a solid background.</string>
     <string name="native_settings_animations">Enable background animations</string>
     <string name="native_settings_animations_desc">Shows floating card animations in the background. May cause slowdowns on low-end devices.</string>
     <string name="native_settings_theme_title">Workspace theme</string>

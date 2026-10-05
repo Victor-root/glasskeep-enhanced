@@ -138,6 +138,15 @@ class TokenStore(context: Context) {
             prefs.edit().putBoolean(KEY_EDGE_TO_EDGE_LANDSCAPE, value).apply()
         }
 
+    /** Whether the notes list shows behind the status and navigation bars
+     *  in both orientations. Native only, kept on this device: the web has
+     *  no such setting. On by default. */
+    var edgeToEdgeBars: Boolean
+        get() = prefs.getBoolean(KEY_EDGE_TO_EDGE_BARS, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_EDGE_TO_EDGE_BARS, value).apply()
+        }
+
     /** Cached "animated cards on the sign-in screen" preference. Off by
      *  default: the web's own default is `(pointer: fine)`, which is
      *  false on every phone (App.jsx:277-285). */
@@ -327,6 +336,7 @@ class TokenStore(context: Context) {
         private const val KEY_QUEUE_OWNER = "queue_owner"
         private const val KEY_AI_ASSISTANT = "ai_assistant_enabled"
         private const val KEY_EDGE_TO_EDGE_LANDSCAPE = "edge_to_edge_landscape"
+        private const val KEY_EDGE_TO_EDGE_BARS = "edge_to_edge_bars"
         private const val KEY_FLOATING_CARDS = "floating_cards_enabled"
         private const val KEY_CHECKLIST_INSERT = "checklist_insert_position"
         private const val KEY_CHECKLIST_REMOVE_SECTION = "checklist_remove_section"

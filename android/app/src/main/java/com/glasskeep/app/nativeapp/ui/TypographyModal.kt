@@ -104,8 +104,8 @@ fun TypographyModal(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.systemBars)
             .background(if (dark) Color(0xFF1F2937) else Color.White)
+            .windowInsetsPadding(WindowInsets.systemBars)
             .blockTouchesBelow(),
     ) {
         // Header: title, description, profile tabs, then the reset CTA

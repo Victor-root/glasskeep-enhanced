@@ -16,6 +16,11 @@ class ShellPrefsState(private val tokenStore: TokenStore) {
     var edgeToEdgeLandscape: Boolean by mutableStateOf(tokenStore.edgeToEdgeLandscape)
         private set
 
+    /** The list showing behind the status and navigation bars. Native
+     *  only, so never reconciled against the server. */
+    var edgeToEdgeBars: Boolean by mutableStateOf(tokenStore.edgeToEdgeBars)
+        private set
+
     var floatingCards: Boolean by mutableStateOf(tokenStore.floatingCardsEnabled)
         private set
 
@@ -99,6 +104,11 @@ class ShellPrefsState(private val tokenStore: TokenStore) {
     fun applyEdgeToEdgeLandscape(enabled: Boolean) {
         edgeToEdgeLandscape = enabled
         tokenStore.edgeToEdgeLandscape = enabled
+    }
+
+    fun applyEdgeToEdgeBars(enabled: Boolean) {
+        edgeToEdgeBars = enabled
+        tokenStore.edgeToEdgeBars = enabled
     }
 
     fun applyFloatingCards(enabled: Boolean) {

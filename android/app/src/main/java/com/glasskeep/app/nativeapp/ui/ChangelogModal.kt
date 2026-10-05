@@ -139,8 +139,8 @@ internal fun ChangelogModal(
     Column(
         Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.systemBars)
             .background(if (dark) DarkCard else Color.White)
+            .windowInsetsPadding(WindowInsets.systemBars)
             .blockTouchesBelow(),
     ) {
         Row(
