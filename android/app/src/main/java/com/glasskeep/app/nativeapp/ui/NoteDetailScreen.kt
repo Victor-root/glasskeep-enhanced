@@ -44,7 +44,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -3854,11 +3853,11 @@ private fun NoteModalFooter(
             .footerShadow(dark)
             // The root Column's own imePadding() already reserves room for
             // the keyboard, and that space reaches past where the nav bar
-            // sits - so adding navigationBarsPadding on top of it while the
+            // sits - so adding the nav bar padding on top of it while the
             // keyboard is up doubled the gap instead of matching it. Only
             // add it back once the keyboard closes. Outside the veil: the
             // web leaves the nav bar strip in the plain note colour.
-            .then(if (imeVisible) Modifier else Modifier.navigationBarsPadding()),
+            .then(if (imeVisible) Modifier else Modifier.windowInsetsPadding(bottomNavigationBarInsets)),
     ) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
         if (BuildConfig.DEBUG) {
