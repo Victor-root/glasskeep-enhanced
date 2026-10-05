@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -76,6 +77,7 @@ class NativeAppActivity : ComponentActivity() {
             // behind before catching up, a narrow, cosmetic-only gap.
             val themeId = container.themeState.themeId
             val signedIn = container.tokenStore.token != null
+            val edgeToEdgeBars = container.shellPrefs.edgeToEdgeBars
 
             // Handles dark/theme/signed-in changes: this SideEffect reruns
             // whenever this scope itself recomposes for one of those. It
@@ -91,9 +93,9 @@ class NativeAppActivity : ComponentActivity() {
                 // trigger this SideEffect for their own reasons - the
                 // snapshotFlow below is what reacts to the override itself
                 // changing.
-                val overrideArgb = container.statusBarOverride.argb
-                val baseColor = systemBarColor(signedIn, overrideArgb, themeId, container.branding.loginThemeId, dark)
-                (view.context as ComponentActivity).applyThemedSystemBars(dark, baseColor)
+                (view.context as ComponentActivity).applySystemBars(
+                    dark, signedIn, edgeToEdgeBars, container.statusBarOverride.argb, themeId, container.branding.loginThemeId,
+                )
             }
 
             // Dedicated, guaranteed-reactive path for the note override: a
@@ -105,15 +107,16 @@ class NativeAppActivity : ComponentActivity() {
             val currentThemeId = rememberUpdatedState(themeId)
             val currentSignedIn = rememberUpdatedState(signedIn)
             LaunchedEffect(view) {
-                snapshotFlow { container.statusBarOverride.argb }
-                    .collect { noteOverrideArgb ->
-                        val baseColor = systemBarColor(currentSignedIn.value, noteOverrideArgb, currentThemeId.value, container.branding.loginThemeId, currentDark.value)
+                snapshotFlow { container.statusBarOverride.argb to container.shellPrefs.edgeToEdgeBars }
+                    .collect { (noteOverrideArgb, seeThrough) ->
                         NativeDebug.d(
                             "NativeAppActivity system bars: dark=${currentDark.value} signedIn=${currentSignedIn.value} " +
-                                "noteOverride=${noteOverrideArgb?.let { "#%08X".format(it) }} " +
-                                "baseColor=${"#%08X".format(baseColor)}",
+                                "noteOverride=${noteOverrideArgb?.let { "#%08X".format(it) }} seeThrough=$seeThrough",
                         )
-                        (view.context as ComponentActivity).applyThemedSystemBars(currentDark.value, baseColor)
+                        (view.context as ComponentActivity).applySystemBars(
+                            currentDark.value, currentSignedIn.value, seeThrough, noteOverrideArgb,
+                            currentThemeId.value, container.branding.loginThemeId,
+                        )
                     }
             }
             GlassKeepWebTheme(darkTheme = dark, accent = WorkspaceTheme.accent(themeId, dark)) {
@@ -164,6 +167,21 @@ class NativeAppActivity : ComponentActivity() {
         const val EXTRA_OPEN_QR_SCANNER = "openQrScanner"
         const val EXTRA_NEW_NOTE_TYPE = "newNoteType"
     }
+}
+
+/** The bars, see-through once signed in when the screens show behind them,
+ *  else in [systemBarColor]; that colour is also what the window shows where
+ *  a screen leaves it unpainted. */
+private fun ComponentActivity.applySystemBars(
+    dark: Boolean,
+    signedIn: Boolean,
+    seeThrough: Boolean,
+    noteOverrideArgb: Int?,
+    themeId: String?,
+    loginThemeId: String?,
+) {
+    val color = systemBarColor(signedIn, noteOverrideArgb, themeId, loginThemeId, dark)
+    applyThemedSystemBars(dark, if (signedIn && seeThrough) Color.TRANSPARENT else color, color)
 }
 
 /** The status and navigation bars' colour: an open note's own, else the

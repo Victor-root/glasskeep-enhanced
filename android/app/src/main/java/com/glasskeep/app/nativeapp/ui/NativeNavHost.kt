@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -503,9 +504,10 @@ fun NativeNavHost(
     // "Edge-to-edge in landscape" off means the whole shell stays clear of
     // the left cutout, exactly what the web does by putting --safe-left
     // back on <body> (App.jsx:1703). Left only: the other three edges are
-    // always padded there, and each screen already handles its own.
+    // always padded there, and each screen already handles its own. A
+    // navigation bar on the left is always kept clear of.
     val safeLeft = if (container.shellPrefs.edgeToEdgeLandscape) {
-        Modifier
+        Modifier.windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Left))
     } else {
         Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Left))
     }

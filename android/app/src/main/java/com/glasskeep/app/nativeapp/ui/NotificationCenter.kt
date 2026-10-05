@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -206,7 +207,6 @@ fun NotificationCenter(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.statusBars)
                 .heightIn(max = maxHeight)
                 .graphicsLayer {
                     translationY = slide * size.height + dragOffset
@@ -222,6 +222,7 @@ fun NotificationCenter(
                 // header, whose opaque phone fill covers it.
                 .topSheetBottomBorder(shape, if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)),
         ) {
+            Spacer(Modifier.fillMaxWidth().windowInsetsTopHeight(WindowInsets.statusBars).background(statusBar))
             NotificationCenterHeader(
                 background = statusBar,
                 titleColor = titleColor,
@@ -241,11 +242,11 @@ fun NotificationCenter(
                     stringResource(R.string.native_notifications_empty),
                     color = titleColor.copy(alpha = 0.7f),
                     fontSize = 13.6.sp,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 24.dp),
+                    modifier = Modifier.fillMaxWidth().windowInsetsPadding(rightSystemInsets).padding(horizontal = 12.dp, vertical = 24.dp),
                     textAlign = TextAlign.Center,
                 )
                 else -> LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
+                    modifier = Modifier.fillMaxWidth().windowInsetsPadding(rightSystemInsets).weight(1f, fill = false),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -364,6 +365,7 @@ private fun NotificationCenterHeader(
                 )
             }
             .background(background)
+            .windowInsetsPadding(rightSystemInsets)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),

@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,9 +46,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -2031,10 +2028,6 @@ fun NoteDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                // NoteModal.jsx:643's --safe-right, always: the side bar of a
-                // 3-button landscape and the cutout. The left is the
-                // shell's (NativeNavHost's safeLeft).
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Right))
                 .imePadding(),
         ) {
             // Sticky icon bar (ModalHeader.jsx's own mobile half): back on
@@ -2046,6 +2039,11 @@ fun NoteDetailScreen(
                     .fillMaxWidth()
                     .onGloballyPositioned { stickyBarCoordinates.value = it }
                     .background(modalBg)
+                    // NoteModal.jsx:643's --safe-right, always: the side bar of
+                    // a 3-button landscape and the cutout. The left is the
+                    // shell's (NativeNavHost's safeLeft). The bars keep their
+                    // background to the screen's edge, their content clear.
+                    .windowInsetsPadding(rightSystemInsets)
                     .then(
                         // ModalHeader.jsx's draw-edit bar: 4px all round and a
                         // bottom border (black 10% / white 15%).
@@ -2261,7 +2259,7 @@ fun NoteDetailScreen(
                     // Draw mode: the note stops scrolling and the canvas
                     // takes everything under the warnings, edge to edge
                     // (NoteModal.jsx:654, 756; DrawingCanvas.jsx:745-748).
-                    Column(Modifier.weight(1f).fillMaxWidth()) {
+                    Column(Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(rightSystemInsets)) {
                         NoteBanners(note!!)
                         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                             val area = DrawingDimensionsDto(
@@ -2289,7 +2287,7 @@ fun NoteDetailScreen(
                     // the clip list scrolling inside its own box, over a
                     // bottom row pairing the storage gauge with the Edited
                     // stamp (NoteModal.jsx:654, 756, 866-885).
-                    Column(Modifier.weight(1f).fillMaxWidth()) {
+                    Column(Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(rightSystemInsets)) {
                         NoteTitle(editability!!)
                         NoteBanners(currentNote)
                         ModalContentFade(
@@ -2331,7 +2329,7 @@ fun NoteDetailScreen(
                     // NoteModal.jsx: inline after the content when the note
                     // scrolls, pinned bottom-right of the viewport when it does not.
                     val stampInline = contentScroll.maxValue > 0
-                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                    Box(Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(rightSystemInsets)) {
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -3870,6 +3868,7 @@ private fun NoteModalFooter(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(if (dark) Color.Black.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.04f))
+                .windowInsetsPadding(rightSystemInsets)
                 .padding(vertical = 6.dp),
             // ModalFooter.jsx's desktop layout splits into two clusters
             // held apart by a flex-1 spacer, but its own mobile media query
@@ -4219,6 +4218,7 @@ private fun FormatSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .windowInsetsPadding(rightSystemInsets)
                     .verticalScroll(rememberScrollState())
                     .onSizeChanged { contentHeightPx = it.height },
             ) {

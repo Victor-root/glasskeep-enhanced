@@ -242,6 +242,7 @@ internal fun SelectionActionBar(
         modifier = modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.statusBars)
+            .windowInsetsPadding(rightSystemInsets)
             .padding(top = top, start = 8.dp, end = 8.dp),
         contentAlignment = Alignment.TopCenter,
     ) {

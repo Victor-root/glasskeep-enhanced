@@ -39,7 +39,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -49,9 +48,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -984,13 +981,6 @@ fun NativeNotesListScreen(
     val showLockedBanner = container.lockState.isLocked && !container.lockState.bannerDismissed && !container.lockState.overlayOpen
     val bannerSlotPx = if (showLockedBanner) bannerHeightPx else 0
     val edgeToEdge = container.shellPrefs.edgeToEdgeBars
-    // Behind a transparent side bar or cutout in landscape, the page keeps
-    // its content clear of it, as the opaque bar used to hide it.
-    val sideInsets = if (edgeToEdge) {
-        Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Right))
-    } else {
-        Modifier
-    }
     val statusBarTopPx = WindowInsets.statusBars.getTop(density)
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     // How far the header has slid away, 0 to 1: read where it is placed
@@ -1040,7 +1030,7 @@ fun NativeNotesListScreen(
             Column(
                 Modifier
                     .fillMaxSize()
-                    .then(sideInsets)
+                    .windowInsetsPadding(rightSystemInsets)
                     .then(if (rawShown != null) Modifier.verticalScroll(notesScrollState) else Modifier),
             ) {
                 Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
@@ -1422,7 +1412,6 @@ fun NativeNotesListScreen(
                 hasUnreadNotifications = toasts.queue.isNotEmpty(),
                 onOpenNotifications = { notificationsOpen = !notificationsOpen },
                 modifier = Modifier
-                    .then(sideInsets)
                     .onSizeChanged { headerHeightPx = it.height }
                     // Sticky under the status bar once the banner has scrolled
                     // away, and slid up by its own height while hidden, the
@@ -1443,7 +1432,7 @@ fun NativeNotesListScreen(
         }
 
         if (!selectionMode && secondaryView == null) CreateNoteScrim { fabVeil.value }
-        NotesListSystemBars(container.statusBarOverride, WorkspaceTheme.statusBarColor(themeId, dark), edgeToEdge) { fabVeil.value }
+        CreateNoteSystemBars(container.statusBarOverride, WorkspaceTheme.statusBarColor(themeId, dark)) { fabVeil.value }
 
         if (fabOpen) {
             // The web swallows the next tap anywhere outside the menu, the
@@ -1697,6 +1686,7 @@ private fun NativeHeader(
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(if (searchOpen) Modifier.searchBackdrop() else Modifier)
+                    .windowInsetsPadding(rightSystemInsets)
                     // pb-7 while offline: the pill hangs under the title block.
                     .padding(
                         if (roomy) {
@@ -1844,7 +1834,7 @@ private fun NativeHeader(
                     focusRequest = searchFocusRequest,
                     dark = dark,
                     textColor = titleColor,
-                    modifier = Modifier.matchParentSize(),
+                    modifier = Modifier.matchParentSize().windowInsetsPadding(rightSystemInsets),
                 )
             }
         }

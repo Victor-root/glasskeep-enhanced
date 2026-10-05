@@ -207,7 +207,6 @@ internal fun SyncStatusSheet(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.statusBars)
                 .heightIn(max = configuration.screenHeightDp.dp)
                 .graphicsLayer { translationY = slideAnim.value * size.height + dragOffset }
                 .dropShadow(shape, Shadow(radius = 6.dp, color = sheetShadow.copy(alpha = 0.07f), spread = (-1).dp, offset = DpOffset(0.dp, 4.dp)))
@@ -216,7 +215,7 @@ internal fun SyncStatusSheet(
                 .background(statusBarBg)
                 .topSheetBottomBorder(shape, if (dark) Color(0xFF364153) else Color(0xFFE5E7EB)),
         ) {
-            Column(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(rightSystemInsets)) {
                 SyncSheetHeader(
                     face = face,
                     state = state,
@@ -312,6 +311,8 @@ internal fun SyncStatusSheet(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .windowInsetsPadding(rightSystemInsets)
                     .padding(top = 8.dp, end = 8.dp)
                     .size(32.dp)
                     .clip(RoundedCornerShape(6.dp))
