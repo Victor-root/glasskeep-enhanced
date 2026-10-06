@@ -53,17 +53,16 @@ class WebViewActivity : AppCompatActivity() {
     // bridge-less WebView on the same cookies, which hands back the
     // address the provider returns to. The web app announces the provider
     // URL it is about to open (the bridge call below): only the app's own
-    // code can start the trip, a link in a note never does.
+    // code can start the trip, a link in a note never does. Only the
+    // server's callback comes back here.
     @Volatile private var announcedSsoUrl: Uri? = null
     private val ssoLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val back = result.data?.getStringExtra(SsoActivity.EXTRA_RETURN_URL)
             ?.let { Uri.parse(it) } ?: return@registerForActivityResult
-        val appHost = webView.url?.let { Uri.parse(it).host }
-        if (appHost != null && appHost.equals(back.host, ignoreCase = true)) {
-            webView.loadUrl(back.toString())
-        }
+        val app = webView.url?.let { Uri.parse(it) } ?: return@registerForActivityResult
+        if (SsoActivity.isCallback(back, app)) webView.loadUrl(back.toString())
     }
 
     // Held while we wait for the POST_NOTIFICATIONS runtime grant on
@@ -325,7 +324,7 @@ class WebViewActivity : AppCompatActivity() {
         fun isAndroidTV(): Boolean = isTelevision()
 
         /** Called by the web app right before it navigates to the single
-         *  sign-on provider. See [isAnnouncedSsoNavigation]. */
+         *  sign-on provider. See [ssoCallbackFor]. */
         @JavascriptInterface
         fun beginSingleSignOn(authorizationUrl: String?) {
             if (authorizationUrl.isNullOrBlank()) return
@@ -644,15 +643,18 @@ class WebViewActivity : AppCompatActivity() {
                     val appHost = try { Uri.parse(url).host } catch (e: Exception) { null }
                     val sameHost = appHost != null &&
                         appHost.equals(target.host, ignoreCase = true)
-                    return if (sameHost) {
-                        false
-                    } else if (isAnnouncedSsoNavigation(target, appHost)) {
+                    // Checked first: the provider may share the server's
+                    // host on another port, and must still never load here.
+                    val ssoCallback = if (request.isForMainFrame) ssoCallbackFor(target, view.url) else null
+                    return if (ssoCallback != null) {
                         ssoLauncher.launch(
                             Intent(this@WebViewActivity, SsoActivity::class.java)
                                 .putExtra(SsoActivity.EXTRA_URL, target.toString())
-                                .putExtra(SsoActivity.EXTRA_APP_HOST, appHost)
+                                .putExtra(SsoActivity.EXTRA_CALLBACK_URL, ssoCallback.toString())
                         )
                         true
+                    } else if (sameHost) {
+                        false
                     } else {
                         // Genuinely external link (a note's link, GitHub, …) —
                         // hand it to a Custom Tab so Back returns to the WebView
@@ -888,18 +890,22 @@ class WebViewActivity : AppCompatActivity() {
         }
     }
 
-    /** True when [target] is the provider URL the web app announced, and
-     *  it sends the browser back to this server's OIDC callback. */
-    private fun isAnnouncedSsoNavigation(target: Uri, appHost: String?): Boolean {
-        val announced = announcedSsoUrl ?: return false
+    /** The callback to come back to when [target] is the provider URL the
+     *  web app announced and it sends the browser back to this server's
+     *  OIDC callback, on the origin of the page that announced it
+     *  ([pageUrl]). Null for any other navigation. */
+    private fun ssoCallbackFor(target: Uri, pageUrl: String?): Uri? {
+        val announced = announcedSsoUrl ?: return null
         announcedSsoUrl = null
         return runCatching {
-            val back = Uri.parse(announced.getQueryParameter("redirect_uri") ?: "")
-            announced.host.equals(target.host, ignoreCase = true) &&
-                announced.getQueryParameter("state") == target.getQueryParameter("state") &&
-                appHost != null && appHost.equals(back.host, ignoreCase = true) &&
-                back.path == "/api/auth/oidc/callback"
-        }.getOrDefault(false)
+            val page = Uri.parse(pageUrl ?: return null)
+            val back = Uri.parse(announced.getQueryParameter("redirect_uri") ?: return null)
+            back.takeIf {
+                SsoActivity.sameOrigin(announced, target) &&
+                    announced.getQueryParameter("state") == target.getQueryParameter("state") &&
+                    SsoActivity.isCallback(back, page)
+            }
+        }.getOrNull()
     }
 
     /** Open `uri` via the user's default browser using Android Custom
