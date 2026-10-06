@@ -1574,9 +1574,34 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   // connexion unique (OpenID Connect)
   allowSso: "Autoriser la connexion unique (SSO)",
   allowSsoDesc:
-    "Les utilisateurs peuvent brancher leur propre fournisseur OpenID Connect (Authentik, Keycloak, Authelia, …) sur leur compte depuis leurs paramètres, puis s'en servir pour se connecter.",
+    "Les utilisateurs peuvent associer leur compte à un fournisseur OpenID Connect (Authentik, Keycloak, Authelia, Pocket ID, …) depuis leurs paramètres, puis s'en servir pour se connecter.",
+  ssoPolicy: "Fournisseurs utilisables",
+  ssoPolicyAdmin: "Fournisseur de l'instance uniquement",
+  ssoPolicyAdminDesc: "Les utilisateurs associent leur compte au fournisseur configuré ci-dessous. Ils ne peuvent pas ajouter le leur.",
+  ssoPolicyPersonal: "Fournisseurs personnels autorisés",
+  ssoPolicyPersonalDesc: "Les utilisateurs peuvent aussi configurer leur propre fournisseur dans leurs paramètres et s'y associer à la place.",
+  ssoAllowPrivateNetwork: "Autoriser les fournisseurs sur le réseau local",
+  ssoAllowPrivateNetworkDesc:
+    "Permet aux fournisseurs personnels des utilisateurs d'être sur une adresse privée. Désactivé, le serveur ne contacte que des adresses publiques pour eux, pour qu'aucun compte ne puisse s'en servir pour sonder votre réseau.",
+  ssoInstanceProvider: "Fournisseur de l'instance",
+  ssoInstanceProviderDesc:
+    "Configuré une fois pour tout le monde, il peut être sur le réseau local. Chaque utilisateur associe ensuite son compte depuis Paramètres > Sécurité.",
+  ssoInstanceLinkedAccounts: "{count} compte(s) associé(s)",
+  ssoInstanceRelinkNote: "Changer l'issuer ou l'identifiant client dissocie tous les comptes associés à ce fournisseur.",
+  ssoInstanceDeleteTitle: "Supprimer le fournisseur de l'instance ?",
+  ssoInstanceDeleteConfirm:
+    "La configuration de {provider} est supprimée, et aucun des comptes qui y sont associés ne pourra plus se connecter avec.",
   oidcSettingsTitle: "Connexion unique",
-  oidcSettingsSubtitle: "Connectez-vous via votre propre fournisseur : Authentik, Keycloak, Authelia, …",
+  oidcSettingsSubtitle: "Connectez-vous via un fournisseur d'identité : Authentik, Keycloak, Authelia, Pocket ID, …",
+  oidcInstanceBadge: "configuré par l'administrateur",
+  oidcPersonalBadge: "le vôtre",
+  oidcInstanceMissing: "L'administrateur n'a pas encore configuré le fournisseur.",
+  oidcInstanceOriginChanged:
+    "L'administrateur a configuré ce fournisseur depuis {saved}. Ouvrez GlassKeep à cette adresse pour associer votre compte ou vous connecter avec.",
+  oidcPersonalDisabled:
+    "L'administrateur n'autorise pour l'instant que le fournisseur de l'instance : votre propre fournisseur est conservé mais pas utilisé.",
+  oidcUseOwnProvider: "Utiliser mon propre fournisseur à la place",
+  oidcLinkReplaces: "Cela remplace votre association avec {provider}.",
   oidcDisabledByAdmin:
     "La connexion unique est désactivée pour le moment par l'administrateur. Votre configuration est conservée.",
   oidcIntro:
@@ -1639,6 +1664,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   oidcErrIdentityMismatch:
     "Vous vous êtes connecté chez votre fournisseur avec une autre identité que celle associée à ce compte GlassKeep.",
   oidcErrIdentityInUse: "Cette identité est déjà associée à un autre compte GlassKeep.",
+  oidcErrPersonalNotAllowed: "L'administrateur n'autorise pas les fournisseurs personnels.",
   oidcErrIssuerInvalid: "L'issuer doit être une adresse http(s), sans paramètres ni fragment.",
   oidcErrOriginInvalid: "L'adresse de GlassKeep n'a pas pu être déterminée depuis cette page.",
   oidcErrIncomplete: "Renseignez le nom du fournisseur, l'issuer, l'identifiant et le secret client.",
@@ -1648,5 +1674,5 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
     "Le fournisseur est injoignable, ou son .well-known/openid-configuration n'est pas valide.",
   oidcErrJwksFailed: "Les clés de signature (JWKS) du fournisseur n'ont pas pu être lues.",
   oidcErrPrivateForbidden:
-    "Ce fournisseur est sur une adresse du réseau local. Seul le fournisseur d'un administrateur peut l'être.",
+    "Ce fournisseur est sur une adresse du réseau local, ce que l'administrateur n'autorise pas pour les fournisseurs personnels.",
 };

@@ -1,9 +1,10 @@
 // src/auth/oidcClient.js
 //
-// Browser side of the OpenID Connect sign-in. Each user declares their
-// own provider in their settings; the server runs the whole flow. This
-// module only asks it where to go, follows the redirect, and on the way
-// back trades the one-time ticket for a GlassKeep session.
+// Browser side of the OpenID Connect sign-in. An admin sets up the
+// instance's provider, users link to it or, when the admin allows it,
+// declare their own; the server runs the whole flow. This module only
+// asks it where to go, follows the redirect, and on the way back trades
+// the one-time ticket for a GlassKeep session.
 // See server/routes/oidcRoutes.js.
 
 import { api } from "../utils/api";
@@ -34,9 +35,9 @@ export async function startOidcSignIn(who) {
 }
 
 // Linking adds a way into the account, so the server asks for the
-// password first.
-export async function startOidcLink(token, password) {
-  const { authorizationUrl } = await api("/auth/oidc/link", { method: "POST", token, body: { password } });
+// password first. `provider` is "instance" or "personal".
+export async function startOidcLink(token, password, provider) {
+  const { authorizationUrl } = await api("/auth/oidc/link", { method: "POST", token, body: { password, provider } });
   goToProvider(authorizationUrl);
 }
 
@@ -64,6 +65,23 @@ export function unlinkMyOidc(token) {
   return api("/auth/oidc/me/identity", { method: "DELETE", token });
 }
 
+// The instance's provider, from the admin panel.
+export function getInstanceOidc(token) {
+  return api("/admin/oidc", { token });
+}
+
+export function saveInstanceOidc(token, body) {
+  return api("/admin/oidc", { method: "PUT", token, timeoutMs: 30000, body });
+}
+
+export function deleteInstanceOidc(token) {
+  return api("/admin/oidc", { method: "DELETE", token });
+}
+
+export function testInstanceOidc(token, body) {
+  return api("/admin/oidc/test", { method: "POST", token, timeoutMs: 30000, body });
+}
+
 // What the callback left in the address bar, removed at once so a reload
 // or a shared link never replays it.
 export function takeOidcRedirectResult() {
@@ -86,6 +104,7 @@ const ERROR_KEYS = {
   oidc_denied: "oidcErrDenied",
   oidc_unavailable: "oidcErrUnavailable",
   oidc_not_allowed: "oidcErrUnavailable",
+  oidc_personal_not_allowed: "oidcErrPersonalNotAllowed",
   oidc_not_configured: "oidcErrNotConfigured",
   oidc_wrong_origin: "oidcErrWrongOrigin",
   oidc_identity_mismatch: "oidcErrIdentityMismatch",
