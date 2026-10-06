@@ -314,7 +314,7 @@ export default function SettingsPanel({
           </button>
         </div>
 
-        <div className="p-4 overflow-y-auto overflow-x-hidden flex-1 min-h-0 flex flex-col">
+        <div className="gk-side-panel-scroll p-4 overflow-y-auto overflow-x-hidden flex-1 min-h-0 flex flex-col">
           {/* Profile Section — header (icon + "Profil" title) intentionally
               omitted; the avatar block is self-explanatory. */}
           <div className="mb-8">
