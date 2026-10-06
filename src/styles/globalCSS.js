@@ -552,7 +552,7 @@ html.dark .glass-card {
 /* Desktop hover only: promote the hovered card to its own compositor layer
    so the group-hover scale animates as a pure transform instead of
    re-rasterising its box-shadow every frame. Scoped to :hover so we never
-   keep 200+ promoted layers around — only the one card under the cursor.
+   keep 200+ promoted layers around, only the one card under the cursor.
    Held back while the list scrolls, like the card's other hover effects
    (the idle-hover variants in index.css). */
 html:not([data-gk-scrolling]) .note-card-wrapper:hover .note-card { will-change: transform; }
