@@ -1,145 +1,141 @@
-import React, { useRef, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { renderPaths } from "../../DrawingCanvas";
 import { t } from "../../i18n";
 
-/** ---------- Drawing Preview (HiDPI-aware) ---------- */
+// Parses the drawing and fits it into the preview box. Returns null when the
+// data can't be parsed, otherwise the logical preview size plus what the
+// renderer needs (an empty drawing gets a placeholder box).
+function layoutDrawing(data, width, height, darkMode, maxPages) {
+  let paths = [];
+  let firstPageHeight = 600;
+  try {
+    const parsedData = typeof data === "string" ? JSON.parse(data) || [] : data;
+    if (Array.isArray(parsedData)) {
+      paths = parsedData;
+    } else if (parsedData && typeof parsedData === "object" && Array.isArray(parsedData.paths)) {
+      paths = parsedData.paths;
+      const dims = parsedData.dimensions;
+      if (dims && dims.width && dims.height) {
+        if (dims.originalHeight) firstPageHeight = dims.originalHeight;
+        else if (dims.height > 1000) firstPageHeight = dims.height / 2;
+        else firstPageHeight = dims.height;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  // Filter to visible pages
+  const maxVisibleY = firstPageHeight * maxPages;
+  paths = paths.filter((path) => {
+    if (!path.points || path.points.length === 0) return false;
+    return path.points.some((point) => point.y < maxVisibleY);
+  });
+
+  // Theme-convert black/white strokes
+  paths = paths.map((path) => {
+    if (darkMode) {
+      if (path.color === "#000000") return { ...path, color: "#FFFFFF" };
+    } else if (path.color === "#FFFFFF") {
+      return { ...path, color: "#000000" };
+    }
+    return path;
+  });
+
+  if (paths.length === 0) {
+    return { empty: true, w: width, h: Math.round(width * 0.4) };
+  }
+
+  // Calculate actual bounding box of all path content
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const path of paths) {
+    const sw = (path.size || 2) / 2;
+    for (const pt of path.points) {
+      if (pt.x - sw < minX) minX = pt.x - sw;
+      if (pt.y - sw < minY) minY = pt.y - sw;
+      if (pt.x + sw > maxX) maxX = pt.x + sw;
+      if (pt.y + sw > maxY) maxY = pt.y + sw;
+    }
+  }
+
+  // Add padding
+  const pad = 10;
+  minX = Math.max(0, minX - pad);
+  minY = Math.max(0, minY - pad);
+  maxX += pad;
+  maxY += pad;
+
+  // Scale to fit preview area while keeping aspect ratio
+  const contentW = maxX - minX;
+  const contentH = maxY - minY;
+  const scale = Math.min(width / contentW, height / contentH);
+  return { empty: false, w: contentW * scale, h: contentH * scale, paths, minX, minY, scale };
+}
+
+function drawPreview(ctx, layout) {
+  const { w, h } = layout;
+  if (layout.empty) {
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(10, 10, w - 20, h - 20);
+    ctx.fillStyle = "#9ca3af";
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(t("drawingPreviewEmpty"), w / 2, h / 2 + 3);
+    return;
+  }
+  // Translate so content starts at (0,0) then scale
+  ctx.scale(layout.scale, layout.scale);
+  ctx.translate(-layout.minX, -layout.minY);
+  renderPaths(ctx, layout.paths, 1);
+}
+
+/** ---------- Drawing Preview (HiDPI-aware) ----------
+ * Rendered once into an off-screen canvas and shown as a plain image. A live
+ * <canvas> in the page is a GPU layer of its own: a grid with a few drawing
+ * notes ended up with dozens of extra layers to move on every scrolled frame,
+ * which weak integrated GPUs felt. An image is painted with the card instead.
+ */
 export default function DrawingPreview({ data, width, height, darkMode = false, maxPages = 1 }) {
-  const canvasRef = useRef(null);
+  const layout = useMemo(
+    () => layoutDrawing(data, width, height, darkMode, maxPages),
+    [data, width, height, darkMode, maxPages]
+  );
+  const [src, setSrc] = useState(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
+    if (!layout) return;
     const dpr = window.devicePixelRatio || 1;
-
-    // Parse drawing data
-    let paths = [];
-    let originalWidth = 800;
-    let originalHeight = 600;
-    let firstPageHeight = 600;
-    try {
-      let parsedData;
-      if (typeof data === "string") {
-        parsedData = JSON.parse(data) || [];
-      } else {
-        parsedData = data;
-      }
-
-      if (Array.isArray(parsedData)) {
-        paths = parsedData;
-      } else if (
-        parsedData &&
-        typeof parsedData === "object" &&
-        Array.isArray(parsedData.paths)
-      ) {
-        paths = parsedData.paths;
-        if (
-          parsedData.dimensions &&
-          parsedData.dimensions.width &&
-          parsedData.dimensions.height
-        ) {
-          originalWidth = parsedData.dimensions.width;
-          originalHeight = parsedData.dimensions.height;
-          if (parsedData.dimensions.originalHeight) {
-            firstPageHeight = parsedData.dimensions.originalHeight;
-          } else if (originalHeight > 1000) {
-            firstPageHeight = originalHeight / 2;
-          } else {
-            firstPageHeight = originalHeight;
-          }
-        }
-      } else {
-        paths = [];
-      }
-    } catch (e) {
-      return;
-    }
-
-    // Filter to visible pages
-    const maxVisibleY = firstPageHeight * maxPages;
-    paths = paths.filter((path) => {
-      if (!path.points || path.points.length === 0) return false;
-      return path.points.some((point) => point.y < maxVisibleY);
-    });
-
-    // Theme-convert black/white strokes
-    paths = paths.map((path) => {
-      if (darkMode) {
-        if (path.color === "#000000") return { ...path, color: "#FFFFFF" };
-      } else {
-        if (path.color === "#FFFFFF") return { ...path, color: "#000000" };
-      }
-      return path;
-    });
-
-    if (paths.length === 0) {
-      const emptyW = width;
-      const emptyH = Math.round(width * 0.4);
-      canvas.width = emptyW * dpr;
-      canvas.height = emptyH * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, emptyW, emptyH);
-      ctx.strokeStyle = "#e5e7eb";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.strokeRect(10, 10, emptyW - 20, emptyH - 20);
-      ctx.fillStyle = "#9ca3af";
-      ctx.font = "10px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(t("drawingPreviewEmpty"), emptyW / 2, emptyH / 2 + 3);
-      return;
-    }
-
-    // Calculate actual bounding box of all path content
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const path of paths) {
-      const sw = (path.size || 2) / 2;
-      for (const pt of path.points) {
-        if (pt.x - sw < minX) minX = pt.x - sw;
-        if (pt.y - sw < minY) minY = pt.y - sw;
-        if (pt.x + sw > maxX) maxX = pt.x + sw;
-        if (pt.y + sw > maxY) maxY = pt.y + sw;
-      }
-    }
-
-    // Add padding
-    const pad = 10;
-    minX = Math.max(0, minX - pad);
-    minY = Math.max(0, minY - pad);
-    maxX += pad;
-    maxY += pad;
-
-    const contentW = maxX - minX;
-    const contentH = maxY - minY;
-
-    // Scale to fit preview area while keeping aspect ratio
-    const scale = Math.min(width / contentW, height / contentH);
-    const previewWidth = contentW * scale;
-    const previewHeight = contentH * scale;
-
+    const canvas = document.createElement("canvas");
     // HiDPI: physical pixels for sharp rendering
-    canvas.width = previewWidth * dpr;
-    canvas.height = previewHeight * dpr;
-
+    canvas.width = layout.w * dpr;
+    canvas.height = layout.h * dpr;
+    const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, previewWidth, previewHeight);
+    drawPreview(ctx, layout);
+    let cancelled = false;
+    canvas.toBlob((blob) => {
+      if (!cancelled && blob) setSrc(URL.createObjectURL(blob));
+    });
+    return () => { cancelled = true; };
+  }, [layout]);
 
-    // Translate so content starts at (0,0) then scale
-    ctx.save();
-    ctx.scale(scale, scale);
-    ctx.translate(-minX, -minY);
-    renderPaths(ctx, paths, 1);
-    ctx.restore();
-  }, [data, width, height, darkMode]);
+  // Release the previous image once its replacement is shown (and on unmount).
+  useEffect(() => () => { if (src) URL.revokeObjectURL(src); }, [src]);
 
   return (
     <div className="w-[90%] mx-auto rounded">
-      <canvas
-        ref={canvasRef}
-        className="block"
-        style={{ width: "100%", height: "auto" }}
-      />
+      {layout && (
+        <img
+          src={src || undefined}
+          alt=""
+          className="block"
+          style={{ width: "100%", height: "auto", aspectRatio: `${layout.w} / ${layout.h}` }}
+          draggable={false}
+          decoding="async"
+        />
+      )}
     </div>
   );
 }

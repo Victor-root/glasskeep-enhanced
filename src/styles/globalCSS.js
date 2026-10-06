@@ -501,14 +501,31 @@ html.gk-overlay-locked body {
 html.gk-overlay-locked .floating-cards-bg .login-deco-card {
   animation-play-state: paused;
 }
+/* The admin panel's backdrop preview reuses these animated cards. A closed
+   side panel stays mounted off-screen (inert), where the browser kept
+   ticking them on the main thread, restyling and repainting the page
+   several times a second for nothing. Freeze them until the panel opens. */
+[inert] .login-deco-card {
+  animation-play-state: paused;
+}
 /* Same trick during active scrolling: a moving backdrop behind the sticky
    blurred header forces the GPU to re-rasterise the blur every frame, which
-   janks the scroll on weak GPUs. FloatingCardsBackground toggles gk-scrolling
+   janks the scroll on weak GPUs. useScrollActivity sets data-gk-scrolling
    on <html> while the user scrolls (removed ~180ms after it stops), so the
    cards freeze for the duration of the scroll and resume the moment it ends —
    imperceptible, and it hands the whole frame budget back to the scroll. */
-html.gk-scrolling .floating-cards-bg .login-deco-card {
+html[data-gk-scrolling] .floating-cards-bg .login-deco-card {
   animation-play-state: paused;
+}
+/* Desktop pointer, same flag: the cards stop reacting to the mouse while the
+   list scrolls under it. Otherwise every card sliding under a resting cursor
+   (touchpad scroll) started its hover lift, pin peek and layer promotion, a
+   repaint per frame for an effect nobody sees mid-scroll. Hover comes back on
+   the card under the cursor as soon as the scroll stops. */
+@media (hover: hover) and (pointer: fine) {
+  html[data-gk-scrolling] .notes-scroll-area > * {
+    pointer-events: none;
+  }
 }
 /* Frosted-glass surfaces, FLATTENED for performance. The live
    backdrop-filter blur is re-rasterised by the GPU on every composite
@@ -617,6 +634,16 @@ header.glass-card {
     inset 0 1px 0 var(--gk-chrome-highlight),
     0 1px 2px var(--gk-chrome-shadow),
     0 6px 18px -12px var(--gk-chrome-shadow);
+}
+/* Desktop shell: the header sits above the scrolling list, not over it, so
+   the blur only ever sees the page background. With the floating cards off
+   that background is a plain gradient, which blurs into itself: the filter
+   changed nothing on screen yet was recomputed on every scrolled frame
+   (most of the GPU's compositing work per frame). Keep it only when the
+   floating cards are there to be blurred. */
+.notes-shell-desktop:not(.floating-cards-bg ~ *) > header.glass-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 /* Installed DESKTOP PWA: the OS title bar sits directly above the header and
    is painted with theme-color (--gk-statusbar). Drop the header's top border
@@ -818,6 +845,20 @@ html.gk-custom-bg:not(.dark) .gk-section-label {
   min-height: 0;
   overflow-y: auto;
   padding-top: 24px;
+  /* Scroll on the compositor. Unless the screen is very dense (around 200%
+     scaling), the browser keeps a transparent scroller like this one on the
+     main thread, which re-rasterised the whole visible grid on every
+     scrolled frame: the main cost of scrolling on integrated GPUs.
+     Composited, the painted grid is just moved. */
+  will-change: scroll-position;
+}
+/* Desktop grid: render every card up front instead of content-visibility:auto.
+   Skipping off-screen cards meant each card entering the viewport was styled,
+   laid out and painted mid-scroll, forcing a repaint of the grid on nearly
+   every frame. A desktop paints the whole grid once without trouble, and the
+   scrollbar now knows the real height of the list from the start. */
+.notes-shell-desktop .note-card {
+  content-visibility: visible;
 }
 /* The base 24px above replaces the header's own mb-6, so multimode's
    48px (which assumed mb-6 was still there, see the comment above)
@@ -2662,12 +2703,16 @@ body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split
 }
 
 /* Login decorative floating cards */
+/* Fade in from 0 to the element's own opacity, held at 0 through the delay
+   (backwards fill). No forwards fill on purpose: a finished animation that
+   keeps filling still counts as a live opacity animation, and the browser
+   then composited the whole full-screen layer through an extra off-screen
+   pass on every frame, for as long as the page stayed open. */
 @keyframes fadeInDecoCards {
-  to { opacity: 1; }
+  from { opacity: 0; }
 }
 .floating-cards-bg {
-  opacity: 0;
-  animation: fadeInDecoCards 0.6s ease 0.3s forwards;
+  animation: fadeInDecoCards 0.6s ease 0.3s backwards;
 }
 @keyframes floatCard {
   0%   { transform: translateY(0px) rotate(var(--rot)); }
