@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { renderPaths } from "../../DrawingCanvas";
 import { t } from "../../i18n";
 
@@ -96,36 +96,52 @@ function drawPreview(ctx, layout) {
  * <canvas> in the page is a GPU layer of its own: a grid with a few drawing
  * notes ended up with dozens of extra layers to move on every scrolled frame,
  * which weak integrated GPUs felt. An image is painted with the card instead.
+ * It is drawn at the size it is displayed (re-drawn only if its box grows),
+ * not at the drawing's own size, which was mostly downscaled away.
  */
 export default function DrawingPreview({ data, width, height, darkMode = false, maxPages = 1 }) {
   const layout = useMemo(
     () => layoutDrawing(data, width, height, darkMode, maxPages),
     [data, width, height, darkMode, maxPages]
   );
+  const boxRef = useRef(null);
+  const [boxWidth, setBoxWidth] = useState(0);
   const [src, setSrc] = useState(null);
 
   useEffect(() => {
-    if (!layout) return;
+    const el = boxRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const w = Math.ceil(entry.contentRect.width);
+      setBoxWidth((prev) => (w > prev ? w : prev));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!layout || !boxWidth) return;
     const dpr = window.devicePixelRatio || 1;
+    const k = boxWidth / layout.w;
     const canvas = document.createElement("canvas");
     // HiDPI: physical pixels for sharp rendering
-    canvas.width = layout.w * dpr;
-    canvas.height = layout.h * dpr;
+    canvas.width = Math.round(boxWidth * dpr);
+    canvas.height = Math.round(layout.h * k * dpr);
     const ctx = canvas.getContext("2d");
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
     drawPreview(ctx, layout);
     let cancelled = false;
     canvas.toBlob((blob) => {
       if (!cancelled && blob) setSrc(URL.createObjectURL(blob));
     });
     return () => { cancelled = true; };
-  }, [layout]);
+  }, [layout, boxWidth]);
 
   // Release the previous image once its replacement is shown (and on unmount).
   useEffect(() => () => { if (src) URL.revokeObjectURL(src); }, [src]);
 
   return (
-    <div className="w-[90%] mx-auto rounded">
+    <div ref={boxRef} className="w-[90%] mx-auto rounded">
       {layout && (
         <img
           src={src || undefined}

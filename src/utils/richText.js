@@ -14,7 +14,8 @@
 // and convert on-the-fly for display. Persisting a legacy note through the
 // rich editor upgrades it in place.
 
-import { generateHTML, generateJSON } from "@tiptap/html";
+import { getSchema, getHTMLFromFragment } from "@tiptap/core";
+import { DOMParser as ProseMirrorDOMParser, Node as ProseMirrorNode } from "@tiptap/pm/model";
 import DOMPurify from "dompurify";
 import { installStyleGuard } from "./safeStyle.js";
 import { marked as markedParser } from "marked";
@@ -28,6 +29,16 @@ const marked =
 // `url(...)`, which turns a shared note into a beacon for its author.
 // See src/utils/safeStyle.js.
 installStyleGuard(DOMPurify);
+
+// ProseMirror schema behind every static render and Markdown migration.
+// Resolving it from the extensions is costly and generateHTML/generateJSON
+// (@tiptap/html) redid it on every call, once per note card each time the
+// grid rendered (every search keystroke, every filter). Built on first use.
+let renderSchema = null;
+function getRenderSchema() {
+  if (!renderSchema) renderSchema = getSchema(RENDER_EXTENSIONS);
+  return renderSchema;
+}
 
 export const RICH_FORMAT_VERSION = 1;
 export const RICH_FORMAT_NAME = "tiptap";
@@ -130,7 +141,8 @@ export function richDocToHTML(doc) {
     // A line break ending a block collapses in static HTML, where the
     // editor shows the empty line it opens (ProseMirror's trailing
     // break): add the same break so read mode keeps that line.
-    const raw = generateHTML(doc, RENDER_EXTENSIONS).replace(/<br\s*\/?>(<\/(?:p|h[1-6])>)/g, "<br><br>$1");
+    const schema = getRenderSchema();
+    const raw = getHTMLFromFragment(ProseMirrorNode.fromJSON(schema, doc).content, schema).replace(/<br\s*\/?>(<\/(?:p|h[1-6])>)/g, "<br><br>$1");
     return DOMPurify.sanitize(raw, SANITIZE_CONFIG);
   } catch {
     return "";
@@ -203,7 +215,8 @@ export function plainTextToRichDoc(text) {
 /**
  * Convert legacy Markdown content (or anything else treated as plain text)
  * into a Tiptap doc. Pipeline: Markdown → HTML (marked) → DOMPurify → Tiptap
- * JSON (generateJSON). Empty input yields an empty doc.
+ * JSON (ProseMirror DOMParser on the shared schema). Empty input yields an
+ * empty doc.
  */
 export function legacyMarkdownToRichDoc(markdown) {
   const src = typeof markdown === "string" ? markdown : "";
@@ -211,7 +224,8 @@ export function legacyMarkdownToRichDoc(markdown) {
   try {
     const rawHtml = marked.parse(src, { breaks: true });
     const cleanHtml = DOMPurify.sanitize(rawHtml, SANITIZE_CONFIG);
-    const doc = generateJSON(cleanHtml, RENDER_EXTENSIONS);
+    const body = new window.DOMParser().parseFromString(cleanHtml, "text/html").body;
+    const doc = ProseMirrorDOMParser.fromSchema(getRenderSchema()).parse(body).toJSON();
     if (doc && doc.type === "doc") return doc;
     return emptyRichDoc();
   } catch {
