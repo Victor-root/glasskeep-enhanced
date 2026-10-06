@@ -1,5 +1,26 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* hover: / group-hover: that hold back while anything scrolls
+   (html[data-gk-scrolling], see useScrollActivity). Note cards sliding under a
+   resting pointer (touchpad scroll) otherwise each started their hover lift,
+   pin peek and layer promotion mid-scroll, a repaint per frame for an effect
+   nobody sees. :hover itself keeps tracking, so the card under the pointer
+   lifts as soon as the scroll stops. */
+@custom-variant idle-hover {
+  @media (hover: hover) {
+    html:not([data-gk-scrolling]) &:hover {
+      @slot;
+    }
+  }
+}
+@custom-variant idle-group-hover {
+  @media (hover: hover) {
+    html:not([data-gk-scrolling]) &:is(:where(.group):hover *) {
+      @slot;
+    }
+  }
+}
+
 @import "tailwindcss";
 
 /* If you toggle dark mode by adding `.dark` to <html>, define this variant in v4 */

@@ -517,16 +517,6 @@ html.gk-overlay-locked .floating-cards-bg .login-deco-card {
 html[data-gk-scrolling] .floating-cards-bg .login-deco-card {
   animation-play-state: paused;
 }
-/* Desktop pointer, same flag: the cards stop reacting to the mouse while the
-   list scrolls under it. Otherwise every card sliding under a resting cursor
-   (touchpad scroll) started its hover lift, pin peek and layer promotion, a
-   repaint per frame for an effect nobody sees mid-scroll. Hover comes back on
-   the card under the cursor as soon as the scroll stops. */
-@media (hover: hover) and (pointer: fine) {
-  html[data-gk-scrolling] .notes-scroll-area > * {
-    pointer-events: none;
-  }
-}
 /* Frosted-glass surfaces, FLATTENED for performance. The live
    backdrop-filter blur is re-rasterised by the GPU on every composite
    frame — a gridful of glass cards scrolling pegs weak integrated GPUs
@@ -562,8 +552,10 @@ html.dark .glass-card {
 /* Desktop hover only: promote the hovered card to its own compositor layer
    so the group-hover scale animates as a pure transform instead of
    re-rasterising its box-shadow every frame. Scoped to :hover so we never
-   keep 200+ promoted layers around — only the one card under the cursor. */
-.note-card-wrapper:hover .note-card { will-change: transform; }
+   keep 200+ promoted layers around — only the one card under the cursor.
+   Held back while the list scrolls, like the card's other hover effects
+   (the idle-hover variants in index.css). */
+html:not([data-gk-scrolling]) .note-card-wrapper:hover .note-card { will-change: transform; }
 /* Draw note cards: disable content-visibility which forces paint containment */
 .note-card--draw {
   content-visibility: visible;
@@ -2712,6 +2704,8 @@ body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split
   from { opacity: 0; }
 }
 .floating-cards-bg {
+  /* Overrides the pre-injection hide in index.css. */
+  opacity: 1;
   animation: fadeInDecoCards 0.6s ease 0.3s backwards;
 }
 @keyframes floatCard {
