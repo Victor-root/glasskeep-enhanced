@@ -7,6 +7,7 @@ import EncryptionAdminSection from "../lock/EncryptionAdminSection.jsx";
 import AiAdminSection from "./AiAdminSection.jsx";
 import AdminUpdateSection from "../admin/AdminUpdateSection.jsx";
 import FederationSection from "../admin/federation/FederationSection.jsx";
+import OidcAdminSection from "../admin/OidcAdminSection.jsx";
 import LoginBrandingSection from "./LoginBrandingSection.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import { RowIcon, SettingsSection } from "../common/SettingsAccordion.jsx";
@@ -654,8 +655,8 @@ export default function AdminPanel({
                 </button>
               </div>
 
-              {/* Single sign-on: users then set up their own provider
-                  from their settings. */}
+              {/* Single sign-on: once allowed, the policy, the local
+                  network option and the instance's provider. */}
               <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.UserCircle} />
@@ -683,6 +684,15 @@ export default function AdminPanel({
                   />
                 </button>
               </div>
+              {adminSettings.ssoAllowed && (
+                <OidcAdminSection
+                  token={authToken}
+                  adminSettings={adminSettings}
+                  updateAdminSettings={updateAdminSettings}
+                  showToast={showToast}
+                  showGenericConfirm={showGenericConfirm}
+                />
+              )}
 
               <LoginSloganRow
                 value={adminSettings.loginSlogan}

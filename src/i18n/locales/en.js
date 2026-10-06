@@ -1573,9 +1573,34 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   // single sign-on (OpenID Connect)
   allowSso: "Allow single sign-on (SSO)",
   allowSsoDesc:
-    "Users can connect their own OpenID Connect provider (Authentik, Keycloak, Authelia, …) to their account from their settings, then sign in with it.",
+    "Users can link their account to an OpenID Connect provider (Authentik, Keycloak, Authelia, Pocket ID, …) from their settings, then sign in with it.",
+  ssoPolicy: "Which providers can be used",
+  ssoPolicyAdmin: "Instance provider only",
+  ssoPolicyAdminDesc: "Users link their account to the provider set up below. They cannot add their own.",
+  ssoPolicyPersonal: "Personal providers allowed",
+  ssoPolicyPersonalDesc: "Users can also set up their own provider in their settings and link to it instead.",
+  ssoAllowPrivateNetwork: "Allow providers on the local network",
+  ssoAllowPrivateNetworkDesc:
+    "Lets users' own providers sit at a private address. Off, the server only reaches public addresses for them, so no account can use it to probe your network.",
+  ssoInstanceProvider: "Instance provider",
+  ssoInstanceProviderDesc:
+    "Set up once for everyone, it may sit on the local network. Each user then links their account from Settings > Security.",
+  ssoInstanceLinkedAccounts: "{count} linked account(s)",
+  ssoInstanceRelinkNote: "Changing the issuer or the client ID unlinks every account linked to this provider.",
+  ssoInstanceDeleteTitle: "Remove the instance provider?",
+  ssoInstanceDeleteConfirm:
+    "The configuration of {provider} is deleted, and every account linked to it can no longer sign in with it.",
   oidcSettingsTitle: "Single sign-on",
-  oidcSettingsSubtitle: "Sign in through your own provider: Authentik, Keycloak, Authelia, …",
+  oidcSettingsSubtitle: "Sign in through an identity provider: Authentik, Keycloak, Authelia, Pocket ID, …",
+  oidcInstanceBadge: "set up by the administrator",
+  oidcPersonalBadge: "your own",
+  oidcInstanceMissing: "The administrator has not set up the provider yet.",
+  oidcInstanceOriginChanged:
+    "The administrator set this provider up from {saved}. Open GlassKeep at that address to link your account or sign in with it.",
+  oidcPersonalDisabled:
+    "The administrator only allows the instance's provider for now: your own provider is kept but not used.",
+  oidcUseOwnProvider: "Use my own provider instead",
+  oidcLinkReplaces: "This replaces your link to {provider}.",
   oidcDisabledByAdmin:
     "Single sign-on is currently turned off by the administrator. Your configuration is kept.",
   oidcIntro:
@@ -1638,6 +1663,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   oidcErrIdentityMismatch:
     "You signed in at your provider with another identity than the one linked to this GlassKeep account.",
   oidcErrIdentityInUse: "This identity is already linked to another GlassKeep account.",
+  oidcErrPersonalNotAllowed: "The administrator does not allow personal providers.",
   oidcErrIssuerInvalid: "The issuer must be an http(s) address, with no query or fragment.",
   oidcErrOriginInvalid: "GlassKeep's own address could not be determined from this page.",
   oidcErrIncomplete: "Fill in the provider name, issuer, client ID and client secret.",
@@ -1647,5 +1673,5 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
     "The provider could not be reached, or its .well-known/openid-configuration is not valid.",
   oidcErrJwksFailed: "The provider's signing keys (JWKS) could not be read.",
   oidcErrPrivateForbidden:
-    "This provider is on a local network address. Only an administrator's provider may be.",
+    "This provider is on a local network address, which the administrator does not allow for personal providers.",
 };

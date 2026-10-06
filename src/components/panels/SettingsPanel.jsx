@@ -497,11 +497,10 @@ export default function SettingsPanel({
               />
             </div>
 
-            {/* Single sign-on through the user's own OpenID Connect
-                provider. Hidden while the admin has not allowed it. */}
+            {/* Single sign-on: the instance's OpenID Connect provider or
+                the user's own. Hidden while the admin has not allowed it. */}
             <OidcSettingsSection
               token={token}
-              isAdmin={!!currentUser?.is_admin}
               showToast={showToast}
               showGenericConfirm={showGenericConfirm}
               visible={open}
