@@ -563,7 +563,7 @@ html[data-tv="1"] .tv-carousel .tv-card__images img {
 
 /* Drawing thumbnail on the closed card. DrawingPreview's inner wrapper
    uses Tailwind's w-[90%]; we strip the side margin in TV cards so the
-   canvas fills the card width (the card already pads internally). */
+   image fills the card width (the card already pads internally). */
 html[data-tv="1"] .tv-card__draw {
   margin: 4px 0 2px;
   border-radius: 8px;
@@ -573,7 +573,7 @@ html[data-tv="1"] .tv-card__draw {
 html[data-tv="1"] .tv-card__draw > div {
   width: 100% !important;
 }
-html[data-tv="1"] .tv-card__draw canvas {
+html[data-tv="1"] .tv-card__draw img {
   display: block;
   width: 100% !important;
   height: auto !important;
@@ -593,7 +593,7 @@ html[data-tv="1"] .tv-detail__draw > div {
   max-width: 1400px;
   margin: 0 auto;
 }
-html[data-tv="1"] .tv-detail__draw canvas {
+html[data-tv="1"] .tv-detail__draw img {
   display: block;
   width: 100% !important;
   height: auto !important;

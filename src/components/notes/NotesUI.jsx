@@ -6,6 +6,7 @@ import MultiSelectToolbar from "./MultiSelectToolbar.jsx";
 import NotesHeader from "./NotesHeader.jsx";
 import NotesComposer from "./NotesComposer.jsx";
 import NotesSections from "./NotesSections.jsx";
+import useScrollActivity from "../../hooks/useScrollActivity.js";
 /** ---------- NotesUI (presentational) ---------- */
 function NotesUI({
   currentUser,
@@ -166,6 +167,7 @@ function NotesUI({
   notificationBellMobile = null,
 }) {
   const mobileSearchRef = useRef(null);
+  useScrollActivity();
   const isMobile = windowWidth < 700 || isLandscapeMobile;
   // Stable array reference for MultiSelectToolbar — avoids rebuilding on every render.
   const filteredNotesForMulti = useMemo(() => [...pinned, ...others], [pinned, others]);

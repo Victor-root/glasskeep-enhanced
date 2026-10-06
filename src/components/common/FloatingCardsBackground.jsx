@@ -1,33 +1,8 @@
-import React, { useEffect } from "react";
+import React from "react";
 
 /** Decorative floating background cards — fixed wallpaper, z-1 keeps it below all UI (desktop only) */
+// The float pauses while the user scrolls: see useScrollActivity.
 export default function FloatingCardsBackground() {
-  // Freeze the float animation while the user is actively scrolling. A moving
-  // backdrop behind the sticky, blurred header forces the GPU to re-rasterise
-  // the blur every frame; on weak GPUs that janks the scroll of a long notes
-  // list. Pausing hands the budget back to the scroll and resumes the instant
-  // it stops (~180ms idle) — invisible while scrolling. Capture phase so it
-  // catches scroll from the window or any inner scroll container.
-  useEffect(() => {
-    const root = document.documentElement;
-    let idleTimer = null;
-    const onScroll = () => {
-      root.classList.add("gk-scrolling");
-      if (idleTimer) clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => {
-        root.classList.remove("gk-scrolling");
-        idleTimer = null;
-      }, 180);
-    };
-    const opts = { capture: true, passive: true };
-    document.addEventListener("scroll", onScroll, opts);
-    return () => {
-      document.removeEventListener("scroll", onScroll, opts);
-      if (idleTimer) clearTimeout(idleTimer);
-      root.classList.remove("gk-scrolling");
-    };
-  }, []);
-
   return (
     <div aria-hidden="true" className="floating-cards-bg" style={{position:"fixed",inset:0,zIndex:1,pointerEvents:"none",overflow:"hidden"}}>
       {/* Colonne gauche */}
