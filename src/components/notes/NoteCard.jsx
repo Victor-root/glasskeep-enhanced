@@ -181,7 +181,7 @@ function NoteCard({
         }
       }}
       onContextMenu={(e) => e.preventDefault()}
-      className="note-card-wrapper mb-2 sm:mb-3 relative z-0 hover:z-30 group select-none"
+      className="note-card-wrapper mb-2 sm:mb-3 relative z-0 idle-hover:z-30 group select-none"
       style={{ WebkitTouchCallout: "none" }}
       data-id={n.id}
       data-group={group}
@@ -193,7 +193,7 @@ function NoteCard({
           OnePlus 7 Pro pop-up camera vibe. */}
       {!multiMode && !disablePin && (
         <div
-          className="note-pin-popup absolute right-3 bottom-full w-10 h-14 overflow-hidden z-0 pointer-events-none group-hover:pointer-events-auto"
+          className="note-pin-popup absolute right-3 bottom-full w-10 h-14 overflow-hidden z-0 pointer-events-none idle-group-hover:pointer-events-auto"
         >
           <button
             aria-label={n.pinned ? t("unpinNote") : t("pinNote")}
@@ -202,7 +202,7 @@ function NoteCard({
               e.stopPropagation();
               togglePin(n.id, !n.pinned);
             }}
-            className="absolute left-0 bottom-0 flex items-start justify-center w-10 h-14 pt-2 rounded-t-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 translate-y-full group-hover:translate-y-[27%] transition-transform duration-300 ease-out"
+            className="absolute left-0 bottom-0 flex items-start justify-center w-10 h-14 pt-2 rounded-t-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 translate-y-full idle-group-hover:translate-y-[27%] transition-transform duration-300 ease-out"
             style={{ backgroundColor: bgFor(n.color, dark) }}
             data-tooltip={n.pinned ? t("unpin") : t("pin")}
             disabled={!!disablePin}
@@ -215,7 +215,7 @@ function NoteCard({
       {/* Card surface — the actual visible note. Higher z-index keeps it
           in front of the pin popup. */}
       <div
-        className={`note-card glass-card rounded-xl p-2 sm:p-3 cursor-pointer transform group-hover:scale-[1.02] transition-transform duration-200 relative min-h-[54px] z-10 ${isDraw ? 'note-card--draw' : 'overflow-hidden'} ${
+        className={`note-card glass-card rounded-xl p-2 sm:p-3 cursor-pointer transform idle-group-hover:scale-[1.02] transition-transform duration-200 relative min-h-[54px] z-10 ${isDraw ? 'note-card--draw' : 'overflow-hidden'} ${
           multiMode && selected
             ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent"
             : ""
