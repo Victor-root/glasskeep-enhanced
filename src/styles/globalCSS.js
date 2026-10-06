@@ -2243,6 +2243,14 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+/* Scroll the open note and the Settings / Admin panels on the compositor,
+   like the notes list (see .notes-scroll-area). Otherwise the browser kept
+   these transparent scrollers on the main thread and re-rasterised the whole
+   visible note or panel on every scrolled frame, on top of the blur behind. */
+[data-modal-scroll],
+.gk-side-panel-scroll {
+  will-change: scroll-position;
+}
 
 /* Modal sticky header — flat (no blur), matching the rest of the app. */
 .modal-header-blur {
