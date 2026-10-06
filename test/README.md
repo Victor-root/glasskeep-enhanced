@@ -48,7 +48,7 @@ donc l'ordre d'exécution n'a aucune importance et un scénario qui
 | Partage entre deux comptes: droits réels, lecture seule, retrait, cloisonnement | `functional/f3-collaboration.mjs` | 9513 |
 | Profil, avatar, réglages et leur synchronisation entre onglets, rappels, notifications, changement de mot de passe | `functional/f4-compte-reglages-rappels.mjs` | 9514 |
 | Panneau d'administration: inscriptions en attente, comptes, garde-fous, réglages d'instance, logos, domaine des passkeys | `functional/f5-administration.mjs` | 9515 à 9518 |
-| Connexion OpenID Connect avec un faux fournisseur: interrupteur de l'administrateur, fournisseur déclaré par chaque compte et secret qui ne ressort jamais, adresse privée refusée à un compte ordinaire, association, connexion par identifiant, identité tenue par issuer + sub, refus (autre identité, autre adresse, autre navigateur, ticket ou état rejoué, jeton falsifié, nonce faux) | `functional/f6-sso.mjs` | 9519, 9520 |
+| Connexion OpenID Connect avec un faux fournisseur: interrupteur de l'administrateur et ses deux politiques, fournisseur de l'instance associé par plusieurs comptes, fournisseur déclaré par chaque compte et secret qui ne ressort jamais, adresse privée refusée à un compte ordinaire tant que le réseau local n'est pas ouvert, association (une par compte), connexion par identifiant, identité tenue par issuer + sub, refus (autre identité, autre adresse, autre navigateur, ticket ou état rejoué, jeton falsifié, nonce faux, politique changée en cours de route), mise à jour d'une base antérieure aux politiques | `functional/f6-sso.mjs` | 9519, 9520, 9521 |
 
 ### Éprouvés par mutation
 

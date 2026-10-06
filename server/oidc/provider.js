@@ -11,9 +11,10 @@
 // PKCE ignores the extra parameters, one that does gets the protection.
 //
 // The provider address is typed by a user, so where the server may go is
-// decided like for a user's AI endpoint (server/ai/endpointGuard.js): an
-// admin's provider may sit on the local network, anyone else's must be a
-// public address. Otherwise any account could make the server probe the
+// decided like for a user's AI endpoint (server/ai/endpointGuard.js): the
+// instance's provider and an admin's may sit on the local network, anyone
+// else's must be a public address unless an admin allowed the local
+// network for them. Otherwise any account could make the server probe the
 // network it runs in. Every call takes `{ allowPrivate }` for that.
 
 const oidc = require("openid-client");

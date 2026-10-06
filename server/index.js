@@ -682,10 +682,21 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
       if (!names.has("webauthn_rp_id")) {
         db.exec(`ALTER TABLE app_settings ADD COLUMN webauthn_rp_id TEXT NOT NULL DEFAULT ''`);
       }
-      // Whether users may sign in through an OpenID Connect provider they
-      // declare in their own settings. Off until an admin allows it.
+      // Whether users may sign in through an OpenID Connect provider.
+      // Off until an admin allows it.
       if (!names.has("sso_allowed")) {
         db.exec(`ALTER TABLE app_settings ADD COLUMN sso_allowed INTEGER NOT NULL DEFAULT 0`);
+      }
+      // Which providers count: only the instance's ("admin"), or each
+      // user's own as well ("personal"). An instance that already allowed
+      // single sign-on did so with personal providers, and keeps them.
+      if (!names.has("sso_policy")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN sso_policy TEXT NOT NULL DEFAULT 'admin'`);
+        db.exec(`UPDATE app_settings SET sso_policy = 'personal' WHERE sso_allowed = 1`);
+      }
+      // Whether a user's own provider may sit on the local network.
+      if (!names.has("sso_allow_private")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN sso_allow_private INTEGER NOT NULL DEFAULT 0`);
       }
     });
     tx();
@@ -727,7 +738,7 @@ const { attachSelfUpdateRoutes } = require("./routes/selfUpdateRoutes");
 const { attachAssetLinksRoutes } = require("./routes/assetLinksRoutes");
 const { attachDeviceLinkRoutes } = require("./routes/deviceLinkRoutes");
 const { attachFederationRoutes } = require("./routes/federationRoutes");
-const { attachOidcRoutes } = require("./routes/oidcRoutes");
+const { attachOidcRoutes, SSO_POLICIES } = require("./routes/oidcRoutes");
 const { requireUnlocked } = require("./routes/lockMiddleware");
 const { t: serverT } = require("./i18n");
 const pushService = require("./services/pushNotifications");
@@ -2412,16 +2423,21 @@ app.get("/api/auth/renew", auth, (req, res) => {
   });
 });
 
-// Sign-in through the OpenID Connect provider each user may declare in
-// their settings, once an admin allows it. Registered after the lock
-// gate, like the password sign-in: a locked instance opens no session
-// either way. adminSettings is read at request time, it is set up below.
+// Sign-in through an OpenID Connect provider, the instance's or each
+// user's own, as the admin allows. Registered after the lock gate, like
+// the password sign-in: a locked instance opens no session either way.
+// adminSettings is read at request time, it is set up below.
 attachOidcRoutes(app, {
   db,
   auth,
+  adminOnly,
   getUserById,
   getUserByEmail,
-  isSsoAllowed: () => adminSettings.ssoAllowed,
+  ssoSettings: () => ({
+    allowed: adminSettings.ssoAllowed,
+    policy: adminSettings.ssoPolicy,
+    allowPrivateNetwork: adminSettings.ssoAllowPrivateNetwork,
+  }),
   signInOnHold,
   denySignIn,
   sessionResponse,
@@ -4717,10 +4733,10 @@ app.delete("/api/logos/:id", auth, (req, res) => {
 // on every login page hit, allowNewAccounts on every signup attempt)
 // don't hit SQLite repeatedly. The mirror is updated on every PATCH so
 // it stays in sync.
-const getAppSettingsRow = db.prepare(`SELECT allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme, webauthn_rp_id, sso_allowed FROM app_settings WHERE id = 1`);
+const getAppSettingsRow = db.prepare(`SELECT allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme, webauthn_rp_id, sso_allowed, sso_policy, sso_allow_private FROM app_settings WHERE id = 1`);
 const upsertAppSettings = db.prepare(
-  `INSERT INTO app_settings (id, allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme, webauthn_rp_id, sso_allowed) VALUES (1, ?, ?, ?, ?, ?, ?, ?)
-   ON CONFLICT(id) DO UPDATE SET allow_new_accounts=excluded.allow_new_accounts, login_slogan=excluded.login_slogan, custom_app_name=excluded.custom_app_name, login_bg_blur=excluded.login_bg_blur, login_theme=excluded.login_theme, webauthn_rp_id=excluded.webauthn_rp_id, sso_allowed=excluded.sso_allowed`,
+  `INSERT INTO app_settings (id, allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme, webauthn_rp_id, sso_allowed, sso_policy, sso_allow_private) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+   ON CONFLICT(id) DO UPDATE SET allow_new_accounts=excluded.allow_new_accounts, login_slogan=excluded.login_slogan, custom_app_name=excluded.custom_app_name, login_bg_blur=excluded.login_bg_blur, login_theme=excluded.login_theme, webauthn_rp_id=excluded.webauthn_rp_id, sso_allowed=excluded.sso_allowed, sso_policy=excluded.sso_policy, sso_allow_private=excluded.sso_allow_private`,
 );
 // Branding images live in their own read/write statements so the
 // (potentially multi-MB) data URLs never get held in the in-memory
@@ -4766,6 +4782,8 @@ let adminSettings = (function loadAdminSettings() {
       loginTheme: VALID_LOGIN_THEMES.has(row.login_theme) ? row.login_theme : "glasskeep",
       passkeyDomain: row.webauthn_rp_id || "",
       ssoAllowed: !!row.sso_allowed,
+      ssoPolicy: SSO_POLICIES.has(row.sso_policy) ? row.sso_policy : "admin",
+      ssoAllowPrivateNetwork: !!row.sso_allow_private,
     };
   }
   // Fresh install — seed the row from the env var default so subsequent
@@ -4778,8 +4796,10 @@ let adminSettings = (function loadAdminSettings() {
     loginTheme: "glasskeep",
     passkeyDomain: "",
     ssoAllowed: false,
+    ssoPolicy: "admin",
+    ssoAllowPrivateNetwork: false,
   };
-  upsertAppSettings.run(seed.allowNewAccounts ? 1 : 0, seed.loginSlogan, seed.appName, seed.loginBackgroundBlur, seed.loginTheme, seed.passkeyDomain, 0);
+  upsertAppSettings.run(seed.allowNewAccounts ? 1 : 0, seed.loginSlogan, seed.appName, seed.loginBackgroundBlur, seed.loginTheme, seed.passkeyDomain, 0, seed.ssoPolicy, 0);
   return seed;
 })();
 
@@ -4841,13 +4861,19 @@ app.get("/api/admin/settings", auth, adminOnly, (req, res) => {
 
 // Update admin settings
 app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
-  const { allowNewAccounts, ssoAllowed, loginSlogan, appName, loginBackgroundBlur, loginTheme, passkeyDomain, logo, logoPwa, loginBackground, loginBackgroundColor, loginBackgroundHash } = req.body || {};
+  const { allowNewAccounts, ssoAllowed, ssoPolicy, ssoAllowPrivateNetwork, loginSlogan, appName, loginBackgroundBlur, loginTheme, passkeyDomain, logo, logoPwa, loginBackground, loginBackgroundColor, loginBackgroundHash } = req.body || {};
 
   if (typeof allowNewAccounts === 'boolean') {
     adminSettings.allowNewAccounts = allowNewAccounts;
   }
   if (typeof ssoAllowed === 'boolean') {
     adminSettings.ssoAllowed = ssoAllowed;
+  }
+  if (SSO_POLICIES.has(ssoPolicy)) {
+    adminSettings.ssoPolicy = ssoPolicy;
+  }
+  if (typeof ssoAllowPrivateNetwork === 'boolean') {
+    adminSettings.ssoAllowPrivateNetwork = ssoAllowPrivateNetwork;
   }
   if (typeof loginSlogan === 'string') {
     adminSettings.loginSlogan = loginSlogan.slice(0, 200);
@@ -4938,6 +4964,8 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
     adminSettings.loginTheme,
     adminSettings.passkeyDomain,
     adminSettings.ssoAllowed ? 1 : 0,
+    adminSettings.ssoPolicy,
+    adminSettings.ssoAllowPrivateNetwork ? 1 : 0,
   );
   // Live-sync the scalar settings to every other admin so their
   // AdminPanel toggles / slogan / app name / blur reflect the change
