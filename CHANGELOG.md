@@ -3,13 +3,14 @@
 ## 🚧 Unreleased
 
 ### ➕ Added
-- 🔐 **Single sign-on (OpenID Connect)**: sign in through your own provider (Authentik, Keycloak, Authelia, Zitadel, PocketID, or any standard OpenID Connect provider). An admin allows it with one switch (Admin → *Login page settings*); each user then declares their provider in Settings → Security, links their account by signing in there once, and uses **Sign in with my provider** on the login screen. Works in the web app and the Android app.
+- 🔐 **Single sign-on (OpenID Connect)**: sign in through an identity provider (Authentik, Keycloak, Authelia, Zitadel, Pocket ID, or any standard OpenID Connect provider). An admin allows it in Admin → *Login page settings* and picks a policy: the **instance's provider only**, which the admin sets up there, or **personal providers allowed**, where each user may also declare their own in Settings → Security. Each user links their account by signing in at the provider once, then uses **Sign in with my provider** on the login screen. Works in the web app and the Android app.
 - 📘 **Single sign-on setup guide** on the [project website](https://victor-root.github.io/glasskeep-enhanced/sso.html): the exact values for Authentik, Keycloak and Authelia, annotated screenshots and troubleshooting.
 
 ### 🔒 Security
 - The flow runs on the server (Authorization Code with PKCE, state and nonce, ID token verified against the provider's keys); the client secret never reaches a browser.
 - An account is opened only by the identity it linked (issuer + subject), never by a matching e-mail; a provider never creates accounts or grants rights. Linking asks for the account password.
-- A regular user's provider must be on a public address, so no account can use the server to probe its network.
+- A regular user's own provider must be on a public address, so no account can use the server to probe its network, unless the admin turns on *Allow providers on the local network*. The instance's provider and an admin's own may always be local.
+- On Android, the provider's pages stay in a separate screen without the app's native features, even when the provider runs on the same machine as GlassKeep.
 
 ### 🛠️ Upgrade
 
