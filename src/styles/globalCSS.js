@@ -479,14 +479,14 @@ body {
 }
 
 /* Disable browser pull-to-refresh while any overlay (notification
-   center, sync popover, modals, sidebar, …) is open. The class is
+   center, sync popover, modals, sidebar, …) is open. The attribute is
    toggled by App.jsx from a single effect — every panel benefits
    without each having to do its own DOM-level cleanup.
    Only overscroll-behavior is set: no overflow:hidden, no positioning
    changes, so the panel's own scrollable list and any underlying
    layout keep working normally. */
-html.gk-overlay-locked,
-html.gk-overlay-locked body {
+html[data-gk-overlay-locked],
+html[data-gk-overlay-locked] body {
   overscroll-behavior: none !important;
   overscroll-behavior-y: none !important;
 }
@@ -498,7 +498,7 @@ html.gk-overlay-locked body {
    overlay is open so the scrim blurs a STATIC backdrop the GPU caches;
    they resume on close. The float is a pure transform, so pausing is
    free and imperceptible behind the overlay. */
-html.gk-overlay-locked .floating-cards-bg .login-deco-card {
+html[data-gk-overlay-locked] .floating-cards-bg .login-deco-card {
   animation-play-state: paused;
 }
 /* The admin panel's backdrop preview reuses these animated cards. A closed
@@ -526,7 +526,7 @@ html[data-gk-scrolling] .floating-cards-bg .login-deco-card {
    now every device does. The ONE blur kept is the modal scrim (see
    .modal-scrim) — the frosted separation behind an open note — which stays
    cheap because the animated background is frozen while any overlay is open
-   (html.gk-overlay-locked), so it blurs a STATIC backdrop the GPU caches. */
+   (html[data-gk-overlay-locked]), so it blurs a STATIC backdrop the GPU caches. */
 .glass-card {
   background-color: rgba(255, 255, 255, 0.92);
   border: 1px solid var(--border-light);

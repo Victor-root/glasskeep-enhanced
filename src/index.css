@@ -67,6 +67,39 @@ html[data-gk-edge-to-edge] header.glass-card::before {
   background: inherit;
 }
 
+/* Sidebar as a drawer (mobile, narrow windows): it decelerates in and
+   accelerates out, and its scrim fades with it. Only translate (what
+   Tailwind's translate-x-* classes set) and opacity move, both on the
+   compositor. The drawer keeps its own layer so the first frame of the
+   slide has nothing left to paint; the closed scrim is hidden (visibility)
+   once faded so it costs nothing at rest. Here rather than in globalCSS,
+   which lands after the first paint: the closed scrim must never show. */
+.gk-drawer {
+  will-change: translate;
+  transition: translate 200ms cubic-bezier(0.3, 0, 0.8, 0.15), background-color 0.3s ease;
+}
+.gk-drawer.is-open {
+  transition: translate 300ms cubic-bezier(0.2, 0, 0, 1), background-color 0.3s ease;
+}
+.gk-drawer-scrim {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 200ms ease-in, visibility 0s linear 200ms;
+}
+.gk-drawer-scrim.is-open {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 300ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gk-drawer,
+  .gk-drawer.is-open,
+  .gk-drawer-scrim,
+  .gk-drawer-scrim.is-open {
+    transition: none;
+  }
+}
+
 /* On mouse click: remove focus outline AND Tailwind ring (box-shadow).
    Keyboard navigation (:focus-visible) keeps its indicator for accessibility. */
 /* Default cursor to arrow everywhere — text cursor only on actual inputs */
