@@ -39,6 +39,8 @@ class WebViewActivity : AppCompatActivity() {
     private lateinit var swipeRefresh: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
     private lateinit var webAuthnBridge: WebAuthnBridge
+    // Debug builds only, see NetDebug.
+    private var netDebug: NetDebug? = null
 
     // Reminder notification deep-link: the target note id (from a tap) plus a
     // flag for whether the web app has finished loading, so we only fire the
@@ -598,6 +600,13 @@ class WebViewActivity : AppCompatActivity() {
             // WebView). The web app calls schedule/cancel when a reminder
             // changes and syncAll on load. See ReminderScheduler.
             addJavascriptInterface(RemindersBridge(), "AndroidReminders")
+            if (BuildConfig.DEBUG) {
+                val origin = Uri.parse(url).let { "${it.scheme}://${it.encodedAuthority}" }
+                netDebug = NetDebug(this@WebViewActivity, origin).also {
+                    it.start()
+                    addJavascriptInterface(it.Bridge(), NetDebug.JS_INTERFACE_NAME)
+                }
+            }
 
             settings.apply {
                 javaScriptEnabled = true
@@ -741,8 +750,27 @@ class WebViewActivity : AppCompatActivity() {
                     injectSafeAreaInsets()
                 }
 
+                override fun onReceivedError(
+                    view: WebView,
+                    request: WebResourceRequest,
+                    error: android.webkit.WebResourceError,
+                ) {
+                    super.onReceivedError(view, request, error)
+                    if (BuildConfig.DEBUG) NetDebug.log("load error ${error.errorCode} ${error.description} on ${request.method} ${request.url.path} (main frame: ${request.isForMainFrame})")
+                }
+
+                override fun onReceivedHttpError(
+                    view: WebView,
+                    request: WebResourceRequest,
+                    errorResponse: WebResourceResponse,
+                ) {
+                    super.onReceivedHttpError(view, request, errorResponse)
+                    if (BuildConfig.DEBUG) NetDebug.log("HTTP ${errorResponse.statusCode} on ${request.method} ${request.url.path}")
+                }
+
                 override fun onPageFinished(view: WebView, pageUrl: String?) {
                     super.onPageFinished(view, pageUrl)
+                    if (BuildConfig.DEBUG) NetDebug.log("page finished: $pageUrl")
                     swipeRefresh.isRefreshing = false
                     // Re-assert the TV flag in case the page navigated
                     // (login → notes) and reset the global.
@@ -1263,11 +1291,18 @@ class WebViewActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         isForeground = true
+        netDebug?.onResume()
     }
 
     override fun onPause() {
         super.onPause()
         isForeground = false
+        netDebug?.onPause()
+    }
+
+    override fun onDestroy() {
+        netDebug?.stop()
+        super.onDestroy()
     }
 
     // Ensure the POST_NOTIFICATIONS grant (Android 13+) so a fired reminder

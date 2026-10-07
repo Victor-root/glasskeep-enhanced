@@ -10,6 +10,7 @@ import {
   purgeQueueForNote,
 } from "./localDb.js";
 import { t } from "../i18n";
+import { netLog, netProbe } from "../utils/netDebug.js";
 
 const API_BASE = "/api";
 const MAX_RETRIES = 5;
@@ -61,6 +62,7 @@ export class SyncEngine {
     this._lastHealthCheckAt = 0; // timestamp of last healthCheck start (for throttling)
     this._rateLimited = false; // true when server returns 403/429 — backs off more aggressively
     this._sseConnected = false; // true while SSE EventSource is open
+    this._loggedSyncState = null; // last syncState written to the debug trace
   }
 
   // ─── Public API ───
@@ -80,6 +82,7 @@ export class SyncEngine {
    */
   async notifyOffline() {
     if (this._destroyed) return;
+    netLog("sync: browser offline event");
     this._serverReachable = false;
     this._lastSyncError = "Browser offline";
     this._failedChecks++;
@@ -95,6 +98,7 @@ export class SyncEngine {
    * visible-tab threshold (limit=1 vs limit=3 for hidden tabs).
    */
   notifyVisible() {
+    netLog("sync: page visible again, onLine=" + navigator.onLine, "serverReachable=" + this._serverReachable);
     this._consecutiveTimeouts = 0;
   }
 
@@ -102,6 +106,7 @@ export class SyncEngine {
     if (this._destroyed) return;
     this._sseConnected = true;
     if (this._serverReachable === true && this._failedChecks === 0) return; // already known
+    netLog("sync: backend alive through SSE, was serverReachable=" + this._serverReachable);
     this._serverReachable = true;
     this._lastSyncError = null;
     this._failedChecks = 0;
@@ -286,6 +291,7 @@ export class SyncEngine {
               lastAttemptAt: Date.now(),
             });
           } else if (isNetworkError) {
+            netLog("sync: queue item", item.type, "network error", err);
             // Genuine network failure (connection refused, DNS, etc.)
             this._serverReachable = false;
             this._lastSyncError = "Server unreachable";
@@ -347,6 +353,7 @@ export class SyncEngine {
    * Returns the resulting status for immediate feedback.
    */
   async forceSync() {
+    netLog("sync: manual sync requested");
     // Signal "checking" for the entire duration of the health check
     // so the UI shows a spinner / "Vérification du serveur..." immediately.
     this._isChecking = true;
@@ -402,9 +409,11 @@ export class SyncEngine {
     if (this._healthCheckInFlight) {
       const staleness = Date.now() - (this._healthCheckStartedAt || 0);
       if (staleness > 10000) {
+        netLog("health: previous check stuck in flight for " + staleness + "ms, resetting guard");
         console.warn("[SyncEngine] healthCheck: stale in-flight (age=%dms) — resetting guard", staleness);
         this._healthCheckInFlight = false;
       } else {
+        netLog("health: skipped, a check is already in flight");
         return this._serverReachable ?? false;
       }
     }
@@ -420,6 +429,7 @@ export class SyncEngine {
     this._lastHealthCheckAt = now;
     this._healthCheckStartedAt = now;
     this._healthCheckInFlight = true;
+    const elapsed = () => `${Date.now() - now}ms`;
 
     try {
       const controller = new AbortController();
@@ -476,6 +486,7 @@ export class SyncEngine {
         }
 
         const wasOffline = this._serverReachable === false;
+        netLog("health: OK in " + elapsed());
         this._serverReachable = true;
         this._lastSyncError = null;
         this._failedChecks = 0;
@@ -520,6 +531,7 @@ export class SyncEngine {
       const isServerError = res.status >= 500;
       const isRateLimited = res.status === 403 || res.status === 429;
       console.warn("[SyncEngine] healthCheck: server responded", res.status);
+      netLog("health: HTTP " + res.status + " in " + elapsed());
       if (isServerError) {
         this._serverReachable = false;
         this._rateLimited = false;
@@ -541,6 +553,10 @@ export class SyncEngine {
       return false;
     } catch (err) {
       console.warn("[SyncEngine] healthCheck failed:", err?.name, err?.message);
+      netLog("health: failed in " + elapsed(), err, "onLine=" + navigator.onLine,
+        "hidden=" + document.hidden, "sse=" + this._sseConnected,
+        "timeouts=" + (this._consecutiveTimeouts + (err?.name === "AbortError" ? 1 : 0)),
+        "swController=" + !!navigator.serviceWorker?.controller);
       const isAbort = err?.name === "AbortError";
       const browserSaysOnline = typeof navigator !== "undefined" && navigator.onLine;
 
@@ -751,6 +767,13 @@ export class SyncEngine {
       if (this._serverReachable !== false) {
         emittedServerReachable = null;
       }
+    }
+
+    if (syncState !== this._loggedSyncState) {
+      netLog("sync: state " + this._loggedSyncState + " -> " + syncState,
+        "error=" + this._lastSyncError, "failedChecks=" + this._failedChecks, "pending=" + stats.total);
+      if (syncState === "offline") netProbe("app went offline: " + this._lastSyncError);
+      this._loggedSyncState = syncState;
     }
 
     this.onStatusChange({
