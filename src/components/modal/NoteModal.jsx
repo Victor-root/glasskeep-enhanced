@@ -55,8 +55,8 @@ import { getContentImages } from "../../utils/noteIcon.js";
 import { renderSafeMarkdown, linkifyContactsHTML } from "../../utils/markdown.jsx";
 import RichTextEditor from "../richtext/RichTextEditor.jsx";
 import { contentToHTML, serializeRichContent, isRichContent } from "../../utils/richText.js";
-import { modalBgFor, scrollColorsFor, solid, bgFor, toHex, audioAccentColor } from "../../utils/colors.js";
-import { setThemeColor, currentStatusBarColor } from "../../utils/helpers.js";
+import { modalBgFor, scrollColorsFor, solid, bgFor, toHex, audioAccentColor, compositeOver } from "../../utils/colors.js";
+import { setThemeColor, currentStatusBarColor, setNavBarColor } from "../../utils/helpers.js";
 import AudioNoteEditor from "../audio/AudioNoteEditor.jsx";
 import StorageGauge from "../audio/StorageGauge.jsx";
 import { parseAudioContent, totalClipsBytes } from "../../utils/audioNote.js";
@@ -518,6 +518,25 @@ export default function NoteModal({
   // Force mobile layout when running inside Android WebView (tablets)
   const mobileLayout = windowWidth < 640 || isLandscapeMobile || isWebView;
 
+  /* Android navigation bar: on the mobile layout it sits right under the
+     footer, so it takes the footer's own colour (its translucent tint over
+     the note's background) rather than the note's; handed back to the
+     theme colour once the note closes. */
+  const footerRef = React.useRef(null);
+  // Only the instance that coloured the bar hands it back, so a closed side
+  // note never clears the colour the other one set.
+  const navBarColoredRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!open || !mobileLayout) {
+      if (navBarColoredRef.current) setNavBarColor(null);
+      navBarColoredRef.current = false;
+      return;
+    }
+    if (!footerRef.current) return;
+    setNavBarColor(compositeOver(getComputedStyle(footerRef.current).backgroundColor, modalBgFor(mColor, dark)));
+    navBarColoredRef.current = true;
+  }, [open, mobileLayout, mColor, dark]);
+
   // Per-note AI side panel.
   //   - Desktop layout (≥1024px non-mobile): the panel sits beside the
   //     modal as a flex sibling, animating width.
@@ -955,6 +974,7 @@ export default function NoteModal({
             // bar (its inset becomes the footer's bottom padding), so the bar
             // shows the footer's colour rather than the note's behind it.
             reserveNavBar={mobileLayout}
+            rootRef={footerRef}
             windowWidth={windowWidth}
             isLandscapeMobile={isLandscapeMobile}
             isWebView={isWebView}

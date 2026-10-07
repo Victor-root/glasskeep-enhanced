@@ -51,6 +51,12 @@ export function setThemeColor(color) {
   try { window.AndroidTheme?.onThemeColor(color); } catch (_) {}
 }
 
+/** Android app (1.4.8+) only: paints the navigation bar in its own colour
+ *  instead of the theme colour; null hands it back to the theme colour. */
+export function setNavBarColor(color) {
+  try { window.AndroidTheme?.onNavBarColor?.(color || ""); } catch (_) {}
+}
+
 export const sanitizeFilename = (name, fallback = "note") =>
   (name || fallback)
     .toString()

@@ -104,6 +104,13 @@ export const toHex = (str) => {
   const { r, g, b } = parseRGBA(str);
   return `#${[r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("")}`;
 };
+/** #rrggbb of a translucent colour laid over an opaque one. */
+export const compositeOver = (top, bottom) => {
+  const t = parseRGBA(top);
+  const b = parseRGBA(bottom);
+  const mix = (x, y) => Math.round(x * t.a + y * (1 - t.a));
+  return toHex(`rgb(${mix(t.r, b.r)}, ${mix(t.g, b.g)}, ${mix(t.b, b.b)})`);
+};
 export const mixWithWhite = (rgbaStr, whiteRatio = 0.8, outAlpha = 0.92) => {
   const { r, g, b } = parseRGBA(rgbaStr);
   const rr = Math.round(255 * whiteRatio + r * (1 - whiteRatio));
