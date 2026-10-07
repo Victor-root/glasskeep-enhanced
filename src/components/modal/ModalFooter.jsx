@@ -15,6 +15,14 @@ import TI from "../../icons/editor/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS, modalBgFor } from "../../utils/colors.js";
 import { t } from "../../i18n";
 
+// The viewBox is shifted onto the glyph's ink, which sits right of and below
+// the centre of its 20-unit drawing, so the icon centres in its button.
+const CollaborateIcon = ({ className }) => (
+  <svg className={className} fill="currentColor" viewBox="2 0.5 20 20" aria-hidden="true">
+    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+  </svg>
+);
+
 const NOTE_COLORS = COLOR_ORDER.filter((name) => LIGHT_COLORS[name]);
 
 /**
@@ -243,7 +251,7 @@ export default function ModalFooter({
     ((!isDesktop && mType === "text" && !viewMode) || (mType === "draw" && drawMode !== "draw" && !viewMode)) && {
       key: "collaborate",
       color: dark ? "#c4b5fd" : "#7c3aed",
-      icon: <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" /></svg>,
+      icon: <CollaborateIcon className="w-4 h-4" />,
       label: t("collaborate"),
       run: onOpenCollaboration,
     },
@@ -321,7 +329,7 @@ export default function ModalFooter({
           onClick={() => setShowModalColorPop((v) => !v)}
           data-tooltip={!isDesktop ? t("color") : undefined}
         >
-          <PaletteColorIcon size={isDesktop ? 16 : 18} />
+          <PaletteColorIcon size={16} />
           {isDesktop && <span>{t("color")}</span>}
         </button>
         {isDesktop ? (
@@ -502,7 +510,7 @@ export default function ModalFooter({
             }}
             data-tooltip={!isDesktop ? t("addTag") : undefined}
           >
-            <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
               <line x1="7" y1="7" x2="7.01" y2="7" strokeWidth="2.5" />
             </svg>
@@ -571,7 +579,7 @@ export default function ModalFooter({
           onClick={() => { if (canUndo) { if (!isDesktop) document.activeElement?.blur(); undo(); } }}
           data-tooltip={!isDesktop ? t("undo") : undefined}
         >
-          <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 10h13a4 4 0 0 1 0 8H7" />
             <path d="M3 10l4-4" />
             <path d="M3 10l4 4" />
@@ -588,7 +596,7 @@ export default function ModalFooter({
           onClick={() => { if (canRedo) { if (!isDesktop) document.activeElement?.blur(); redo(); } }}
           data-tooltip={!isDesktop ? t("redo") : undefined}
         >
-          <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 10H8a4 4 0 0 0 0 8h10" />
             <path d="M21 10l-4-4" />
             <path d="M21 10l-4 4" />
@@ -628,17 +636,7 @@ export default function ModalFooter({
               onClick={onOpenCollaboration}
               data-tooltip={hasCollabs || !isDesktop ? t("collaborate") : undefined}
             >
-              {/* 20px, not the 18px every other mobile footer icon here uses:
-                  this glyph's own ink only fills about 60% of its 20-unit
-                  viewBox (the two head circles and the body sit well
-                  inside the edges, unlike e.g. the tag icon's outline,
-                  which runs almost edge to edge), so at the same box size
-                  it reads visibly smaller than its neighbours. Sized up to
-                  match the footer's own bigger tier (trash/kebab/image are
-                  already 20px) instead of redrawing the glyph. */}
-              <svg className={isDesktop ? "w-4 h-4" : "w-[20px] h-[20px]"} fill="currentColor" viewBox="0 0 20 20">
-                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-              </svg>
+              <CollaborateIcon className="w-4 h-4" />
               {hasCollabs && isDesktop && (
                 <span className="modal-footer-avatars flex items-center -space-x-1">
                   {collabs.slice(0, 3).map((c) => (
