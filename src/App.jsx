@@ -81,6 +81,7 @@ import { parseAudioContent, isAudioContentEmpty, extensionForMime } from "./util
 import { dataUrlToBlob } from "./utils/audioConvert.js";
 import useModalState from "./hooks/useModalState.js";
 import useTouchScrollbars from "./hooks/useTouchScrollbars.js";
+import useNoteSaveState from "./hooks/useNoteSaveState.js";
 import useDraftNote from "./hooks/useDraftNote.js";
 import useAdminActions from "./hooks/useAdminActions.js";
 import { useBranding } from "./branding/BrandingContext.jsx";
@@ -605,6 +606,7 @@ export default function App() {
     // Handlers
     onModalBodyClick, isCollaborativeNote, formatModal, resizeModalTextarea,
   } = useModalState({ notes, currentUser, closeModalRef, runFormat });
+  const noteSaveState = useNoteSaveState(open ? activeId : null, modalHasChanges, syncStatus);
 
   // Reminder picker open state — lifted here (not in ModalFooter) so it joins
   // the central overlay stack: the Android back button closes it and the
@@ -7320,6 +7322,7 @@ export default function App() {
       onSetReminder={setNoteReminder}
       editedStamp={editedStamp}
       modalHasChanges={modalHasChanges}
+      saveState={noteSaveState}
       modalScrollable={modalScrollable}
       tagsWithCounts={tagsWithCounts}
       addTags={addTags}

@@ -1987,6 +1987,12 @@ html.dark .modal-footer-labeled-btn {
   width: 24px;
   height: 24px;
 }
+/* Badges (logo, tag count, collaborators) sit on the icon's top-right
+   corner, not on the corners of the now larger button. */
+.modal-footer-toolbar--touch .modal-footer-btn > span.absolute {
+  top: calc(50% - 18px);
+  right: calc(50% - 18px);
+}
 /* The filled read/edit disc stays clear of the footer's top edge. */
 .modal-footer-toolbar--touch .modal-footer-btn--mode {
   max-width: 38px;
@@ -2002,6 +2008,95 @@ html.dark .modal-footer-labeled-btn {
 }
 .modal-footer-toolbar--touch .modal-footer-btn--fmt > .tabler-icon > svg {
   stroke-width: 1.4; /* 1.75px once scaled up to 30px */
+}
+
+/* Save line (phones): the open note's save state along the footer's top
+   edge (ModalFooter data-save-state, from useNoteSaveState). Saving: a sheen
+   in the theme's gradient runs over a faint accent track. Saved: the line
+   fills in green from the left, glows, then fades. Offline: amber, breathing
+   until the server is back. Error: red. Transform and opacity only. */
+.modal-footer-toolbar--touch {
+  position: relative;
+}
+.gk-save-line {
+  --gk-save-color: #10b981;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 2px;
+  pointer-events: none;
+  /* Room for the glow above and below; the sheen is cut at the edges. */
+  clip-path: inset(-10px 0);
+}
+html.dark .gk-save-line { --gk-save-color: #34d399; }
+.gk-save-line::before,
+.gk-save-line::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+}
+.gk-save-line::before {
+  left: 0;
+  right: 0;
+  background: var(--gk-save-color);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--gk-save-color) 60%, transparent);
+  transform-origin: left center;
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+.gk-save-line::after {
+  left: 0;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, var(--gk-chrome-grad-from), var(--gk-chrome-grad-to), transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--gk-chrome-accent) 45%, transparent);
+  transform: translateX(-100%);
+  opacity: 0;
+  transition: opacity 250ms ease;
+}
+[data-save-state="saving"] > .gk-save-line::before {
+  --gk-save-color: var(--gk-chrome-accent);
+  opacity: 0.22;
+}
+[data-save-state="saving"] > .gk-save-line::after {
+  opacity: 1;
+  animation: gkSaveSheen 1.3s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+[data-save-state="saved"] > .gk-save-line::before {
+  opacity: 1;
+  transition: none;
+  animation: gkSaveFill 380ms cubic-bezier(0.2, 0, 0, 1);
+}
+[data-save-state="offline"] > .gk-save-line::before {
+  --gk-save-color: #f59e0b;
+  opacity: 1;
+  animation: gkSaveBreathe 2.4s ease-in-out infinite;
+}
+html.dark [data-save-state="offline"] > .gk-save-line::before { --gk-save-color: #fbbf24; }
+[data-save-state="error"] > .gk-save-line::before {
+  --gk-save-color: #ef4444;
+  opacity: 1;
+}
+html.dark [data-save-state="error"] > .gk-save-line::before { --gk-save-color: #f87171; }
+@keyframes gkSaveSheen {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(265%); }
+}
+@keyframes gkSaveFill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes gkSaveBreathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-save-state] > .gk-save-line::before,
+  [data-save-state] > .gk-save-line::after { animation: none; }
+  [data-save-state="saving"] > .gk-save-line::before { opacity: 0.6; }
+  [data-save-state="saving"] > .gk-save-line::after { opacity: 0; }
 }
 
 /* Footer colored variants (apply to both icon-only and labeled) */

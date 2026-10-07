@@ -115,7 +115,8 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
 
   const modalHasChanges = useMemo(() => {
     if (!activeNoteObj) return false;
-    if ((mTitle || "") !== (activeNoteObj.title || "")) return true;
+    // Saved titles are trimmed: trailing spaces being typed are not a change.
+    if ((mTitle || "").trim() !== (activeNoteObj.title || "")) return true;
     if ((mColor || "default") !== (activeNoteObj.color || "default"))
       return true;
     const tagsA = JSON.stringify(mTagList || []);
