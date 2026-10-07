@@ -1648,6 +1648,30 @@ html.dark .gk-sheet {
   color: #f3f4f6;
   box-shadow: 0 -10px 36px rgba(0, 0, 0, 0.5);
 }
+/* A sheet takes the open note's colour (or the header's): greys and accent
+   tints made for neutral surfaces fade into it, pale ones on light pastels,
+   dark ones on dark hues. Inside a sheet they are re-pointed to the sheet's
+   text colour at reduced opacity, and to deeper (light) or lighter (dark)
+   tints, readable on every note colour. */
+.gk-sheet {
+  --color-gray-300: rgb(31 41 55 / 0.42);
+  --color-gray-400: rgb(31 41 55 / 0.62);
+  --color-gray-500: rgb(31 41 55 / 0.7);
+  --color-emerald-600: var(--color-emerald-700);
+}
+html.dark .gk-sheet {
+  --color-gray-300: rgb(243 244 246 / 0.85);
+  --color-gray-400: rgb(243 244 246 / 0.75);
+  --color-gray-500: rgb(243 244 246 / 0.66);
+  --color-gray-600: rgb(243 244 246 / 0.5);
+  --color-indigo-300: var(--color-indigo-200);
+  --color-red-600: var(--color-red-300);
+  --gk-accent-text: color-mix(in srgb, var(--gk-chrome-accent) 40%, #fff);
+  --rt-btn-active-text: #fff;
+  --rt-btn-active-bg: rgb(255 255 255 / 0.16);
+  --rt-list-bullet: #a5b4fc;
+  --rt-list-ordered: #7dd3fc;
+}
 .gk-sheet[data-state="open"] {
   transform: translateY(0);
   transition: transform 380ms cubic-bezier(0.2, 0, 0, 1);
@@ -4009,6 +4033,12 @@ html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
 }
 
 /* Time stepper + chips */
+/* In a sheet (on the note's colour) the faded parts stay readable. */
+.gk-sheet .gk-reminder .rt-pop-label { opacity: 0.8; }
+.gk-sheet .gk-reminder .gk-cal-dow { opacity: 0.75; }
+.gk-sheet .gk-reminder .gk-cal-day--muted { opacity: 0.45; }
+.gk-sheet .gk-reminder .gk-cal-day:disabled { opacity: 0.38; }
+.gk-sheet .gk-reminder .gk-time-sep { opacity: 0.7; }
 .gk-reminder .gk-time { padding: 2px 4px; }
 .gk-reminder .gk-time-stepper { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 9px; }
 .gk-reminder .gk-time-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
@@ -6372,6 +6402,15 @@ html.dark .gk-notif-card-swipe-bg {
 .gk-tag-chip-remove {
   color: color-mix(in srgb, var(--gk-chrome-accent) 65%, transparent);
 }
+.gk-sheet .gk-tag-chip-remove { color: var(--gk-icon-fg); }
+/* In a dark sheet the accent tint sinks into the note's colour: neutral
+   translucent chips instead. */
+html.dark .gk-sheet .gk-tag-chip {
+  background-color: rgb(255 255 255 / 0.14);
+  color: inherit;
+  border-color: transparent;
+}
+html.dark .gk-sheet .gk-tag-chip-remove { color: rgb(243 244 246 / 0.75); }
 
 /* Header kebab menu (phones): the header's colour, unfolding from the button
    it covers. Keep HEADER_MENU_EXIT_MS (NotesHeader.jsx) above the closing

@@ -45,7 +45,8 @@ function AccessToggle({ canWrite, onChange }) {
   const ro = canWrite === 0;
   const cell =
     "inline-flex items-center justify-center px-2 py-1 transition-colors";
-  const active = "bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)]";
+  // --gk-accent-text: lighter in dark sheets (globalCSS, .gk-sheet).
+  const active = "bg-[var(--gk-accent-soft-bg)] text-[var(--gk-accent-text,var(--gk-chrome-accent))]";
   const idle = "text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/10";
   return (
     <div className="inline-flex rounded-lg border border-[var(--border-light)] overflow-hidden">
