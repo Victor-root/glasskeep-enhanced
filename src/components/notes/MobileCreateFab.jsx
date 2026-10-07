@@ -89,7 +89,7 @@ export default function MobileCreateFab({
         }}
       >
       <div
-        className={`flex flex-col items-end gap-3 transition-[opacity,transform] duration-200 ease-out ${
+        className={`flex flex-col items-end gap-3 transition-[opacity,translate] duration-200 ease-out ${
           open
             ? "opacity-100 translate-y-0 pointer-events-auto"
             : "opacity-0 translate-y-3 pointer-events-none"
