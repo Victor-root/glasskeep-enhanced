@@ -2,9 +2,13 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { t } from "../../i18n";
 import { SearchIcon, CloseIcon } from "../../icons/index.jsx";
 import { ALL_IMAGES, REMINDERS } from "../../utils/constants.js";
+import ScrollThumb from "../common/ScrollThumb.jsx";
 
 import { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, RemindersSidebarIcon } from "../../icons/sidebarIcons.jsx";
 export { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, RemindersSidebarIcon };
+
+// Past this distance a touch is a scroll, not a long press.
+const LONG_PRESS_SLOP_PX = 10;
 
 export default function TagSidebar({
   open,
@@ -27,18 +31,31 @@ export default function TagSidebar({
   const itemClass = (active) =>
     active ? "gk-side-item gk-side-item--active" : "gk-side-item";
 
+  const navRef = useRef(null);
+
   // Long-press support for multi-tag selection on touch devices
   const longPressTimer = useRef(null);
   const longPressTriggered = useRef(false);
+  const longPressStart = useRef(null);
 
-  const handleTagTouchStart = (tag) => {
+  const handleTagTouchStart = (tag, e) => {
     longPressTriggered.current = false;
+    const touch = e.touches[0];
+    longPressStart.current = { x: touch.clientX, y: touch.clientY };
     longPressTimer.current = setTimeout(() => {
       longPressTriggered.current = true;
       onSelect(tag, { ctrlKey: true });
     }, 500);
   };
   const handleTagTouchEnd = () => clearTimeout(longPressTimer.current);
+  // A finger that starts sliding is scrolling the list, not holding a tag.
+  const handleTagTouchMove = (e) => {
+    const start = longPressStart.current;
+    const touch = e.touches[0];
+    if (start && Math.hypot(touch.clientX - start.x, touch.clientY - start.y) > LONG_PRESS_SLOP_PX) {
+      clearTimeout(longPressTimer.current);
+    }
+  };
 
   // Suppress slide animation when sidebar first becomes permanent (server load)
   const hasBeenPermanentRef = useRef(permanent);
@@ -88,7 +105,8 @@ export default function TagSidebar({
             <CloseIcon />
           </button>
         </div>
-        <nav className="gk-sidebar-body p-2 overflow-y-auto h-[calc(100%-var(--gk-header-h,56px))]">
+        <ScrollThumb scrollerRef={navRef} className="gk-scroll-thumb gk-scroll-thumb--sidebar" />
+        <nav ref={navRef} className="gk-sidebar-body p-2 overflow-y-auto h-[calc(100%-var(--gk-header-h,56px))]">
           {/* Multi-tag filter indicator — at the top so it's impossible to miss */}
           {activeTagFilters.length > 1 && (
             <div
@@ -195,7 +213,8 @@ export default function TagSidebar({
                     onClose();
                   }
                 }}
-                onTouchStart={() => handleTagTouchStart(tag)}
+                onTouchStart={(e) => handleTagTouchStart(tag, e)}
+                onTouchMove={handleTagTouchMove}
                 onTouchEnd={handleTagTouchEnd}
                 onTouchCancel={handleTagTouchEnd}
               >
