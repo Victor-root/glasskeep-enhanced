@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel, { ColorSwatchGrid } from "../common/ColorPickerPanel.jsx";
 import Popover from "../common/Popover.jsx";
-import BottomSheet from "../common/BottomSheet.jsx";
+import BottomSheet, { SheetRow } from "../common/BottomSheet.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
 import AddImageMenu from "./AddImageMenu.jsx";
 import LogoPickerPopover from "./LogoPickerPopover.jsx";
@@ -12,7 +12,7 @@ import ReminderPicker from "../notes/ReminderPicker.jsx";
 import { Popover as RichTextPopover } from "../richtext/Popover.jsx";
 import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon, LogoIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
-import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
+import { COLOR_ORDER, LIGHT_COLORS, modalBgFor } from "../../utils/colors.js";
 import { t } from "../../i18n";
 
 const NOTE_COLORS = COLOR_ORDER.filter((name) => LIGHT_COLORS[name]);
@@ -143,6 +143,8 @@ export default function ModalFooter({
   };
 
   const btnClass = isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn";
+  // Mobile sheets take the open note's own background colour.
+  const sheetBg = modalBgFor(mColor, dark);
 
   /* Image sub-menu (regular image vs logo / note icon) */
   const imageBtnRef = useRef(null);
@@ -310,7 +312,7 @@ export default function ModalFooter({
             onSelect={(name) => setMColor(name)}
           />
         ) : (
-          <BottomSheet open={showModalColorPop} onClose={() => setShowModalColorPop(false)} title={t("color")}>
+          <BottomSheet open={showModalColorPop} onClose={() => setShowModalColorPop(false)} title={t("color")} background={sheetBg}>
             <div className="px-1 pt-1 pb-3">
               <ColorSwatchGrid
                 labeled
@@ -392,6 +394,8 @@ export default function ModalFooter({
                 setLogoPickerOpen(true);
               }}
               onRemoveIcon={() => removeNoteIcon && removeNoteIcon()}
+              asSheet={!isDesktop}
+              sheetBackground={sheetBg}
             />
             <LogoPickerPopover
               anchorRef={imageBtnRef}
@@ -526,7 +530,7 @@ export default function ModalFooter({
               document.body
             );
           })() : (
-            <BottomSheet open={modalTagFocused} onClose={closeTagPicker} title={t("tags")}>
+            <BottomSheet open={modalTagFocused} onClose={closeTagPicker} title={t("tags")} background={sheetBg}>
               <NoteTagPicker variant="sheet" {...tagPickerProps} />
             </BottomSheet>
           )}
@@ -695,15 +699,10 @@ export default function ModalFooter({
             </div>
           </Popover>
         ) : (
-          <BottomSheet open={modalKebabOpen} onClose={() => setModalKebabOpen(false)} title={t("moreOptions")}>
-            <div className="gk-sheet-card">
-              {kebabItems.map((item) => (
-                <button key={item.key} className="gk-sheet-row" onClick={() => runKebabItem(item)}>
-                  <span className="gk-sheet-row-icon" style={{ color: item.color }}>{item.icon}</span>
-                  <span className="min-w-0 truncate">{item.label}</span>
-                </button>
-              ))}
-            </div>
+          <BottomSheet open={modalKebabOpen} onClose={() => setModalKebabOpen(false)} title={t("moreOptions")} background={sheetBg}>
+            {kebabItems.map((item) => (
+              <SheetRow key={item.key} icon={item.icon} color={item.color} label={item.label} onClick={() => runKebabItem(item)} />
+            ))}
           </BottomSheet>
         )}
 

@@ -70,9 +70,8 @@ html.dark {
   --gk-scroll-thumb-hover: linear-gradient(180deg, color-mix(in srgb, var(--gk-chrome-grad-from) 82%, #000), color-mix(in srgb, var(--gk-chrome-grad-to) 82%, #000));
   --gk-panel-bg: color-mix(in srgb, var(--gk-chrome-accent) 6%, #ffffff);
   --gk-panel-card: color-mix(in srgb, var(--gk-chrome-accent) 4%, #ffffff);
-  /* Mobile bottom sheets (BottomSheet.jsx): a tinted base with white cards. */
+  /* Mobile bottom sheets (BottomSheet.jsx) not given a background of their own. */
   --gk-sheet-bg: color-mix(in srgb, var(--gk-chrome-accent) 7%, #f3f3f6);
-  --gk-sheet-card: #ffffff;
   /* Two icon tiers so option-row vs section-header chips stay distinct
      (GlassKeep: indigo grad-from vs violet grad-to, as before). */
   --gk-icon-fg: var(--gk-chrome-grad-from);
@@ -116,7 +115,6 @@ html.dark {
   --gk-panel-bg: color-mix(in srgb, var(--gk-chrome-accent) 10%, #1f1f1f);
   --gk-panel-card: color-mix(in srgb, var(--gk-chrome-accent) 8%, #282828);
   --gk-sheet-bg: color-mix(in srgb, var(--gk-chrome-accent) 8%, #1c1c1e);
-  --gk-sheet-card: color-mix(in srgb, var(--gk-chrome-accent) 10%, #2a2a2d);
   /* Lighten the icon foregrounds on dark so they stay legible while keeping
      the two-tier (option vs section) hue distinction. */
   --gk-icon-fg: color-mix(in srgb, var(--gk-chrome-grad-from) 62%, #fff);
@@ -1606,7 +1604,7 @@ html.dark .modal-icon-btn--image:hover {
    large rounded top corners and a grab handle. Only transform (sheet) and
    opacity (backdrop) animate; it decelerates in and accelerates out. Lifted
    above the soft keyboard through --keyboard-inset. Content is laid out with
-   the card / row bricks below. */
+   the field / row bricks below, straight on the sheet's background. */
 .gk-sheet-root {
   position: fixed;
   inset: 0;
@@ -1689,25 +1687,36 @@ html.dark .gk-sheet-grabber { background: rgba(255, 255, 255, 0.28); }
   scrollbar-width: none;
 }
 .gk-sheet-body::-webkit-scrollbar { display: none; }
-.gk-sheet-card {
-  background: var(--gk-sheet-card);
-  border-radius: 18px;
-  overflow: hidden;
+.gk-sheet-field {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 14px;
 }
-.gk-sheet-card + .gk-sheet-card { margin-top: 12px; }
+html.dark .gk-sheet-field { background: rgba(255, 255, 255, 0.07); }
 .gk-sheet-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
   width: 100%;
   min-height: 54px;
-  padding: 0 18px;
+  padding: 0 8px;
+  border-radius: 12px;
   text-align: left;
   font-size: 1rem;
   transition: background-color 0.12s ease;
 }
-.gk-sheet-row + .gk-sheet-row { border-top: 1px solid rgba(0, 0, 0, 0.06); }
-html.dark .gk-sheet-row + .gk-sheet-row { border-top-color: rgba(255, 255, 255, 0.07); }
+/* Separator drawn apart from the row so it stays straight under the row's
+   rounded pressed state. */
+.gk-sheet-row + .gk-sheet-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.07);
+}
+html.dark .gk-sheet-row + .gk-sheet-row::before { background: rgba(255, 255, 255, 0.08); }
 .gk-sheet-row:active { background-color: var(--gk-chrome-hover); }
 .gk-sheet-row-icon {
   flex-shrink: 0;
