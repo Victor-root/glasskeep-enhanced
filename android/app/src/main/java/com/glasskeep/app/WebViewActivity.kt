@@ -978,9 +978,15 @@ class WebViewActivity : AppCompatActivity() {
      *  it is what sits behind them (the header) whenever the page is at rest. */
     private fun applySystemBars() {
         val color = themeBarColor ?: return
-        val barColor = if (isEdgeToEdgeActive()) Color.TRANSPARENT else color
+        val edgeToEdge = isEdgeToEdgeActive()
+        val barColor = if (edgeToEdge) Color.TRANSPARENT else color
         window.statusBarColor = barColor
         window.navigationBarColor = barColor
+        // With 3-button navigation the system otherwise lays its own
+        // translucent white scrim over a transparent navigation bar.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = !edgeToEdge
+        }
 
         val luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
         val isLight = luminance > 0.5
