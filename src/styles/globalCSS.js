@@ -2279,13 +2279,26 @@ html:not(.dark) .code-copy-btn {
 @supports not selector(::-webkit-scrollbar) {
   * { scrollbar-width: thin; scrollbar-color: var(--gk-chrome-accent) var(--gk-scroll-track); }
 }
-/* Modal — scrollbar adaptée à la couleur de la note */
-.modal-scroll-themed::-webkit-scrollbar-track { background: var(--sb-track); }
-.modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 10px; }
-.modal-scroll-themed::-webkit-scrollbar-thumb:hover { filter: brightness(1.15); }
-/* Fallback si CSS vars non résolues sur webkit (Safari) */
-html.dark .modal-scroll-themed::-webkit-scrollbar-track { background: var(--sb-track, #3b0764) !important; }
-html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb, #7c3aed) !important; border-radius: 10px; }
+/* Modal : scrollbar adaptée à la couleur de la note (pointer devices; touch
+   screens use the single touch scrollbar below). */
+@media (hover: hover), (pointer: fine) {
+  .modal-scroll-themed::-webkit-scrollbar-track { background: var(--sb-track); }
+  .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 10px; }
+  .modal-scroll-themed::-webkit-scrollbar-thumb:hover { filter: brightness(1.15); }
+  /* Fallback si CSS vars non résolues sur webkit (Safari) */
+  html.dark .modal-scroll-themed::-webkit-scrollbar-track { background: var(--sb-track, #3b0764) !important; }
+  html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb, #7c3aed) !important; border-radius: 10px; }
+}
+/* Touch screens: one scrollbar everywhere, drawn like the Android app's own
+   page scrollbar (WebViewActivity, onScrollbarColor): a thin theme-accent
+   thumb, no track, shown only while its box scrolls (data-gk-scrollbar, see
+   useTouchScrollbars). */
+@media (hover: none) and (pointer: coarse) {
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; }
+  [data-gk-scrollbar]::-webkit-scrollbar-thumb { background: var(--gk-chrome-accent); }
+}
 /* Reserve the scrollbar gutter on desktop so the inner width stays
    identical whether the note is short (no scrollbar) or long (scrollbar
    visible). Without this, a long note shaves ~15 px off the toolbar's
@@ -6206,6 +6219,28 @@ html.dark .gk-notif-card-swipe-bg {
 }
 .gk-tag-chip-remove {
   color: color-mix(in srgb, var(--gk-chrome-accent) 65%, transparent);
+}
+
+/* Header kebab menu (phones): the header's colour, unfolding from the button
+   it covers. Keep HEADER_MENU_EXIT_MS (NotesHeader.jsx) above the closing
+   duration. */
+.gk-header-menu {
+  background: var(--gk-statusbar);
+  transform-origin: top right;
+  opacity: 0;
+  transform: scale(0.9);
+  pointer-events: none;
+  transition: opacity 130ms ease-in, transform 130ms ease-in;
+}
+.gk-header-menu[data-state="open"] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition: opacity 160ms ease-out, transform 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gk-header-menu,
+  .gk-header-menu[data-state="open"] { transition: none; }
 }
 
 /* Header icon buttons hover circle. Pointer devices only: a touch screen keeps

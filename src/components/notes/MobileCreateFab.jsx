@@ -1,6 +1,10 @@
 import React, { useRef, useEffect } from "react";
 import { t } from "../../i18n";
 import { TextNoteIcon, ChecklistIcon, BrushIcon, MicIcon } from "../../icons/index.jsx";
+import { setSystemBarsScrim } from "../../utils/helpers.js";
+
+// Darkness of the backdrop, matched on the Android status and navigation bars.
+const SCRIM_ALPHA = 0.3;
 
 export default function MobileCreateFab({
   open,
@@ -44,6 +48,14 @@ export default function MobileCreateFab({
     };
   }, [open, setOpen]);
 
+  // The bars are painted by the app outside the page, so the backdrop cannot
+  // reach them: they dim natively alongside it.
+  useEffect(() => {
+    if (!open) return undefined;
+    setSystemBarsScrim(SCRIM_ALPHA);
+    return () => setSystemBarsScrim(0);
+  }, [open]);
+
   const pick = (fn) => () => {
     setOpen(false);
     fn?.();
@@ -55,14 +67,16 @@ export default function MobileCreateFab({
           open of this menu doesn't pay the one-off blur-shader compile cost
           (the cold-start lag). See .gk-backdrop-warm in globalCSS. */}
       <div aria-hidden="true" className="gk-backdrop-warm" />
+      {/* Above the sticky header (z-40), under the dial. */}
       <div
-        className={`fixed inset-0 z-30 transition-opacity duration-200 ease-out bg-black/30 backdrop-blur-[2px] ${
+        className={`fixed inset-0 z-[45] transition-opacity duration-200 ease-out backdrop-blur-[2px] ${
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
+        style={{ backgroundColor: `rgba(0, 0, 0, ${SCRIM_ALPHA})` }}
       />
       <div
         ref={containerRef}
-        className="fixed z-40 flex flex-col items-end gap-3 pointer-events-none"
+        className="fixed z-[46] flex flex-col items-end gap-3 pointer-events-none"
         style={{
           // --safe-bottom / --safe-right resolve to the Android-injected
           // value when running inside the native APK, or to the standard

@@ -1,17 +1,20 @@
 package com.glasskeep.app
 
 import android.Manifest
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.app.DownloadManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.view.animation.DecelerateInterpolator
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
@@ -30,6 +33,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowInsetsControllerCompat
 import com.glasskeep.app.net.CleartextPolicy
 
@@ -203,6 +207,29 @@ class WebViewActivity : AppCompatActivity() {
                 else try { Color.parseColor(hexColor) } catch (_: Exception) { return@runOnUiThread }
                 applySystemBars()
             }
+        }
+
+        /** The page's own scrollbar (drawn by the WebView) in the theme
+         *  accent, as thin as the page's inner scrollbars. */
+        @JavascriptInterface
+        fun onScrollbarColor(hexColor: String) {
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) return
+            runOnUiThread {
+                val color = try { Color.parseColor(hexColor) } catch (_: Exception) { return@runOnUiThread }
+                val density = resources.displayMetrics.density
+                webView.scrollBarSize = (SCROLLBAR_WIDTH_DP * density).toInt()
+                webView.verticalScrollbarThumbDrawable = GradientDrawable().apply {
+                    setColor(color)
+                    cornerRadius = SCROLLBAR_WIDTH_DP * density / 2
+                }
+            }
+        }
+
+        /** Darkens the painted bars by this share of black, alongside a
+         *  dimming overlay the page lays over itself (0 lifts it). */
+        @JavascriptInterface
+        fun setBarsScrim(alpha: Float) {
+            runOnUiThread { animateBarsScrim(alpha.coerceIn(0f, 1f)) }
         }
 
         /** Settings → "Edge-to-edge in portrait". Stored natively so the
@@ -433,6 +460,9 @@ class WebViewActivity : AppCompatActivity() {
     // Set while the page wants the navigation bar apart from the theme
     // colour (ThemeBridge.onNavBarColor).
     private var navBarColor: Int? = null
+    // Share of black over the painted bars (ThemeBridge.setBarsScrim).
+    private var barsScrim = 0f
+    private var barsScrimAnimator: ValueAnimator? = null
 
     /** Portrait edge-to-edge: the user option is on and the phone is upright.
      *  The bars then stay transparent and the page draws behind them. */
@@ -1020,8 +1050,9 @@ class WebViewActivity : AppCompatActivity() {
      *  portrait edge-to-edge. The icons follow those colours either way: they
      *  are what sits behind them whenever the page is at rest. */
     private fun applySystemBars() {
-        val color = themeBarColor ?: return
-        val navColor = navBarColor ?: color
+        val theme = themeBarColor ?: return
+        val color = ColorUtils.blendARGB(theme, Color.BLACK, barsScrim)
+        val navColor = ColorUtils.blendARGB(navBarColor ?: theme, Color.BLACK, barsScrim)
         val edgeToEdge = isEdgeToEdgeActive()
         window.statusBarColor = if (edgeToEdge) Color.TRANSPARENT else color
         window.navigationBarColor = if (edgeToEdge) Color.TRANSPARENT else navColor
@@ -1034,6 +1065,20 @@ class WebViewActivity : AppCompatActivity() {
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.isAppearanceLightStatusBars = isLight(color)
         controller.isAppearanceLightNavigationBars = isLight(navColor)
+    }
+
+    /** Same timing as the page overlay's fade (MobileCreateFab). */
+    private fun animateBarsScrim(target: Float) {
+        barsScrimAnimator?.cancel()
+        barsScrimAnimator = ValueAnimator.ofFloat(barsScrim, target).apply {
+            duration = BARS_SCRIM_MS
+            interpolator = DecelerateInterpolator()
+            addUpdateListener {
+                barsScrim = it.animatedValue as Float
+                applySystemBars()
+            }
+            start()
+        }
     }
 
     private fun isLight(color: Int): Boolean =
@@ -1317,6 +1362,7 @@ class WebViewActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         netDebug?.stop()
+        barsScrimAnimator?.cancel()
         super.onDestroy()
     }
 
@@ -1447,5 +1493,9 @@ class WebViewActivity : AppCompatActivity() {
         const val EXTRA_OPEN_NOTE_ID = "openNoteId"
 
         private const val KEY_EDGE_TO_EDGE_PORTRAIT = "edge_to_edge_portrait"
+        // Matches the page's touch scrollbars (globalCSS).
+        private const val SCROLLBAR_WIDTH_DP = 4f
+        // Matches the FAB overlay's fade (MobileCreateFab).
+        private const val BARS_SCRIM_MS = 200L
     }
 }

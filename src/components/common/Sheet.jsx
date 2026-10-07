@@ -1,5 +1,6 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { usePresence } from "../../hooks/usePresence.js";
 
 // Past this share of its height, or this speed (px/ms) towards its own edge,
 // a released drag closes the sheet instead of snapping it back.
@@ -25,31 +26,10 @@ const UNMOUNT_DELAY_MS = 320;
 export default function Sheet({ open, onClose, title, titleAction, edge = "bottom", background, keepMounted = false, children }) {
   // +1 when the sheet closes downwards (bottom edge), -1 upwards (top edge).
   const dir = edge === "top" ? -1 : 1;
-  const [mounted, setMounted] = useState(open);
-  const [shown, setShown] = useState(false);
   const sheetRef = useRef(null);
   const scrimRef = useRef(null);
   const dragRef = useRef(null);
-
-  useLayoutEffect(() => {
-    if (open) setMounted(true);
-    else setShown(false);
-  }, [open]);
-
-  // Mounted closed first, its closed position resolved (the read below),
-  // then opened on the next frame so the slide-in starts off-screen.
-  useEffect(() => {
-    if (!mounted || !open) return undefined;
-    void sheetRef.current?.offsetHeight;
-    const frame = requestAnimationFrame(() => setShown(true));
-    return () => cancelAnimationFrame(frame);
-  }, [mounted, open]);
-
-  useEffect(() => {
-    if (open || !mounted) return undefined;
-    const timer = setTimeout(() => setMounted(false), UNMOUNT_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [open, mounted]);
+  const { mounted, shown, unmount } = usePresence(open, sheetRef, UNMOUNT_DELAY_MS);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -136,7 +116,7 @@ export default function Sheet({ open, onClose, title, titleAction, edge = "botto
         aria-modal="true"
         aria-label={title}
         onTransitionEnd={(e) => {
-          if (e.target === e.currentTarget && e.propertyName === "transform" && !open) setMounted(false);
+          if (e.target === e.currentTarget && e.propertyName === "transform" && !open) unmount();
         }}
       >
         {edge === "top" ? (

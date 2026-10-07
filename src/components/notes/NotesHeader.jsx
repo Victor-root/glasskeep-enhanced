@@ -5,8 +5,13 @@ import { Hamburger, SearchIcon, CloseIcon, GridIcon, ListIcon, SunIcon, MoonIcon
 import TI from "../../icons/editor/index.jsx";
 import SyncStatusIcon from "../../sync/SyncStatusIcon.jsx";
 import { useSwallowClosingClick } from "../../hooks/useSwallowClosingClick.js";
+import { usePresence } from "../../hooks/usePresence.js";
 import UserAvatar from "../common/UserAvatar.jsx";
 import { useBranding, DEFAULT_APP_NAME } from "../../branding/BrandingContext.jsx";
+
+// Matches the closing transition of .gk-header-menu in globalCSS, plus a
+// margin in case transitionend never fires.
+const HEADER_MENU_EXIT_MS = 180;
 
 export default function NotesHeader({
   dark,
@@ -130,6 +135,7 @@ export default function NotesHeader({
   // card opens. So the closing `pointerdown` also hands its gesture to
   // useSwallowClosingClick, whose listeners outlive the menu.
   const swallowClickOf = useSwallowClosingClick();
+  const headerMenuPresence = usePresence(headerMenuOpen, headerMenuRef, HEADER_MENU_EXIT_MS);
 
   // Publish the header's exact rendered height as --gk-header-h. TagSidebar
   // sizes its own header row to this same value, so its body nav's
@@ -594,7 +600,7 @@ export default function NotesHeader({
               )}
             </button>
 
-            {headerMenuOpen && (
+            {headerMenuPresence.mounted && (
               <>
                 {/* The dropdown's top is anchored to the kebab button
                     itself on mobile (top-0) so it paints OVER the 3
@@ -608,11 +614,13 @@ export default function NotesHeader({
                     than ~95vw so it can't overflow on tiny phones. */}
                 <div
                   ref={headerMenuRef}
-                  className={`absolute top-0 sm:top-12 right-0 w-max max-w-[95vw] sm:min-w-[220px] sm:max-w-[360px] max-h-[72vh] sm:max-h-[80vh] overflow-y-auto z-[1100] border border-[var(--border-light)] rounded-lg shadow-lg ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
-                  style={{ backgroundColor: dark ? "#222222" : undefined }}
+                  className={`gk-header-menu absolute top-0 sm:top-12 right-0 w-max max-w-[95vw] sm:min-w-[220px] sm:max-w-[360px] max-h-[72vh] sm:max-h-[80vh] overflow-y-auto z-[1100] border border-[var(--border-light)] rounded-lg shadow-lg ${dark ? "text-gray-100" : "text-gray-800"}`}
+                  data-state={headerMenuPresence.shown ? "open" : "closed"}
+                  onTransitionEnd={(e) => {
+                    if (e.target === e.currentTarget && e.propertyName === "opacity" && !headerMenuOpen) headerMenuPresence.unmount();
+                  }}
                   onClick={(e) => e.stopPropagation()}
-                >
-                  <button
+                >                  <button
                     className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                     onClick={() => {
                       setHeaderMenuOpen(false);
@@ -669,7 +677,7 @@ export default function NotesHeader({
                         {hasUpdate && (
                           <span aria-hidden="true" className="absolute top-0 right-0 flex items-center justify-center">
                             <span className="absolute inline-flex w-2 h-2 rounded-full bg-emerald-400 opacity-75 animate-ping" />
-                            <span className={`relative inline-flex w-2 h-2 rounded-full bg-emerald-500 ring-2 ${dark ? "ring-[#222222]" : "ring-white"}`} />
+                            <span className={`relative inline-flex w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-[var(--gk-statusbar)]`} />
                           </span>
                         )}
                       </span>

@@ -80,6 +80,7 @@ import SecondaryNoteInstance from "./components/modal/SecondaryNoteInstance.jsx"
 import { parseAudioContent, isAudioContentEmpty, extensionForMime } from "./utils/audioNote.js";
 import { dataUrlToBlob } from "./utils/audioConvert.js";
 import useModalState from "./hooks/useModalState.js";
+import useTouchScrollbars from "./hooks/useTouchScrollbars.js";
 import useDraftNote from "./hooks/useDraftNote.js";
 import useAdminActions from "./hooks/useAdminActions.js";
 import { useBranding } from "./branding/BrandingContext.jsx";
@@ -2205,6 +2206,8 @@ export default function App() {
     document.head.appendChild(style);
     return () => style.remove();
   }, []);
+  // After the CSS inject: it reads the theme accent from globalCSS.
+  useTouchScrollbars();
 
   // Router
   useEffect(() => {
