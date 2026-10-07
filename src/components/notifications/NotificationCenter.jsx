@@ -148,12 +148,11 @@ export default function NotificationCenter({
   // shifted the page (and could leave it stuck). The sheet just overlays the
   // chrome; the list keeps its own overflow-y for scrolling.
 
-  // Grabber drag-to-close — mirrors the editor's .mobile-fmt-sheet
-  // grabber except the panel is anchored at the TOP, so the drag is
-  // upward (finger moves toward the top of the screen) and the panel
-  // shrinks from the bottom by translating up. Direct DOM mutation
-  // via panel.style.transform keeps the per-frame work off the React
-  // render path; same trick the editor sheet already uses.
+  // Grabber drag-to-close, like the bottom sheets' handle except the
+  // panel is anchored at the TOP, so the drag is upward (finger moves
+  // toward the top of the screen) and the panel shrinks from the bottom
+  // by translating up. Direct DOM mutation via panel.style.transform
+  // keeps the per-frame work off the React render path.
   const dragRef = useRef({ active: false, startY: 0, currentY: 0 });
   const dragCleanupRef = useRef(null);
 
