@@ -57,6 +57,12 @@ export function setNavBarColor(color) {
   try { window.AndroidTheme?.onNavBarColor?.(color || ""); } catch (_) {}
 }
 
+/** Android app (1.4.8+) only: darkens the painted status and navigation bars
+ *  by this share of black, in step with a dimming overlay over the page. */
+export function setSystemBarsScrim(alpha) {
+  try { window.AndroidTheme?.setBarsScrim?.(alpha); } catch (_) {}
+}
+
 export const sanitizeFilename = (name, fallback = "note") =>
   (name || fallback)
     .toString()
