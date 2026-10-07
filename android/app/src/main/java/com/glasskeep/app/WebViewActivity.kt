@@ -212,7 +212,6 @@ class WebViewActivity : AppCompatActivity() {
          *  which the WebView's (always on top) cannot do. */
         @JavascriptInterface
         fun setNativePageScrollbar(enabled: Boolean) {
-            if (BuildConfig.DEBUG) NetDebug.log("native page scrollbar: $enabled")
             runOnUiThread { webView.isVerticalScrollBarEnabled = enabled }
         }
 
