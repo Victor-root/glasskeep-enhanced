@@ -7,6 +7,7 @@ import Popover from "../common/Popover.jsx";
 import { SunIcon, MoonIcon, FloatingCardsIcon, SettingsIcon, CloseIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { fileToCompressedDataURL } from "../../utils/helpers.js";
+import { debugLog } from "../../utils/netDebug.js";
 import TypographyModal from "./TypographyModal.jsx";
 import PasskeySettingsSection from "../settings/PasskeySettingsSection.jsx";
 import OidcSettingsSection from "../settings/OidcSettingsSection.jsx";
@@ -127,6 +128,89 @@ export default function SettingsPanel({
   // expansion state is server-synced (defaults to all collapsed).
   const toggleSection = (key) =>
     setOpenSections?.((prev) => ({ ...prev, [key]: !prev[key] }));
+  // Temporary trace (debug APK only, logcat tag GKScroll) for the scrollbar
+  // that shows on Android with nothing to scroll: the scroll body's exact
+  // geometry, its direct children, and any element reaching past its
+  // visible bottom without being clipped by an ancestor.
+  const scrollBodyRef = useRef(null);
+  useEffect(() => {
+    const el = scrollBodyRef.current;
+    if (!open || !el || !window.AndroidNetDebug) return undefined;
+    const round = (n) => Math.round(n * 100) / 100;
+    const label = (node) => {
+      const cls = typeof node.className === "string" ? node.className : node.className?.baseVal || "";
+      const text = (node.textContent || "").replace(/\s+/g, " ").trim().slice(0, 24);
+      return `${node.tagName.toLowerCase()}.${cls.split(/\s+/).slice(0, 4).join(".")} "${text}"`;
+    };
+    const measure = (reason) => {
+      const box = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      const before = el.scrollTop;
+      el.scrollTop = el.scrollHeight;
+      const maxScroll = el.scrollTop;
+      el.scrollTop = before;
+      debugLog("GKScroll", reason, {
+        dpr: window.devicePixelRatio,
+        viewport: `${window.innerWidth}x${window.innerHeight}`,
+        visualViewport: window.visualViewport && round(window.visualViewport.height),
+        top: round(box.top),
+        height: round(box.height),
+        offsetHeight: el.offsetHeight,
+        clientHeight: el.clientHeight,
+        scrollHeight: el.scrollHeight,
+        maxScroll,
+        scrollbarWidth: el.offsetWidth - el.clientWidth,
+        padding: `${cs.paddingTop} / ${cs.paddingBottom}`,
+        overflowY: cs.overflowY,
+        willChange: cs.willChange,
+      });
+      for (const child of el.children) {
+        const r = child.getBoundingClientRect();
+        const ccs = getComputedStyle(child);
+        debugLog("GKScroll", "  child", label(child), {
+          top: round(r.top - box.top + el.scrollTop),
+          bottom: round(r.bottom - box.top + el.scrollTop),
+          height: round(r.height),
+          margin: `${ccs.marginTop} / ${ccs.marginBottom}`,
+        });
+      }
+      const visibleBottom = el.clientHeight;
+      let reported = 0;
+      for (const node of el.querySelectorAll("*")) {
+        if (reported >= 15) break;
+        const r = node.getBoundingClientRect();
+        if (!r.width && !r.height) continue;
+        const bottom = r.bottom - box.top + el.scrollTop;
+        if (bottom <= visibleBottom + 0.01) continue;
+        let clipped = false;
+        for (let a = node.parentElement; a && a !== el; a = a.parentElement) {
+          if (getComputedStyle(a).overflowY !== "visible") { clipped = true; break; }
+        }
+        if (clipped) continue;
+        reported++;
+        debugLog("GKScroll", "  past bottom", label(node), {
+          bottom: round(bottom),
+          by: round(bottom - visibleBottom),
+          position: getComputedStyle(node).position,
+          transform: getComputedStyle(node).transform,
+        });
+      }
+      if (!reported) debugLog("GKScroll", "  nothing reaches past the visible bottom");
+    };
+    let frame = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => measure("resize"));
+    });
+    ro.observe(el);
+    for (const child of el.children) ro.observe(child);
+    const settled = setTimeout(() => measure("open, after the slide-in"), 400);
+    return () => {
+      clearTimeout(settled);
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
+  }, [open]);
   // Current installed APK version, fetched once from the Android
   // bridge. Empty string when running on the web/PWA (no bridge) so
   // the "v…" line stays hidden.
@@ -316,7 +400,7 @@ export default function SettingsPanel({
           </button>
         </div>
 
-        <div className="gk-side-panel-scroll p-4 overflow-y-auto overflow-x-hidden flex-1 min-h-0 flex flex-col">
+        <div ref={scrollBodyRef} className="gk-side-panel-scroll p-4 overflow-y-auto overflow-x-hidden flex-1 min-h-0 flex flex-col">
           {/* Profile Section — header (icon + "Profil" title) intentionally
               omitted; the avatar block is self-explanatory. */}
           <div className="mb-8">
