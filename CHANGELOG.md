@@ -7,6 +7,9 @@
 - 📱 **Edge-to-edge in portrait** (Android app 1.4.8+): a new switch in Settings → *UI Preferences* makes the status bar and the navigation bar transparent in portrait, so the notes scroll behind them. Off by default; landscape keeps its own option.
 - 📘 **Single sign-on setup guide** on the [project website](https://victor-root.github.io/glasskeep-enhanced/sso.html): the exact values for Authentik, Keycloak and Authelia, annotated screenshots and troubleshooting.
 
+### 🐛 Fixed
+- 📶 **Android app stuck offline after a while in the background**, often until it was force-closed: API requests no longer go through the service worker (Chrome / WebView 123+), and the app (1.4.8+) now lets the WebView detect network changes, so connections to the server that died during sleep are dropped instead of reused.
+
 ### 🔒 Security
 - The flow runs on the server (Authorization Code with PKCE, state and nonce, ID token verified against the provider's keys); the client secret never reaches a browser.
 - An account is opened only by the identity it linked (issuer + subject), never by a matching e-mail; a provider never creates accounts or grants rights. Linking asks for the account password.
