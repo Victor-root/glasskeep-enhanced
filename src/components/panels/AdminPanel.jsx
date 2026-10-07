@@ -529,7 +529,7 @@ export default function AdminPanel({
           </div>
         </div>
 
-        <div className="gk-side-panel-scroll p-4 overflow-y-auto overflow-x-hidden h-[calc(100%-64px)]">
+        <div className="gk-side-panel-scroll mobile-hide-scrollbar p-4 overflow-y-auto overflow-x-hidden h-[calc(100%-64px)]">
           <AdminUpdateSection
             updateInfo={updateInfo}
             selfUpdate={selfUpdate}

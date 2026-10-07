@@ -17,13 +17,6 @@ export function netLog(...parts) {
   try { bridge.log(parts.map(describe).join(" ")); } catch (_) {}
 }
 
-// Same trace under another logcat tag (must start with "GK").
-export function debugLog(tag, ...parts) {
-  const bridge = typeof window !== "undefined" ? window.AndroidNetDebug : null;
-  if (!bridge) return;
-  try { bridge.logTagged(tag, parts.map(describe).join(" ")); } catch (_) {}
-}
-
 // Asks the app to reach the server outside the WebView and log the result.
 export function netProbe(reason) {
   const bridge = typeof window !== "undefined" ? window.AndroidNetDebug : null;

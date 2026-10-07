@@ -93,13 +93,6 @@ class NetDebug(private val context: Context, private val serverOrigin: String) {
             Companion.log("web: $message")
         }
 
-        /** Same trace under another GK* tag, for an investigation unrelated
-         *  to connectivity (kept apart so each can be filtered on its own). */
-        @JavascriptInterface
-        fun logTagged(tag: String?, message: String?) {
-            if (BuildConfig.DEBUG && tag != null && tag.startsWith("GK")) Log.d(tag, "web: $message")
-        }
-
         /** Fetches /api/health with the platform HTTP stack, outside the
          *  WebView and its service worker, and logs the outcome. */
         @JavascriptInterface
