@@ -87,11 +87,11 @@ export default defineConfig({
         clientsClaim: true,
         navigateFallback: "/index.html",
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
-        // All /api/* requests bypass the Service Worker entirely.
-        // On mobile, a suspended/stuck SW can intercept fetch and cause
-        // AbortError timeouts even when the network is fine. API calls
-        // are live data — caching them causes stale reads and sync bugs.
-        // Only static assets (JS, CSS, images) benefit from SW caching.
+        // /api/* is never cached or answered by the Service Worker: API
+        // calls are live data, caching them causes stale reads and sync
+        // bugs. Only static assets (JS, CSS, images) benefit from SW
+        // caching. sw-routes.js (imported below) also keeps /api requests
+        // from being dispatched to the worker at all, where supported.
         //
         // /.well-known/* is also excluded: Android's Digital Asset Links
         // verifier (used to authorise the native app for passkeys) hits
@@ -105,8 +105,9 @@ export default defineConfig({
         // point, so all the precache/offline behaviour above is preserved
         // untouched — we only ADD push handling. push-sw.js lives in
         // /public, so it ships to the dist root and is importScripts()'d
-        // at /push-sw.js by the generated sw.js.
-        importScripts: ["/push-sw.js"]
+        // at /push-sw.js by the generated sw.js. sw-routes.js is layered on
+        // the same way.
+        importScripts: ["/push-sw.js", "/sw-routes.js"]
       }
       // devOptions: { enabled: true } // ← uncomment to test SW in dev (remember to disable later)
     })
