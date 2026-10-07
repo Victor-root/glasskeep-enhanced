@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel, { ColorSwatchGrid } from "../common/ColorPickerPanel.jsx";
@@ -107,6 +107,12 @@ export default function ModalFooter({
   // kebab menu (state lifted to App)
   modalKebabOpen,
   setModalKebabOpen,
+  // image menu and the logo picker it leads to (lifted to App with the
+  // other footer menus, so the Android back button closes them)
+  imageMenuOpen,
+  setImageMenuOpen,
+  logoPickerOpen,
+  setLogoPickerOpen,
   // undo / redo
   undo,
   redo,
@@ -148,8 +154,6 @@ export default function ModalFooter({
 
   /* Image sub-menu (regular image vs logo / note icon) */
   const imageBtnRef = useRef(null);
-  const [imageMenuOpen, setImageMenuOpen] = useState(false);
-  const [logoPickerOpen, setLogoPickerOpen] = useState(false);
   const currentNoteIcon = noteIcon;
 
   const handlePickExistingLogo = (logo) => {
