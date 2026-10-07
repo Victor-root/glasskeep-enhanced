@@ -1965,6 +1965,30 @@ html.dark .modal-footer-labeled-btn {
   }
 }
 
+/* Mobile layout (ModalFooter, not isDesktop): finger-sized buttons that share
+   the row evenly, up to the 48px touch target, and 24px icons whatever size
+   each icon was drawn at. */
+.modal-footer-toolbar--touch .modal-footer-inner {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.modal-footer-toolbar--touch .modal-footer-inner > * {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 48px;
+}
+.modal-footer-toolbar--touch .modal-footer-btn {
+  width: 100%;
+  max-width: 48px;
+  height: auto;
+  aspect-ratio: 1;
+}
+.modal-footer-toolbar--touch .modal-footer-btn > svg,
+.modal-footer-toolbar--touch .modal-footer-btn > .tabler-icon {
+  width: 24px;
+  height: 24px;
+}
+
 /* Footer colored variants (apply to both icon-only and labeled) */
 .modal-footer-btn--trash, .modal-footer-labeled-btn.modal-footer-btn--trash { color: #dc2626; }
 @media (hover: hover) {
