@@ -26,6 +26,7 @@ import {
   purgeQueueForNote as idbPurgeQueueForNote,
 } from "./sync/localDb.js";
 import { api, getAuth, setAuth, AUTH_KEY, getClientId } from "./utils/api.js";
+import { netLog } from "./utils/netDebug.js";
 import { localizeServerError } from "./utils/serverErrors.js";
 import { mdForDownload } from "./utils/markdown.jsx";
 import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, fileToCompressedDataURL, setThemeColor, currentStatusBarColor } from "./utils/helpers.js";
@@ -3472,6 +3473,7 @@ export default function App() {
     };
 
     const connectSSE = () => {
+      netLog("sse: connecting, attempt " + reconnectAttempts);
       try {
         const url = new URL(`${window.location.origin}/api/events`);
         url.searchParams.set("token", token);
@@ -3480,6 +3482,7 @@ export default function App() {
 
         es.onopen = () => {
           console.log("SSE connected");
+          netLog("sse: open");
           setSseConnected(true);
           // SSE onopen through a reverse proxy does NOT prove the backend is
           // alive — the proxy accepts the TCP connection even when the backend
@@ -4183,6 +4186,7 @@ export default function App() {
 
         es.onerror = (error) => {
           console.log("SSE error, attempting reconnect...", error);
+          netLog("sse: error, readyState=" + es.readyState, "onLine=" + navigator.onLine);
           setSseConnected(false);
           const engine = syncEngineRef.current;
           if (engine) {
@@ -4209,6 +4213,7 @@ export default function App() {
           const isRL = engine?.isRateLimited;
           const minDelay = isRL ? 10000 : 1000;
           const delay = Math.max(minDelay, Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay));
+          netLog("sse: reconnecting in " + delay + "ms");
           reconnectTimeout = setTimeout(() => {
             reconnectAttempts++;
             const currentAuth = getAuth();
@@ -4221,6 +4226,8 @@ export default function App() {
       }
     };
 
+    netLog("boot: " + navigator.userAgent, "onLine=" + navigator.onLine,
+      "swController=" + !!navigator.serviceWorker?.controller);
     connectSSE();
 
     // Expose reconnect for use when sync engine detects server recovery
@@ -4260,6 +4267,7 @@ export default function App() {
     // early-exits when _serverReachable===false (stuck "offline" on mobile
     // after the health-check timer chain breaks during tab suspension).
     const handleVisibilityChange = async () => {
+      netLog("page " + document.visibilityState, "sse readyState=" + es?.readyState);
       if (document.visibilityState !== "visible") return;
 
       const engine = syncEngineRef.current;
@@ -4308,6 +4316,7 @@ export default function App() {
 
     // Handle online/offline events
     const handleOnline = async () => {
+      netLog("browser online event");
       setIsOnline(true);
       // Browser detected network recovery — run health check first,
       // then process queue and reconnect SSE only after confirming
@@ -4340,6 +4349,7 @@ export default function App() {
     };
 
     const handleOffline = () => {
+      netLog("browser offline event");
       setIsOnline(false);
       // Immediately tell the sync engine — don't wait for the next health check.
       // The browser "offline" event is instant proof the network is down.
