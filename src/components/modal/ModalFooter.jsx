@@ -1,17 +1,21 @@
 import React, { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
-import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
+import ColorPickerPanel, { ColorSwatchGrid } from "../common/ColorPickerPanel.jsx";
 import Popover from "../common/Popover.jsx";
+import BottomSheet from "../common/BottomSheet.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
 import AddImageMenu from "./AddImageMenu.jsx";
 import LogoPickerPopover from "./LogoPickerPopover.jsx";
+import NoteTagPicker from "./NoteTagPicker.jsx";
 import ReminderPicker from "../notes/ReminderPicker.jsx";
 import { Popover as RichTextPopover } from "../richtext/Popover.jsx";
 import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon, LogoIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { t } from "../../i18n";
+
+const NOTE_COLORS = COLOR_ORDER.filter((name) => LIGHT_COLORS[name]);
 
 /**
  * Google Keep-style footer toolbar for the note modal.
@@ -138,17 +142,6 @@ export default function ModalFooter({
     onToggleViewMode();
   };
 
-  /* ── Tag checkbox logic ── */
-  const isTagApplied = (tag) => mTagList.some((t) => t.toLowerCase() === tag.toLowerCase());
-
-  const toggleTag = (tag) => {
-    if (isTagApplied(tag)) {
-      setMTagList((prev) => prev.filter((t) => t.toLowerCase() !== tag.toLowerCase()));
-    } else {
-      addTags(tag);
-    }
-  };
-
   const btnClass = isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn";
 
   /* Image sub-menu (regular image vs logo / note icon) */
@@ -171,10 +164,116 @@ export default function ModalFooter({
   /* Kebab menu (download + collaborate) */
   const kebabRef = useRef(null);
 
-  /* Close tag dropdown on outside click */
+  /* Kebab menu entries, shared by the desktop popover and the mobile sheet.
+     Each keeps its own colour so it reads the same in both. */
+  const kebabItems = [
+    // Reminder: opens the picker anchored to the kebab trigger, in a
+    // dedicated orange so it reads distinctly from the other entries.
+    canRemind && {
+      key: "reminder",
+      color: dark ? "#fb923c" : "#ea580c",
+      icon: hasReminder
+        ? <TI.BellRingingFilled className="tabler-icon tabler-icon--filled" style={{ width: 18, height: 18 }} />
+        : <TI.Bell className="tabler-icon" style={{ width: 18, height: 18 }} />,
+      label: t("reminder"),
+      run: () => setReminderPopOpen(true),
+    },
+    isTrashed
+      ? {
+        key: "restore",
+        color: dark ? "#fbbf24" : "#a16207",
+        icon: <ArchiveIcon />,
+        label: t("restoreFromTrash"),
+        run: () => onRestoreFromTrash(activeId),
+      }
+      : {
+        key: "archive",
+        color: dark ? "#fbbf24" : "#a16207",
+        icon: <ArchiveIcon />,
+        label: activeNoteObj?.archived ? t("unarchive") : t("archive"),
+        run: handleArchiveToggle,
+      },
+    // Text <-> checklist conversion; not for draw notes or in the trash.
+    !isTrashed && onConvertNoteType && (mType === "text" || mType === "checklist") && {
+      key: "convert",
+      color: dark ? "#c4b5fd" : "#7c3aed",
+      icon: mType === "text" ? <ChecklistIcon /> : <TextNoteIcon />,
+      label: mType === "text" ? t("convertToChecklist") : t("convertToText"),
+      run: onConvertNoteType,
+    },
+    // Duplicate (two-overlapping-squares glyph kept inline, one-shot icon).
+    !isTrashed && onDuplicateNote && {
+      key: "duplicate",
+      color: dark ? "#67e8f9" : "#0891b2",
+      icon: (
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="9" y="9" width="11" height="11" rx="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      ),
+      label: t("duplicateNote"),
+      run: onDuplicateNote,
+    },
+    // Download; audio notes have their own download menu on the player.
+    mType !== "audio" && {
+      key: "download",
+      color: dark ? "#4ade80" : "#16a34a",
+      icon: <DownloadIcon />,
+      label: t("downloadMd"),
+      run: handleDownload,
+    },
+    // Per-note AI chat; hidden when the user has no AI configured.
+    !isTrashed && noteAiAvailable && onOpenNoteAi && {
+      key: "ai",
+      color: dark ? "#a5b4fc" : "#4f46e5",
+      icon: <TI.MessageSearch />,
+      label: t("noteAiChatMenuItem"),
+      run: onOpenNoteAi,
+    },
+    // Collaborate folds in here on mobile text edit mode and draw edit mode,
+    // keeping the footer button's purple.
+    ((!isDesktop && mType === "text" && !viewMode) || (mType === "draw" && drawMode !== "draw" && !viewMode)) && {
+      key: "collaborate",
+      color: dark ? "#c4b5fd" : "#7c3aed",
+      icon: <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" /></svg>,
+      label: t("collaborate"),
+      run: onOpenCollaboration,
+    },
+    // Trash folds in here on mobile edit mode.
+    !isDesktop && mType === "text" && !viewMode && {
+      key: "trash",
+      color: dark ? "#f87171" : "#dc2626",
+      icon: <Trash />,
+      label: isTrashed ? t("permanentlyDelete") : t("trash"),
+      run: onOpenConfirmDelete,
+    },
+  ].filter(Boolean);
+  const runKebabItem = (item) => {
+    setModalKebabOpen(false);
+    item.run();
+  };
+
+  const closeTagPicker = () => setModalTagFocused(false);
+  const tagPickerProps = {
+    tagInput,
+    setTagInput,
+    tagsWithCounts,
+    mTagList,
+    setMTagList,
+    addTags,
+    inputRef: modalTagInputRef,
+    suppressTagBlurRef,
+    handleTagKeyDown,
+    handleTagBlur,
+    handleTagPaste,
+    onClose: closeTagPicker,
+  };
+
+  /* Close the desktop tag dropdown on outside click (the mobile sheet has
+     its own backdrop). */
   const tagDropdownRef = useRef(null);
   useEffect(() => {
-    if (!modalTagFocused) return;
+    if (!modalTagFocused || !isDesktop) return;
     const onDown = (e) => {
       const drop = tagDropdownRef.current;
       const btn = modalTagBtnRef?.current;
@@ -184,7 +283,7 @@ export default function ModalFooter({
     };
     document.addEventListener("mousedown", onDown, true);
     return () => document.removeEventListener("mousedown", onDown, true);
-  }, [modalTagFocused, setModalTagFocused, modalTagBtnRef]);
+  }, [modalTagFocused, setModalTagFocused, modalTagBtnRef, isDesktop]);
 
   return (
     <div className="modal-footer-toolbar border-t border-[var(--border-light)]">
@@ -200,15 +299,29 @@ export default function ModalFooter({
           <PaletteColorIcon size={isDesktop ? 16 : 18} />
           {isDesktop && <span>{t("color")}</span>}
         </button>
-        <ColorPickerPanel
-          anchorRef={modalColorBtnRef}
-          open={showModalColorPop}
-          onClose={() => setShowModalColorPop(false)}
-          colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
-          selectedColor={mColor}
-          darkMode={dark}
-          onSelect={(name) => setMColor(name)}
-        />
+        {isDesktop ? (
+          <ColorPickerPanel
+            anchorRef={modalColorBtnRef}
+            open={showModalColorPop}
+            onClose={() => setShowModalColorPop(false)}
+            colors={NOTE_COLORS}
+            selectedColor={mColor}
+            darkMode={dark}
+            onSelect={(name) => setMColor(name)}
+          />
+        ) : (
+          <BottomSheet open={showModalColorPop} onClose={() => setShowModalColorPop(false)} title={t("color")}>
+            <div className="gk-sheet-card px-3 py-5">
+              <ColorSwatchGrid
+                labeled
+                colors={NOTE_COLORS}
+                selectedColor={mColor}
+                darkMode={dark}
+                onSelect={(name) => { setMColor(name); setShowModalColorPop(false); }}
+              />
+            </div>
+          </BottomSheet>
+        )}
 
         {/* ── Reminder ── The bell lives in the kebab menu (see below); the
             picker popover is rendered once, anchored to the kebab trigger. */}
@@ -355,7 +468,7 @@ export default function ModalFooter({
             className={`${btnClass} focus:outline-none`}
             onClick={() => {
               setModalTagFocused((v) => {
-                if (!v) setTimeout(() => { if (windowWidth >= 640) modalTagInputRef.current?.focus(); }, 0);
+                if (!v) setTimeout(() => { if (isDesktop) modalTagInputRef.current?.focus(); }, 0);
                 return !v;
               });
               setTagInput("");
@@ -375,22 +488,14 @@ export default function ModalFooter({
             )}
           </button>
 
-          {/* Tag checkbox dropdown */}
-          {modalTagFocused && (() => {
+          {/* Tag picker: dropdown on desktop, bottom sheet on mobile */}
+          {isDesktop ? modalTagFocused && (() => {
             const rect = modalTagBtnRef.current?.getBoundingClientRect();
             if (!rect) return null;
             const spaceBelow = window.innerHeight - rect.bottom;
             const dropUp = spaceBelow < 320;
             const dropWidth = 260;
             const dropLeft = Math.min(rect.left, window.innerWidth - dropWidth - 8);
-
-            const allTags = tagsWithCounts;
-            const filtered = allTags.filter(
-              ({ tag: tg }) =>
-                !tagInput.trim() || tg.toLowerCase().includes(tagInput.toLowerCase())
-            );
-            const trimmed = tagInput.trim();
-            const isNew = trimmed && !allTags.some(({ tag: tg }) => tg.toLowerCase() === trimmed.toLowerCase());
 
             const arrowLeft = rect.left + rect.width / 2 - dropLeft - 6;
             const arrowDir = dropUp ? "down" : "up";
@@ -416,142 +521,15 @@ export default function ModalFooter({
                 }}
                 className="gk-tag-popover rounded-2xl shadow-2xl bg-white dark:bg-gray-900 border border-indigo-100/80 dark:border-indigo-800/50 ring-1 ring-black/5 dark:ring-white/5"
               >
-                <div className="overflow-hidden rounded-2xl">
-                {/* Search input */}
-                <div className="px-2 pt-2 pb-1.5">
-                  <div className="gk-tag-search-wrap flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-800/80 border border-gray-200/80 dark:border-gray-700/60 focus-within:border-indigo-300 dark:focus-within:border-indigo-600 transition-colors duration-150">
-                    <svg className="w-3 h-3 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="6.5" cy="6.5" r="4"/><line x1="10" y1="10" x2="14" y2="14"/>
-                    </svg>
-                    <input
-                      ref={modalTagInputRef}
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") { setTagInput(""); setModalTagFocused(false); return; }
-                        handleTagKeyDown(e);
-                      }}
-                      onBlur={() => {
-                        setTimeout(() => {
-                          if (!suppressTagBlurRef.current) handleTagBlur();
-                          suppressTagBlurRef.current = false;
-                          setModalTagFocused(false);
-                        }, 200);
-                      }}
-                      onPaste={handleTagPaste}
-                      placeholder={t("searchOrCreateTag")}
-                      className="flex-1 bg-transparent text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-w-0"
-                    />
-                  </div>
-                </div>
-
-                {/* Tag list with checkboxes */}
-                {filtered.length > 0 && (
-                  <>
-                    <div className="px-3 pt-1 pb-1">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{t("existingTags")}</span>
-                    </div>
-                    <div className="px-1.5 pb-1.5 max-h-52 overflow-y-auto">
-                      {filtered.map(({ tag, count }) => {
-                        const checked = isTagApplied(tag);
-                        return (
-                          <button
-                            key={tag}
-                            type="button"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              suppressTagBlurRef.current = true;
-                              toggleTag(tag);
-                            }}
-                            className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-indigo-50/80 dark:hover:bg-indigo-900/30 text-sm text-gray-700 dark:text-gray-200 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer"
-                          >
-                            <span className={`gk-tag-cb inline-flex items-center justify-center rounded-md border-2 transition-all duration-150 shrink-0 ${
-                              checked
-                                ? "gk-tag-cb--on"
-                                : "border-gray-300 dark:border-gray-600"
-                            }`} style={{ width: 18, height: 18 }}>
-                              {checked && (
-                                <svg className="w-3 h-3 text-white" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M3.5 8.5l3 3 6-6" />
-                                </svg>
-                              )}
-                            </span>
-                            <span className="flex items-center gap-2 min-w-0 flex-1">
-                              <svg className="w-3 h-3 opacity-50 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
-                              </svg>
-                              <span className={`truncate ${checked ? "font-semibold" : "font-medium"}`}>{tag}</span>
-                            </span>
-                            <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 tabular-nums shrink-0">{count}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-
-                {filtered.length === 0 && !isNew && (
-                  <div className="px-3 py-3 text-sm text-gray-400 dark:text-gray-500 text-center">{t("noTagsFound")}</div>
-                )}
-
-                {isNew && (
-                  <>
-                    {filtered.length > 0 && <div className="mx-3 border-t border-gray-100 dark:border-gray-800"/>}
-                    <div className="px-1.5 py-1.5">
-                      <button
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          suppressTagBlurRef.current = true;
-                          addTags(trimmed);
-                          setTagInput("");
-                        }}
-                        className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-emerald-50/80 dark:hover:bg-emerald-900/20 text-sm flex items-center gap-2 transition-all duration-150 group cursor-pointer"
-                      >
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-100/80 dark:bg-emerald-800/40 text-emerald-500 dark:text-emerald-400 shrink-0 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-700/50 transition-colors duration-150">
-                          <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                            <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
-                          </svg>
-                        </span>
-                        <span className="font-medium text-emerald-600 dark:text-emerald-400">{t("createTag")} "<span className="font-semibold">{trimmed}</span>"</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {mTagList.length > 0 && (
-                  <>
-                    <div className="mx-3 border-t border-gray-100 dark:border-gray-800"/>
-                    <div className="px-3 py-2">
-                      <div className="flex flex-wrap gap-1">
-                        {mTagList.map((tag) => (
-                          <span
-                            key={tag}
-                            className="gk-tag-chip inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-700/40"
-                          >
-                            {tag}
-                            <button
-                              className="gk-tag-chip-remove w-3 h-3 rounded-full text-indigo-400 dark:text-indigo-300 hover:bg-red-400 dark:hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none leading-none"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                suppressTagBlurRef.current = true;
-                                setMTagList((prev) => prev.filter((t) => t !== tag));
-                              }}
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-                </div>
+                <NoteTagPicker variant="popover" {...tagPickerProps} />
               </div>,
               document.body
             );
-          })()}
+          })() : (
+            <BottomSheet open={modalTagFocused} onClose={closeTagPicker} title={t("tags")}>
+              <NoteTagPicker variant="sheet" {...tagPickerProps} />
+            </BottomSheet>
+          )}
         </div>
 
         {/* ── Undo (hidden in draw canvas mode & in text view mode, also
@@ -691,130 +669,43 @@ export default function ModalFooter({
         >
           <Kebab />
         </button>
-        <Popover
-          anchorRef={kebabRef}
-          open={modalKebabOpen}
-          onClose={() => setModalKebabOpen(false)}
-          showArrow
-        >
-          <div
+        {isDesktop ? (
+          <Popover
+            anchorRef={kebabRef}
+            open={modalKebabOpen}
+            onClose={() => setModalKebabOpen(false)}
+            showArrow
+          >
+            <div
               className={`min-w-[180px] border border-[var(--border-light)] rounded-lg shadow-lg ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
               style={{ backgroundColor: dark ? "#222222" : undefined }}
               onClick={(e) => e.stopPropagation()}
             >
-            {/* Reminder — lives in the kebab. Opens the picker anchored to
-                the kebab trigger. Uses a dedicated orange so it reads
-                distinctly from the other coloured menu entries. */}
-            {canRemind && (
-              <button
-                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                style={{ color: dark ? "#fb923c" : "#ea580c" }}
-                onClick={() => { setModalKebabOpen(false); setReminderPopOpen(true); }}
-              >
-                {hasReminder ? (
-                  <TI.BellRingingFilled className="tabler-icon tabler-icon--filled" style={{ width: 18, height: 18 }} />
-                ) : (
-                  <TI.Bell className="tabler-icon" style={{ width: 18, height: 18 }} />
-                )}
-                {t("reminder")}
-              </button>
-            )}
-            {/* Archive / Restore */}
-            {isTrashed ? (
-              <button
-                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                style={{ color: dark ? "#fbbf24" : "#a16207" }}
-                onClick={() => { onRestoreFromTrash(activeId); setModalKebabOpen(false); }}
-              >
-                <ArchiveIcon />{t("restoreFromTrash")}
-              </button>
-            ) : (
-              <button
-                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                style={{ color: dark ? "#fbbf24" : "#a16207" }}
-                onClick={() => { handleArchiveToggle(); setModalKebabOpen(false); }}
-              >
-                <ArchiveIcon />{activeNoteObj?.archived ? t("unarchive") : t("archive")}
-              </button>
-            )}
-            {/* Convert between text and checklist — hidden on draw notes & in trash */}
-            {!isTrashed && onConvertNoteType && (mType === "text" || mType === "checklist") && (
-              <button
-                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                style={{ color: dark ? "#c4b5fd" : "#7c3aed" }}
-                onClick={() => { onConvertNoteType(); setModalKebabOpen(false); }}
-              >
-                {mType === "text" ? <ChecklistIcon /> : <TextNoteIcon />}
-                {mType === "text" ? t("convertToChecklist") : t("convertToText")}
-              </button>
-            )}
-            {/* Duplicate — hidden in trash. Two-overlapping-squares
-                glyph kept inline (one-shot icon, not worth a vendored
-                file). */}
-            {!isTrashed && onDuplicateNote && (
-              <button
-                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                style={{ color: dark ? "#67e8f9" : "#0891b2" }}
-                onClick={() => { onDuplicateNote(); setModalKebabOpen(false); }}
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="9" y="9" width="11" height="11" rx="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-                {t("duplicateNote")}
-              </button>
-            )}
-            {/* Download — hidden for audio notes: their hero player has its
-                own dedicated download menu (with format options), so the
-                kebab entry would be redundant noise. */}
-            {mType !== "audio" && (
-              <button
-                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                style={{ color: dark ? "#4ade80" : "#16a34a" }}
-                onClick={() => { handleDownload(); setModalKebabOpen(false); }}
-              >
-                <DownloadIcon />{t("downloadMd")}
-              </button>
-            )}
-            {/* Chat with AI — per-note panel scoped to this note. Renders
-                as a side panel on desktop and as a full-screen overlay
-                on mobile. Hidden when the user has no AI configured. */}
-            {!isTrashed && noteAiAvailable && onOpenNoteAi && (
-              <button
-                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                style={{ color: dark ? "#a5b4fc" : "#4f46e5" }}
-                onClick={() => { onOpenNoteAi(); setModalKebabOpen(false); }}
-              >
-                <TI.MessageSearch />
-                {t("noteAiChatMenuItem")}
-              </button>
-            )}
-            {/* Collaborate — shown in kebab on mobile text edit mode & draw edit mode.
-                Keeps the footer button's purple so the colour doesn't change
-                when it folds into the kebab. */}
-            {((!isDesktop && mType === "text" && !viewMode) || (mType === "draw" && drawMode !== "draw" && !viewMode)) && (
-              <button
-                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                style={{ color: dark ? "#c4b5fd" : "#7c3aed" }}
-                onClick={() => { onOpenCollaboration(); setModalKebabOpen(false); }}
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" /></svg>
-                {t("collaborate")}
-              </button>
-            )}
-            {/* Trash — shown in kebab on mobile edit mode */}
-            {!isDesktop && mType === "text" && !viewMode && (
-              <button
-                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                style={{ color: dark ? "#f87171" : "#dc2626" }}
-                onClick={() => { onOpenConfirmDelete(); setModalKebabOpen(false); }}
-              >
-                <Trash />
-                {isTrashed ? t("permanentlyDelete") : t("trash")}
-              </button>
-            )}
-          </div>
-        </Popover>
+              {kebabItems.map((item) => (
+                <button
+                  key={item.key}
+                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                  style={{ color: item.color }}
+                  onClick={() => runKebabItem(item)}
+                >
+                  {item.icon}
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </Popover>
+        ) : (
+          <BottomSheet open={modalKebabOpen} onClose={() => setModalKebabOpen(false)} title={t("moreOptions")}>
+            <div className="gk-sheet-card">
+              {kebabItems.map((item) => (
+                <button key={item.key} className="gk-sheet-row" onClick={() => runKebabItem(item)}>
+                  <span className="gk-sheet-row-icon" style={{ color: item.color }}>{item.icon}</span>
+                  <span className="min-w-0 truncate">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </BottomSheet>
+        )}
 
         {/* Reminder picker — rendered once, anchored to whichever trigger is
             active (footer bell in read mode, kebab in edit mode). Uses the

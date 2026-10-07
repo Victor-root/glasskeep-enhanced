@@ -70,6 +70,9 @@ html.dark {
   --gk-scroll-thumb-hover: linear-gradient(180deg, color-mix(in srgb, var(--gk-chrome-grad-from) 82%, #000), color-mix(in srgb, var(--gk-chrome-grad-to) 82%, #000));
   --gk-panel-bg: color-mix(in srgb, var(--gk-chrome-accent) 6%, #ffffff);
   --gk-panel-card: color-mix(in srgb, var(--gk-chrome-accent) 4%, #ffffff);
+  /* Mobile bottom sheets (BottomSheet.jsx): a tinted base with white cards. */
+  --gk-sheet-bg: color-mix(in srgb, var(--gk-chrome-accent) 7%, #f3f3f6);
+  --gk-sheet-card: #ffffff;
   /* Two icon tiers so option-row vs section-header chips stay distinct
      (GlassKeep: indigo grad-from vs violet grad-to, as before). */
   --gk-icon-fg: var(--gk-chrome-grad-from);
@@ -112,6 +115,8 @@ html.dark {
   --gk-scroll-thumb-hover: linear-gradient(180deg, color-mix(in srgb, var(--gk-chrome-grad-from) 80%, #fff), color-mix(in srgb, var(--gk-chrome-grad-to) 80%, #fff));
   --gk-panel-bg: color-mix(in srgb, var(--gk-chrome-accent) 10%, #1f1f1f);
   --gk-panel-card: color-mix(in srgb, var(--gk-chrome-accent) 8%, #282828);
+  --gk-sheet-bg: color-mix(in srgb, var(--gk-chrome-accent) 8%, #1c1c1e);
+  --gk-sheet-card: color-mix(in srgb, var(--gk-chrome-accent) 10%, #2a2a2d);
   /* Lighten the icon foregrounds on dark so they stay legible while keeping
      the two-tier (option vs section) hue distinction. */
   --gk-icon-fg: color-mix(in srgb, var(--gk-chrome-grad-from) 62%, #fff);
@@ -1597,6 +1602,125 @@ html.dark .modal-icon-btn--image:hover {
 }
 
 /* ── Modal footer toolbar (Google Keep style) ─────────────────────────── */
+/* Mobile bottom sheet (BottomSheet.jsx): rises over a dimmed backdrop with
+   large rounded top corners and a grab handle. Only transform (sheet) and
+   opacity (backdrop) animate; it decelerates in and accelerates out. Lifted
+   above the soft keyboard through --keyboard-inset. Content is laid out with
+   the card / row bricks below. */
+.gk-sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+}
+.gk-sheet-root[data-state="closed"] { pointer-events: none; }
+.gk-sheet-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  transition: opacity 260ms ease-in;
+}
+.gk-sheet-scrim[data-state="open"] {
+  opacity: 1;
+  transition: opacity 380ms ease-out;
+}
+.gk-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--keyboard-inset);
+  max-height: calc(100dvh - var(--safe-top) - 32px - var(--keyboard-inset));
+  display: flex;
+  flex-direction: column;
+  padding-bottom: max(12px, calc(var(--safe-bottom) - var(--keyboard-inset)));
+  background: var(--gk-sheet-bg);
+  color: #1f2937;
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -10px 36px rgba(0, 0, 0, 0.16);
+  transform: translateY(100%);
+  transition: transform 260ms cubic-bezier(0.3, 0, 0.8, 0.15);
+  will-change: transform;
+}
+html.dark .gk-sheet {
+  color: #f3f4f6;
+  box-shadow: 0 -10px 36px rgba(0, 0, 0, 0.5);
+}
+.gk-sheet[data-state="open"] {
+  transform: translateY(0);
+  transition: transform 380ms cubic-bezier(0.2, 0, 0, 1);
+}
+.gk-sheet[data-dragging],
+.gk-sheet-scrim[data-dragging] { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .gk-sheet,
+  .gk-sheet[data-state="open"],
+  .gk-sheet-scrim,
+  .gk-sheet-scrim[data-state="open"] { transition: none; }
+}
+/* Handle + title: the drag area, kept clear of touch scrolling. */
+.gk-sheet-head {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 20px 16px;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.gk-sheet-grabber {
+  width: 40px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+}
+html.dark .gk-sheet-grabber { background: rgba(255, 255, 255, 0.28); }
+.gk-sheet-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.gk-sheet-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px 8px;
+  scrollbar-width: none;
+}
+.gk-sheet-body::-webkit-scrollbar { display: none; }
+.gk-sheet-card {
+  background: var(--gk-sheet-card);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.gk-sheet-card + .gk-sheet-card { margin-top: 12px; }
+.gk-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 54px;
+  padding: 0 18px;
+  text-align: left;
+  font-size: 1rem;
+  transition: background-color 0.12s ease;
+}
+.gk-sheet-row + .gk-sheet-row { border-top: 1px solid rgba(0, 0, 0, 0.06); }
+html.dark .gk-sheet-row + .gk-sheet-row { border-top-color: rgba(255, 255, 255, 0.07); }
+.gk-sheet-row:active { background-color: var(--gk-chrome-hover); }
+.gk-sheet-row-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* One icon size for every row, whatever size the shared icon was drawn at
+   for the desktop menus (some carry inline sizes, hence !important). */
+.gk-sheet-row-icon > svg { width: 22px !important; height: 22px !important; }
+
 .modal-footer-toolbar {
   flex-shrink: 0;
   background: rgba(0, 0, 0, 0.04);
