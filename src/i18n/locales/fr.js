@@ -386,6 +386,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   floatingCardsOff: "Cartes flottantes : désactivées",
   enableAnimationsMobile: "Activer les animations de fond",
   enableAnimationsMobileDesc: "Affiche les animations de cartes flottantes en arrière-plan. Peut ralentir les équipements moins performants.",
+  edgeToEdgePortrait: "Bord à bord en portrait",
+  edgeToEdgePortraitDesc: "Rend la barre d'état et la barre de navigation transparentes en mode portrait : les notes défilent derrière.",
   edgeToEdgeLandscape: "Bord à bord en paysage",
   edgeToEdgeLandscapeDesc: "Étend le contenu sous la barre d'état en mode paysage. Désactiver si l'encoche gêne l'affichage.",
   checklistInsertPosition: "Nouveaux éléments",

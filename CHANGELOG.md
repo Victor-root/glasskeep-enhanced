@@ -4,6 +4,7 @@
 
 ### ➕ Added
 - 🔐 **Single sign-on (OpenID Connect)**: sign in through an identity provider (Authentik, Keycloak, Authelia, Zitadel, Pocket ID, or any standard OpenID Connect provider). An admin allows it in Admin → *Login page settings* and picks a policy: the **instance's provider only**, which the admin sets up there, or **personal providers allowed**, where each user may also declare their own in Settings → Security. Each user links their account by signing in at the provider once, then uses **Sign in with my provider** on the login screen. Works in the web app and the Android app.
+- 📱 **Edge-to-edge in portrait** (Android app 1.4.8+): a new switch in Settings → *UI Preferences* makes the status bar and the navigation bar transparent in portrait, so the notes scroll behind them. Off by default; landscape keeps its own option.
 - 📘 **Single sign-on setup guide** on the [project website](https://victor-root.github.io/glasskeep-enhanced/sso.html): the exact values for Authentik, Keycloak and Authelia, annotated screenshots and troubleshooting.
 
 ### 🔒 Security

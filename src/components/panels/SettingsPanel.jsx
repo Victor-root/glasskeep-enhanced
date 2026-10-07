@@ -53,6 +53,8 @@ export default function SettingsPanel({
   setChecklistRemoveSectionBehavior,
   edgeToEdgeLandscape,
   setEdgeToEdgeLandscape,
+  edgeToEdgePortrait,
+  setEdgeToEdgePortrait,
   editorToolbarMode,
   setEditorToolbarMode,
   pasteMode,
@@ -606,6 +608,35 @@ export default function SettingsPanel({
                       })}
                     </ul>
                   </Popover>
+                </div>
+              )}
+
+              {/* "Edge-to-edge in portrait" is applied by the Android
+                  app itself (system bars), so it shows only in an app
+                  version that has the bridge for it. */}
+              {isMobileViewport && typeof window.AndroidTheme?.setEdgeToEdgePortrait === "function" && (
+                <div className="flex items-center justify-between gap-3 px-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <RowIcon icon={TI.DeviceMobile} />
+                    <div className="min-w-0">
+                      <div className="font-medium">{t("edgeToEdgePortrait")}</div>
+                      <div className="text-sm text-gray-500">{t("edgeToEdgePortraitDesc")}</div>
+                    </div>
+                  </div>
+                  <button
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
+                      edgeToEdgePortrait
+                        ? "bg-[var(--gk-switch-on)]"
+                        : "bg-gray-300 dark:bg-gray-600"
+                    }`}
+                    onClick={() => setEdgeToEdgePortrait(!edgeToEdgePortrait)}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        edgeToEdgePortrait ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
                 </div>
               )}
 

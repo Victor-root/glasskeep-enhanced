@@ -67,6 +67,7 @@ import arrowsSortSvg       from "./tabler/arrows-sort.svg?raw";
 import sparklesSvg         from "./tabler/sparkles.svg?raw";
 import layoutSidebarSvg    from "./tabler/layout-sidebar.svg?raw";
 import brainSvg            from "./tabler/brain.svg?raw";
+import deviceMobileSvg     from "./tabler/device-mobile.svg?raw";
 import deviceMobileRotSvg  from "./tabler/device-mobile-rotated.svg?raw";
 import eraserSvg           from "./tabler/eraser.svg?raw";
 import deviceFloppySvg     from "./tabler/device-floppy.svg?raw";
@@ -230,6 +231,7 @@ export const TI = {
   Sparkles:             (p) => <TablerIcon svg={sparklesSvg} {...p} />,
   LayoutSidebar:        (p) => <TablerIcon svg={layoutSidebarSvg} {...p} />,
   Brain:                (p) => <TablerIcon svg={brainSvg} {...p} />,
+  DeviceMobile:         (p) => <TablerIcon svg={deviceMobileSvg} {...p} />,
   DeviceMobileRotated:  (p) => <TablerIcon svg={deviceMobileRotSvg} {...p} />,
   Eraser:               (p) => <TablerIcon svg={eraserSvg} {...p} />,
   DeviceFloppy:         (p) => <TablerIcon svg={deviceFloppySvg} {...p} />,
