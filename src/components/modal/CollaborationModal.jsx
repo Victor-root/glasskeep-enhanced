@@ -1,6 +1,6 @@
 import React from "react";
 import UserAvatar from "../common/UserAvatar.jsx";
-import BottomSheet from "../common/BottomSheet.jsx";
+import Sheet from "../common/Sheet.jsx";
 import ConfirmRemoveCollaboratorDialog from "./ConfirmRemoveCollaboratorDialog.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
@@ -554,10 +554,10 @@ export default function CollaborationModal({
   if (asSheet) {
     return (
       <>
-        <BottomSheet open={open} onClose={handleClose} title={title} background={sheetBackground}>
+        <Sheet open={open} onClose={handleClose} title={title} background={sheetBackground}>
           {body}
           {footer}
-        </BottomSheet>
+        </Sheet>
         {confirmRemoveDialog}
       </>
     );

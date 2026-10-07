@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel, { ColorSwatchGrid } from "../common/ColorPickerPanel.jsx";
 import Popover from "../common/Popover.jsx";
-import BottomSheet, { SheetRow } from "../common/BottomSheet.jsx";
+import Sheet, { SheetRow } from "../common/Sheet.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
 import AddImageMenu from "./AddImageMenu.jsx";
 import LogoPickerPopover from "./LogoPickerPopover.jsx";
@@ -335,7 +335,7 @@ export default function ModalFooter({
             onSelect={(name) => setMColor(name)}
           />
         ) : (
-          <BottomSheet open={showModalColorPop} onClose={() => setShowModalColorPop(false)} title={t("color")} background={sheetBg}>
+          <Sheet open={showModalColorPop} onClose={() => setShowModalColorPop(false)} title={t("color")} background={sheetBg}>
             <div className="px-1 pt-1 pb-3">
               <ColorSwatchGrid
                 labeled
@@ -345,7 +345,7 @@ export default function ModalFooter({
                 onSelect={(name) => { setMColor(name); setShowModalColorPop(false); }}
               />
             </div>
-          </BottomSheet>
+          </Sheet>
         )}
 
         {/* ── Reminder ── The bell lives in the kebab menu (see below); the
@@ -553,9 +553,9 @@ export default function ModalFooter({
               document.body
             );
           })() : (
-            <BottomSheet open={modalTagFocused} onClose={closeTagPicker} title={t("tags")} background={sheetBg}>
+            <Sheet open={modalTagFocused} onClose={closeTagPicker} title={t("tags")} background={sheetBg}>
               <NoteTagPicker variant="sheet" {...tagPickerProps} />
-            </BottomSheet>
+            </Sheet>
           )}
         </div>
 
@@ -722,11 +722,11 @@ export default function ModalFooter({
             </div>
           </Popover>
         ) : (
-          <BottomSheet open={modalKebabOpen} onClose={() => setModalKebabOpen(false)} title={t("moreOptions")} background={sheetBg}>
+          <Sheet open={modalKebabOpen} onClose={() => setModalKebabOpen(false)} title={t("moreOptions")} background={sheetBg}>
             {kebabItems.map((item) => (
               <SheetRow key={item.key} icon={item.icon} color={item.color} label={item.label} onClick={() => runKebabItem(item)} />
             ))}
-          </BottomSheet>
+          </Sheet>
         )}
 
         {/* Reminder picker, opened from the kebab: on desktop a popover in
@@ -743,9 +743,9 @@ export default function ModalFooter({
             {reminderPicker}
           </RichTextPopover>
         ) : (
-          <BottomSheet open={reminderPopOpen} onClose={() => setReminderPopOpen(false)} title={t("reminder")} background={sheetBg}>
+          <Sheet open={reminderPopOpen} onClose={() => setReminderPopOpen(false)} title={t("reminder")} background={sheetBg}>
             {reminderPicker}
-          </BottomSheet>
+          </Sheet>
         ))}
 
         {/* ── Read-only access badge — shown (instead of the view/edit

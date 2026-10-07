@@ -705,6 +705,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   syncProcessingCount: "{count} en cours",
   syncFailedCount: "{count} en erreur",
   syncNow: "Synchroniser maintenant",
+  syncPanelTitle: "Synchronisation",
   syncSafeToClose: "Tout est sauvegardé, vous pouvez fermer",
   syncNotSafeToClose: "Modifications locales non sauvées sur le serveur",
   syncRetryCount: "{count} tentative(s)",

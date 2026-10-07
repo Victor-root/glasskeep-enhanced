@@ -2,9 +2,9 @@
 // Cloud sync status icon with dropdown menu showing detailed sync state
 
 import React, { useState, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { t } from "../i18n";
 import { useSwallowClosingClick } from "../hooks/useSwallowClosingClick.js";
+import Sheet from "../components/common/Sheet.jsx";
 
 // ─── SVG Icons ───
 
@@ -74,6 +74,7 @@ const LockBadge = ({ className }) => (
 );
 
 const MAX_RETRIES = 5; // must match syncEngine.js
+const SHEET_BREAKPOINT_PX = 640;
 
 // ─── Status config ───
 
@@ -187,18 +188,17 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
     return () => clearInterval(id);
   }, [open]);
 
-  // Close on outside tap/click — pointerdown + flag prevents the follow-up
-  // click from reaching elements behind the panel on mobile.
+  const isMobileSheet = typeof window !== "undefined" && window.innerWidth < SHEET_BREAKPOINT_PX;
+  // NotesHeader renders two of these icons (desktop and mobile clusters)
+  // sharing syncDropdownOpen; only the visible one owns the panel.
+  const isHiddenInstance = () => !!btnRef.current && btnRef.current.offsetParent === null;
+
+  // Desktop popover: close on an outside tap/click. Pointerdown + swallow
+  // keeps the follow-up click from reaching elements behind the panel. The
+  // mobile sheet has its own backdrop.
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open || isMobileSheet || isHiddenInstance()) return undefined;
     const onPointerDown = (e) => {
-      // Portal-safe + null-safe: the sheet is portalled to <body>, and across
-      // the portal/IIFE re-render menuRef.current can be momentarily null —
-      // in which case the menuRef check below falls through and the sheet
-      // closes the instant you touch its OWN grabber. closest() walks the
-      // target's real DOM ancestry, so a touch anywhere inside the sheet
-      // (grabber included) is correctly treated as "inside".
-      if (e.target?.closest?.(".gk-sync-sheet")) return;
       if (menuRef.current && menuRef.current.contains(e.target)) return;
       if (btnRef.current && btnRef.current.contains(e.target)) return;
       e.preventDefault();
@@ -208,56 +208,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
     };
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
-  }, [open, setOpen, swallowClickOf]);
-
-  // Slide the phone sheet in: flip .is-open one frame after mount so the
-  // transform transition has a from-state (translateY(-100%)) to animate from.
-  // No body-scroll lock on purpose — it shifted the page and could get stuck;
-  // the sheet simply overlays the header.
-  const [animIn, setAnimIn] = useState(false);
-  useEffect(() => {
-    if (!open) { setAnimIn(false); return undefined; }
-    let r2 = 0;
-    const r1 = requestAnimationFrame(() => { r2 = requestAnimationFrame(() => setAnimIn(true)); });
-    return () => { cancelAnimationFrame(r1); if (r2) cancelAnimationFrame(r2); };
-  }, [open]);
-
-  // Grabber drag-to-close (phone sheet). The sheet is anchored at the top, so
-  // dragging the grabber UP collapses it. The drag moves the panel via an
-  // inline transform; the CSS uses a transition (not a keyframe animation) so
-  // nothing holds transform and the panel follows the finger 1:1.
-  const dragRef = useRef({ active: false, startY: 0, currentY: 0 });
-  const handleGrabberDown = (e) => {
-    if (e.button != null && e.button !== 0) return;
-    const panel = menuRef.current;
-    if (!panel) return;
-    dragRef.current = { active: true, startY: e.clientY, currentY: 0 };
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
-    panel.style.transition = "none";
-  };
-  const handleGrabberMove = (e) => {
-    if (!dragRef.current.active) return;
-    const dy = Math.max(0, dragRef.current.startY - e.clientY);
-    dragRef.current.currentY = dy;
-    if (menuRef.current) menuRef.current.style.transform = `translateY(-${dy}px)`;
-  };
-  const handleGrabberUp = (e) => {
-    if (!dragRef.current.active) return;
-    const dy = dragRef.current.currentY;
-    dragRef.current.active = false;
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
-    const panel = menuRef.current;
-    if (!panel) return;
-    if (dy > 60) {
-      setOpen(false);
-    } else {
-      // Snap back: restore the CSS transition, clear the inline transform so
-      // .is-open (translateY 0) takes over and animates the panel home.
-      panel.style.transition = "";
-      panel.style.transform = "";
-    }
-  };
-  const isMobileSheet = typeof window !== "undefined" && window.innerWidth < 640;
+  }, [open, isMobileSheet, setOpen, swallowClickOf]);
 
   if (!syncStatus) return null;
 
@@ -305,6 +256,192 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
     serverDotColor = "bg-gray-400";
   }
 
+  // Desktop popover: compact full-bleed sections split by hairlines.
+  // Mobile sheet (`sheet`): larger type, sections as rounded fields, a pill
+  // sync button.
+  const renderDetails = (sheet) => {
+    const text = sheet ? "text-sm" : "text-xs";
+    const padX = sheet ? "px-1" : "px-4";
+    const section = sheet
+      ? "gk-sheet-field mt-3 overflow-hidden"
+      : `border-b ${dark ? "border-[rgba(255,255,255,0.06)]" : "border-[rgba(0,0,0,0.06)]"}`;
+    const scrollList = (maxH) => (sheet ? "" : `${maxH} overflow-y-auto`);
+    const itemHover = sheet ? "" : dark ? "hover:bg-white/5" : "hover:bg-gray-50";
+    const noteRef = (item) => (item.noteId && item.noteId !== "__reorder__" ? `#${item.noteId.slice(0, 8)}` : "");
+
+    return (
+      <>
+        {/* Status header */}
+        <div className={sheet ? `${padX} pt-1 pb-1` : "gk-sync-sheet__header px-4 py-3"}>
+          <div className={`flex items-center ${sheet ? "gap-2.5" : "gap-2"}`}>
+            <Icon className={`${sheet ? "w-7 h-7" : "w-5 h-5"} ${color}`} />
+            <span className={`font-semibold ${sheet ? "text-lg" : "text-sm"}`}>{label}</span>
+          </div>
+
+          <div className={`mt-1.5 flex items-center gap-2 ${text}`}>
+            <span className={`inline-flex items-center gap-1 ${serverColor}`}>
+              <span className={`${sheet ? "w-2 h-2" : "w-1.5 h-1.5"} rounded-full ${serverDotColor}`} />
+              {serverLabel}
+            </span>
+            {lastSyncAt && (
+              <span className={dark ? "text-gray-500" : "text-gray-400"}>
+                · {formatTimeAgo(lastSyncAt)}
+              </span>
+            )}
+          </div>
+
+          {/* Instance lock: the server is up but the encryption layer is
+              gating writes. */}
+          {instanceLocked && (
+            <div className={`mt-1.5 flex items-start gap-1.5 ${text} ${dark ? "text-red-400" : "text-red-600"}`}>
+              <LockBadge className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span className="leading-snug">{t("syncInstanceLocked")}</span>
+            </div>
+          )}
+
+          {serverReachable === false && lastSyncError && lastSyncError !== "Server unreachable" && lastSyncError !== "Browser offline" && (
+            <div className={`mt-0.5 ${text} ${dark ? "text-red-400/70" : "text-red-500/70"}`}>
+              {lastSyncError.startsWith("Backend not responding") ? (t("syncErrorBackendDown") || "The proxy is responding but GlassKeep is not accessible") :
+               lastSyncError.startsWith("Server error") ? (t("syncErrorServerError") || `The server returned an error (${lastSyncError})`) :
+               lastSyncError === "Health check timeout" ? (t("syncErrorTimeout") || "Health check timed out") :
+               lastSyncError}
+            </div>
+          )}
+
+          {failedChecks > 0 && syncState === "offline" && (
+            <div className={`mt-1 ${text} ${dark ? "text-amber-400" : "text-amber-600"}`}>
+              {t("syncFailedChecks", { count: failedChecks })}
+            </div>
+          )}
+        </div>
+
+        {/* Queue summary (pending + processing) */}
+        {pendingAndProcessing > 0 && (
+          <div className={`${section} px-4 ${sheet ? "py-3" : "py-2.5"}`}>
+            <div className={`flex items-center gap-2 ${text}`}>
+              <span className={`w-2 h-2 rounded-full ${processing > 0 ? "bg-blue-500 animate-pulse" : "bg-amber-500"}`} />
+              <span className={dark ? "text-gray-300" : "text-gray-600"}>
+                {processing > 0
+                  ? t("syncQueueSyncing", { processing, pending: pending || 0 })
+                  : t("syncQueueWaiting", { count: pending })}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Retrying: transient, will be retried */}
+        {retryItems.length > 0 && (
+          <div className={section}>
+            <div className={`px-4 pt-2.5 pb-1.5 flex items-center gap-1.5 ${text} font-medium ${dark ? "text-amber-400" : "text-amber-600"}`}>
+              <RefreshIcon className="w-3 h-3" />
+              {t("syncRetryingTitle")}
+            </div>
+            <div className={scrollList("max-h-[120px]")}>
+              {retryItems.map((item) => (
+                <div key={item.queueId} className={`px-4 py-1.5 ${text} ${itemHover}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={dark ? "text-gray-300" : "text-gray-700"}>
+                      {actionTypeLabel(item.type)}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={dark ? "text-amber-400/70" : "text-amber-500"}>
+                        {t("syncRetryCount", { count: item.attempts })}/{MAX_RETRIES}
+                      </span>
+                      <span className={dark ? "text-gray-500" : "text-gray-400"}>{noteRef(item)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className={sheet ? "h-2" : "h-1"} />
+          </div>
+        )}
+
+        {/* Failed: permanent, max retries reached */}
+        {(failed > 0 || (lastSyncError && syncState === "error")) && (
+          <div className={section}>
+            <div className={`px-4 pt-2.5 pb-1.5 flex items-center gap-1.5 ${text} font-medium ${dark ? "text-red-400" : "text-red-600"}`}>
+              <WarningIcon className="w-3.5 h-3.5" />
+              {t("syncErrorsTitle")}
+            </div>
+
+            {/* Global error, unless an item already shows it */}
+            {lastSyncError && syncState === "error" && (failedItems.length === 0 || !failedItems.some(i => i.lastError === lastSyncError)) && (
+              <div className={`px-4 py-1.5 ${text} ${dark ? "text-red-400/80" : "text-red-500"}`}>
+                {lastSyncError}
+              </div>
+            )}
+
+            {failedItems.length > 0 && (
+              <div className={scrollList("max-h-[180px]")}>
+                {failedItems.map((item) => (
+                  <div key={item.queueId} className={`px-4 py-2 ${text} ${itemHover}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`font-medium ${dark ? "text-gray-300" : "text-gray-700"}`}>
+                        {actionTypeLabel(item.type)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {item.attempts > 0 && (
+                          <span className={dark ? "text-gray-500" : "text-gray-400"}>
+                            {t("syncRetryCount", { count: item.attempts })}
+                          </span>
+                        )}
+                        <span className={`truncate ${dark ? "text-gray-500" : "text-gray-400"}`}>{noteRef(item)}</span>
+                      </div>
+                    </div>
+                    {item.lastError && (
+                      <div className={`mt-0.5 ${dark ? "text-red-400/70" : "text-red-500/80"}`}>
+                        {item.lastError}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className={sheet ? "h-2" : "h-1"} />
+          </div>
+        )}
+
+        <div className={sheet ? "pt-4 pb-2" : "px-4 py-3"}>
+          <button
+            disabled={forceSyncing}
+            onClick={async () => {
+              if (forceSyncing) return;
+              setForceSyncing(true);
+              try {
+                await onSyncNow?.();
+              } finally {
+                setForceSyncing(false);
+              }
+            }}
+            className={`w-full flex items-center justify-center gap-2 font-medium transition-colors ${
+              sheet ? "h-12 rounded-full text-base" : "px-3 py-2 rounded-md text-sm"
+            } ${
+              forceSyncing
+                ? "bg-indigo-400 text-white/70 cursor-wait"
+                : dark
+                  ? "bg-indigo-600 hover:bg-indigo-500 text-white"
+                  : "bg-indigo-500 hover:bg-indigo-600 text-white"
+            }`}
+          >
+            <RefreshIcon className={`${sheet ? "w-5 h-5" : "w-4 h-4"} ${forceSyncing ? "animate-spin" : ""}`} />
+            {forceSyncing ? (t("syncServerChecking") || "Checking server...") : t("syncNow")}
+          </button>
+        </div>
+
+        {hasPendingChanges || syncState === "error" || syncState === "offline" ? (
+          <div className={`${padX} pb-3 ${text} text-center ${dark ? "text-amber-400" : "text-amber-600"}`}>
+            {t("syncNotSafeToClose")}
+          </div>
+        ) : syncState === "synced" ? (
+          <div className={`${padX} pb-3 ${text} text-center ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+            {t("syncSafeToClose")}
+          </div>
+        ) : null}
+      </>
+    );
+  };
+
   return (
     <div className="relative">
       <button
@@ -333,264 +470,22 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
         )}
       </button>
 
-      {open && (() => {
-        // Phone (<640px): a full-width top SHEET portalled to <body> so it's
-        // positioned relative to the viewport (the header's transform would
-        // otherwise make `fixed` relative to the header + its padding). The
-        // .gk-sync-sheet CSS drives the full-width/slide/safe-top on phones.
-        // Desktop keeps the anchored popover rendered inline (sm: classes).
-        //
-        // NotesHeader renders TWO SyncStatusIcon (desktop + mobile clusters)
-        // that share syncDropdownOpen. The hidden one used to keep its inline
-        // dropdown hidden via its display:none container — but a portal escapes
-        // to <body> and would show a DUPLICATE sheet. So the hidden instance
-        // (its button has no offsetParent) renders nothing on phones.
-        if (isMobileSheet && btnRef.current && btnRef.current.offsetParent === null) {
-          return null;
-        }
-        const sheet = (
-          <div
-            ref={menuRef}
-            className={`gk-sync-sheet ${animIn ? "is-open" : ""} fixed top-14 left-1/2 -translate-x-1/2 sm:absolute sm:top-12 sm:left-auto sm:right-0 sm:translate-x-0 w-[calc(100vw-1rem)] max-w-[340px] sm:w-auto sm:min-w-[280px] z-[1100] border rounded-lg overflow-hidden ${
-              dark
-                ? "bg-[var(--gk-statusbar)] sm:bg-[#222] border-gray-700 text-gray-100"
-                : "bg-[var(--gk-statusbar)] sm:bg-[#f9f6ff] border-gray-200 text-gray-800"
-            }`}
-            // Mobile sheet layout is driven inline off the same JS flag that
-            // decides to render the sheet — exactly like the notification sheet
-            // — so it never desyncs from the CSS media query at the 639/640px
-            // boundary (which left the Tailwind rounded top corners poking out
-            // as white notches under the header). Square top + no top/side
-            // border = flush with the header; rounded bottom only.
-            style={isMobileSheet ? {
-              position: "fixed",
-              top: "var(--safe-top, 0px)",
-              left: 0,
-              right: 0,
-              width: "100%",
-              maxWidth: "none",
-              translate: "none",
-              borderTopLeftRadius: 0,
-              borderTopRightRadius: 0,
-              borderBottomLeftRadius: "1rem",
-              borderBottomRightRadius: "1rem",
-              borderTopWidth: 0,
-              borderLeftWidth: 0,
-              borderRightWidth: 0,
-            } : undefined}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Phone sheet: small close affordance, below the status bar. */}
-            {isMobileSheet && (
-              <button
-                type="button"
-                aria-label={t("close")}
-                onClick={() => setOpen(false)}
-                className={`absolute right-2 z-10 w-8 h-8 rounded-md flex items-center justify-center ${dark ? "text-gray-400 hover:text-gray-100 hover:bg-white/10" : "text-gray-500 hover:text-gray-800 hover:bg-black/5"}`}
-                style={{ top: "0.5rem" }}
-              >
-                ✕
-              </button>
-            )}
-            {/* ── Section 1: Status header ── */}
-            {/* No hard divider line — a soft 6px gradient fade bleeds into the
-                body below (see .gk-sync-sheet__header in globalCSS), identical
-                to the notification sheet's header. */}
-            <div className="gk-sync-sheet__header px-4 py-3">
-              <div className="flex items-center gap-2">
-                <Icon className={`w-5 h-5 ${color}`} />
-                <span className="font-semibold text-sm">{label}</span>
-              </div>
-
-              {/* Server status + last sync */}
-              <div className="mt-1.5 flex items-center gap-2 text-xs">
-                <span className={`inline-flex items-center gap-1 ${serverColor}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${serverDotColor}`} />
-                  {serverLabel}
-                </span>
-                {lastSyncAt && (
-                  <span className={dark ? "text-gray-500" : "text-gray-400"}>
-                    · {formatTimeAgo(lastSyncAt)}
-                  </span>
-                )}
-              </div>
-
-              {/* Instance lock state — separate line so the user can
-                  see at a glance that the server is up AND that the
-                  encryption layer is gating writes. */}
-              {instanceLocked && (
-                <div className={`mt-1.5 flex items-start gap-1.5 text-xs ${dark ? "text-red-400" : "text-red-600"}`}>
-                  <LockBadge className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span className="leading-snug">{t("syncInstanceLocked")}</span>
-                </div>
-              )}
-
-              {/* Error detail when server is down */}
-              {serverReachable === false && lastSyncError && lastSyncError !== "Server unreachable" && lastSyncError !== "Browser offline" && (
-                <div className={`mt-0.5 text-xs ${dark ? "text-red-400/70" : "text-red-500/70"}`}>
-                  {lastSyncError.startsWith("Backend not responding") ? (t("syncErrorBackendDown") || "The proxy is responding but GlassKeep is not accessible") :
-                   lastSyncError.startsWith("Server error") ? (t("syncErrorServerError") || `The server returned an error (${lastSyncError})`) :
-                   lastSyncError === "Health check timeout" ? (t("syncErrorTimeout") || "Health check timed out") :
-                   lastSyncError}
-                </div>
-              )}
-
-              {/* Reconnection attempts */}
-              {failedChecks > 0 && syncState === "offline" && (
-                <div className={`mt-1 text-xs ${dark ? "text-amber-400" : "text-amber-600"}`}>
-                  {t("syncFailedChecks", { count: failedChecks })}
-                </div>
-              )}
-            </div>
-
-            {/* ── Section 2: Queue summary (pending + processing) ── */}
-            {pendingAndProcessing > 0 && (
-              <div className={`px-4 py-2.5 border-b ${dark ? "border-[rgba(255,255,255,0.06)]" : "border-[rgba(0,0,0,0.06)]"}`}>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className={`w-2 h-2 rounded-full ${processing > 0 ? "bg-blue-500 animate-pulse" : "bg-amber-500"}`} />
-                  <span className={dark ? "text-gray-300" : "text-gray-600"}>
-                    {processing > 0
-                      ? t("syncQueueSyncing", { processing, pending: pending || 0 })
-                      : t("syncQueueWaiting", { count: pending })
-                    }
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* ── Section 3a: Retrying (amber — transient, will be retried) ── */}
-            {retryItems.length > 0 && (
-              <div className={`border-b ${dark ? "border-[rgba(255,255,255,0.06)]" : "border-[rgba(0,0,0,0.06)]"}`}>
-                <div className={`px-4 pt-2.5 pb-1.5 flex items-center gap-1.5 text-xs font-medium ${dark ? "text-amber-400" : "text-amber-600"}`}>
-                  <RefreshIcon className="w-3 h-3" />
-                  {t("syncRetryingTitle")}
-                </div>
-                <div className="max-h-[120px] overflow-y-auto">
-                  {retryItems.map((item) => (
-                    <div
-                      key={item.queueId}
-                      className={`px-4 py-1.5 text-xs ${dark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={dark ? "text-gray-300" : "text-gray-700"}>
-                          {actionTypeLabel(item.type)}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className={dark ? "text-amber-400/70" : "text-amber-500"}>
-                            {t("syncRetryCount", { count: item.attempts })}/{MAX_RETRIES}
-                          </span>
-                          <span className={dark ? "text-gray-500" : "text-gray-400"}>
-                            {item.noteId && item.noteId !== "__reorder__" ? `#${item.noteId.slice(0, 8)}` : ""}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="h-1" />
-              </div>
-            )}
-
-            {/* ── Section 3b: Failed (red — permanent, max retries reached) ── */}
-            {(failed > 0 || (lastSyncError && syncState === "error")) && (
-              <div className={`border-b ${dark ? "border-[rgba(255,255,255,0.06)]" : "border-[rgba(0,0,0,0.06)]"}`}>
-                <div className={`px-4 pt-2.5 pb-1.5 flex items-center gap-1.5 text-xs font-medium ${dark ? "text-red-400" : "text-red-600"}`}>
-                  <WarningIcon className="w-3.5 h-3.5" />
-                  {t("syncErrorsTitle")}
-                </div>
-
-                {/* Global error (only if not duplicated by item errors) */}
-                {lastSyncError && syncState === "error" && (failedItems.length === 0 || !failedItems.some(i => i.lastError === lastSyncError)) && (
-                  <div className={`px-4 py-1.5 text-xs ${dark ? "text-red-400/80" : "text-red-500"}`}>
-                    {lastSyncError}
-                  </div>
-                )}
-
-                {failedItems.length > 0 && (
-                  <div className="max-h-[180px] overflow-y-auto">
-                    {failedItems.map((item) => (
-                      <div
-                        key={item.queueId}
-                        className={`px-4 py-2 text-xs ${dark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`font-medium ${dark ? "text-gray-300" : "text-gray-700"}`}>
-                            {actionTypeLabel(item.type)}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            {item.attempts > 0 && (
-                              <span className={dark ? "text-gray-500" : "text-gray-400"}>
-                                {t("syncRetryCount", { count: item.attempts })}
-                              </span>
-                            )}
-                            <span className={`truncate ${dark ? "text-gray-500" : "text-gray-400"}`}>
-                              {item.noteId && item.noteId !== "__reorder__" ? `#${item.noteId.slice(0, 8)}` : ""}
-                            </span>
-                          </div>
-                        </div>
-                        {item.lastError && (
-                          <div className={`mt-0.5 ${dark ? "text-red-400/70" : "text-red-500/80"}`}>
-                            {item.lastError}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="h-1" />
-              </div>
-            )}
-
-            {/* ── Section 4: Sync button ── */}
-            <div className="px-4 py-3">
-              <button
-                disabled={forceSyncing}
-                onClick={async () => {
-                  if (forceSyncing) return;
-                  setForceSyncing(true);
-                  try {
-                    await onSyncNow?.();
-                  } finally {
-                    setForceSyncing(false);
-                  }
-                }}
-                className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  forceSyncing
-                    ? "bg-indigo-400 text-white/70 cursor-wait"
-                    : dark
-                      ? "bg-indigo-600 hover:bg-indigo-500 text-white"
-                      : "bg-indigo-500 hover:bg-indigo-600 text-white"
-                }`}
-              >
-                <RefreshIcon className={`w-4 h-4 ${forceSyncing ? "animate-spin" : ""}`} />
-                {forceSyncing ? (t("syncServerChecking") || "Checking server...") : t("syncNow")}
-              </button>
-            </div>
-
-            {/* ── Section 5: Safe to close ── */}
-            {hasPendingChanges || syncState === "error" || syncState === "offline" ? (
-              <div className={`px-4 pb-3 text-xs text-center ${dark ? "text-amber-400" : "text-amber-600"}`}>
-                {t("syncNotSafeToClose")}
-              </div>
-            ) : syncState === "synced" ? (
-              <div className={`px-4 pb-3 text-xs text-center ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
-                {t("syncSafeToClose")}
-              </div>
-            ) : null}
-            {/* Phone sheet: bottom grabber — drag up to dismiss (like the notif sheet). */}
-            {isMobileSheet && (
-              <div
-                className="gk-sync-sheet__grabber"
-                onPointerDown={handleGrabberDown}
-                onPointerMove={handleGrabberMove}
-                onPointerUp={handleGrabberUp}
-                onPointerCancel={handleGrabberUp}
-              />
-            )}
-          </div>
-        );
-        return isMobileSheet ? createPortal(sheet, document.body) : sheet;
-      })()}
+      {open && !isMobileSheet && !isHiddenInstance() && (
+        <div
+          ref={menuRef}
+          className={`gk-sync-sheet absolute top-12 right-0 min-w-[280px] max-w-[340px] z-[1100] border rounded-lg overflow-hidden ${
+            dark ? "bg-[#222] border-gray-700 text-gray-100" : "bg-[#f9f6ff] border-gray-200 text-gray-800"
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {renderDetails(false)}
+        </div>
+      )}
+      {isMobileSheet && !isHiddenInstance() && (
+        <Sheet edge="top" open={open} onClose={() => setOpen(false)} title={t("syncPanelTitle")} background="var(--gk-statusbar)">
+          {renderDetails(true)}
+        </Sheet>
+      )}
     </div>
   );
 }

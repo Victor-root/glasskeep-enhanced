@@ -1,8 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-// Past this share of its height, or this downward speed (px/ms), a released
-// drag closes the sheet instead of snapping it back.
+// Past this share of its height, or this speed (px/ms) towards its own edge,
+// a released drag closes the sheet instead of snapping it back.
 const CLOSE_DISTANCE_RATIO = 0.3;
 const CLOSE_VELOCITY = 0.5;
 // Matches the closing transition in globalCSS (.gk-sheet), plus a margin in
@@ -10,15 +10,21 @@ const CLOSE_VELOCITY = 0.5;
 const UNMOUNT_DELAY_MS = 320;
 
 /**
- * Mobile bottom sheet: rises from the bottom over a dimmed backdrop, rounded
- * top corners, a grab handle instead of a close button. Dragging the handle
- * (or the title row) follows the finger and closes past a threshold or on a
- * quick flick; tapping the backdrop closes too. Only transform and opacity
- * animate, both on the compositor. Stays mounted through its closing slide;
- * with `keepMounted` it also stays in the page once closed, hidden, so its
- * content keeps its DOM (e.g. a portal target that must not move).
+ * Mobile sheet over a dimmed backdrop, sliding in from the bottom edge
+ * (`edge="bottom"`, rounded top corners, handle and title on top) or from
+ * the top edge (`edge="top"`, rounded bottom corners, title on top and the
+ * handle at the bottom). A grab handle instead of a close button: dragging
+ * it (or the title row) towards the sheet's edge follows the finger and
+ * closes past a threshold or on a quick flick; tapping the backdrop closes
+ * too. `titleAction` sits at the end of the title row. Only transform and
+ * opacity animate, both on the compositor. Stays mounted through its
+ * closing slide; with `keepMounted` it also stays in the page once closed,
+ * hidden, so its content keeps its DOM (e.g. a portal target that must not
+ * move).
  */
-export default function BottomSheet({ open, onClose, title, background, keepMounted = false, children }) {
+export default function Sheet({ open, onClose, title, titleAction, edge = "bottom", background, keepMounted = false, children }) {
+  // +1 when the sheet closes downwards (bottom edge), -1 upwards (top edge).
+  const dir = edge === "top" ? -1 : 1;
   const [mounted, setMounted] = useState(open);
   const [shown, setShown] = useState(false);
   const sheetRef = useRef(null);
@@ -55,12 +61,14 @@ export default function BottomSheet({ open, onClose, title, background, keepMoun
   const setDragStyles = (offset, height) => {
     const sheet = sheetRef.current;
     const scrim = scrimRef.current;
-    if (sheet) sheet.style.transform = offset == null ? "" : `translateY(${offset}px)`;
+    if (sheet) sheet.style.transform = offset == null ? "" : `translateY(${offset * dir}px)`;
     if (scrim) scrim.style.opacity = offset == null ? "" : String(Math.max(0, 1 - offset / height));
   };
 
   const onPointerDown = (e) => {
     if (e.button != null && e.button !== 0) return;
+    // A control in the title row (titleAction) keeps its own tap.
+    if (e.target.closest("button, a, input")) return;
     const sheet = sheetRef.current;
     if (!sheet) return;
     dragRef.current = {
@@ -79,10 +87,10 @@ export default function BottomSheet({ open, onClose, title, background, keepMoun
     const drag = dragRef.current;
     if (!drag) return;
     const dt = e.timeStamp - drag.lastT;
-    if (dt > 0) drag.velocity = (e.clientY - drag.lastY) / dt;
+    if (dt > 0) drag.velocity = ((e.clientY - drag.lastY) * dir) / dt;
     drag.lastY = e.clientY;
     drag.lastT = e.timeStamp;
-    setDragStyles(Math.max(0, e.clientY - drag.startY), drag.height);
+    setDragStyles(Math.max(0, (e.clientY - drag.startY) * dir), drag.height);
   };
 
   const onPointerUp = (e) => {
@@ -90,10 +98,10 @@ export default function BottomSheet({ open, onClose, title, background, keepMoun
     if (!drag) return;
     dragRef.current = null;
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
-    const offset = Math.max(0, e.clientY - drag.startY);
+    const offset = Math.max(0, (e.clientY - drag.startY) * dir);
     const close = offset > drag.height * CLOSE_DISTANCE_RATIO || drag.velocity > CLOSE_VELOCITY;
     // Handing the position back to the stylesheet with transitions restored
-    // animates from where the finger left it: down to closed, or back up.
+    // animates from where the finger left it: on to closed, or back open.
     delete sheetRef.current?.dataset.dragging;
     scrimRef.current?.removeAttribute("data-dragging");
     if (close) onClose();
@@ -102,12 +110,26 @@ export default function BottomSheet({ open, onClose, title, background, keepMoun
 
   if (!mounted && !keepMounted) return null;
   const state = shown ? "open" : "closed";
+  const dragHandlers = {
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel: onPointerUp,
+  };
+  const grabber = <div className="gk-sheet-grabber" />;
+  const titleRow = title && (
+    <div className="gk-sheet-titlerow">
+      <h2 className="gk-sheet-title">{title}</h2>
+      {titleAction && <div className="gk-sheet-titleaction">{titleAction}</div>}
+    </div>
+  );
   return createPortal(
     <div className="gk-sheet-root" data-state={state} hidden={!mounted} inert={!open}>
       <div ref={scrimRef} className="gk-sheet-scrim" data-state={state} onClick={onClose} />
       <div
         ref={sheetRef}
         className="gk-sheet"
+        data-edge={edge}
         data-state={state}
         style={background ? { background } : undefined}
         role="dialog"
@@ -117,17 +139,21 @@ export default function BottomSheet({ open, onClose, title, background, keepMoun
           if (e.target === e.currentTarget && e.propertyName === "transform" && !open) setMounted(false);
         }}
       >
-        <div
-          className="gk-sheet-head"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-        >
-          <div className="gk-sheet-grabber" />
-          {title && <h2 className="gk-sheet-title">{title}</h2>}
-        </div>
-        <div className="gk-sheet-body">{children}</div>
+        {edge === "top" ? (
+          <>
+            {titleRow && <div className="gk-sheet-head" {...dragHandlers}>{titleRow}</div>}
+            <div className="gk-sheet-body">{children}</div>
+            <div className="gk-sheet-head" {...dragHandlers}>{grabber}</div>
+          </>
+        ) : (
+          <>
+            <div className="gk-sheet-head" {...dragHandlers}>
+              {grabber}
+              {titleRow}
+            </div>
+            <div className="gk-sheet-body">{children}</div>
+          </>
+        )}
       </div>
     </div>,
     document.body,

@@ -70,7 +70,7 @@ html.dark {
   --gk-scroll-thumb-hover: linear-gradient(180deg, color-mix(in srgb, var(--gk-chrome-grad-from) 82%, #000), color-mix(in srgb, var(--gk-chrome-grad-to) 82%, #000));
   --gk-panel-bg: color-mix(in srgb, var(--gk-chrome-accent) 6%, #ffffff);
   --gk-panel-card: color-mix(in srgb, var(--gk-chrome-accent) 4%, #ffffff);
-  /* Mobile bottom sheets (BottomSheet.jsx) not given a background of their own. */
+  /* Mobile sheets (Sheet.jsx) not given a background of their own. */
   --gk-sheet-bg: color-mix(in srgb, var(--gk-chrome-accent) 7%, #f3f3f6);
   /* Two icon tiers so option-row vs section-header chips stay distinct
      (GlassKeep: indigo grad-from vs violet grad-to, as before). */
@@ -1602,8 +1602,9 @@ html.dark .modal-icon-btn--image:hover {
 }
 
 /* ── Modal footer toolbar (Google Keep style) ─────────────────────────── */
-/* Mobile bottom sheet (BottomSheet.jsx): rises over a dimmed backdrop with
-   large rounded top corners and a grab handle. Only transform (sheet) and
+/* Mobile sheet (Sheet.jsx): rises over a dimmed backdrop with large rounded
+   top corners and a grab handle (or, edge="top", drops from the top with
+   rounded bottom corners, see the [data-edge="top"] rules below). Only transform (sheet) and
    opacity (backdrop) animate; it decelerates in and accelerates out. Lifted
    above the soft keyboard through --keyboard-inset. Content is laid out with
    the field / row bricks below, straight on the sheet's background. */
@@ -1683,6 +1684,36 @@ html.dark .gk-sheet-grabber { background: rgba(255, 255, 255, 0.28); }
   font-size: 1.125rem;
   font-weight: 600;
 }
+.gk-sheet-titlerow {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+}
+.gk-sheet-titleaction {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+/* Top sheet: drops from under the status bar, title on top, the handle at
+   its bottom edge, closing upwards. */
+.gk-sheet[data-edge="top"] {
+  top: 0;
+  bottom: auto;
+  max-height: calc(100dvh - var(--safe-bottom) - 32px);
+  padding-top: var(--safe-top);
+  padding-bottom: 0;
+  border-radius: 0 0 28px 28px;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.16);
+  transform: translateY(-100%);
+}
+html.dark .gk-sheet[data-edge="top"] { box-shadow: 0 10px 36px rgba(0, 0, 0, 0.5); }
+.gk-sheet[data-edge="top"][data-state="open"] { transform: translateY(0); }
+.gk-sheet[data-edge="top"] > .gk-sheet-head:first-child { padding: 14px 20px 12px; }
+.gk-sheet[data-edge="top"] > .gk-sheet-head:last-child { padding: 12px 20px 12px; }
 .gk-sheet-body {
   min-height: 0;
   overflow-y: auto;
@@ -5784,34 +5815,6 @@ html.dark .gk-notif-bell-dot {
   overflow: hidden;
   animation: gkNotifCenterIn 180ms ease-out both;
 }
-/* Mobile sheet variant — full-screen panel that slides DOWN from the
-   top when opened (transform animates from translateY(-100%) → 0) and
-   slides back UP when closed, on the same decelerating timing curve as
-   the other mobile sheets so they feel like one design system. The
-   keyframe-based fade-in above is suppressed so it doesn't fight the
-   transform transition. */
-.gk-notif-center--mobile {
-  animation: none;
-  transform: translateY(-100%);
-  /* This sheet is much taller than the compact sync sheet, so at an identical
-     duration its translateY(-100%) slide covers far more distance per frame
-     and reads as a faster, snappier "deploy". Give it a slightly longer
-     duration to bring the perceived velocity back in line with the sync
-     sheet's gentle slide. Keep MOBILE_ANIM_MS (NotificationCenter.jsx) >= this
-     so the close animation isn't cut short before unmount. */
-  transition: transform 0.6s cubic-bezier(0.32, 0.72, 0, 1);
-  will-change: transform;
-  /* Flat opaque header colour + NO backdrop blur. The sheet slides via
-     transform; a live backdrop-filter forced the GPU to re-rasterise the
-     blur every frame, which made the open animation stutter. Opaque fill +
-     transform-only = smooth, and it matches the header. */
-  background: var(--gk-statusbar);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-html.dark .gk-notif-center--mobile {
-  background: var(--gk-statusbar);
-}
 /* Settings / Admin side panels: a subtly theme-tinted surface on desktop
    (--gk-panel-bg follows the active theme, light + dark), but the flat header
    colour (--gk-statusbar) on phones so the whole panel matches the chrome.
@@ -5827,16 +5830,8 @@ html.dark .gk-notif-center--mobile {
 @media (max-width: 639px) {
   .gk-side-panel { background: var(--gk-statusbar); }
 }
-/* Sync status popover → full-width top SHEET on phones, mirroring the
-   notification sheet (slide down from the top + bottom grabber). Driven from
-   CSS so it overrides the desktop popover's Tailwind positioning without
-   touching it; the sheet's own transform-animation also supersedes the
-   centring -translate-x utility. Desktop (>=640px) keeps the anchored popover. */
-/* Soft floating shadow — the same outer drop shadow as .gk-notif-center so the
-   sync sheet and the notification sheet read identically. We deliberately drop
-   the notif's inset top-highlight (0 1px 0 white): on the salmon
-   (--gk-statusbar) sheet it showed as a hard white liseret along the very top
-   edge of the screen. Replaces the Tailwind shadow-lg the sheet shipped with. */
+/* Desktop sync status popover: the same outer drop shadow as .gk-notif-center
+   so both header popovers read identically. */
 .gk-sync-sheet {
   box-shadow:
     0 4px 6px -1px rgba(15, 23, 42, 0.07),
@@ -5862,96 +5857,6 @@ html.dark .gk-notif-center--mobile {
 html.dark .gk-sync-sheet__header::after {
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.20), transparent);
 }
-@media (max-width: 639px) {
-  .gk-sync-sheet {
-    /* Slide via a transition + .is-open class, NOT a keyframe animation: a
-       running animation's fill holds transform and would override the
-       grabber's inline drag transform, so the tirette wouldn't follow the
-       finger. A transition leaves transform free for the drag.
-       Layout (position, full width, square top / rounded bottom, edge borders)
-       is set INLINE on the element off the same JS isMobileSheet flag —
-       mirroring the notification sheet — so it can't desync from this media
-       query at the 639/640px sub-pixel boundary, which used to leave the
-       Tailwind rounded-lg corners showing as white notches at the top. */
-    transform: translateY(-100%);
-    transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
-    will-change: transform;
-  }
-  .gk-sync-sheet.is-open { transform: translateY(0); }
-}
-.gk-sync-sheet__grabber {
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-.gk-sync-sheet__grabber::after {
-  content: "";
-  width: 42px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.28);
-  transition: background 0.12s ease, transform 0.12s ease;
-}
-.gk-sync-sheet__grabber:active { cursor: grabbing; }
-.gk-sync-sheet__grabber:active::after { background: rgba(0, 0, 0, 0.45); transform: scaleX(1.15); }
-html.dark .gk-sync-sheet__grabber::after { background: rgba(255, 255, 255, 0.32); }
-html.dark .gk-sync-sheet__grabber:active::after { background: rgba(255, 255, 255, 0.5); }
-.gk-notif-center--mobile.is-open {
-  transform: translateY(0);
-}
-/* Allow the list to actually shrink below its content height when the
-   sheet hits max-height — without min-height:0 a flex child resists
-   shrinking past its intrinsic content size and the overflow-y:auto
-   scroll never kicks in. Only relevant in the natural-height mobile
-   sheet (desktop has its own max-height on the panel itself). */
-.gk-notif-center--mobile .gk-notif-center__list {
-  min-height: 0;
-}
-/* Grabber lives at the BOTTOM of the panel (the panel pushes from
-   the top, so the bottom is the dismissible edge — mirror of the
-   editor sheet, where the grabber sits at the top of a bottom-anchored
-   sheet). Same Android-style pill via ::after, same touch-target
-   height. Drag UP to close. */
-.gk-notif-center-grabber {
-  /* margin-top:auto pushes the grabber to the bottom edge of the
-     flex column regardless of how short the list is (empty state,
-     one notification, etc.) so the affordance always sits where the
-     user expects it on a full-screen sheet. flex-shrink:0 keeps it
-     from collapsing when the list grows tall enough to fill the
-     column on its own. */
-  margin-top: auto;
-  flex-shrink: 0;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-}
-html.dark .gk-notif-center-grabber {
-  border-top-color: rgba(255, 255, 255, 0.06);
-}
-.gk-notif-center-grabber::after {
-  content: "";
-  width: 42px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.28);
-  transition: background 0.12s ease, transform 0.12s ease;
-}
-.gk-notif-center-grabber:active { cursor: grabbing; }
-.gk-notif-center-grabber:active::after {
-  background: rgba(0, 0, 0, 0.45);
-  transform: scaleX(1.15);
-}
-html.dark .gk-notif-center-grabber::after { background: rgba(255, 255, 255, 0.32); }
-html.dark .gk-notif-center-grabber:active::after { background: rgba(255, 255, 255, 0.5); }
 html.dark .gk-notif-center {
   color: #f0f0f5;
   background: rgba(28, 28, 38, 0.96);
@@ -6076,14 +5981,6 @@ html.dark .gk-notif-center__header {
   background: linear-gradient(180deg, rgba(32, 30, 42, 0.96), rgba(28, 28, 38, 0.90));
 }
 
-/* Mobile: the notification sheet header matches the main app header — a flat
-   --gk-statusbar block (same colour as the status bar / header). Two selectors
-   so it beats both the light and html.dark base rules above. */
-.gk-notif-center--mobile .gk-notif-center__header,
-html.dark .gk-notif-center--mobile .gk-notif-center__header {
-  background: var(--gk-statusbar);
-}
-
 /* Soft 6 px bottom fade that bleeds into the list — no hard line. */
 .gk-notif-center__header::after {
   content: "";
@@ -6163,6 +6060,12 @@ html.dark .gk-notif-center__close:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+/* In the mobile sheet the body scrolls and pads; the list keeps a little room
+   so the clipped cards' shadows still show. */
+.gk-notif-center__list--sheet {
+  margin: 0 -6px;
+  padding: 2px 6px 6px;
 }
 .gk-notif-center__empty {
   text-align: center;
