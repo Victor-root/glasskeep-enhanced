@@ -350,7 +350,7 @@ export default function ReminderPicker({ value, onSave, onClear, onClose, timeCh
   };
 
   return (
-    <>
+    <div className="gk-reminder">
       <div className="rt-pop-label">{t("reminderPickDateTime")}</div>
       <MiniCalendar valueDate={valueDate} onPick={(d) => setDateStr(toDateInput(d))} />
       <TimePicker value={timeStr} onChange={setTimeStr} serverChips={timeChips} onServerChipsChange={onTimeChipsChange} />
@@ -372,6 +372,6 @@ export default function ReminderPicker({ value, onSave, onClear, onClose, timeCh
           {value ? t("reminderUpdate") : t("reminderSet")}
         </button>
       </div>
-    </>
+    </div>
   );
 }
