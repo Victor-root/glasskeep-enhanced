@@ -311,7 +311,7 @@ export default function ModalFooter({
           />
         ) : (
           <BottomSheet open={showModalColorPop} onClose={() => setShowModalColorPop(false)} title={t("color")}>
-            <div className="gk-sheet-card px-3 py-5">
+            <div className="px-1 pt-1 pb-3">
               <ColorSwatchGrid
                 labeled
                 colors={NOTE_COLORS}
