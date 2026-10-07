@@ -5054,12 +5054,15 @@ export default function App() {
   // Disable pull-to-refresh when any overlay is open. Two delivery paths:
   //   1. Native Android — the JS bridge disables the SwipeRefreshLayout.
   //   2. Chrome PWA — html/body get overscroll-behavior:none via the
-  //      .gk-overlay-locked class (defined in globalCSS.js).
+  //      data-gk-overlay-locked attribute (defined in globalCSS.js). An
+  //      attribute rather than a class, like data-gk-scrolling: rules matching
+  //      <html>'s class list (the workspace themes) would otherwise be
+  //      re-evaluated as every overlay opens, stalling its opening animation.
   // notifCenterOpen is part of overlayOpenCount now that closeNotifBellRef
   // gives App.jsx a way to close the panel from the popstate handler.
   useEffect(() => {
     const locked = overlayOpenCount > 0;
-    document.documentElement.classList.toggle("gk-overlay-locked", locked);
+    document.documentElement.toggleAttribute("data-gk-overlay-locked", locked);
     try { window.AndroidTheme?.setRefreshEnabled(!locked); } catch (_) {}
   }, [overlayOpenCount]);
 

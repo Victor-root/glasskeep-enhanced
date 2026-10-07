@@ -58,16 +58,16 @@ export default function TagSidebar({
 
   return (
     <>
-      {open && !permanent && (
+      {!permanent && (
         <div
-          className="fixed inset-0 z-30 bg-black/30"
+          className={`gk-drawer-scrim fixed inset-0 z-30 bg-black/30${open ? " is-open" : ""}`}
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
         />
       )}
       <aside
-        className={`gk-sidebar fixed top-0 left-0 z-40 h-full ${skipTransition ? "" : "transition-[transform,background-color] duration-200 "}${permanent || open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`gk-sidebar fixed top-0 left-0 z-40 h-full ${permanent ? (skipTransition ? "" : "transition-[translate,background-color] duration-200 ") : `gk-drawer${open ? " is-open" : ""} `}${permanent || open ? "translate-x-0" : "-translate-x-full"}`}
         style={{
           // Visuals (background, border, glass shadow) live in the .gk-sidebar
           // CSS rule so they follow the chrome theme tokens; only layout here.
