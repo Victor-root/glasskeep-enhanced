@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { t } from "../../i18n";
 import { SearchIcon, CloseIcon } from "../../icons/index.jsx";
 import { ALL_IMAGES, REMINDERS } from "../../utils/constants.js";
-import ScrollThumb from "../common/ScrollThumb.jsx";
 
 import { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, RemindersSidebarIcon } from "../../icons/sidebarIcons.jsx";
 export { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, RemindersSidebarIcon };
@@ -30,8 +29,6 @@ export default function TagSidebar({
   // theme and the glass identity in both light and dark.
   const itemClass = (active) =>
     active ? "gk-side-item gk-side-item--active" : "gk-side-item";
-
-  const navRef = useRef(null);
 
   // Long-press support for multi-tag selection on touch devices
   const longPressTimer = useRef(null);
@@ -105,8 +102,7 @@ export default function TagSidebar({
             <CloseIcon />
           </button>
         </div>
-        <ScrollThumb scrollerRef={navRef} className="gk-scroll-thumb gk-scroll-thumb--sidebar" />
-        <nav ref={navRef} className="gk-sidebar-body p-2 overflow-y-auto h-[calc(100%-var(--gk-header-h,56px))]">
+        <nav className="gk-sidebar-body p-2 overflow-y-auto h-[calc(100%-var(--gk-header-h,56px))]">
           {/* Multi-tag filter indicator — at the top so it's impossible to miss */}
           {activeTagFilters.length > 1 && (
             <div
