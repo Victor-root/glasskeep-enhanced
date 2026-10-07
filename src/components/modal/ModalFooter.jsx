@@ -10,10 +10,18 @@ import LogoPickerPopover from "./LogoPickerPopover.jsx";
 import NoteTagPicker from "./NoteTagPicker.jsx";
 import ReminderPicker from "../notes/ReminderPicker.jsx";
 import { Popover as RichTextPopover } from "../richtext/Popover.jsx";
-import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon, LogoIcon, PencilIcon } from "../../icons/index.jsx";
+import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon, LogoIcon, PencilIcon, PinOutline, PinFilled } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS, modalBgFor } from "../../utils/colors.js";
 import { t } from "../../i18n";
+
+// Spoken by screen readers as the save line changes.
+const SAVE_STATE_LABELS = {
+  saving: "noteSaveSaving",
+  saved: "noteSaveSaved",
+  offline: "noteSaveOffline",
+  error: "noteSaveError",
+};
 
 // The viewBox is shifted onto the glyph's ink, which sits right of and below
 // the centre of its 20-unit drawing, so the icon centres in its button.
@@ -32,6 +40,8 @@ const NOTE_COLORS = COLOR_ORDER.filter((name) => LIGHT_COLORS[name]);
  */
 export default function ModalFooter({
   dark,
+  saveState = "idle",
+  onTogglePin,
   reserveNavBar = false,
   rootRef,
   windowWidth,
@@ -182,7 +192,16 @@ export default function ModalFooter({
 
   /* Kebab menu entries, shared by the desktop popover and the mobile sheet.
      Each keeps its own colour so it reads the same in both. */
+  const isPinned = !!activeNoteObj?.pinned;
   const kebabItems = [
+    // Pin lives in the note header on desktop.
+    !isDesktop && onTogglePin && tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED" && {
+      key: "pin",
+      color: dark ? "#a5b4fc" : "#4f46e5",
+      icon: isPinned ? <PinFilled /> : <PinOutline />,
+      label: isPinned ? t("unpinNote") : t("pinNote"),
+      run: () => activeId != null && onTogglePin(activeId, !isPinned),
+    },
     // Reminder: opens the picker anchored to the kebab trigger, in a
     // dedicated orange so it reads distinctly from the other entries.
     canRemind && {
@@ -316,10 +335,19 @@ export default function ModalFooter({
     <div
       ref={rootRef}
       className={`modal-footer-toolbar border-t border-[var(--border-light)]${isDesktop ? "" : " modal-footer-toolbar--touch"}`}
+      data-save-state={isDesktop ? undefined : saveState}
       // The gesture bar sits on top of the keyboard, so its inset would only
       // be dead space above it once the panel has slid up.
       style={reserveNavBar ? { paddingBottom: "max(0px, var(--safe-bottom) - var(--keyboard-inset))" } : undefined}
     >
+      {/* Phones: the note's save state, along the footer's top edge
+          (.gk-save-line), in place of the header's save check. */}
+      {!isDesktop && (
+        <>
+          <div className="gk-save-line" aria-hidden="true" />
+          <span className="sr-only" role="status">{SAVE_STATE_LABELS[saveState] ? t(SAVE_STATE_LABELS[saveState]) : ""}</span>
+        </>
+      )}
       <div className={`modal-footer-inner flex items-center px-2 sm:px-3 py-1.5 ${isDesktop ? "gap-1" : "gap-0.5"}`}>
 
         {/* ── Color picker ── */}

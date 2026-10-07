@@ -139,6 +139,7 @@ export default function NoteModal({
   onSetReminder,
   editedStamp,
   modalHasChanges,
+  saveState,
   modalScrollable,
   tagsWithCounts,
   addTags,
@@ -879,6 +880,8 @@ export default function NoteModal({
 
           <ModalFooter
             dark={dark}
+            saveState={saveState}
+            onTogglePin={togglePin}
             // Mobile: the footer's own surface runs down under the navigation
             // bar (its inset becomes the footer's bottom padding), so the bar
             // shows the footer's colour rather than the note's behind it.
