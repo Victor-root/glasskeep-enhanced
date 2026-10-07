@@ -948,22 +948,22 @@ export default function NoteModal({
           {!isDesktopLayout && mType !== "checklist" && !viewMode && !(mType === 'draw' && drawMode === 'draw') && (
             <div
               ref={fmtSheetRef}
-              className={`mobile-fmt-sheet${showModalFmt ? " is-open" : ""}${dark ? " mobile-fmt-sheet--dark" : ""}`}
+              className={`mobile-fmt-sheet${showModalFmt ? " is-open" : ""}`}
               role="dialog"
               aria-label={t("formatting")}
               inert={!showModalFmt}
               style={{ backgroundColor: modalBgFor(mColor, dark) }}
             >
               <div
-                className="mobile-fmt-sheet-grabber"
-                role="button"
-                tabIndex={-1}
-                aria-label={t("close")}
+                className="gk-sheet-head"
                 onPointerDown={handleFmtGrabberDown}
                 onPointerMove={handleFmtGrabberMove}
                 onPointerUp={handleFmtGrabberUp}
                 onPointerCancel={handleFmtGrabberUp}
-              />
+              >
+                <div className="gk-sheet-grabber" />
+                <h2 className="gk-sheet-title">{t("formatting")}</h2>
+              </div>
               <div ref={setMobileToolbarSlot} className="mobile-fmt-sheet-content" />
             </div>
           )}

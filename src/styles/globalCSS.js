@@ -1745,37 +1745,24 @@ html.dark .modal-footer-toolbar {
 /* Mobile-only formatting bottom sheet. Lives as a flex child of the modal
    panel between the scroll container and the footer; collapses to 0 height
    when closed, expands to its natural height (capped) when open, so the
-   editor area shrinks instead of being overlaid. The sheet stays mounted
-   while the modal is open so the rich-text toolbar's portal target is
-   stable across opens — visibility is driven by max-height + opacity on
-   the .is-open class. */
+   editor area shrinks instead of being overlaid: the note stays visible
+   and selectable while formatting. Same look as the overlay sheets
+   (BottomSheet.jsx): large rounded top corners, a soft shadow, the shared
+   .gk-sheet-head handle and title, on the note's colour (inline style).
+   The sheet stays mounted while the modal is open so the rich-text
+   toolbar's portal target is stable across opens; visibility is driven by
+   max-height + opacity on the .is-open class. */
 .mobile-fmt-sheet {
   position: relative;
   flex-shrink: 0;
   overflow: hidden;
   max-height: 0;
   opacity: 0;
-  background-color: #ffffff;
-  /* Flat darkening wash on top of the inline-styled modal color so
-     the sheet sits a shade darker than the modal it lives in. The
-     inline backgroundColor (modalBgFor) provides the note-tinted base,
-     and this background-image lays a uniform alpha tint on top. */
-  background-image: linear-gradient(rgba(0, 0, 0, 0.07), rgba(0, 0, 0, 0.07));
-  /* Subtle hairline frame; the "this is a dismissible sheet"
-     affordance is the Android-style grabber bar
-     (.mobile-fmt-sheet-grabber) plus a darkening gradient painted by
-     the ::before below to make the top edge stand out. No drop
-     shadow above the sheet — the gradient already separates the
-     sheet from the editor cleanly. */
-  border-top: 1px solid rgba(0, 0, 0, 0.15);
-  border-left: 1px solid rgba(0, 0, 0, 0.1);
-  border-right: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 12px 12px 0 0;
-  /* Smooth iOS-style open / close — a longer duration with a
-     decelerating curve reads as fluid where the previous "ease"
-     felt jerky. will-change + contain promote the sheet onto its
-     own layer so changing max-height doesn't relayout / repaint
-     the rest of the modal. */
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.12);
+  /* Smooth iOS-style open / close: a longer duration with a decelerating
+     curve reads as fluid. will-change + contain keep the max-height change
+     from relaying out / repainting the rest of the modal. */
   transition:
     max-height 0.32s cubic-bezier(0.32, 0.72, 0, 1),
     opacity    0.22s cubic-bezier(0.32, 0.72, 0, 1);
@@ -1784,76 +1771,11 @@ html.dark .modal-footer-toolbar {
   display: flex;
   flex-direction: column;
 }
-/* Top "shadow header" — a soft darker band that fades to transparent
-   over the first ~28 px of the sheet so the panel reads as a clearly
-   distinct surface rising out of the editor. pointer-events: none so
-   it never intercepts the grabber's pointer events. */
-.mobile-fmt-sheet::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 16px;
-  pointer-events: none;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0));
-  border-radius: 12px 12px 0 0;
-  z-index: 1;
-}
-.mobile-fmt-sheet--dark::before {
-  /* Dark mode: a flat 10 % white wash on top reads better than a
-     gradient against an already-dark panel. */
-  background: rgb(255 255 255 / 10%);
-}
-/* Lift the grabber and the toolbar above the gradient so they remain
-   crisp on top of the darkening overlay. */
-.mobile-fmt-sheet-grabber,
-.mobile-fmt-sheet-content { position: relative; z-index: 2; }
-/* Drag-handle bar, the same affordance Android / iOS bottom sheets use
-   to signal "this surface is dismissible". A real DOM element so we
-   can attach pointer events for swipe-to-close — the visible pill is
-   painted by ::after centred inside it. The strip is taller than the
-   pill itself so the touch target stays comfortable on mobile. */
-.mobile-fmt-sheet-grabber {
-  flex-shrink: 0;
-  height: 10px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-.mobile-fmt-sheet-grabber::after {
-  content: "";
-  width: 42px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.28);
-  transition: background 0.12s ease, transform 0.12s ease;
-}
-.mobile-fmt-sheet-grabber:active { cursor: grabbing; }
-.mobile-fmt-sheet-grabber:active::after {
-  background: rgba(0, 0, 0, 0.45);
-  transform: scaleX(1.15);
-}
-.mobile-fmt-sheet--dark .mobile-fmt-sheet-grabber::after { background: rgba(255, 255, 255, 0.32); }
-.mobile-fmt-sheet--dark .mobile-fmt-sheet-grabber:active::after { background: rgba(255, 255, 255, 0.5); }
+html.dark .mobile-fmt-sheet { box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.45); }
 .mobile-fmt-sheet.is-open {
   max-height: min(58vh, 460px);
   opacity: 1;
 }
-.mobile-fmt-sheet--dark {
-  background-color: #1f2937;
-  /* Stronger overlay in dark mode — pure black at 0.07 on a dark
-     modal barely shifts; bump to 0.18 so the sheet still reads as
-     "a notch deeper" than the modal underneath. */
-  background-image: linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18));
-  border-top-color: rgba(255, 255, 255, 0.14);
-  border-left-color: rgba(255, 255, 255, 0.08);
-  border-right-color: rgba(255, 255, 255, 0.08);
-}
-.mobile-fmt-sheet--dark::before { background: rgba(255, 255, 255, 0.32); }
 .mobile-fmt-sheet-content {
   overflow-y: auto;
   overscroll-behavior: contain;
