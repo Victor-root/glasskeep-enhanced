@@ -12,6 +12,8 @@ import { useBranding, DEFAULT_APP_NAME } from "../../branding/BrandingContext.js
 // Matches the closing transition of .gk-header-menu in globalCSS, plus a
 // margin in case transitionend never fires.
 const HEADER_MENU_EXIT_MS = 180;
+// Same for the closing fold of .gk-mobile-search.
+const SEARCH_EXIT_MS = 260;
 
 export default function NotesHeader({
   dark,
@@ -136,6 +138,10 @@ export default function NotesHeader({
   // useSwallowClosingClick, whose listeners outlive the menu.
   const swallowClickOf = useSwallowClosingClick();
   const headerMenuPresence = usePresence(headerMenuOpen, headerMenuRef, HEADER_MENU_EXIT_MS);
+  const searchBarRef = React.useRef(null);
+  const searchPresence = usePresence(mobileSearchOpen, searchBarRef, SEARCH_EXIT_MS);
+  // Header x of the search icon, where the bar unfolds from and folds back to.
+  const [searchOrigin, setSearchOrigin] = React.useState(null);
 
   // Publish the header's exact rendered height as --gk-header-h. TagSidebar
   // sizes its own header row to this same value, so its body nav's
@@ -331,7 +337,10 @@ export default function NotesHeader({
               type="button"
               className={`${qrQuickEnabled ? "p-1.5" : "p-2"} rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-600 dark:text-gray-300`}
               aria-label={t("search")}
-              onClick={() => {
+              onClick={(e) => {
+                const header = headerRef.current.getBoundingClientRect();
+                const btn = e.currentTarget.getBoundingClientRect();
+                setSearchOrigin(btn.left + btn.width / 2 - header.left);
                 // iOS Safari only opens the soft keyboard when focus() is
                 // called synchronously inside the user-gesture handler.
                 // flushSync forces React to mount the input immediately so
@@ -354,55 +363,64 @@ export default function NotesHeader({
           />,
           document.body
         )}
-        {mobileSearchOpen && (
-          <div className={`${mobileOnly} absolute inset-0 z-30 flex items-center px-3 gap-2 bg-[var(--bg-card,_var(--bg-primary))] backdrop-blur-xl`}>
-            <div className="relative flex-1 min-w-0">
-              <input
-                ref={mobileSearchRef}
-                type="text"
-                placeholder={aiAssistantEnabled ? t("searchOrAskAi") : t("search")}
-                className={`w-full bg-transparent border border-transparent rounded-lg pl-3 ${aiAssistantEnabled ? "pr-16" : "pr-8"} py-2 text-sm ring-1 ring-slate-400/15 transition-shadow focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    if (search) {
-                      setSearch("");
-                    } else {
-                      setMobileSearchOpen(false);
-                    }
+        {/* Mobile search bar: unfolds left and right from the search icon
+            over the whole header (.gk-mobile-search). */}
+        {(mobileSearchOpen || searchPresence.mounted) && (
+          <div
+            ref={searchBarRef}
+            className={`${mobileOnly} gk-mobile-search absolute inset-0 z-30 flex items-center gap-3 ${qrQuickEnabled ? "px-3" : "px-4"}`}
+            data-state={searchPresence.shown ? "open" : "closed"}
+            style={searchOrigin == null ? undefined : { "--gk-search-origin": `${searchOrigin}px` }}
+            onTransitionEnd={(e) => {
+              if (e.target === e.currentTarget && !mobileSearchOpen) searchPresence.unmount();
+            }}
+          >
+            <span className="shrink-0 text-[var(--gk-chrome-accent)]" aria-hidden="true">
+              <SearchIcon />
+            </span>
+            <input
+              ref={mobileSearchRef}
+              type="text"
+              placeholder={aiAssistantEnabled ? t("searchOrAskAi") : t("search")}
+              className="flex-1 min-w-0 h-full bg-transparent border-0 text-lg outline-none focus:outline-none focus:ring-0 placeholder-gray-500 dark:placeholder-gray-400"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  if (search) {
+                    setSearch("");
+                  } else {
+                    setMobileSearchOpen(false);
                   }
-                  if (
-                    e.key === "Enter" &&
-                    aiAssistantEnabled &&
-                    search.trim().length > 0
-                  ) {
-                    onAiSearch?.(search);
-                  }
-                }}
-              />
-              <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                {aiAssistantEnabled && search.trim().length > 0 && (
-                  <button
-                    type="button"
-                    className="h-6 w-6 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
-                    onClick={() => onAiSearch?.(search)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M10 21h-3a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v3.5"/><path d="M9 9h1"/><path d="M9 13h2.5"/><path d="M9 17h1"/><path d="M14 21v-4a2 2 0 1 1 4 0v4"/><path d="M14 19h4"/><path d="M21 15v6"/></svg>
-                  </button>
-                )}
-                {search && (
-                  <button
-                    type="button"
-                    aria-label={t("clearSearch")}
-                    className="h-5 w-5 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
-                    onClick={() => { setSearch(""); setMobileSearchOpen(false); }}
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            </div>
+                }
+                if (
+                  e.key === "Enter" &&
+                  aiAssistantEnabled &&
+                  search.trim().length > 0
+                ) {
+                  onAiSearch?.(search);
+                }
+              }}
+            />
+            {aiAssistantEnabled && search.trim().length > 0 && (
+              <button
+                type="button"
+                className="shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
+                onClick={() => onAiSearch?.(search)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M10 21h-3a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v3.5"/><path d="M9 9h1"/><path d="M9 13h2.5"/><path d="M9 17h1"/><path d="M14 21v-4a2 2 0 1 1 4 0v4"/><path d="M14 19h4"/><path d="M21 15v6"/></svg>
+              </button>
+            )}
+            {search && (
+              <button
+                type="button"
+                aria-label={t("clearSearch")}
+                className="shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-2xl leading-none text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+                onClick={() => { setSearch(""); setMobileSearchOpen(false); }}
+              >
+                ×
+              </button>
+            )}
           </div>
         )}
 
