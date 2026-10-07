@@ -70,14 +70,37 @@ export default function ColorPickerPanel({ anchorRef, open, onClose, colors, sel
           : "bg-white/98 border-gray-100/80"
       }`}
     >
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 48px)", gap: "12px" }}>
-        {colors.map((name) => (
+      <ColorSwatchGrid
+        colors={colors}
+        selectedColor={selectedColor}
+        darkMode={darkMode}
+        onSelect={(name) => { onSelect(name); onClose(); }}
+      />
+    </div>,
+    document.body
+  );
+}
+
+/** The swatches themselves, shared by the desktop popover above and the
+ *  mobile note color sheet. `labeled` lays them out as a fluid 4-column
+ *  grid with each color's name under its swatch. */
+export function ColorSwatchGrid({ colors, selectedColor, darkMode, onSelect, labeled = false }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: labeled ? "repeat(4, minmax(0, 1fr))" : "repeat(4, 48px)",
+        gap: labeled ? "18px 8px" : "12px",
+      }}
+    >
+      {colors.map((name) => {
+        const swatch = (
           <button
-            key={name}
+            key={labeled ? undefined : name}
             type="button"
-            onClick={(e) => { e.stopPropagation(); onSelect(name); onClose(); }}
+            onClick={(e) => { e.stopPropagation(); onSelect(name); }}
             aria-label={trColorName(name)}
-            data-tooltip={trColorName(name)}
+            data-tooltip={labeled ? undefined : trColorName(name)}
             className={`w-12 h-12 rounded-full transition-transform active:scale-95 hover:scale-110 focus:outline-none flex items-center justify-center ${
               name === "default"
                 ? "border-2 border-gray-300 dark:border-gray-500"
@@ -104,9 +127,17 @@ export default function ColorPickerPanel({ anchorRef, open, onClose, colors, sel
               </svg>
             )}
           </button>
-        ))}
-      </div>
-    </div>,
-    document.body
+        );
+        if (!labeled) return swatch;
+        return (
+          <div key={name} className="flex flex-col items-center gap-1.5 min-w-0">
+            {swatch}
+            <span className={`text-xs truncate max-w-full ${selectedColor === name ? "font-semibold" : "opacity-70"}`}>
+              {trColorName(name)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
