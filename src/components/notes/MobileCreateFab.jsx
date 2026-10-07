@@ -5,9 +5,6 @@ import { setSystemBarsScrim } from "../../utils/helpers.js";
 
 // Darkness of the backdrop, matched on the Android status and navigation bars.
 const SCRIM_ALPHA = 0.3;
-// Opening decelerates; closing accelerates (the app's exit curve) so the
-// backdrop does not drop most of its dimming in the first frames.
-const EASE = (open) => (open ? "ease-out" : "ease-[cubic-bezier(0.3,0,0.8,0.15)]");
 
 export default function MobileCreateFab({
   open,
@@ -72,7 +69,7 @@ export default function MobileCreateFab({
       <div aria-hidden="true" className="gk-backdrop-warm" />
       {/* Above the sticky header (z-40), under the dial. */}
       <div
-        className={`fixed inset-0 z-[45] transition-opacity duration-200 ${EASE(open)} backdrop-blur-[2px] ${
+        className={`fixed inset-0 z-[45] transition-opacity duration-200 ease-out backdrop-blur-[2px] ${
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         style={{ backgroundColor: `rgba(0, 0, 0, ${SCRIM_ALPHA})` }}
@@ -92,7 +89,7 @@ export default function MobileCreateFab({
         }}
       >
       <div
-        className={`flex flex-col items-end gap-3 transition-[opacity,transform] duration-200 ${EASE(open)} ${
+        className={`flex flex-col items-end gap-3 transition-[opacity,transform] duration-200 ease-out ${
           open
             ? "opacity-100 translate-y-0 pointer-events-auto"
             : "opacity-0 translate-y-3 pointer-events-none"

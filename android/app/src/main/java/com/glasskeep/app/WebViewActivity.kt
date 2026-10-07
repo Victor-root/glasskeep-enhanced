@@ -14,7 +14,6 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.view.animation.DecelerateInterpolator
-import android.view.animation.PathInterpolator
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
@@ -1058,14 +1057,12 @@ class WebViewActivity : AppCompatActivity() {
         controller.isAppearanceLightNavigationBars = isLight(navColor)
     }
 
-    /** Same timing and curves as the page overlay's fade (MobileCreateFab). */
+    /** Same timing as the page overlay's fade (MobileCreateFab). */
     private fun animateBarsScrim(target: Float) {
         barsScrimAnimator?.cancel()
         barsScrimAnimator = ValueAnimator.ofFloat(barsScrim, target).apply {
             duration = BARS_SCRIM_MS
-            // Lifting accelerates like the page's closing backdrop.
-            interpolator = if (target > barsScrim) DecelerateInterpolator()
-            else PathInterpolator(0.3f, 0f, 0.8f, 0.15f)
+            interpolator = DecelerateInterpolator()
             addUpdateListener {
                 barsScrim = it.animatedValue as Float
                 applySystemBars()
