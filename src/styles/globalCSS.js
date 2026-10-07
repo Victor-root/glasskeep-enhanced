@@ -1987,6 +1987,18 @@ html.dark .modal-footer-labeled-btn {
   width: 24px;
   height: 24px;
 }
+/* One stroke weight for the outlined icons (the Tabler ones already use it). */
+.modal-footer-toolbar--touch .modal-footer-btn > svg[stroke="currentColor"] {
+  stroke-width: 1.75;
+}
+/* Its glyph fills less of its box than the others: brought to their height. */
+.modal-footer-toolbar--touch .modal-footer-btn--fmt > .tabler-icon {
+  width: 30px;
+  height: 30px;
+}
+.modal-footer-toolbar--touch .modal-footer-btn--fmt > .tabler-icon > svg {
+  stroke-width: 1.4; /* 1.75px once scaled up to 30px */
+}
 
 /* Footer colored variants (apply to both icon-only and labeled) */
 .modal-footer-btn--trash, .modal-footer-labeled-btn.modal-footer-btn--trash { color: #dc2626; }
