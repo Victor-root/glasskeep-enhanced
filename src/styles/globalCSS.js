@@ -2425,28 +2425,19 @@ html:not(.dark) .code-copy-btn {
 }
 /* Touch screens: one scrollbar everywhere, a thin theme-accent thumb with no
    track, shown only while its box scrolls (data-gk-scrollbar, see
-   useTouchScrollbars). The page's own is drawn by PageScrollbar, under the
-   sticky header (z-40). */
+   useTouchScrollbars). The page and the sidebar draw theirs (ScrollThumb). */
 @media (hover: none) and (pointer: coarse) {
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; }
   [data-gk-scrollbar]::-webkit-scrollbar-thumb { background: var(--gk-chrome-accent); }
-  /* The sidebar's thumb keeps clear of the screen edge: the track is 4px
-     wider, a transparent border the thumb's colour does not paint. */
-  .gk-sidebar-body::-webkit-scrollbar { width: 8px; }
-  .gk-sidebar-body::-webkit-scrollbar-thumb {
-    border-right: 4px solid transparent;
-    /* 2px corners on both sides of the painted part (inner right = 6 - 4). */
-    border-radius: 2px 6px 6px 2px;
-  }
-  .gk-sidebar-body[data-gk-scrollbar]::-webkit-scrollbar-thumb { background-clip: padding-box; }
+  /* The sidebar draws its own thumb (ScrollThumb) to keep it off the screen
+     edge, which its native scrollbar could not be moved away from. */
+  .gk-sidebar-body { scrollbar-width: none; }
+  .gk-sidebar-body::-webkit-scrollbar { display: none; }
 }
-.gk-page-scrollbar {
-  position: fixed;
+.gk-scroll-thumb {
   top: 0;
-  right: 0;
-  z-index: 35;
   width: 4px;
   border-radius: 2px;
   background: var(--gk-chrome-accent);
@@ -2455,9 +2446,21 @@ html:not(.dark) .code-copy-btn {
   transition: opacity 250ms ease-out;
   will-change: transform;
 }
-.gk-page-scrollbar[data-active] {
+.gk-scroll-thumb[data-active] {
   opacity: 1;
   transition: none;
+}
+/* The page's: under the notes shell's sticky header (z-40). */
+.gk-scroll-thumb--page {
+  position: fixed;
+  right: 0;
+  z-index: 35;
+}
+/* The sidebar's: a little off the screen edge. */
+.gk-scroll-thumb--sidebar {
+  position: absolute;
+  right: 4px;
+  z-index: 1;
 }
 /* Reserve the scrollbar gutter on desktop so the inner width stays
    identical whether the note is short (no scrollbar) or long (scrollbar
