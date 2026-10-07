@@ -10,7 +10,7 @@ import LogoPickerPopover from "./LogoPickerPopover.jsx";
 import NoteTagPicker from "./NoteTagPicker.jsx";
 import ReminderPicker from "../notes/ReminderPicker.jsx";
 import { Popover as RichTextPopover } from "../richtext/Popover.jsx";
-import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon, LogoIcon } from "../../icons/index.jsx";
+import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon, LogoIcon, PencilIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS, modalBgFor } from "../../utils/colors.js";
 import { t } from "../../i18n";
@@ -781,10 +781,7 @@ export default function ModalFooter({
             aria-label={viewMode ? t("editMode") : t("viewMode")}
           >
             {viewMode ? (
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Z" fill="currentColor" />
-                <path d="m14.06 4.94 3.75 3.75 1.41-1.41a1.5 1.5 0 0 0 0-2.12l-1.63-1.63a1.5 1.5 0 0 0-2.12 0l-1.41 1.41Z" fill="currentColor" />
-              </svg>
+              <PencilIcon />
             ) : (
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
@@ -808,10 +805,7 @@ export default function ModalFooter({
                 aria-label={viewMode ? t("editMode") : t("viewMode")}
               >
                 {viewMode ? (
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Z" fill="currentColor" />
-                    <path d="m14.06 4.94 3.75 3.75 1.41-1.41a1.5 1.5 0 0 0 0-2.12l-1.63-1.63a1.5 1.5 0 0 0-2.12 0l-1.41 1.41Z" fill="currentColor" />
-                  </svg>
+                  <PencilIcon />
                 ) : (
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />

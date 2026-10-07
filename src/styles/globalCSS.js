@@ -1966,20 +1966,19 @@ html.dark .modal-footer-labeled-btn {
 }
 
 /* Mobile layout (ModalFooter, not isDesktop): finger-sized buttons that share
-   the row evenly, up to the 48px touch target, and 24px icons whatever size
-   each icon was drawn at. */
+   the row evenly, up to 44px (the footer keeps its height), and 24px icons
+   whatever size each icon was drawn at. */
 .modal-footer-toolbar--touch .modal-footer-inner {
-  padding-left: 8px;
-  padding-right: 8px;
+  padding: 1px 8px;
 }
 .modal-footer-toolbar--touch .modal-footer-inner > * {
   flex: 1 1 0;
   min-width: 0;
-  max-width: 48px;
+  max-width: 44px;
 }
 .modal-footer-toolbar--touch .modal-footer-btn {
   width: 100%;
-  max-width: 48px;
+  max-width: 44px;
   height: auto;
   aspect-ratio: 1;
 }
