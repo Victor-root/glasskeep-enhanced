@@ -269,7 +269,7 @@ export default function CollaborationModal({
                     key={collab.id}
                     // Single aligned row: fixed square avatar, the name
                     // truncates (badge stays beside it), actions pinned
-                    // right and vertically centred. No wrapping — that
+                    // right and vertically centred. No wrapping: that
                     // looked unbalanced on mobile.
                     className={asSheet ? "gk-sheet-row" : "flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"}
                   >
@@ -367,7 +367,7 @@ export default function CollaborationModal({
             />
           </div>
 
-          {/* Alphabet index — only meaningful when not searching */}
+          {/* Alphabet index, only meaningful when not searching */}
           {candidates.length >= LETTER_INDEX_MIN && !q && (
             <div className="flex flex-wrap items-center gap-0.5 mb-2">
               <button type="button" onClick={() => setLetter(null)} className={chipCls(letter === null, false)}>
@@ -406,7 +406,7 @@ export default function CollaborationModal({
                 {t("noUsersAvailable")}
               </div>
             ) : visible.length === 0 ? (
-              <div className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">—</div>
+              <div className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">{t("noUsersFound")}</div>
             ) : (
               visible.map((u) => {
                 const sel = selected.has(u.key);
@@ -482,7 +482,7 @@ export default function CollaborationModal({
           className={asSheet ? "sticky bottom-0 pt-4 pb-1" : "shrink-0 pt-4"}
           style={asSheet ? { background: sheetBackground || "var(--gk-sheet-bg)" } : undefined}
         >
-          {/* Access level applied to the people being ADDED — spelled out
+          {/* Access level applied to the people being ADDED, spelled out
               (and distinguished from the per-row toggles, which change an
               existing collaborator) so it isn't mysterious. */}
           <div className="flex items-center justify-between gap-3">
@@ -574,7 +574,7 @@ export default function CollaborationModal({
         >
           <h3 className="text-lg font-semibold min-w-0 truncate mb-4 shrink-0">{title}</h3>
 
-          {/* Scrollable body — the modal frame (title) and footer (access +
+          {/* Scrollable body: the modal frame (title) and footer (access +
               actions) stay put; only this region (the lists) scrolls.
               -mx-1.5/px-1.5: overflow-y:auto also clips on the X axis, which
               cut off the search input's focus ring on the left/right edges.
