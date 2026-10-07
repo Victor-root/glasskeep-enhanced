@@ -112,8 +112,9 @@ const Underline = ({ style = "simple", color }) => {
 };
 
 // --- List family (kept colour-accented per earlier design decision) ---
-const LIST_BULLET_COLOR  = "#6366f1";
-const LIST_ORDERED_COLOR = "#0ea5e9";
+// Lighter in dark sheets, on the note's colour (globalCSS, .gk-sheet).
+const LIST_BULLET_COLOR  = "var(--rt-list-bullet, #6366f1)";
+const LIST_ORDERED_COLOR = "var(--rt-list-ordered, #0ea5e9)";
 // Neutral dark-gray, kept distinct from the colourful list icons AND from
 // pure black (a small stroke icon in near-black just reads as black). Driven
 // by a CSS variable so it stays legible in dark mode (see --rt-task-icon).
