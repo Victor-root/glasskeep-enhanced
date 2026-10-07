@@ -48,7 +48,7 @@ export default function NoteTagPicker({
 
   const search = (
     <div className={sheet
-      ? "gk-tag-search-wrap gk-sheet-card flex items-center gap-3 px-4 h-12"
+      ? "gk-tag-search-wrap gk-sheet-field flex items-center gap-3 px-4 h-12"
       : "gk-tag-search-wrap flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-800/80 border border-gray-200/80 dark:border-gray-700/60 focus-within:border-indigo-300 dark:focus-within:border-indigo-600 transition-colors duration-150"}
     >
       <svg className={`${sheet ? "w-4 h-4" : "w-3 h-3"} text-gray-400 dark:text-gray-500 shrink-0`} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -85,7 +85,7 @@ export default function NoteTagPicker({
       <div className={sheet ? "px-2 pt-5 pb-2" : "px-3 pt-1 pb-1"}>
         <span className={`${sheet ? "text-xs" : "text-[10px]"} font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500`}>{t("existingTags")}</span>
       </div>
-      <div className={sheet ? "gk-sheet-card" : "px-1.5 pb-1.5 max-h-52 overflow-y-auto"}>
+      <div className={sheet ? undefined : "px-1.5 pb-1.5 max-h-52 overflow-y-auto"}>
         {filtered.map(({ tag, count }) => {
           const checked = isTagApplied(tag);
           return (
@@ -127,7 +127,7 @@ export default function NoteTagPicker({
   const create = isNew && (
     <>
       {!sheet && filtered.length > 0 && <div className="mx-3 border-t border-gray-100 dark:border-gray-800"/>}
-      <div className={sheet ? "gk-sheet-card mt-3" : "px-1.5 py-1.5"}>
+      <div className={sheet ? "mt-2" : "px-1.5 py-1.5"}>
         <button
           type="button"
           onMouseDown={(e) => { keepFocus(e); addTags(trimmed); setTagInput(""); }}

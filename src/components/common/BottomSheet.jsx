@@ -16,7 +16,7 @@ const UNMOUNT_DELAY_MS = 320;
  * quick flick; tapping the backdrop closes too. Only transform and opacity
  * animate, both on the compositor. Stays mounted through its closing slide.
  */
-export default function BottomSheet({ open, onClose, title, children }) {
+export default function BottomSheet({ open, onClose, title, background, children }) {
   const [mounted, setMounted] = useState(open);
   const [shown, setShown] = useState(false);
   const sheetRef = useRef(null);
@@ -107,6 +107,7 @@ export default function BottomSheet({ open, onClose, title, children }) {
         ref={sheetRef}
         className="gk-sheet"
         data-state={state}
+        style={background ? { background } : undefined}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -128,5 +129,15 @@ export default function BottomSheet({ open, onClose, title, children }) {
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** One action of a sheet: a coloured icon and its label. */
+export function SheetRow({ icon, color, label, onClick }) {
+  return (
+    <button type="button" className="gk-sheet-row" onClick={onClick}>
+      <span className="gk-sheet-row-icon" style={{ color }}>{icon}</span>
+      <span className="min-w-0 truncate">{label}</span>
+    </button>
   );
 }
