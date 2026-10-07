@@ -2432,6 +2432,15 @@ html:not(.dark) .code-copy-btn {
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; }
   [data-gk-scrollbar]::-webkit-scrollbar-thumb { background: var(--gk-chrome-accent); }
+  /* The sidebar's thumb keeps clear of the screen edge: the track is 4px
+     wider, a transparent border the thumb's colour does not paint. */
+  .gk-sidebar-body::-webkit-scrollbar { width: 8px; }
+  .gk-sidebar-body::-webkit-scrollbar-thumb {
+    border-right: 4px solid transparent;
+    /* 2px corners on both sides of the painted part (inner right = 6 - 4). */
+    border-radius: 2px 6px 6px 2px;
+  }
+  .gk-sidebar-body[data-gk-scrollbar]::-webkit-scrollbar-thumb { background-clip: padding-box; }
 }
 .gk-page-scrollbar {
   position: fixed;
