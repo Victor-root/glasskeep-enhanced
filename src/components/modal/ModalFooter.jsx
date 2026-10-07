@@ -261,6 +261,17 @@ export default function ModalFooter({
     item.run();
   };
 
+  const reminderPicker = canRemind && (
+    <ReminderPicker
+      value={reminderAt}
+      onSave={(iso) => onSetReminder(activeId, iso)}
+      onClear={() => onSetReminder(activeId, null)}
+      onClose={() => setReminderPopOpen(false)}
+      timeChips={reminderTimeChips}
+      onTimeChipsChange={onReminderTimeChipsChange}
+    />
+  );
+
   const closeTagPicker = () => setModalTagFocused(false);
   const tagPickerProps = {
     tagInput,
@@ -718,30 +729,24 @@ export default function ModalFooter({
           </BottomSheet>
         )}
 
-        {/* Reminder picker — rendered once, anchored to whichever trigger is
-            active (footer bell in read mode, kebab in edit mode). Uses the
-            rich-text menu shell so it matches the editor's font/block-type
-            dropdowns. */}
-        {canRemind && (
+        {/* Reminder picker, opened from the kebab: on desktop a popover in
+            the rich-text menu shell (matching the editor's font / block-type
+            dropdowns), on phones a bottom sheet. */}
+        {canRemind && (isDesktop ? (
           <RichTextPopover
             open={reminderPopOpen}
             onClose={() => setReminderPopOpen(false)}
             anchorRef={kebabRef}
             className="rt-pop--reminder"
             preferredWidth={286}
-            fullscreenOnMobile
-            title={t("reminder")}
           >
-            <ReminderPicker
-              value={reminderAt}
-              onSave={(iso) => onSetReminder(activeId, iso)}
-              onClear={() => onSetReminder(activeId, null)}
-              onClose={() => setReminderPopOpen(false)}
-              timeChips={reminderTimeChips}
-              onTimeChipsChange={onReminderTimeChipsChange}
-            />
+            {reminderPicker}
           </RichTextPopover>
-        )}
+        ) : (
+          <BottomSheet open={reminderPopOpen} onClose={() => setReminderPopOpen(false)} title={t("reminder")} background={sheetBg}>
+            {reminderPicker}
+          </BottomSheet>
+        ))}
 
         {/* ── Read-only access badge — shown (instead of the view/edit
             toggle) when the owner limited this collaborator to read-only.
