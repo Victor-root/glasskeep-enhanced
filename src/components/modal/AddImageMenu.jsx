@@ -1,6 +1,6 @@
 import React from "react";
 import Popover from "../common/Popover.jsx";
-import BottomSheet, { SheetRow } from "../common/BottomSheet.jsx";
+import Sheet, { SheetRow } from "../common/Sheet.jsx";
 import { t } from "../../i18n";
 
 /**
@@ -71,11 +71,11 @@ export default function AddImageMenu({
 
   if (asSheet) {
     return (
-      <BottomSheet open={open} onClose={onClose} title={t("image")} background={sheetBackground}>
+      <Sheet open={open} onClose={onClose} title={t("image")} background={sheetBackground}>
         {items.map((item) => (
           <SheetRow key={item.key} icon={item.icon} color={item.color} label={item.label} onClick={() => runItem(item)} />
         ))}
-      </BottomSheet>
+      </Sheet>
     );
   }
 

@@ -42,7 +42,7 @@ const NoteViewContent = memo(function NoteViewContent({ html, noteViewRef }) {
 import DrawingCanvas from "../../DrawingCanvas";
 import ModalHeader from "./ModalHeader.jsx";
 import ModalFooter from "./ModalFooter.jsx";
-import BottomSheet from "../common/BottomSheet.jsx";
+import Sheet from "../common/Sheet.jsx";
 import NoteAiChatPanel from "../notes/NoteAiChatPanel.jsx";
 import ModalImagesGrid from "./ModalImagesGrid.jsx";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog.jsx";
@@ -866,7 +866,7 @@ export default function NoteModal({
               its target while the sheet is closed. Only relevant for text
               notes (and the inline text body of draw notes) in edit mode. */}
           {!isDesktopLayout && mType !== "checklist" && !viewMode && !(mType === 'draw' && drawMode === 'draw') && (
-            <BottomSheet
+            <Sheet
               open={showModalFmt}
               onClose={() => setShowModalFmt(false)}
               title={t("formatting")}
@@ -874,7 +874,7 @@ export default function NoteModal({
               keepMounted
             >
               <div ref={setMobileToolbarSlot} className="mobile-fmt-sheet-content" />
-            </BottomSheet>
+            </Sheet>
           )}
 
           <ModalFooter
