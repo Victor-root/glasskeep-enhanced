@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -209,20 +208,11 @@ class WebViewActivity : AppCompatActivity() {
             }
         }
 
-        /** The page's own scrollbar (drawn by the WebView) in the theme
-         *  accent, as thin as the page's inner scrollbars. */
+        /** Off while the page draws its own scrollbar, under its header,
+         *  which the WebView's (always on top) cannot do. */
         @JavascriptInterface
-        fun onScrollbarColor(hexColor: String) {
-            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) return
-            runOnUiThread {
-                val color = try { Color.parseColor(hexColor) } catch (_: Exception) { return@runOnUiThread }
-                val density = resources.displayMetrics.density
-                webView.scrollBarSize = (SCROLLBAR_WIDTH_DP * density).toInt()
-                webView.verticalScrollbarThumbDrawable = GradientDrawable().apply {
-                    setColor(color)
-                    cornerRadius = SCROLLBAR_WIDTH_DP * density / 2
-                }
-            }
+        fun setNativePageScrollbar(enabled: Boolean) {
+            runOnUiThread { webView.isVerticalScrollBarEnabled = enabled }
         }
 
         /** Darkens the painted bars by this share of black, alongside a
@@ -1493,8 +1483,6 @@ class WebViewActivity : AppCompatActivity() {
         const val EXTRA_OPEN_NOTE_ID = "openNoteId"
 
         private const val KEY_EDGE_TO_EDGE_PORTRAIT = "edge_to_edge_portrait"
-        // Matches the page's touch scrollbars (globalCSS).
-        private const val SCROLLBAR_WIDTH_DP = 4f
         // Matches the FAB overlay's fade (MobileCreateFab).
         private const val BARS_SCRIM_MS = 200L
     }

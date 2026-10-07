@@ -2289,15 +2289,32 @@ html:not(.dark) .code-copy-btn {
   html.dark .modal-scroll-themed::-webkit-scrollbar-track { background: var(--sb-track, #3b0764) !important; }
   html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb, #7c3aed) !important; border-radius: 10px; }
 }
-/* Touch screens: one scrollbar everywhere, drawn like the Android app's own
-   page scrollbar (WebViewActivity, onScrollbarColor): a thin theme-accent
-   thumb, no track, shown only while its box scrolls (data-gk-scrollbar, see
-   useTouchScrollbars). */
+/* Touch screens: one scrollbar everywhere, a thin theme-accent thumb with no
+   track, shown only while its box scrolls (data-gk-scrollbar, see
+   useTouchScrollbars). The page's own is drawn by PageScrollbar, under the
+   sticky header (z-40). */
 @media (hover: none) and (pointer: coarse) {
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; }
   [data-gk-scrollbar]::-webkit-scrollbar-thumb { background: var(--gk-chrome-accent); }
+}
+.gk-page-scrollbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 35;
+  width: 4px;
+  border-radius: 2px;
+  background: var(--gk-chrome-accent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 250ms ease-out;
+  will-change: transform;
+}
+.gk-page-scrollbar[data-active] {
+  opacity: 1;
+  transition: none;
 }
 /* Reserve the scrollbar gutter on desktop so the inner width stays
    identical whether the note is short (no scrollbar) or long (scrollbar
