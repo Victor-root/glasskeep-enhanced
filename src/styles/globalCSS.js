@@ -357,14 +357,16 @@ html[class*="gk-theme-"] .modal-footer-labeled-btn.modal-footer-btn--mode {
   /* Halo on hover only. */
   box-shadow: none !important;
 }
-html[class*="gk-theme-"] .modal-footer-btn--mode:hover,
-html[class*="gk-theme-"] .modal-footer-labeled-btn.modal-footer-btn--mode:hover {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--gk-chrome-grad-from) 88%, #000) 0%,
-    color-mix(in srgb, var(--gk-chrome-grad-to) 88%, #000) 100%
-  ) !important;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--gk-chrome-grad-from) 45%, transparent) !important;
+@media (hover: hover) {
+  html[class*="gk-theme-"] .modal-footer-btn--mode:hover,
+  html[class*="gk-theme-"] .modal-footer-labeled-btn.modal-footer-btn--mode:hover {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--gk-chrome-grad-from) 88%, #000) 0%,
+      color-mix(in srgb, var(--gk-chrome-grad-to) 88%, #000) 100%
+    ) !important;
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--gk-chrome-grad-from) 45%, transparent) !important;
+  }
 }
 /* Toggle switches in the Settings / Admin panels: "on" colour follows the
    theme (GlassKeep keeps indigo-600 from :root). Also retint the button glow
@@ -2001,14 +2003,16 @@ html.dark .modal-footer-btn--fmt.is-active {
   flex-shrink: 0;
   transition: transform 0.18s cubic-bezier(0.34, 1.5, 0.64, 1);
 }
-.modal-footer-btn:hover,
-.modal-footer-labeled-btn:hover {
-  background: rgba(0, 0, 0, 0.07);
-  color: #111827;
-}
-.modal-footer-btn:hover svg,
-.modal-footer-labeled-btn:hover svg {
-  transform: scale(1.12);
+@media (hover: hover) {
+  .modal-footer-btn:hover,
+  .modal-footer-labeled-btn:hover {
+    background: rgba(0, 0, 0, 0.07);
+    color: #111827;
+  }
+  .modal-footer-btn:hover svg,
+  .modal-footer-labeled-btn:hover svg {
+    transform: scale(1.12);
+  }
 }
 .modal-footer-btn:active,
 .modal-footer-labeled-btn:active {
@@ -2019,10 +2023,12 @@ html.dark .modal-footer-btn,
 html.dark .modal-footer-labeled-btn {
   color: rgba(255, 255, 255, 0.92);
 }
-html.dark .modal-footer-btn:hover,
-html.dark .modal-footer-labeled-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+@media (hover: hover) {
+  html.dark .modal-footer-btn:hover,
+  html.dark .modal-footer-labeled-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
 }
 
 /* Responsive: collapse labels to icon-only below 1024px, distribute evenly */
@@ -2057,29 +2063,49 @@ html.dark .modal-footer-labeled-btn:hover {
 
 /* Footer colored variants (apply to both icon-only and labeled) */
 .modal-footer-btn--trash, .modal-footer-labeled-btn.modal-footer-btn--trash { color: #dc2626; }
-.modal-footer-btn--trash:hover, .modal-footer-labeled-btn.modal-footer-btn--trash:hover { background: rgba(239, 68, 68, 0.1) !important; color: #b91c1c !important; }
+@media (hover: hover) {
+  .modal-footer-btn--trash:hover, .modal-footer-labeled-btn.modal-footer-btn--trash:hover { background: rgba(239, 68, 68, 0.1) !important; color: #b91c1c !important; }
+}
 html.dark .modal-footer-btn--trash, html.dark .modal-footer-labeled-btn.modal-footer-btn--trash { color: #fca5a5; }
-html.dark .modal-footer-btn--trash:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--trash:hover { background: rgba(239, 68, 68, 0.22) !important; color: #fecaca !important; }
+@media (hover: hover) {
+  html.dark .modal-footer-btn--trash:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--trash:hover { background: rgba(239, 68, 68, 0.22) !important; color: #fecaca !important; }
+}
 
 .modal-footer-btn--download, .modal-footer-labeled-btn.modal-footer-btn--download { color: #16a34a; }
-.modal-footer-btn--download:hover, .modal-footer-labeled-btn.modal-footer-btn--download:hover { background: rgba(22, 163, 74, 0.1) !important; color: #15803d !important; }
+@media (hover: hover) {
+  .modal-footer-btn--download:hover, .modal-footer-labeled-btn.modal-footer-btn--download:hover { background: rgba(22, 163, 74, 0.1) !important; color: #15803d !important; }
+}
 html.dark .modal-footer-btn--download, html.dark .modal-footer-labeled-btn.modal-footer-btn--download { color: #86efac; }
-html.dark .modal-footer-btn--download:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--download:hover { background: rgba(34, 197, 94, 0.2) !important; color: #bbf7d0 !important; }
+@media (hover: hover) {
+  html.dark .modal-footer-btn--download:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--download:hover { background: rgba(34, 197, 94, 0.2) !important; color: #bbf7d0 !important; }
+}
 
 .modal-footer-btn--archive, .modal-footer-labeled-btn.modal-footer-btn--archive { color: #a16207; }
-.modal-footer-btn--archive:hover, .modal-footer-labeled-btn.modal-footer-btn--archive:hover { background: rgba(161, 98, 7, 0.1) !important; color: #854d0e !important; }
+@media (hover: hover) {
+  .modal-footer-btn--archive:hover, .modal-footer-labeled-btn.modal-footer-btn--archive:hover { background: rgba(161, 98, 7, 0.1) !important; color: #854d0e !important; }
+}
 html.dark .modal-footer-btn--archive, html.dark .modal-footer-labeled-btn.modal-footer-btn--archive { color: #fcd34d; }
-html.dark .modal-footer-btn--archive:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--archive:hover { background: rgba(251, 191, 36, 0.2) !important; color: #fde68a !important; }
+@media (hover: hover) {
+  html.dark .modal-footer-btn--archive:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--archive:hover { background: rgba(251, 191, 36, 0.2) !important; color: #fde68a !important; }
+}
 
 .modal-footer-btn--collab, .modal-footer-labeled-btn.modal-footer-btn--collab { color: #7c3aed; }
-.modal-footer-btn--collab:hover, .modal-footer-labeled-btn.modal-footer-btn--collab:hover { background: rgba(124, 58, 237, 0.1) !important; color: #6d28d9 !important; }
+@media (hover: hover) {
+  .modal-footer-btn--collab:hover, .modal-footer-labeled-btn.modal-footer-btn--collab:hover { background: rgba(124, 58, 237, 0.1) !important; color: #6d28d9 !important; }
+}
 html.dark .modal-footer-btn--collab, html.dark .modal-footer-labeled-btn.modal-footer-btn--collab { color: #c4b5fd; }
-html.dark .modal-footer-btn--collab:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--collab:hover { background: rgba(167, 139, 250, 0.2) !important; color: #ddd6fe !important; }
+@media (hover: hover) {
+  html.dark .modal-footer-btn--collab:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--collab:hover { background: rgba(167, 139, 250, 0.2) !important; color: #ddd6fe !important; }
+}
 
 .modal-footer-btn--image, .modal-footer-labeled-btn.modal-footer-btn--image { color: #0284c7; }
-.modal-footer-btn--image:hover, .modal-footer-labeled-btn.modal-footer-btn--image:hover { background: rgba(2, 132, 199, 0.1) !important; color: #0369a1 !important; }
+@media (hover: hover) {
+  .modal-footer-btn--image:hover, .modal-footer-labeled-btn.modal-footer-btn--image:hover { background: rgba(2, 132, 199, 0.1) !important; color: #0369a1 !important; }
+}
 html.dark .modal-footer-btn--image, html.dark .modal-footer-labeled-btn.modal-footer-btn--image { color: #7dd3fc; }
-html.dark .modal-footer-btn--image:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--image:hover { background: rgba(56, 189, 248, 0.2) !important; color: #bae6fd !important; }
+@media (hover: hover) {
+  html.dark .modal-footer-btn--image:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--image:hover { background: rgba(56, 189, 248, 0.2) !important; color: #bae6fd !important; }
+}
 
 .modal-footer-btn--mode, .modal-footer-labeled-btn.modal-footer-btn--mode {
   background: linear-gradient(90deg, #6366f1 0%, #7c3aed 100%) !important;
@@ -2087,10 +2113,12 @@ html.dark .modal-footer-btn--image:hover, html.dark .modal-footer-labeled-btn.mo
   /* Halo on hover only. */
   box-shadow: none !important;
 }
-.modal-footer-btn--mode:hover, .modal-footer-labeled-btn.modal-footer-btn--mode:hover {
-  background: linear-gradient(90deg, #4f46e5 0%, #6d28d9 100%) !important;
-  color: #fff !important;
-  box-shadow: 0 8px 18px rgba(99, 102, 241, 0.45) !important;
+@media (hover: hover) {
+  .modal-footer-btn--mode:hover, .modal-footer-labeled-btn.modal-footer-btn--mode:hover {
+    background: linear-gradient(90deg, #4f46e5 0%, #6d28d9 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 8px 18px rgba(99, 102, 241, 0.45) !important;
+  }
 }
 html.dark .modal-footer-btn--mode, html.dark .modal-footer-labeled-btn.modal-footer-btn--mode {
   color: #fff !important;
@@ -2103,9 +2131,11 @@ html.dark .modal-footer-btn--mode, html.dark .modal-footer-labeled-btn.modal-foo
   /* Halo on hover only. */
   box-shadow: none !important;
 }
-.modal-footer-btn--save-active:hover {
-  background: linear-gradient(90deg, #059669 0%, #047857 100%) !important;
-  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.45) !important;
+@media (hover: hover) {
+  .modal-footer-btn--save-active:hover {
+    background: linear-gradient(90deg, #059669 0%, #047857 100%) !important;
+    box-shadow: 0 8px 18px rgba(16, 185, 129, 0.45) !important;
+  }
 }
 html.dark .modal-footer-btn--save-active { color: #fff !important; }
 .modal-footer-btn--save-idle {
@@ -2124,9 +2154,11 @@ html.dark .modal-footer-btn--save-idle {
   color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22) !important;
 }
-.modal-footer-btn--pin-active:hover {
-  background: #0f172a !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+@media (hover: hover) {
+  .modal-footer-btn--pin-active:hover {
+    background: #0f172a !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+  }
 }
 .modal-footer-btn--pin-active svg { transform: none !important; }
 html.dark .modal-footer-btn--pin-active {
@@ -2134,8 +2166,10 @@ html.dark .modal-footer-btn--pin-active {
   color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
 }
-html.dark .modal-footer-btn--pin-active:hover {
-  background: rgba(255, 255, 255, 0.22) !important;
+@media (hover: hover) {
+  html.dark .modal-footer-btn--pin-active:hover {
+    background: rgba(255, 255, 255, 0.22) !important;
+  }
 }
 
 /* Copy buttons */
