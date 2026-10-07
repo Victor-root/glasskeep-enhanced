@@ -25,6 +25,7 @@ const NOTE_COLORS = COLOR_ORDER.filter((name) => LIGHT_COLORS[name]);
 export default function ModalFooter({
   dark,
   reserveNavBar = false,
+  rootRef,
   windowWidth,
   isLandscapeMobile,
   isWebView,
@@ -294,6 +295,7 @@ export default function ModalFooter({
 
   return (
     <div
+      ref={rootRef}
       className="modal-footer-toolbar border-t border-[var(--border-light)]"
       // The gesture bar sits on top of the keyboard, so its inset would only
       // be dead space above it once the panel has slid up.

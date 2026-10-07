@@ -194,6 +194,17 @@ class WebViewActivity : AppCompatActivity() {
             runOnUiThread { applySystemBarColor(hexColor) }
         }
 
+        /** Navigation bar colour of its own (an open note's footer), or ""
+         *  to follow the theme colour again. */
+        @JavascriptInterface
+        fun onNavBarColor(hexColor: String) {
+            runOnUiThread {
+                navBarColor = if (hexColor.isBlank()) null
+                else try { Color.parseColor(hexColor) } catch (_: Exception) { return@runOnUiThread }
+                applySystemBars()
+            }
+        }
+
         /** Settings → "Edge-to-edge in portrait". Stored natively so the
          *  bars are already right at the next cold start, before the page
          *  loads. */
@@ -419,6 +430,9 @@ class WebViewActivity : AppCompatActivity() {
     // until the page reports one; the window theme keeps the bars transparent
     // until then.
     private var themeBarColor: Int? = null
+    // Set while the page wants the navigation bar apart from the theme
+    // colour (ThemeBridge.onNavBarColor).
+    private var navBarColor: Int? = null
 
     /** Portrait edge-to-edge: the user option is on and the phone is upright.
      *  The bars then stay transparent and the page draws behind them. */
@@ -1001,28 +1015,29 @@ class WebViewActivity : AppCompatActivity() {
         applySystemBars()
     }
 
-    /** Paints the bars in the page's theme colour, or leaves them transparent
-     *  in portrait edge-to-edge. The icons follow the theme colour either way:
-     *  it is what sits behind them (the header) whenever the page is at rest. */
+    /** Paints the bars in the page's colours (the navigation bar's own one
+     *  when set, else the theme colour), or leaves them transparent in
+     *  portrait edge-to-edge. The icons follow those colours either way: they
+     *  are what sits behind them whenever the page is at rest. */
     private fun applySystemBars() {
         val color = themeBarColor ?: return
+        val navColor = navBarColor ?: color
         val edgeToEdge = isEdgeToEdgeActive()
-        val barColor = if (edgeToEdge) Color.TRANSPARENT else color
-        window.statusBarColor = barColor
-        window.navigationBarColor = barColor
+        window.statusBarColor = if (edgeToEdge) Color.TRANSPARENT else color
+        window.navigationBarColor = if (edgeToEdge) Color.TRANSPARENT else navColor
         // With 3-button navigation the system otherwise lays its own
         // translucent white scrim over a transparent navigation bar.
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = !edgeToEdge
         }
 
-        val luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
-        val isLight = luminance > 0.5
-
         val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.isAppearanceLightStatusBars = isLight
-        controller.isAppearanceLightNavigationBars = isLight
+        controller.isAppearanceLightStatusBars = isLight(color)
+        controller.isAppearanceLightNavigationBars = isLight(navColor)
     }
+
+    private fun isLight(color: Int): Boolean =
+        (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255 > 0.5
 
     private val handler = Handler(Looper.getMainLooper())
     private var backHeld = false
