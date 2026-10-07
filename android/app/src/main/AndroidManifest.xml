@@ -2,6 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Without it the WebView turns its network change detection off
+         entirely: navigator.onLine never moves, and after a network switch
+         (Wi-Fi <-> mobile, a Wi-Fi reconnect, a long sleep) its connections
+         and DNS answers from the old network are never dropped, so requests
+         to the server could keep failing until the process was killed.
+         Normal permission: granted at install, no prompt. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
