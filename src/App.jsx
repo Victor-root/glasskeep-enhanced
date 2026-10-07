@@ -94,6 +94,9 @@ import { useStableCallback } from "./hooks/useStableCallback.js";
 import InstanceUnlockScreen from "./components/lock/InstanceUnlockScreen.jsx";
 import LockedBanner from "./components/lock/LockedBanner.jsx";
 
+// Longer than the slowest overlay closing animation (the sheets' 260ms).
+const OVERLAY_UNLOCK_DELAY_MS = 320;
+
 /** ---------- App ---------- */
 export default function App() {
   const [route, setRoute] = useState(window.location.hash || "#/login");
@@ -5074,10 +5077,21 @@ export default function App() {
   //      re-evaluated as every overlay opens, stalling its opening animation.
   // notifCenterOpen is part of overlayOpenCount now that closeNotifBellRef
   // gives App.jsx a way to close the panel from the popstate handler.
+  // Unlocking waits for the last overlay's closing fade: the attribute also
+  // freezes the animated background, and released mid-fade it made a
+  // blurred scrim re-rasterise on every frame of its fade-out.
   useEffect(() => {
     const locked = overlayOpenCount > 0;
-    document.documentElement.toggleAttribute("data-gk-overlay-locked", locked);
-    try { window.AndroidTheme?.setRefreshEnabled(!locked); } catch (_) {}
+    const apply = () => {
+      document.documentElement.toggleAttribute("data-gk-overlay-locked", locked);
+      try { window.AndroidTheme?.setRefreshEnabled(!locked); } catch (_) {}
+    };
+    if (locked) {
+      apply();
+      return undefined;
+    }
+    const timer = setTimeout(apply, OVERLAY_UNLOCK_DELAY_MS);
+    return () => clearTimeout(timer);
   }, [overlayOpenCount]);
 
   useEffect(() => {
