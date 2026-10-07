@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from "react";
 import { t } from "../../i18n";
 import { TextNoteIcon, ChecklistIcon, BrushIcon, MicIcon } from "../../icons/index.jsx";
 import { setSystemBarsScrim } from "../../utils/helpers.js";
+import { netLog } from "../../utils/netDebug.js";
 
 // Darkness of the backdrop, matched on the Android status and navigation bars.
 const SCRIM_ALPHA = 0.3;
@@ -54,6 +55,23 @@ export default function MobileCreateFab({
     if (!open) return undefined;
     setSystemBarsScrim(SCRIM_ALPHA);
     return () => setSystemBarsScrim(0);
+  }, [open]);
+
+  // Debug builds of the app only (GKNet): frame gaps of each open / close.
+  const tracedRef = useRef(false);
+  useEffect(() => {
+    if (!tracedRef.current) { tracedRef.current = true; return undefined; }
+    if (!window.AndroidNetDebug) return undefined;
+    const gaps = [];
+    const start = performance.now();
+    let last = start;
+    let frame = requestAnimationFrame(function tick(now) {
+      gaps.push(Math.round(now - last));
+      last = now;
+      if (now - start < 450) frame = requestAnimationFrame(tick);
+      else netLog(`fab ${open ? "open" : "close"} frames`, { count: gaps.length, max: Math.max(...gaps), slow: gaps.filter((g) => g > 20) });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [open]);
 
   const pick = (fn) => () => {

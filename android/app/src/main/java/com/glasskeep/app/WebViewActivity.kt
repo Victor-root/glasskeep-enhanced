@@ -1060,13 +1060,26 @@ class WebViewActivity : AppCompatActivity() {
     /** Same timing as the page overlay's fade (MobileCreateFab). */
     private fun animateBarsScrim(target: Float) {
         barsScrimAnimator?.cancel()
+        val traceStart = android.os.SystemClock.uptimeMillis()
+        var traceFrames = 0
+        var traceApplyMs = 0L
         barsScrimAnimator = ValueAnimator.ofFloat(barsScrim, target).apply {
             duration = BARS_SCRIM_MS
             interpolator = DecelerateInterpolator()
             addUpdateListener {
                 barsScrim = it.animatedValue as Float
+                val t = android.os.SystemClock.uptimeMillis()
                 applySystemBars()
+                if (BuildConfig.DEBUG) {
+                    traceFrames++
+                    traceApplyMs += android.os.SystemClock.uptimeMillis() - t
+                }
             }
+            if (BuildConfig.DEBUG) addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    NetDebug.log("bars scrim -> $target: ${traceFrames} frames in ${android.os.SystemClock.uptimeMillis() - traceStart}ms, applySystemBars ${traceApplyMs}ms")
+                }
+            })
             start()
         }
     }
