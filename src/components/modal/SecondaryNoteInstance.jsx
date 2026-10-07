@@ -93,6 +93,8 @@ export default function SecondaryNoteInstance({
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
     modalKebabOpen, setModalKebabOpen,
+    imageMenuOpen, setImageMenuOpen,
+    logoPickerOpen, setLogoPickerOpen,
     imgViewOpen, imgViewIndex,
     mobileNavVisible,
     modalScrollable,
@@ -1238,6 +1240,10 @@ export default function SecondaryNoteInstance({
       setShowModalColorPop={setShowModalColorPop}
       modalKebabOpen={modalKebabOpen}
       setModalKebabOpen={setModalKebabOpen}
+      imageMenuOpen={imageMenuOpen}
+      setImageMenuOpen={setImageMenuOpen}
+      logoPickerOpen={logoPickerOpen}
+      setLogoPickerOpen={setLogoPickerOpen}
       confirmDeleteOpen={confirmDeleteOpen}
       setConfirmDeleteOpen={setConfirmDeleteOpen}
       savingModal={savingModal}

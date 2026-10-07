@@ -57,6 +57,9 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
 
   // Modal footer kebab menu
   const [modalKebabOpen, setModalKebabOpen] = useState(false);
+  // Modal footer image menu, and the logo picker it leads to
+  const [imageMenuOpen, setImageMenuOpen] = useState(false);
+  const [logoPickerOpen, setLogoPickerOpen] = useState(false);
 
   // Image Viewer state (fullscreen)
   const [imgViewOpen, setImgViewOpen] = useState(false);
@@ -499,6 +502,8 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
     modalKebabOpen, setModalKebabOpen,
+    imageMenuOpen, setImageMenuOpen,
+    logoPickerOpen, setLogoPickerOpen,
     imgViewOpen, setImgViewOpen, imgViewIndex,
     mobileNavVisible,
     modalScrollable,

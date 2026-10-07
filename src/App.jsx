@@ -584,6 +584,8 @@ export default function App() {
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
     modalKebabOpen, setModalKebabOpen,
+    imageMenuOpen, setImageMenuOpen,
+    logoPickerOpen, setLogoPickerOpen,
     imgViewOpen, setImgViewOpen, imgViewIndex,
     mobileNavVisible,
     modalScrollable,
@@ -5034,7 +5036,7 @@ export default function App() {
   const overlayOpenCount = [
     imgViewOpen, confirmDeleteOpen, genericConfirmOpen,
     collaborationModalOpen, showModalColorPop, showModalFmt, modalMenuOpen,
-    modalKebabOpen, reminderPopOpen, modalTagFocused, notifCenterOpen, syncDropdownOpen, mobileSearchOpen,
+    modalKebabOpen, imageMenuOpen, logoPickerOpen, reminderPopOpen, modalTagFocused, notifCenterOpen, syncDropdownOpen, mobileSearchOpen,
     showColorPop, showComposerFmt, headerMenuOpen, multiMode,
     typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
     noteAiOpen, changelogOpen, qrScannerOpen, sbsSecondaryId,
@@ -5095,6 +5097,8 @@ export default function App() {
       if (showModalFmt) { setShowModalFmt(false); return; }
       if (modalMenuOpen) { setModalMenuOpen(false); return; }
       if (modalKebabOpen) { setModalKebabOpen(false); return; }
+      if (logoPickerOpen) { setLogoPickerOpen(false); return; }
+      if (imageMenuOpen) { setImageMenuOpen(false); return; }
       if (reminderPopOpen) { setReminderPopOpen(false); return; }
       if (modalTagFocused) { setModalTagFocused(false); return; }
       // noteAiOpen lives INSIDE the NoteModal (open), so we close the
@@ -5118,7 +5122,7 @@ export default function App() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
-      showModalColorPop, showModalFmt, modalMenuOpen, modalKebabOpen, reminderPopOpen, modalTagFocused,
+      showModalColorPop, showModalFmt, modalMenuOpen, modalKebabOpen, imageMenuOpen, logoPickerOpen, reminderPopOpen, modalTagFocused,
       notifCenterOpen, syncDropdownOpen, mobileSearchOpen, showColorPop, showComposerFmt,
       headerMenuOpen, multiMode, typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
       noteAiOpen, changelogOpen, qrScannerOpen]);
@@ -7333,6 +7337,10 @@ export default function App() {
       onReminderTimeChipsChange={handleReminderTimeChipsChange}
       modalKebabOpen={modalKebabOpen}
       setModalKebabOpen={setModalKebabOpen}
+      imageMenuOpen={imageMenuOpen}
+      setImageMenuOpen={setImageMenuOpen}
+      logoPickerOpen={logoPickerOpen}
+      setLogoPickerOpen={setLogoPickerOpen}
       confirmDeleteOpen={confirmDeleteOpen}
       setConfirmDeleteOpen={setConfirmDeleteOpen}
       savingModal={savingModal}

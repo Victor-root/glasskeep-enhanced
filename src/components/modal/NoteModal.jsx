@@ -163,6 +163,11 @@ export default function NoteModal({
   // kebab menu
   modalKebabOpen,
   setModalKebabOpen,
+  // image menu + logo picker
+  imageMenuOpen,
+  setImageMenuOpen,
+  logoPickerOpen,
+  setLogoPickerOpen,
   // confirm delete
   confirmDeleteOpen,
   setConfirmDeleteOpen,
@@ -1030,6 +1035,10 @@ export default function NoteModal({
             onOpenConfirmDelete={() => setConfirmDeleteOpen(true)}
             modalKebabOpen={modalKebabOpen}
             setModalKebabOpen={setModalKebabOpen}
+            imageMenuOpen={imageMenuOpen}
+            setImageMenuOpen={setImageMenuOpen}
+            logoPickerOpen={logoPickerOpen}
+            setLogoPickerOpen={setLogoPickerOpen}
             undo={undo}
             redo={redo}
             canUndo={canUndo}
@@ -1085,6 +1094,8 @@ export default function NoteModal({
             onSetCollaboratorAccess={setCollaboratorAccess}
             searchUsers={searchUsers}
             updateDropdownPosition={updateDropdownPosition}
+            asSheet={!isDesktopLayout}
+            sheetBackground={modalBgFor(mColor, dark)}
           />
         </div>
         {/* Per-note AI panel — wrapped in a width-animating div so the
