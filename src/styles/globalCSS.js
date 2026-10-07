@@ -1744,82 +1744,76 @@ html.dark .modal-footer-toolbar {
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.2);
 }
 
-/* Inside the sheet, the toolbar reflows into a vertically-stacked grid:
-   the FOUR super-groups remain stacked one above the other (the desktop
-   ribbon collapsed onto a column), but inside each super-group every
-   button flows on a SINGLE wrapping line — no more artificial 2-sub-row
-   centring that left big gaps on phones. .rt-sg-row collapses to
-   "display: contents" so its children promote up to the super-group's
-   flex context, and .rt-sg becomes flex-wrap row with center-justify.
-   Wraps only happen when there are genuinely too many buttons for the
-   width. The .rt-sep vertical dividers are hidden — they were ribbon-
-   specific. The fixed-width font picker / Size / Style buttons relax
-   to natural widths so the row packs tight. */
+/* Inside the mobile formatting sheet the ribbon becomes full-width rows:
+   the super-groups stack (divided by a hairline) and each of their rows
+   spans the width, its controls sharing it (wrapping when a line is too
+   full for a phone), at a 48px touch height with larger icons. The
+   ribbon's .rt-sep dividers turn into line breaks, so the one-row simple
+   toolbar splits into a row per group. */
 .mobile-fmt-sheet-content .rt-toolbar {
   flex-direction: column;
   align-items: stretch;
   flex-wrap: nowrap;
   margin: 0;
-  padding: 4px 8px 10px;
+  padding: 0 0 6px;
   border-top: none;
   border-bottom: none;
   row-gap: 0;
   background: transparent;
 }
-.mobile-fmt-sheet-content .rt-sep { display: none; }
 .mobile-fmt-sheet-content .rt-sg {
   width: 100%;
   flex: 0 0 auto;
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--rt-divider);
 }
 .mobile-fmt-sheet-content .rt-sg:last-of-type { border-bottom: none; }
-.mobile-fmt-sheet-content .rt-sg-row { display: contents; }
-.mobile-fmt-sheet-content .rt-btn--wide {
-  width: auto;
-  flex: 0 1 auto;
-  min-width: 110px;
-  max-width: 50%;
+.mobile-fmt-sheet-content .rt-sg-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
 }
-.mobile-fmt-sheet-content .rt-btn--narrow { margin-left: 0; }
-.mobile-fmt-sheet-content .rt-style-btn {
-  flex: 0 0 auto;
-  width: 80px;
-  max-width: 30%;
+.mobile-fmt-sheet-content .rt-sg-row > * {
+  flex: 1 1 44px;
+  min-width: 0;
+  margin: 0;
 }
-
-/* Paragraph super-group on mobile: the desktop ribbon centres "Increase
-   indent" over the "Justify / Decrease indent" join with margin tricks
-   (margin-left:auto + a margin-right nudge on each row's last button).
-   On the phone sheet that single flat wrapping line reads better as:
-     row 1 → lists + Increase/Decrease indent together
-     row 2 → the four alignment buttons
-   We reset those desktop margins and reorder with flex order, forcing a
-   full-width break before the alignment buttons so they drop to their own
-   line. The leading .gk-sheet ancestor (the bottom sheet hosting
-   .mobile-fmt-sheet-content) is here only to out-specify the desktop
-   margin-trick rules of the same shape that appear LATER in this stylesheet
-   — without it their margin-right nudge ties on specificity, wins on source
-   order, and leaves a visible gap between Increase and Decrease indent.
-   Desktop layout is untouched. */
-.gk-sheet .mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"] .rt-sg-row > .rt-btn:last-child {
-  margin-left: 0;
-  margin-right: 0;
-}
-.mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"] .rt-btn--indent { order: 1; }
-.mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"] .rt-btn--outdent { order: 2; }
-.mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"]::after {
-  content: "";
+.mobile-fmt-sheet-content .rt-sg-row > .rt-splitbtn { flex-basis: 64px; }
+.mobile-fmt-sheet-content .rt-sg-row > .rt-btn--swatch { flex-basis: 50px; }
+.mobile-fmt-sheet-content .rt-sg-row > .rt-btn--wide { flex: 2 1 120px; }
+.mobile-fmt-sheet-content .rt-sep,
+.mobile-fmt-sheet-content .rt-sg-row > .rt-sep {
   flex: 0 0 100%;
+  width: 100%;
   height: 0;
-  order: 3;
+  margin: 0;
+  background: none;
 }
-.mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"] .rt-btn--align { order: 4; }
+.mobile-fmt-sheet-content .rt-btn {
+  width: auto;
+  min-width: 0;
+  height: 48px;
+  margin: 0;
+  border-radius: 12px;
+  font-size: 1rem;
+}
+.mobile-fmt-sheet-content .rt-btn svg { width: 24px; height: 24px; }
+/* The size picker keeps its value next to its chevron once it is wide. */
+.mobile-fmt-sheet-content .rt-btn--narrow { justify-content: center; gap: 6px; }
+.mobile-fmt-sheet-content .rt-splitbtn { display: flex; }
+.mobile-fmt-sheet-content .rt-splitbtn > .rt-btn:first-child { flex: 1 1 0; }
+.mobile-fmt-sheet-content .rt-splitbtn > .rt-btn--chevron { flex: 0 0 26px; }
+.mobile-fmt-sheet-content .rt-btn--chevron svg { width: 16px; height: 16px; }
+.mobile-fmt-sheet-content .rt-style-btn {
+  width: auto;
+  height: 48px;
+  border-radius: 12px;
+}
 
 /* Mobile-only "Mise en forme" footer toggle styling — flag the active
    state with the same indigo accent the toolbar already uses. */
