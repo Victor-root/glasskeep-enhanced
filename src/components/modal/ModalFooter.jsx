@@ -24,6 +24,7 @@ const NOTE_COLORS = COLOR_ORDER.filter((name) => LIGHT_COLORS[name]);
  */
 export default function ModalFooter({
   dark,
+  reserveNavBar = false,
   windowWidth,
   isLandscapeMobile,
   isWebView,
@@ -292,7 +293,12 @@ export default function ModalFooter({
   }, [modalTagFocused, setModalTagFocused, modalTagBtnRef, isDesktop]);
 
   return (
-    <div className="modal-footer-toolbar border-t border-[var(--border-light)]">
+    <div
+      className="modal-footer-toolbar border-t border-[var(--border-light)]"
+      // The gesture bar sits on top of the keyboard, so its inset would only
+      // be dead space above it once the panel has slid up.
+      style={reserveNavBar ? { paddingBottom: "max(0px, var(--safe-bottom) - var(--keyboard-inset))" } : undefined}
+    >
       <div className={`modal-footer-inner flex items-center px-2 sm:px-3 py-1.5 ${isDesktop ? "gap-1" : "gap-0.5"}`}>
 
         {/* ── Color picker ── */}

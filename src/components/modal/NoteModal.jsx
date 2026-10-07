@@ -641,9 +641,6 @@ export default function NoteModal({
             backgroundColor: modalBgFor(mColor, dark),
             height: mobileLayout ? '100dvh' : undefined,
             paddingTop: mobileLayout ? 'var(--safe-top)' : undefined,
-            // The gesture bar sits on top of the keyboard, so its inset would
-            // only be dead space above it once the panel has slid up.
-            paddingBottom: mobileLayout ? 'max(0px, var(--safe-bottom) - var(--keyboard-inset))' : undefined,
             paddingLeft: mobileLayout && !edgeToEdgeLandscape ? 'var(--safe-left)' : undefined,
             paddingRight: mobileLayout ? 'var(--safe-right)' : undefined,
           }}
@@ -954,6 +951,10 @@ export default function NoteModal({
 
           <ModalFooter
             dark={dark}
+            // Mobile: the footer's own surface runs down under the navigation
+            // bar (its inset becomes the footer's bottom padding), so the bar
+            // shows the footer's colour rather than the note's behind it.
+            reserveNavBar={mobileLayout}
             windowWidth={windowWidth}
             isLandscapeMobile={isLandscapeMobile}
             isWebView={isWebView}
