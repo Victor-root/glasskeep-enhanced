@@ -14,9 +14,11 @@ const UNMOUNT_DELAY_MS = 320;
  * top corners, a grab handle instead of a close button. Dragging the handle
  * (or the title row) follows the finger and closes past a threshold or on a
  * quick flick; tapping the backdrop closes too. Only transform and opacity
- * animate, both on the compositor. Stays mounted through its closing slide.
+ * animate, both on the compositor. Stays mounted through its closing slide;
+ * with `keepMounted` it also stays in the page once closed, hidden, so its
+ * content keeps its DOM (e.g. a portal target that must not move).
  */
-export default function BottomSheet({ open, onClose, title, background, children }) {
+export default function BottomSheet({ open, onClose, title, background, keepMounted = false, children }) {
   const [mounted, setMounted] = useState(open);
   const [shown, setShown] = useState(false);
   const sheetRef = useRef(null);
@@ -98,10 +100,10 @@ export default function BottomSheet({ open, onClose, title, background, children
     setDragStyles(null);
   };
 
-  if (!mounted) return null;
+  if (!mounted && !keepMounted) return null;
   const state = shown ? "open" : "closed";
   return createPortal(
-    <div className="gk-sheet-root" data-state={state}>
+    <div className="gk-sheet-root" data-state={state} hidden={!mounted} inert={!open}>
       <div ref={scrimRef} className="gk-sheet-scrim" data-state={state} onClick={onClose} />
       <div
         ref={sheetRef}

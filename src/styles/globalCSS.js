@@ -1607,10 +1607,12 @@ html.dark .modal-icon-btn--image:hover {
    opacity (backdrop) animate; it decelerates in and accelerates out. Lifted
    above the soft keyboard through --keyboard-inset. Content is laid out with
    the field / row bricks below, straight on the sheet's background. */
+/* Above the note it opens from (z 40-50), below what may open from inside
+   it: confirmation dialogs (z 60) and menus / popovers (z 9999+). */
 .gk-sheet-root {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: 55;
 }
 .gk-sheet-root[data-state="closed"] { pointer-events: none; }
 .gk-sheet-scrim {
@@ -1742,51 +1744,6 @@ html.dark .modal-footer-toolbar {
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.2);
 }
 
-/* Mobile-only formatting bottom sheet. Lives as a flex child of the modal
-   panel between the scroll container and the footer; collapses to 0 height
-   when closed, expands to its natural height (capped) when open, so the
-   editor area shrinks instead of being overlaid: the note stays visible
-   and selectable while formatting. Same look as the overlay sheets
-   (BottomSheet.jsx): large rounded top corners, a soft shadow, the shared
-   .gk-sheet-head handle and title, on the note's colour (inline style).
-   The sheet stays mounted while the modal is open so the rich-text
-   toolbar's portal target is stable across opens; visibility is driven by
-   max-height + opacity on the .is-open class. */
-.mobile-fmt-sheet {
-  position: relative;
-  flex-shrink: 0;
-  overflow: hidden;
-  max-height: 0;
-  opacity: 0;
-  border-radius: 28px 28px 0 0;
-  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.12);
-  /* Smooth iOS-style open / close: a longer duration with a decelerating
-     curve reads as fluid. will-change + contain keep the max-height change
-     from relaying out / repainting the rest of the modal. */
-  transition:
-    max-height 0.32s cubic-bezier(0.32, 0.72, 0, 1),
-    opacity    0.22s cubic-bezier(0.32, 0.72, 0, 1);
-  will-change: max-height, opacity;
-  contain: layout paint style;
-  display: flex;
-  flex-direction: column;
-}
-html.dark .mobile-fmt-sheet { box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.45); }
-.mobile-fmt-sheet.is-open {
-  max-height: min(58vh, 460px);
-  opacity: 1;
-}
-.mobile-fmt-sheet-content {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  /* Hide the scrollbar visually in every browser. Touch-scroll still
-     works if the toolbar ever overflows, but the bar would otherwise
-     flash on the right edge during the open / close max-height
-     animations and during the swipe-to-close drag. */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.mobile-fmt-sheet-content::-webkit-scrollbar { display: none; }
 /* Inside the sheet, the toolbar reflows into a vertically-stacked grid:
    the FOUR super-groups remain stacked one above the other (the desktop
    ribbon collapsed onto a column), but inside each super-group every
@@ -1844,13 +1801,13 @@ html.dark .mobile-fmt-sheet { box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.45); }
      row 2 → the four alignment buttons
    We reset those desktop margins and reorder with flex order, forcing a
    full-width break before the alignment buttons so they drop to their own
-   line. The leading .mobile-fmt-sheet ancestor (always the parent of
+   line. The leading .gk-sheet ancestor (the bottom sheet hosting
    .mobile-fmt-sheet-content) is here only to out-specify the desktop
    margin-trick rules of the same shape that appear LATER in this stylesheet
    — without it their margin-right nudge ties on specificity, wins on source
    order, and leaves a visible gap between Increase and Decrease indent.
    Desktop layout is untouched. */
-.mobile-fmt-sheet .mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"] .rt-sg-row > .rt-btn:last-child {
+.gk-sheet .mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"] .rt-sg-row > .rt-btn:last-child {
   margin-left: 0;
   margin-right: 0;
 }
@@ -5862,8 +5819,8 @@ html.dark .gk-notif-bell-dot {
 }
 /* Mobile sheet variant — full-screen panel that slides DOWN from the
    top when opened (transform animates from translateY(-100%) → 0) and
-   slides back UP when closed. Mirrors the editor's mobile-fmt-sheet
-   timing curve so the two surfaces feel like one design system. The
+   slides back UP when closed, on the same decelerating timing curve as
+   the other mobile sheets so they feel like one design system. The
    keyframe-based fade-in above is suppressed so it doesn't fight the
    transform transition. */
 .gk-notif-center--mobile {
