@@ -307,7 +307,7 @@ export default function ModalFooter({
   return (
     <div
       ref={rootRef}
-      className="modal-footer-toolbar border-t border-[var(--border-light)]"
+      className={`modal-footer-toolbar border-t border-[var(--border-light)]${isDesktop ? "" : " modal-footer-toolbar--touch"}`}
       // The gesture bar sits on top of the keyboard, so its inset would only
       // be dead space above it once the panel has slid up.
       style={reserveNavBar ? { paddingBottom: "max(0px, var(--safe-bottom) - var(--keyboard-inset))" } : undefined}
