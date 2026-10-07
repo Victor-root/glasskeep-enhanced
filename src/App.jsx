@@ -49,7 +49,6 @@ import { handleSmartEnter } from "./components/common/FormatToolbar.jsx";
 import DrawingPreview from "./components/common/DrawingPreview.jsx";
 import UserAvatar from "./components/common/UserAvatar.jsx";
 import TooltipPortal from "./components/common/TooltipPortal.jsx";
-import PageScrollbar from "./components/common/PageScrollbar.jsx";
 import AuthShell from "./components/auth/AuthShell.jsx";
 import LoginView from "./components/auth/LoginView.jsx";
 import RegisterView from "./components/auth/RegisterView.jsx";
@@ -7570,7 +7569,6 @@ export default function App() {
   return (
     <>
       <TooltipPortal />
-      <PageScrollbar />
       {/* Server is at-rest-locked under the user's feet. Render a
           non-intrusive banner instead of yanking them off their
           local cache; they can keep reading and queueing edits, and

@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { TOUCH_QUERY } from "../../hooks/useTouchScrollbars.js";
-import { netLog } from "../../utils/netDebug.js";
 
 // Android's own scrollbar timing: shown while scrolling, fades this long after.
 const HIDE_DELAY_MS = 300;
@@ -19,11 +18,6 @@ export default function PageScrollbar() {
     && (!window.AndroidTheme || typeof window.AndroidTheme.setNativePageScrollbar === "function"));
 
   useEffect(() => {
-    netLog("PageScrollbar", {
-      enabled,
-      touch: !!window.matchMedia?.(TOUCH_QUERY).matches,
-      bridge: typeof window.AndroidTheme?.setNativePageScrollbar,
-    });
     if (!enabled) return undefined;
     const thumb = thumbRef.current;
     const setNative = (on) => {
@@ -47,13 +41,7 @@ export default function PageScrollbar() {
       const top = (window.scrollY / (total - view)) * (view - next);
       thumb.style.transform = `translateY(${top}px)`;
     };
-    let logged = false;
     const onScroll = () => {
-      if (!logged) {
-        logged = true;
-        const rect = thumb.getBoundingClientRect();
-        netLog("PageScrollbar first scroll", { scrollY: window.scrollY, total: document.documentElement.scrollHeight, view: window.innerHeight, thumbTop: Math.round(rect.top), thumbZ: getComputedStyle(thumb).zIndex });
-      }
       if (!frame) frame = requestAnimationFrame(draw);
       thumb.setAttribute("data-active", "");
       clearTimeout(hideTimer);

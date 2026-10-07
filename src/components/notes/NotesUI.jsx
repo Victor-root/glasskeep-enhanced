@@ -4,6 +4,7 @@ import { ALL_IMAGES, REMINDERS } from "../../utils/constants.js";
 import { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, RemindersSidebarIcon } from "../../icons/sidebarIcons.jsx";
 import MultiSelectToolbar from "./MultiSelectToolbar.jsx";
 import NotesHeader from "./NotesHeader.jsx";
+import PageScrollbar from "../common/PageScrollbar.jsx";
 import NotesComposer from "./NotesComposer.jsx";
 import NotesSections from "./NotesSections.jsx";
 import useScrollActivity from "../../hooks/useScrollActivity.js";
@@ -243,6 +244,8 @@ function NotesUI({
       className={`min-h-screen overflow-x-clip${isMobile ? "" : " notes-shell-desktop"}`}
       style={{ marginLeft: sidebarPermanent ? `${sidebarWidth}px` : "0px", position:"relative", zIndex:2 }}
     >
+      {/* In this stacking context, so the header (z-40) covers it. */}
+      <PageScrollbar />
       <NotesHeader
         dark={dark}
         headerVisible={headerVisible}
