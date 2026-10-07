@@ -1,12 +1,12 @@
 import { useEffect } from "react";
 
-// About ScrollThumb's delay plus fade before it hides.
+// About PageScrollbar's delay plus fade before it hides.
 const SHOW_MS = 550;
 export const TOUCH_QUERY = "(hover: none) and (pointer: coarse)";
 
 /**
  * Touch screens: the page's inner scrollbars (globalCSS, data-gk-scrollbar)
- * only show while their box scrolls, like the page scrollbar (ScrollThumb).
+ * only show while their box scrolls, like the page scrollbar (PageScrollbar).
  */
 export default function useTouchScrollbars() {
   useEffect(() => {
