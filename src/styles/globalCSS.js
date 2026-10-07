@@ -1987,6 +1987,10 @@ html.dark .modal-footer-labeled-btn {
   width: 24px;
   height: 24px;
 }
+/* The filled read/edit disc stays clear of the footer's top edge. */
+.modal-footer-toolbar--touch .modal-footer-btn--mode {
+  max-width: 38px;
+}
 /* One stroke weight for the outlined icons (the Tabler ones already use it). */
 .modal-footer-toolbar--touch .modal-footer-btn > svg[stroke="currentColor"] {
   stroke-width: 1.75;
