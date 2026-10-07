@@ -14,6 +14,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.PathInterpolator
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
@@ -1057,29 +1058,18 @@ class WebViewActivity : AppCompatActivity() {
         controller.isAppearanceLightNavigationBars = isLight(navColor)
     }
 
-    /** Same timing as the page overlay's fade (MobileCreateFab). */
+    /** Same timing and curves as the page overlay's fade (MobileCreateFab). */
     private fun animateBarsScrim(target: Float) {
         barsScrimAnimator?.cancel()
-        val traceStart = android.os.SystemClock.uptimeMillis()
-        var traceFrames = 0
-        var traceApplyMs = 0L
         barsScrimAnimator = ValueAnimator.ofFloat(barsScrim, target).apply {
             duration = BARS_SCRIM_MS
-            interpolator = DecelerateInterpolator()
+            // Lifting accelerates like the page's closing backdrop.
+            interpolator = if (target > barsScrim) DecelerateInterpolator()
+            else PathInterpolator(0.3f, 0f, 0.8f, 0.15f)
             addUpdateListener {
                 barsScrim = it.animatedValue as Float
-                val t = android.os.SystemClock.uptimeMillis()
                 applySystemBars()
-                if (BuildConfig.DEBUG) {
-                    traceFrames++
-                    traceApplyMs += android.os.SystemClock.uptimeMillis() - t
-                }
             }
-            if (BuildConfig.DEBUG) addListener(object : android.animation.AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: android.animation.Animator) {
-                    NetDebug.log("bars scrim -> $target: ${traceFrames} frames in ${android.os.SystemClock.uptimeMillis() - traceStart}ms, applySystemBars ${traceApplyMs}ms")
-                }
-            })
             start()
         }
     }
