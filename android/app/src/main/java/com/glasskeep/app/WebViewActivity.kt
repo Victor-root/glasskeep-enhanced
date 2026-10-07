@@ -192,6 +192,20 @@ class WebViewActivity : AppCompatActivity() {
             runOnUiThread { applySystemBarColor(hexColor) }
         }
 
+        /** Settings → "Edge-to-edge in portrait". Stored natively so the
+         *  bars are already right at the next cold start, before the page
+         *  loads. */
+        @JavascriptInterface
+        fun setEdgeToEdgePortrait(enabled: Boolean) {
+            runOnUiThread {
+                val prefs = getSharedPreferences("glasskeep", MODE_PRIVATE)
+                if (prefs.getBoolean(KEY_EDGE_TO_EDGE_PORTRAIT, false) == enabled) return@runOnUiThread
+                prefs.edit().putBoolean(KEY_EDGE_TO_EDGE_PORTRAIT, enabled).apply()
+                applySystemBars()
+                injectSafeAreaInsets()
+            }
+        }
+
         @JavascriptInterface
         fun setRefreshEnabled(enabled: Boolean) {
             runOnUiThread { swipeRefresh.isEnabled = enabled }
@@ -399,19 +413,36 @@ class WebViewActivity : AppCompatActivity() {
     // covering its lower half. Reported on API 30+ only (see the listener).
     private var keyboardInsetDp = 0.0
 
+    // Theme colour last sent by the page (see ThemeBridge.onThemeColor). Null
+    // until the page reports one; the window theme keeps the bars transparent
+    // until then.
+    private var themeBarColor: Int? = null
+
+    /** Portrait edge-to-edge: the user option is on and the phone is upright.
+     *  The bars then stay transparent and the page draws behind them. */
+    private fun isEdgeToEdgeActive(): Boolean =
+        getSharedPreferences("glasskeep", MODE_PRIVATE)
+            .getBoolean(KEY_EDGE_TO_EDGE_PORTRAIT, false) &&
+            resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+
+    /** The system-bar state the page lays itself out against: the insets, the
+     *  keyboard height, and data-gk-edge-to-edge on <html> while the bars are
+     *  transparent. */
     private fun injectSafeAreaInsets() {
         // Skip injection if the WebView hasn't loaded any page yet — evaluating JS
         // before there's a document just queues a useless call.
         if (!this::webView.isInitialized) return
         val js = """
             (function(){
-              var s = document.documentElement && document.documentElement.style;
-              if (!s) return;
+              var d = document.documentElement;
+              if (!d) return;
+              var s = d.style;
               s.setProperty('--android-inset-top',    '${safeAreaTopDp}px');
               s.setProperty('--android-inset-bottom', '${safeAreaBottomDp}px');
               s.setProperty('--android-inset-left',   '${safeAreaLeftDp}px');
               s.setProperty('--android-inset-right',  '${safeAreaRightDp}px');
               s.setProperty('--android-keyboard-inset', '${keyboardInsetDp}px');
+              d.toggleAttribute('data-gk-edge-to-edge', ${isEdgeToEdgeActive()});
               window.dispatchEvent(new Event('gk-android-insets'));
             })();
         """.trimIndent()
@@ -877,6 +908,9 @@ class WebViewActivity : AppCompatActivity() {
         webView.evaluateJavascript(
             "if(window.__setDarkMode)window.__setDarkMode($isDark)", null
         )
+        // Portrait edge-to-edge follows the orientation.
+        applySystemBars()
+        injectSafeAreaInsets()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -935,18 +969,25 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     private fun applySystemBarColor(hexColor: String) {
-        try {
-            val color = Color.parseColor(hexColor)
-            window.statusBarColor = color
-            window.navigationBarColor = color
+        themeBarColor = try { Color.parseColor(hexColor) } catch (_: Exception) { return }
+        applySystemBars()
+    }
 
-            val luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
-            val isLight = luminance > 0.5
+    /** Paints the bars in the page's theme colour, or leaves them transparent
+     *  in portrait edge-to-edge. The icons follow the theme colour either way:
+     *  it is what sits behind them (the header) whenever the page is at rest. */
+    private fun applySystemBars() {
+        val color = themeBarColor ?: return
+        val barColor = if (isEdgeToEdgeActive()) Color.TRANSPARENT else color
+        window.statusBarColor = barColor
+        window.navigationBarColor = barColor
 
-            val controller = WindowInsetsControllerCompat(window, window.decorView)
-            controller.isAppearanceLightStatusBars = isLight
-            controller.isAppearanceLightNavigationBars = isLight
-        } catch (_: Exception) { }
+        val luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
+        val isLight = luminance > 0.5
+
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.isAppearanceLightStatusBars = isLight
+        controller.isAppearanceLightNavigationBars = isLight
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -1348,5 +1389,7 @@ class WebViewActivity : AppCompatActivity() {
         // Reminder notification deep-link: ReminderNotifier stashes the target
         // note id here; we forward it to window.__glasskeepOpenNote once loaded.
         const val EXTRA_OPEN_NOTE_ID = "openNoteId"
+
+        private const val KEY_EDGE_TO_EDGE_PORTRAIT = "edge_to_edge_portrait"
     }
 }

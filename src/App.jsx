@@ -339,6 +339,15 @@ export default function App() {
       return true;
     }
   });
+  // Edge-to-edge portrait (Android app): transparent system bars, the notes
+  // scroll behind them. Applied natively, see the effect below.
+  const [edgeToEdgePortrait, setEdgeToEdgePortrait] = useState(() => {
+    try {
+      return localStorage.getItem("edgeToEdgePortrait") === "true";
+    } catch (e) {
+      return false;
+    }
+  });
   const [editorToolbarMode, setEditorToolbarMode] = useState(() => {
     try {
       const stored = localStorage.getItem("editorToolbarMode");
@@ -1242,6 +1251,10 @@ export default function App() {
           setEdgeToEdgeLandscape(settings.edgeToEdgeLandscape);
           localStorage.setItem("edgeToEdgeLandscape", String(settings.edgeToEdgeLandscape));
         }
+        if (typeof settings?.edgeToEdgePortrait === "boolean") {
+          setEdgeToEdgePortrait(settings.edgeToEdgePortrait);
+          localStorage.setItem("edgeToEdgePortrait", String(settings.edgeToEdgePortrait));
+        }
         if (settings?.editorToolbarMode === "simple" || settings?.editorToolbarMode === "advanced") {
           setEditorToolbarMode(settings.editorToolbarMode);
           localStorage.setItem("editorToolbarMode", settings.editorToolbarMode);
@@ -1715,6 +1728,25 @@ export default function App() {
       }).catch(() => {});
     }
   }, [edgeToEdgeLandscape]);
+
+  // Edge-to-edge portrait: save + hand it to the Android app, which owns the
+  // system bars and marks <html> with data-gk-edge-to-edge while it applies.
+  useEffect(() => {
+    try { localStorage.setItem("edgeToEdgePortrait", String(edgeToEdgePortrait)); } catch (e) {}
+    try { window.AndroidTheme?.setEdgeToEdgePortrait?.(edgeToEdgePortrait); } catch (_) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("edgeToEdgePortrait")) {
+      remoteSyncedKeysRef.current.delete("edgeToEdgePortrait");
+      return;
+    }
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { edgeToEdgePortrait },
+      }).catch(() => {});
+    }
+  }, [edgeToEdgePortrait]);
 
   // Typography presets: local-first + server sync, mirroring the other prefs.
   useEffect(() => {
@@ -3737,6 +3769,14 @@ export default function App() {
                   mark("edgeToEdgeLandscape");
                   setEdgeToEdgeLandscape(v);
                   try { localStorage.setItem("edgeToEdgeLandscape", String(v)); } catch (_) {}
+                }
+              }
+              if (keys.has("edgeToEdgePortrait")) {
+                const v = settings.edgeToEdgePortrait;
+                if (typeof v === "boolean") {
+                  mark("edgeToEdgePortrait");
+                  setEdgeToEdgePortrait(v);
+                  try { localStorage.setItem("edgeToEdgePortrait", String(v)); } catch (_) {}
                 }
               }
               if (keys.has("typographyPresets")) {
@@ -7610,6 +7650,8 @@ export default function App() {
         setChecklistRemoveSectionBehavior={setChecklistRemoveSectionBehavior}
         edgeToEdgeLandscape={edgeToEdgeLandscape}
         setEdgeToEdgeLandscape={setEdgeToEdgeLandscape}
+        edgeToEdgePortrait={edgeToEdgePortrait}
+        setEdgeToEdgePortrait={setEdgeToEdgePortrait}
         editorToolbarMode={editorToolbarMode}
         setEditorToolbarMode={setEditorToolbarMode}
         pasteMode={pasteMode}

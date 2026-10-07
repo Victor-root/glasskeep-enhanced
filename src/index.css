@@ -45,6 +45,26 @@
      it instead of staying behind it. */
   --keyboard-inset: 0px;
   --keyboard-pan: 0px;
+
+  /* How far the notes header reaches up behind the status bar (see below). */
+  --gk-header-bleed: 0px;
+}
+
+/* Portrait edge-to-edge in the Android app: WebViewActivity sets
+   data-gk-edge-to-edge on <html> while the system bars are transparent, so
+   the page scrolls behind them. The notes header extends its own background
+   up behind the status bar, and slides that much further when it hides. */
+html[data-gk-edge-to-edge] {
+  --gk-header-bleed: var(--safe-top);
+}
+html[data-gk-edge-to-edge] header.glass-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: var(--gk-header-bleed);
+  background: inherit;
 }
 
 /* On mouse click: remove focus outline AND Tailwind ring (box-shadow).
