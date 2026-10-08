@@ -291,7 +291,7 @@ function AudioBody({ clips }) {
               alignItems: "center", justifyContent: "center",
               background: "rgba(124,58,237,0.35)", color: "#fff", flexShrink: 0,
             }}>
-              <MicrophoneFilledIcon className="w-5 h-5" />
+              <Mic size={20} />
             </span>
             <span style={{ flex: 1, fontWeight: 600 }}>{name}</span>
             {dur > 0 && (
