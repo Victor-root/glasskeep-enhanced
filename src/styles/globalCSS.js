@@ -2457,16 +2457,24 @@ html:not(.dark) .code-copy-btn {
   ::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; }
   [data-gk-scrollbar]::-webkit-scrollbar-thumb { background: var(--gk-chrome-accent); }
 }
-.gk-page-scrollbar {
+/* Between the status and navigation bars, clear of the screen's rounded
+   corners, and of its edge. */
+.gk-page-scrollbar-track {
   position: fixed;
-  top: 0;
-  /* Clear of the screen edge. */
+  top: var(--safe-top);
+  bottom: var(--safe-bottom);
   right: 4px;
   z-index: 35;
   width: 4px;
+  pointer-events: none;
+}
+.gk-page-scrollbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
   border-radius: 2px;
   background: var(--gk-chrome-accent);
-  pointer-events: none;
   opacity: 0;
   transition: opacity 250ms ease-out;
   will-change: transform;
