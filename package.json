@@ -72,7 +72,7 @@
     "@tiptap/pm": "^3.31.4",
     "@tiptap/react": "^3.31.4",
     "@tiptap/starter-kit": "^3.31.4",
-    "bcryptjs": "^2.4.3",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.11.1",
     "blurhash": "^2.0.5",
     "cors": "^2.8.6",
@@ -88,7 +88,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-masonry-css": "^1.0.16",
-    "undici": "^7.30.0",
+    "undici": "^8.11.2",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
@@ -100,7 +100,6 @@
     "autoprefixer": "^10.6.1",
     "concurrently": "^9.2.4",
     "cross-env": "^10.1.0",
-    "dotenv": "^17.4.2",
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.26",
