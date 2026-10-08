@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +29,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import android.util.Log
+import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.R
 import kotlinx.coroutines.launch
 
@@ -67,9 +70,19 @@ fun OnboardingPager(
     var tvPage by remember { mutableIntStateOf(if (startAtSetup) 1 else 0) }
     val currentPage = if (tv) tvPage else pagerState.currentPage
     val goTo: (Int) -> Unit = { page ->
+        if (BuildConfig.DEBUG) Log.d("GKOnboarding", "goTo($page) from page $currentPage")
         if (tv) tvPage = page else scope.launch { pagerState.animateScrollToPage(page) }
     }
-    BackHandler(enabled = tv && tvPage == 1) { tvPage = 0 }
+    BackHandler(enabled = tv && tvPage == 1) {
+        if (BuildConfig.DEBUG) Log.d("GKOnboarding", "Back key on the setup page")
+        tvPage = 0
+    }
+    if (BuildConfig.DEBUG) {
+        DisposableEffect(Unit) {
+            Log.d("GKOnboarding", "onboarding composed, tv=$tv, page=$currentPage")
+            onDispose { Log.d("GKOnboarding", "onboarding disposed") }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (tv) {
