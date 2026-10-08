@@ -324,7 +324,11 @@ write_status "fetching" "$CURRENT_STEP" "Downloading the latest version..." ""
 (
     cd "$INSTALL_DIR"
     # Guard against local edits leaking into the rebuild.
-    if [[ -n "$TARGET_VERSION" ]]; then
+    if [[ -n "$TARGET_VERSION" && "$TARGET_VERSION" == "$FROM_VERSION" ]]; then
+        # Started by the running release for itself (its Node.js
+        # catch-up): its code is already here, wherever it came from.
+        echo "[self-update] already on v${TARGET_VERSION}: nothing to download"
+    elif [[ -n "$TARGET_VERSION" ]]; then
         # The exact release the admin was offered: fetch and check out
         # its tag, never the tracked branch's current tip, which may
         # already be ahead of the last tagged release.
