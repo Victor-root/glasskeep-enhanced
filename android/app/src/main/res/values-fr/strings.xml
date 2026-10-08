@@ -19,6 +19,7 @@
     <string name="download_started">Téléchargement lancé…</string>
     <string name="download_complete">Enregistré : %1$s</string>
     <string name="download_error">Erreur de téléchargement</string>
+    <string name="sso_no_browser">Aucun navigateur pour se connecter</string>
     <string name="shortcut_qr_short">Scanner QRCODE</string>
     <string name="shortcut_qr_long">Scanner QRCODE</string>
     <string name="shortcut_new_text_short">Note texte</string>

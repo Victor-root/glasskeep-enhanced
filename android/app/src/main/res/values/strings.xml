@@ -20,6 +20,7 @@
     <string name="download_started">Download started…</string>
     <string name="download_complete">Saved: %1$s</string>
     <string name="download_error">Download error</string>
+    <string name="sso_no_browser">No browser to sign in with</string>
     <!-- App shortcut: long-press the launcher icon to open the QR
          scanner straight away (sign in to a PC paired with this phone). -->
     <string name="shortcut_qr_short">Scan QRCODE</string>
