@@ -21,6 +21,7 @@ Headline feature: **single sign-on** with any OpenID Connect provider (Pocket ID
 
 ### 🐛 Fixed
 - 📶 **Android app stuck offline after a while in the background**, often until it was force-closed: API requests no longer go through the service worker (Chrome / WebView 123+), and the app now lets the WebView detect network changes, so connections to the server that died during sleep are dropped instead of reused.
+- 📺 **Android TV: the welcome screen bounced between its two pages** when the remote went right, and the title could not be brought back once scrolled away; its buttons now show which one the remote is on, and its cards keep a readable width on a large screen.
 - ⌨️ **Android: the keyboard covered the sign-in fields**: the sign-in screen now moves up just enough to keep the field being typed in visible.
 - A wrong current password (password or instance passphrase change) signed you out instead of just showing the error.
 - A popover closed by scrolling swallowed the next tap.

@@ -7,12 +7,17 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,10 +41,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -88,6 +95,37 @@ internal val ButtonGradient = Brush.horizontalGradient(
     colors = listOf(Color(0xFF6366f1), Color(0xFF7c3aed))
 )
 internal val Indigo = Color(0xFF6366f1)
+
+/** The gradient button of the onboarding screens. Focus from a remote or
+ *  a keyboard rings it in white and enlarges it, so a D-pad shows where
+ *  it is. */
+@Composable
+internal fun GradientButton(
+    onClick: () -> Unit,
+    shape: Shape,
+    contentPadding: PaddingValues,
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    Box(
+        modifier = modifier
+            .scale(if (focused) 1.04f else 1f)
+            .clip(shape)
+            .background(ButtonGradient)
+            .then(if (focused) Modifier.border(3.dp, Color.White, shape) else Modifier)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(contentPadding),
+        contentAlignment = Alignment.Center,
+        content = content,
+    )
+}
 
 // Amber, not red: an unencrypted address on your own network is allowed,
 // it is just worth knowing about. Legible on both the light card and the
@@ -416,18 +454,13 @@ fun SetupScreen(initialUrl: String = "", onConnect: (String) -> Unit) {
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                Box(
+                GradientButton(
+                    onClick = doConnect,
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(ButtonGradient)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button
-                        ) { doConnect() },
-                    contentAlignment = Alignment.Center
+                        .height(48.dp),
                 ) {
                     Text(
                         stringResource(if (loading) R.string.connecting else R.string.setup_connect),
@@ -557,18 +590,13 @@ private fun TvSetupScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                Box(
+                GradientButton(
+                    onClick = onConnect,
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(ButtonGradient)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button
-                        ) { onConnect() },
-                    contentAlignment = Alignment.Center
+                        .height(52.dp),
                 ) {
                     Text(
                         stringResource(if (loading) R.string.connecting else R.string.setup_connect),
