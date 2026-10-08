@@ -81,7 +81,7 @@
     "framer-motion": "^12.43.0",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.539.0",
-    "marked": "^16.4.2",
+    "marked": "^18.1.0",
     "openid-client": "^6.8.8",
     "qr-scanner": "^1.4.2",
     "qrcode": "^1.5.4",
