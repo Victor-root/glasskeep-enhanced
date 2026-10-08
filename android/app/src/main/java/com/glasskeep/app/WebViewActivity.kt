@@ -4,6 +4,7 @@ import android.Manifest
 import android.animation.ValueAnimator
 import android.app.Activity
 import android.app.DownloadManager
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -34,6 +35,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowInsetsControllerCompat
@@ -57,24 +59,17 @@ class WebViewActivity : AppCompatActivity() {
     private var pendingOpenNoteId: String? = null
     private var pageLoaded = false
 
-    // Single sign-on round trip. The server ties a sign-in attempt to a
-    // cookie in the app's cookie store, which a Custom Tab does not share,
-    // and the provider is a third-party site that must not run next to the
-    // bridges of this WebView. So the trip goes through SsoActivity, a
-    // bridge-less WebView on the same cookies, which hands back the
-    // address the provider returns to. The web app announces the provider
-    // URL it is about to open (the bridge call below): only the app's own
-    // code can start the trip, a link in a note never does. Only the
-    // server's callback comes back here.
-    @Volatile private var announcedSsoUrl: Uri? = null
+    // The server address this screen was opened on.
+    private lateinit var appUrl: String
+
+    // Single sign-on: the provider is a third-party site that must not run
+    // next to the bridges of this WebView, and passkeys only work in a real
+    // browser. So it opens in the default browser as a sheet over the app
+    // (a partial Custom Tab, which must be launched for a result), and the
+    // outcome comes back through SsoReturnActivity, not as a result here.
     private val ssoLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val back = result.data?.getStringExtra(SsoActivity.EXTRA_RETURN_URL)
-            ?.let { Uri.parse(it) } ?: return@registerForActivityResult
-        val app = webView.url?.let { Uri.parse(it) } ?: return@registerForActivityResult
-        if (SsoActivity.isCallback(back, app)) webView.loadUrl(back.toString())
-    }
+    ) { }
 
     // Held while we wait for the POST_NOTIFICATIONS runtime grant on
     // Android 13+. Once the user replies, we re-attempt the notif post
@@ -373,12 +368,12 @@ class WebViewActivity : AppCompatActivity() {
         @JavascriptInterface
         fun isAndroidTV(): Boolean = isTelevision()
 
-        /** Called by the web app right before it navigates to the single
-         *  sign-on provider. See [ssoCallbackFor]. */
+        /** Opens the single sign-on provider. Only an authorization URL
+         *  that returns to this server's callback is accepted. */
         @JavascriptInterface
-        fun beginSingleSignOn(authorizationUrl: String?) {
+        fun openSingleSignOn(authorizationUrl: String?) {
             if (authorizationUrl.isNullOrBlank()) return
-            announcedSsoUrl = Uri.parse(authorizationUrl)
+            runOnUiThread { openSingleSignOnSheet(Uri.parse(authorizationUrl)) }
         }
 
         /** Open a URL in the device's external browser. Used by docs /
@@ -537,6 +532,8 @@ class WebViewActivity : AppCompatActivity() {
                 finish()
                 return
             }
+
+        appUrl = url
 
         // Deep-link target if we were launched by a reminder notification tap.
         pendingOpenNoteId = intent.getStringExtra(EXTRA_OPEN_NOTE_ID)
@@ -718,28 +715,24 @@ class WebViewActivity : AppCompatActivity() {
                     request: WebResourceRequest
                 ): Boolean {
                     val target = request.url
-                    // Compare HOSTS, not a string prefix. The app's own pages
-                    // must always stay in the WebView, but a brittle
+                    // Compare host and port, not a string prefix. The app's
+                    // own pages must always stay in the WebView, but a brittle
                     // requestUrl.startsWith(url) check let some same-server
                     // navigations slip through to the external browser — SPA
                     // hash routes (#/notes), reloads (manual / SW auto-update /
                     // pull-to-refresh), and server redirects don't necessarily
                     // start with the exact launch URL. That's the intermittent
-                    // "the app reopens in Brave on top of itself" bug.
-                    val appHost = try { Uri.parse(url).host } catch (e: Exception) { null }
-                    val sameHost = appHost != null &&
-                        appHost.equals(target.host, ignoreCase = true)
-                    // Checked first: the provider may share the server's
-                    // host on another port, and must still never load here.
-                    val ssoCallback = if (request.isForMainFrame) ssoCallbackFor(target, view.url) else null
-                    return if (ssoCallback != null) {
-                        ssoLauncher.launch(
-                            Intent(this@WebViewActivity, SsoActivity::class.java)
-                                .putExtra(SsoActivity.EXTRA_URL, target.toString())
-                                .putExtra(SsoActivity.EXTRA_CALLBACK_URL, ssoCallback.toString())
-                        )
-                        true
-                    } else if (sameHost) {
+                    // "the app reopens in Brave on top of itself" bug. The
+                    // scheme is left out (a server may upgrade http to https);
+                    // the port is not: a sign-on provider may share the
+                    // server's host on another one, and must never load here.
+                    val appPage = try {
+                        val app = Uri.parse(url)
+                        app.host != null &&
+                            app.host.equals(target.host, ignoreCase = true) &&
+                            app.port == target.port
+                    } catch (_: Exception) { false }
+                    return if (appPage) {
                         false
                     } else {
                         // Genuinely external link (a note's link, GitHub, …) —
@@ -964,7 +957,7 @@ class WebViewActivity : AppCompatActivity() {
                 }
             }
 
-            loadUrl(url)
+            loadUrl(ssoReturnUrl(intent) ?: url)
         }
 
         // Handle gesture back navigation (swipe back)
@@ -996,24 +989,41 @@ class WebViewActivity : AppCompatActivity() {
             pendingOpenNoteId = it
             maybeDispatchOpenNote()
         }
+        ssoReturnUrl(intent)?.let { webView.loadUrl(it) }
     }
 
-    /** The callback to come back to when [target] is the provider URL the
-     *  web app announced and it sends the browser back to this server's
-     *  OIDC callback, on the origin of the page that announced it
-     *  ([pageUrl]). Null for any other navigation. */
-    private fun ssoCallbackFor(target: Uri, pageUrl: String?): Uri? {
-        val announced = announcedSsoUrl ?: return null
-        announcedSsoUrl = null
-        return runCatching {
-            val page = Uri.parse(pageUrl ?: return null)
-            val back = Uri.parse(announced.getQueryParameter("redirect_uri") ?: return null)
-            back.takeIf {
-                SsoActivity.sameOrigin(announced, target) &&
-                    announced.getQueryParameter("state") == target.getQueryParameter("state") &&
-                    SsoActivity.isCallback(back, page)
-            }
-        }.getOrNull()
+    /** The web app's address that finishes single sign-on, when [intent]
+     *  carries the outcome SsoReturnActivity received. It goes to the
+     *  origin of the page shown (the one that started the attempt), or of
+     *  the server address when the screen is only being created. */
+    private fun ssoReturnUrl(intent: Intent): String? {
+        val outcome = intent.getStringExtra(EXTRA_SSO_OUTCOME) ?: return null
+        val app = Uri.parse(webView.url ?: appUrl)
+        return "${app.scheme}://${app.encodedAuthority}/?$outcome"
+    }
+
+    /** The provider in the default browser, as a sheet over the app (a
+     *  full-screen tab where the browser has no such sheet). Its
+     *  redirect_uri must be this server's callback, on the origin of the
+     *  page asking. */
+    private fun openSingleSignOnSheet(authorization: Uri) {
+        val page = webView.url?.let { Uri.parse(it) } ?: return
+        val callback = authorization.getQueryParameter("redirect_uri")?.let { Uri.parse(it) } ?: return
+        val isCallback = callback.scheme == page.scheme &&
+            callback.encodedAuthority == page.encodedAuthority &&
+            callback.path == SSO_CALLBACK_PATH
+        if (!isCallback || authorization.scheme !in setOf("https", "http")) return
+        val tab = CustomTabsIntent.Builder()
+            .setShowTitle(true)
+            .setInitialActivityHeightPx((resources.displayMetrics.heightPixels * 0.9).toInt())
+            .setToolbarCornerRadiusDp(16)
+            .build()
+        tab.intent.data = authorization
+        try {
+            ssoLauncher.launch(tab.intent)
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.sso_no_browser, Toast.LENGTH_LONG).show()
+        }
     }
 
     /** Open `uri` via the user's default browser using Android Custom
@@ -1024,7 +1034,7 @@ class WebViewActivity : AppCompatActivity() {
      *  short toast as a last resort so the tap is still acknowledged. */
     private fun openUrlExternally(uri: Uri) {
         try {
-            val tab = androidx.browser.customtabs.CustomTabsIntent.Builder()
+            val tab = CustomTabsIntent.Builder()
                 .setShowTitle(true)
                 .build()
             tab.launchUrl(this, uri)
@@ -1522,6 +1532,10 @@ class WebViewActivity : AppCompatActivity() {
         // Reminder notification deep-link: ReminderNotifier stashes the target
         // note id here; we forward it to window.__glasskeepOpenNote once loaded.
         const val EXTRA_OPEN_NOTE_ID = "openNoteId"
+
+        // Single sign-on outcome as a query string, from SsoReturnActivity.
+        const val EXTRA_SSO_OUTCOME = "ssoOutcome"
+        private const val SSO_CALLBACK_PATH = "/api/auth/oidc/callback"
 
         private const val KEY_EDGE_TO_EDGE_PORTRAIT = "edge_to_edge_portrait"
         // Matches the FAB overlay's fade (MobileCreateFab).
