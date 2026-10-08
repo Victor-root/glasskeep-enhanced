@@ -303,7 +303,7 @@ function attachPasskeyRoutes(app, deps) {
     }
 
     const info = verification.registrationInfo;
-    // SimpleWebAuthn v13 nests the credential under .credential and
+    // SimpleWebAuthn (since v13) nests the credential under .credential and
     // returns id (base64url string), publicKey (Uint8Array), counter.
     const cred = info.credential;
     const credentialId = cred.id;
