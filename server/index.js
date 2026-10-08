@@ -73,6 +73,12 @@ app.use(
   }),
 );
 app.use(express.urlencoded({ extended: true, limit: "160mb" }));
+// Express 5 leaves req.body undefined on a request without a body; the
+// handlers read it as an object, as Express 4 guaranteed.
+app.use((req, _res, next) => {
+  if (req.body === undefined) req.body = {};
+  next();
+});
 
 // Un corps illisible doit répondre comme le reste de l'API, en JSON.
 // Sans ce garde-fou, Express renvoie sa propre page HTML: un fichier de
@@ -5598,7 +5604,7 @@ if (NODE_ENV === "production") {
     },
   }));
 
-  app.get("*", (_req, res) => sendIndex(res));
+  app.get("/{*path}", (_req, res) => sendIndex(res));
 }
 
 // ---------- Reminders: scheduler + delivery ----------
@@ -5786,7 +5792,8 @@ if (
     console.log(`API listening on https://0.0.0.0:${PORT}  (env=${NODE_ENV})`);
   });
 } else {
-  app.listen(PORT, "0.0.0.0", () => {
+  app.listen(PORT, "0.0.0.0", (err) => {
+    if (err) throw err;
     console.log(`API listening on http://0.0.0.0:${PORT}  (env=${NODE_ENV})`);
   });
 }
