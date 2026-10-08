@@ -3,6 +3,7 @@ package com.glasskeep.app.ui
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +21,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -60,15 +63,31 @@ fun OnboardingPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
         ) { page ->
-            when (page) {
-                0 -> WelcomeScreen(onContinue = {
-                    // Persist the ack THEN animate so a user who quits
-                    // mid-scroll still gets the "welcome already seen"
-                    // skip on next launch.
-                    onWelcomeCompleted()
-                    scope.launch { pagerState.animateScrollToPage(1) }
-                })
-                1 -> SetupScreen(initialUrl = initialUrl, onConnect = onConnect)
+            // A remote moving sideways stays on its page: letting focus
+            // cross over had the pager follow it to the other page and
+            // back, endlessly. Pages change through their buttons.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .focusProperties {
+                        onExit = {
+                            if (requestedFocusDirection == FocusDirection.Left ||
+                                requestedFocusDirection == FocusDirection.Right
+                            ) cancelFocusChange()
+                        }
+                    }
+                    .focusGroup(),
+            ) {
+                when (page) {
+                    0 -> WelcomeScreen(onContinue = {
+                        // Persist the ack THEN animate so a user who quits
+                        // mid-scroll still gets the "welcome already seen"
+                        // skip on next launch.
+                        onWelcomeCompleted()
+                        scope.launch { pagerState.animateScrollToPage(1) }
+                    })
+                    1 -> SetupScreen(initialUrl = initialUrl, onConnect = onConnect)
+                }
             }
         }
 
