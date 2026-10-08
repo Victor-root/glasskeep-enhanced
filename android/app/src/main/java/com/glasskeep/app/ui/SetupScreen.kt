@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -260,7 +262,7 @@ internal fun isTelevision(): Boolean {
 // submit button). Used only when isTelevision() returns true.
 private val TvBgTop = Color(0xFF1a1530)
 private val TvBgMid = Color(0xFF0b0d12)
-private val TvBgBottom = Color(0xFF06070b)
+internal val TvBgBottom = Color(0xFF06070b)
 private val TvCardBg = Color(0xFF0F1119).copy(alpha = 0.85f)
 private val TvCardBorder = Color(0xFFffffff).copy(alpha = 0.08f)
 private val TvTitleStart = Color(0xFFc4b5fd) // violet-300
@@ -368,7 +370,9 @@ fun SetupScreen(initialUrl: String = "", onConnect: (String) -> Unit) {
         FloatingCardsBackground(dark)
 
         Column(
-            modifier = Modifier.padding(horizontal = 32.dp),
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Image(
@@ -503,6 +507,7 @@ private fun TvSetupScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.55f)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

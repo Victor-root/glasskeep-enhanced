@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.glasskeep.app.net.CleartextPolicy
 import com.glasskeep.app.ui.OnboardingPager
+import com.glasskeep.app.ui.TvBgBottom
+import com.glasskeep.app.ui.isTelevision
 import com.glasskeep.app.ui.theme.GlassKeepTheme
 
 class MainActivity : ComponentActivity() {
@@ -78,7 +80,13 @@ class MainActivity : ComponentActivity() {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(if (dark) Color(0xFF1A1A1A) else Color(0xFFF0E8FF))
+                    .background(
+                        when {
+                            isTelevision() -> TvBgBottom
+                            dark -> Color(0xFF1A1A1A)
+                            else -> Color(0xFFF0E8FF)
+                        }
+                    )
                     .windowInsetsPadding(WindowInsets.safeDrawing)
             ) {
                 GlassKeepTheme {
