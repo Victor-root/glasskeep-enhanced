@@ -17,13 +17,25 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.glasskeep.app.R
@@ -58,7 +70,24 @@ fun OnboardingPager(
     val scope = rememberCoroutineScope()
     val dark = isSystemInDarkTheme()
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    // With a remote, focus stays on the button that changed the page,
+    // left behind on the page now off screen: the page that comes into
+    // view takes it instead. Touch screens never see a D-pad key, so no
+    // control gets focus (or a keyboard) there.
+    var remote by remember { mutableStateOf(false) }
+    val pageFocus = remember { List(2) { FocusRequester() } }
+    LaunchedEffect(pagerState.settledPage) {
+        if (remote) pageFocus[pagerState.settledPage].requestFocus()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onPreviewKeyEvent {
+                if (it.type == KeyEventType.KeyDown && it.key in DpadKeys) remote = true
+                false
+            },
+    ) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
@@ -69,6 +98,7 @@ fun OnboardingPager(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .focusRequester(pageFocus[page])
                     .focusProperties {
                         onExit = {
                             if (requestedFocusDirection == FocusDirection.Left ||
@@ -114,6 +144,10 @@ fun OnboardingPager(
         }
     }
 }
+
+private val DpadKeys = setOf(
+    Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight, Key.DirectionCenter,
+)
 
 @Composable
 private fun BackButton(
