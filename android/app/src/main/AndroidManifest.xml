@@ -79,9 +79,12 @@
         android:theme="@style/Theme.GlassKeep"
         android:usesCleartextTraffic="true">
 
+        <!-- adjustResize: the keyboard is reported as an inset, which the
+             edge-to-edge onboarding screens keep clear of (MainActivity). -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

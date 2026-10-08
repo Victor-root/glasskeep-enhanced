@@ -13,6 +13,8 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
+import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
@@ -27,6 +29,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.OnBackPressedCallback
@@ -34,12 +37,15 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.updateLayoutParams
 import com.glasskeep.app.net.CleartextPolicy
 
 class WebViewActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var swipeRefresh: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+    private lateinit var statusBarBackground: View
+    private lateinit var navigationBarBackground: View
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
     private lateinit var webAuthnBridge: WebAuthnBridge
     // Debug builds only, see NetDebug.
@@ -507,6 +513,13 @@ class WebViewActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_webview)
 
+        statusBarBackground = findViewById(R.id.status_bar_background)
+        navigationBarBackground = findViewById(R.id.navigation_bar_background)
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
+            placeBarBackgrounds(insets)
+            insets
+        }
+
         // MainActivity has already vetted the address it passes here. The
         // fallback (a reminder notification tap, say) reads the stored one
         // straight from preferences, so it goes through the same gate.
@@ -645,7 +658,6 @@ class WebViewActivity : AppCompatActivity() {
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                databaseEnabled = true
                 cacheMode = WebSettings.LOAD_DEFAULT
                 mediaPlaybackRequiresUserGesture = false
 
@@ -1035,6 +1047,34 @@ class WebViewActivity : AppCompatActivity() {
         applySystemBars()
     }
 
+    /** Lays the bar backgrounds over the system bars: the status bar along
+     *  the top, the navigation bar along whichever edge it sits on (a side
+     *  one in landscape with button navigation). */
+    private fun placeBarBackgrounds(insets: androidx.core.view.WindowInsetsCompat) {
+        val status = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+        statusBarBackground.updateLayoutParams<FrameLayout.LayoutParams> { height = status.top }
+        val nav = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+        navigationBarBackground.updateLayoutParams<FrameLayout.LayoutParams> {
+            when {
+                nav.right > 0 -> {
+                    width = nav.right
+                    height = FrameLayout.LayoutParams.MATCH_PARENT
+                    gravity = Gravity.RIGHT
+                }
+                nav.left > 0 -> {
+                    width = nav.left
+                    height = FrameLayout.LayoutParams.MATCH_PARENT
+                    gravity = Gravity.LEFT
+                }
+                else -> {
+                    width = FrameLayout.LayoutParams.MATCH_PARENT
+                    height = nav.bottom
+                    gravity = Gravity.BOTTOM
+                }
+            }
+        }
+    }
+
     /** Paints the bars in the page's colours (the navigation bar's own one
      *  when set, else the theme colour), or leaves them transparent in
      *  portrait edge-to-edge. The icons follow those colours either way: they
@@ -1044,12 +1084,13 @@ class WebViewActivity : AppCompatActivity() {
         val color = ColorUtils.blendARGB(theme, Color.BLACK, barsScrim)
         val navColor = ColorUtils.blendARGB(navBarColor ?: theme, Color.BLACK, barsScrim)
         val edgeToEdge = isEdgeToEdgeActive()
-        window.statusBarColor = if (edgeToEdge) Color.TRANSPARENT else color
-        window.navigationBarColor = if (edgeToEdge) Color.TRANSPARENT else navColor
-        // With 3-button navigation the system otherwise lays its own
-        // translucent white scrim over a transparent navigation bar.
+        statusBarBackground.setBackgroundColor(if (edgeToEdge) Color.TRANSPARENT else color)
+        navigationBarBackground.setBackgroundColor(if (edgeToEdge) Color.TRANSPARENT else navColor)
+        // The system bars themselves stay transparent over those backgrounds.
+        // With 3-button navigation the system would otherwise lay its own
+        // translucent white scrim over the navigation bar.
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            window.isNavigationBarContrastEnforced = !edgeToEdge
+            window.isNavigationBarContrastEnforced = false
         }
 
         val controller = WindowInsetsControllerCompat(window, window.decorView)
