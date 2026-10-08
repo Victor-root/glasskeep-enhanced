@@ -122,14 +122,14 @@ function isUpdateInProgress() {
 
 function writeInitialStatus({ fromVersion, toVersion }) {
     const mode = detectMode();
-    // Native exposes 4 visible steps (fetch / install / build /
-    // restart). Docker exposes only 2 — the pull and the swap-and-
+    // Native exposes 5 visible steps (fetch / Node.js / install /
+    // build / restart). Docker exposes only 2: the pull and the swap-and-
     // healthcheck — because the rest of the swap dance happens while
     // the API server is offline and would never reach the frontend.
     // Each updater later rewrites this file with its own totalSteps,
     // but matching the initial value avoids a flicker in the
     // progress bar denominator.
-    const totalSteps = mode === "docker" ? 2 : 4;
+    const totalSteps = mode === "docker" ? 2 : 5;
     const data = {
         mode,
         state: "queued",
@@ -485,6 +485,12 @@ async function cancelUpdate() {
         e.code = "unsupported";
         throw e;
     }
+    // Killing apt mid-install would leave Node.js itself half replaced.
+    if (readStatus()?.state === "upgrading_runtime") {
+        const e = new Error("Node.js is being upgraded; the update cannot be cancelled now");
+        e.code = "not_cancellable";
+        throw e;
+    }
     const installDir = process.env.INSTALL_DIR || NATIVE_DEFAULTS.installDir;
     const dataDir = getDataDir();
     const backupDir = path.join(dataDir, ".update-backup");
@@ -544,6 +550,16 @@ async function cancelUpdate() {
                 try { fs.copyFileSync(src, dst); } catch { /* ignore */ }
             }
         }
+        // Same as the script's rebuild_if_node_changed: the run may have
+        // upgraded Node before it was cancelled.
+        const snapshotNode = (readFile(path.join(backupDir, "NODE_MAJOR")) || "").trim();
+        if (snapshotNode && snapshotNode !== installedNodeMajor()) {
+            spawnSync("npm", ["rebuild", "--silent"], {
+                cwd: installDir,
+                stdio: "ignore",
+                timeout: 5 * 60 * 1000,
+            });
+        }
         spawnSync("rm", ["-rf", backupDir], { stdio: "ignore" });
     }
 
@@ -579,6 +595,61 @@ async function cancelUpdate() {
     spawnSync("systemctl", ["restart", `${serviceName}.service`, "--no-block"], {
         stdio: "ignore",
     });
+}
+
+// Major of the Node.js installed on disk, which the restarted service will
+// run: after an upgrade it differs from the one running this process.
+function installedNodeMajor() {
+    const r = spawnSync("node", ["-p", "process.versions.node.split('.')[0]"], {
+        encoding: "utf8",
+        timeout: 10000,
+    });
+    return (r.stdout || "").trim();
+}
+
+// ── Node.js runtime catch-up ─────────────────────────────────────────────────
+// An update runs the self-update.sh of the version being replaced, which
+// may predate its Node.js step: the new release then starts on the old
+// Node. Once that run has finished, run the updater again for this same
+// release, whose script upgrades Node. The marker keeps a failed attempt
+// from looping on every start; the admin panel shows its outcome.
+function completeRuntimeUpgrade(log = console) {
+    if (detectMode() !== "native") return;
+    const required = Number((pkg.engines?.node || "").match(/\d+/)?.[0]);
+    const running = Number(process.versions.node.split(".")[0]);
+    if (!required || running >= required) return;
+    const updaterUnit = process.env.UPDATER_UNIT || NATIVE_DEFAULTS.updaterService;
+    const marker = path.join(getDataDir(), ".runtime-upgrade-attempt");
+    const deadline = Date.now() + 10 * 60 * 1000;
+
+    const attempt = () => {
+        // The update that installed this release restarted us before its
+        // own last checks; starting the unit while it still runs would
+        // only join that run.
+        const unitState = spawnSync("systemctl", ["show", "-p", "ActiveState", "--value", updaterUnit], {
+            encoding: "utf8",
+            timeout: 10000,
+        }).stdout?.trim();
+        if (["activating", "active", "deactivating"].includes(unitState) || isUpdateInProgress()) {
+            if (Date.now() < deadline) setTimeout(attempt, 5000).unref();
+            return;
+        }
+        if (readFile(marker).trim() === pkg.version) {
+            log.warn(`[self-update] still on Node.js ${process.version}, v${required} is required; the automatic upgrade already ran for ${pkg.version}`);
+            return;
+        }
+        try {
+            fs.writeFileSync(marker, pkg.version);
+        } catch (e) {
+            log.warn(`[self-update] cannot record the Node.js upgrade attempt: ${e.message}`);
+            return;
+        }
+        log.log(`[self-update] Node.js ${process.version} is older than v${required}: upgrading it`);
+        startUpdate({ fromVersion: pkg.version, toVersion: pkg.version }).catch((e) => {
+            log.warn(`[self-update] Node.js upgrade failed to start: ${e.message}`);
+        });
+    };
+    attempt();
 }
 
 // ── Lifecycle (restart / shutdown the running instance) ─────────────────────
@@ -650,6 +721,7 @@ module.exports = {
     isUpdateInProgress,
     startUpdate,
     cancelUpdate,
+    completeRuntimeUpgrade,
     acknowledgeStatus,
     restartSelf,
     shutdownSelf,

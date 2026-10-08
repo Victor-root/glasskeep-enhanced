@@ -436,6 +436,7 @@ const STEP_LABEL_KEYS = {
     fetching: "selfUpdateStepFetching",
     renaming: "selfUpdateStepRenaming",
     creating: "selfUpdateStepCreating",
+    upgrading_runtime: "selfUpdateStepRuntime",
     installing: "selfUpdateStepInstalling",
     building: "selfUpdateStepBuilding",
     starting_service: "selfUpdateStepStarting",
@@ -655,10 +656,12 @@ export default function SelfUpdateProgress({
     // Cancel is only meaningful on native installs while the update
     // is actually in flight. We hide the button in any other case
     // so the admin doesn't think they can interrupt the docker swap
-    // (we don't support that yet) or cancel a finished run.
+    // (we don't support that yet) or cancel a finished run. Nor while
+    // Node.js itself is being replaced (the server refuses it too).
     const cancelAvailable =
         isActive &&
         !cancelling &&
+        status?.state !== "upgrading_runtime" &&
         (mode === "native" || (!mode && status?.mode === "native"));
 
     const requestCancel = () => {
@@ -851,7 +854,8 @@ export default function SelfUpdateProgress({
                         host and we want the admin to know that's
                         expected rather than wondering if it's hung. */}
                     {!terminal &&
-                        (status?.state === "installing" ||
+                        (status?.state === "upgrading_runtime" ||
+                            status?.state === "installing" ||
                             status?.state === "building") && (
                             <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                                 {t("selfUpdateSlowStepHint")}

@@ -463,7 +463,9 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
             return res.json({ cancelled: true });
         } catch (e) {
             if (log && log.warn) log.warn("self-update/cancel failed:", e.message);
-            const status = e.code === "unsupported" ? 400 : 500;
+            const status =
+                e.code === "not_cancellable" ? 409 :
+                e.code === "unsupported" ? 400 : 500;
             return res.status(status).json({
                 error: e.message || "cancel failed",
                 code: e.code || "internal",

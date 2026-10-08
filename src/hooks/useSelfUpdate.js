@@ -26,6 +26,7 @@ const ACTIVE_STATES = new Set([
     "fetching",
     "renaming",
     "creating",
+    "upgrading_runtime",
     "installing",
     "building",
     "starting_service",

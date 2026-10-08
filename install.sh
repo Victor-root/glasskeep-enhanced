@@ -1311,9 +1311,15 @@ action_update() {
     step "$(printf "$MSG_STEP_PULL" "$latest_tag")" \
         bash -c "cd '${INSTALL_DIR}' && git fetch --depth=1 origin '+refs/tags/${latest_tag}:refs/tags/${latest_tag}' && git reset --hard 'refs/tags/${latest_tag}' && git branch | grep -v '^\* ' | xargs -r git branch -D 2>/dev/null || true"
 
+    # A release can move to a newer Node.js major (NODE_MAJOR).
+    install_nodejs
+
+    # npm ci rebuilds node_modules from the release's lockfile, so native
+    # modules match the Node.js now installed and package-lock.json is
+    # left as the release ships it.
     info "${DIM}${MSG_HINT_LONG}${RESET}"
     step "$MSG_STEP_NPM_UPDATE" \
-        bash -c "cd '${INSTALL_DIR}' && npm install --silent"
+        bash -c "cd '${INSTALL_DIR}' && npm ci --silent"
 
     info "${DIM}${MSG_HINT_LONG}${RESET}"
     local build_heap_mb
