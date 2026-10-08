@@ -1726,9 +1726,11 @@ show_access_info() {
 
     local proto="http"
     local https_val cert_path trust_val
-    https_val=$(grep -E '^HTTPS_ENABLED=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
-    cert_path=$(grep -E '^SSL_CERT='     "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
-    trust_val=$(grep -E '^TRUST_PROXY='  "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+    # A key can be absent (no SSL_CERT behind a reverse proxy): under
+    # set -e and pipefail, grep finding nothing must not end the script.
+    https_val=$(grep -E '^HTTPS_ENABLED=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || true)
+    cert_path=$(grep -E '^SSL_CERT='     "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || true)
+    trust_val=$(grep -E '^TRUST_PROXY='  "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || true)
     [[ "$https_val" == "true" ]] && proto="https"
 
     # Detect a custom (user-supplied) certificate: HTTPS is enabled,
