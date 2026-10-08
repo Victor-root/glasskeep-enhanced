@@ -621,12 +621,6 @@ class WebViewActivity : AppCompatActivity() {
             safeAreaLeftDp   = bars.left   / density.toDouble()
             safeAreaRightDp  = bars.right  / density.toDouble()
             keyboardInsetDp  = ime / density.toDouble()
-            if (BuildConfig.DEBUG) {
-                android.util.Log.d(
-                    "GKKeyboard",
-                    "api=${android.os.Build.VERSION.SDK_INT} ime=$ime imeVisible=${insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())} density=$density"
-                )
-            }
             injectSafeAreaInsets()
             insets
         }

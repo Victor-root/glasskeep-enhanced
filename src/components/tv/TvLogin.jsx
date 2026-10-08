@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
 import useSpatialFocus from "./useSpatialFocus.js";
+import useKeyboardInset from "../../hooks/useKeyboardInset.js";
 import UserAvatar from "../common/UserAvatar.jsx";
 
 // Couch-friendly login. Mirrors the phone's three-step flow but keeps
@@ -21,6 +22,7 @@ export default function TvLogin({
   allowExit,
   onExitTvMode,
 }) {
+  useKeyboardInset();
   const hasProfiles = Array.isArray(profiles) && profiles.length > 0;
   const [mode, setMode] = useState(hasProfiles ? "profiles" : "manual");
   const [selectedProfile, setSelectedProfile] = useState(null);
