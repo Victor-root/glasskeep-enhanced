@@ -52,7 +52,7 @@ async function performAuthentication(optionsJSON, { withPrf = false } = {}) {
   if (bridge) {
     // Credential Manager parses PRF eval bytes from the JSON directly,
     // so we forward the options untouched — preparePrfOptions() is a
-    // workaround for @simplewebauthn/browser v13 and doesn't apply
+    // workaround for @simplewebauthn/browser and doesn't apply
     // here.
     return await bridge.authenticate(optionsJSON);
   }
@@ -114,7 +114,7 @@ function base64UrlToUint8Array(s) {
   return Uint8Array.from(atob(b64 + pad), (c) => c.charCodeAt(0));
 }
 
-// @simplewebauthn/browser v13's startAuthentication just does
+// @simplewebauthn/browser's startAuthentication just does
 // `{ ...optionsJSON, challenge: decode(…) }` — it never converts
 // extensions. Pass any PRF eval salt as a base64url string in the
 // options JSON and it reaches navigator.credentials.get() still as a
@@ -137,7 +137,7 @@ function preparePrfOptions(optionsJSON) {
 // results. Returns base64url-encoded bytes ready for the verify body
 // or null if the authenticator didn't return one.
 //
-// @simplewebauthn/browser v13 resolves PRF output as an ArrayBuffer
+// @simplewebauthn/browser resolves PRF output as an ArrayBuffer
 // inside clientExtensionResults.prf.results.first. However, different
 // platform authenticators and polyfills may hand us a Uint8Array, a
 // DataView, another typed-array view, or (rarely) a base64url string.
