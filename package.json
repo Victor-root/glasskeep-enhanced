@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=26 <27"
   },
   "scripts": {
     "dev": "concurrently -k -n WEB,API -c auto \"vite\" \"npm:api\"",
@@ -112,5 +112,9 @@
     "tailwindcss": "^4.3.3",
     "vite": "^7.3.7",
     "vite-plugin-pwa": "^1.3.0"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.28.2": true
   }
 }

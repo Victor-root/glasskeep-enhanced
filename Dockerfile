@@ -6,7 +6,7 @@
 # =============================================================================
 
 # ─────────────────────────── Stage 1: build ──────────────────────────────────
-FROM node:24-bookworm-slim AS builder
+FROM node:26-trixie-slim AS builder
 
 WORKDIR /app
 
@@ -32,7 +32,7 @@ RUN npm run build
 RUN npm prune --omit=dev --no-audit --no-fund
 
 # ─────────────────────────── Stage 2: runtime ────────────────────────────────
-FROM node:24-bookworm-slim AS runtime
+FROM node:26-trixie-slim AS runtime
 
 WORKDIR /app
 

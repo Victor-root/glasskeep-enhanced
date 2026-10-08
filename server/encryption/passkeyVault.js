@@ -116,7 +116,7 @@ function deriveKekFromPrf(prfOutput, credentialId, instanceSalt) {
     `glasskeep|passkey-instance-unlock|v1|${credentialId}`,
     "utf8",
   );
-  // crypto.hkdfSync exists in Node ≥15; we ship for Node 20.
+  // crypto.hkdfSync exists in Node ≥15; we ship for Node 26.
   const kek = crypto.hkdfSync("sha256", prfOutput, instanceSalt, info, 32);
   return Buffer.isBuffer(kek) ? kek : Buffer.from(kek);
 }

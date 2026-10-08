@@ -46,7 +46,7 @@ SERVICE_NAME="glass-keep"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 UPDATER_SERVICE_NAME="glass-keep-updater"
 UPDATER_SERVICE_FILE="/etc/systemd/system/${UPDATER_SERVICE_NAME}.service"
-NODE_MAJOR=24
+NODE_MAJOR=26
 
 # ── Language detection ────────────────────────────────────────────────────────
 detect_lang() {

@@ -207,19 +207,20 @@ try {
     })());
   }
 
-  // La bibliothèque, sans longueur imposée, accepte le sceau court: le
-  // point de départ du constat. Vrai dans les deux cas, c'est une
-  // propriété de Node, pas du projet.
-  t.check("sans longueur imposée, la bibliothèque accepte bien un sceau de quatre octets", (() => {
+  // Node 24 et avant acceptaient le sceau court sans longueur imposée: le
+  // point de départ du constat ci-dessus. Depuis Node 26 (le moteur du
+  // projet), Node le refuse lui-même; le projet impose la longueur quand
+  // même, vérifié plus haut, sans dépendre de ce changement.
+  t.check("Node refuse lui-même un sceau de quatre octets sans longueur imposée", (() => {
     const iv = crypto.randomBytes(12);
     const c = crypto.createCipheriv("aes-256-gcm", key, iv);
-    const ct = Buffer.concat([c.update(clear, "utf8"), c.final()]);
+    c.update(clear, "utf8");
+    c.final();
     const short = c.getAuthTag().subarray(0, 4);
     try {
-      const d = crypto.createDecipheriv("aes-256-gcm", key, iv);
-      d.setAuthTag(short);
-      return true; // setAuthTag n'a pas protesté
-    } catch { return false; }
+      crypto.createDecipheriv("aes-256-gcm", key, iv).setAuthTag(short);
+      return false;
+    } catch { return true; }
   })());
 } finally {
   child.kill();
