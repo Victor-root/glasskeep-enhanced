@@ -89,7 +89,12 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
   useEffect(() => removeBootBgLayer, []);
 
   return (
-    <div className="min-h-screen flex flex-col px-4 relative overflow-hidden">
+    // Rides up as one block when the soft keyboard would cover the field
+    // being typed in (useKeyboardInset), like the note overlays do.
+    <div
+      className="min-h-screen flex flex-col px-4 relative overflow-hidden"
+      style={{ top: "calc(-1 * var(--keyboard-pan, 0px))" }}
+    >
       {/* Admin-configured login background. Fixed + behind everything
           (z-0). The image sits in an overscanned inner layer so the
           blur's faded edges fall outside the viewport, and a
