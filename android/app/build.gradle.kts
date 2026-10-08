@@ -2,7 +2,7 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 // Pull release-keystore credentials from android/keystore.properties.
@@ -24,7 +24,7 @@ val hasReleaseSigning =
 
 android {
     namespace = "com.glasskeep.app"
-    compileSdk = 34
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.glasskeep.app"
@@ -79,10 +79,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
         // BuildConfig is opt-in on AGP 8+. The self-update flow reads
@@ -90,23 +86,19 @@ android {
         // asset on GitHub Releases.
         buildConfig = true
     }
+}
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
-    }
-
-    // Rename the output APK so Android Studio's Build → Build Bundle(s) /
-    // APK(s) → Build APK(s) drops a "GlassKeep-v<versionName>.apk" file
-    // (debug builds get a "-debug" suffix) instead of the default
-    // "app-release.apk" / "app-debug.apk". Matches the asset naming
-    // convention the in-app self-updater scans for on GitHub Releases,
-    // so the APK uploaded to a release is already named correctly.
-    applicationVariants.all {
-        val variant = this
-        outputs.forEach { output ->
-            val suffix = if (variant.buildType.name == "debug") "-debug" else ""
-            (output as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
-                .outputFileName = "GlassKeep-v${variant.versionName}${suffix}.apk"
+// Rename the output APK so Android Studio's Build → Build Bundle(s) /
+// APK(s) → Build APK(s) drops a "GlassKeep-v<versionName>.apk" file
+// (debug builds get a "-debug" suffix) instead of the default
+// "app-release.apk" / "app-debug.apk". Matches the asset naming
+// convention the in-app self-updater scans for on GitHub Releases,
+// so the APK uploaded to a release is already named correctly.
+androidComponents {
+    onVariants { variant ->
+        val suffix = if (variant.buildType == "debug") "-debug" else ""
+        variant.outputs.forEach { output ->
+            output.outputFileName.set(output.versionName.map { "GlassKeep-v$it$suffix.apk" })
         }
     }
 }
