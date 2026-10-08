@@ -862,7 +862,6 @@ function debugRetrieval({ question, totalNotes, tokens, picked }) {
     score: Number(p.score.toFixed(3)),
     matched: p.matched,
   }));
-  // eslint-disable-next-line no-console
   console.log("[ai-retrieval]", {
     questionLength: String(question || "").length,
     totalNotes,

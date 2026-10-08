@@ -745,7 +745,6 @@ const { attachAssetLinksRoutes } = require("./routes/assetLinksRoutes");
 const { attachDeviceLinkRoutes } = require("./routes/deviceLinkRoutes");
 const { attachFederationRoutes } = require("./routes/federationRoutes");
 const { attachOidcRoutes, SSO_POLICIES } = require("./routes/oidcRoutes");
-const { requireUnlocked } = require("./routes/lockMiddleware");
 const { t: serverT } = require("./i18n");
 const pushService = require("./services/pushNotifications");
 const { startReminderScheduler } = require("./services/reminderScheduler");
@@ -1175,9 +1174,6 @@ const listArchivedNotes = wrapNoteReadStmt(db.prepare(
 const listTrashedNotes = wrapNoteReadStmt(db.prepare(
   `SELECT * FROM notes WHERE user_id = ? AND trashed = 1 ORDER BY timestamp DESC`
 ));
-const listNotesPage = wrapNoteReadStmt(db.prepare(
-  `SELECT * FROM notes WHERE user_id = ? ORDER BY pinned DESC, position DESC, timestamp DESC LIMIT ? OFFSET ?`
-));
 const getNoteById = wrapNoteReadStmt(getNoteByIdRaw);
 const getNote = wrapNoteReadStmt(db.prepare("SELECT * FROM notes WHERE id = ? AND user_id = ?"));
 const getNoteWithCollaboration = wrapNoteReadStmt(db.prepare(`
@@ -1560,11 +1556,6 @@ const upsertUserPosition = db.prepare(`
     position = excluded.position,
     pinned = excluded.pinned
 `);
-const upsertUserPinned = db.prepare(`
-  INSERT INTO note_user_positions (note_id, user_id, position, pinned)
-  VALUES (@note_id, @user_id, @position, @pinned)
-  ON CONFLICT(note_id, user_id) DO UPDATE SET pinned = excluded.pinned
-`);
 
 // Highest effective position across a user's visible (active) notes —
 // owned or collaborated. Used to seed a freshly shared note at the top
@@ -1792,7 +1783,7 @@ function sendEventToUser(userId, event) {
   for (const res of set) {
     try {
       res.write(payload);
-    } catch (error) {
+    } catch {
       // Remove dead connections
       toRemove.push(res);
     }
@@ -1843,12 +1834,12 @@ function broadcastNoteUpdated(noteId) {
     const recipientIds = new Set([note.user_id, ...getCollaboratorUserIdsForNote(noteId)]);
     const evt = { type: "note_updated", noteId };
     for (const uid of recipientIds) sendEventToUser(uid, evt);
-  } catch { }
+  } catch { /* best-effort live refresh: never disturb the note operation */ }
   // If this note is shared across a federation link, push the change to
   // the peer immediately (the periodic tick remains the retry/safety
   // net). Guarded + fire-and-forget so it can never disturb the local
   // note operation that triggered this broadcast.
-  try { noteFederationRef?.onNoteChangedLocally(noteId); } catch { }
+  try { noteFederationRef?.onNoteChangedLocally(noteId); } catch { /* fire-and-forget, see above */ }
 }
 
 // Persist a "note_shared" notification and push it over SSE if the
@@ -1997,7 +1988,7 @@ function createAccessRevokedNotification({
 let federationNotifyPeersRef = null;
 attachUnlockRoutes(app, {
   db, auth, adminOnly, log: console, broadcastToAll,
-  onLockStateChanged: () => { try { federationNotifyPeersRef?.(); } catch {} },
+  onLockStateChanged: () => { try { federationNotifyPeersRef?.(); } catch { /* peer ping is best-effort */ } },
 });
 
 // Passkey schema is created up-front (idempotent) so registration + login
@@ -2105,10 +2096,10 @@ app.get("/api/events", authFromQueryOrHeader, (req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   // Help Nginx/Proxies not to buffer SSE
-  try { res.setHeader("X-Accel-Buffering", "no"); } catch { }
+  try { res.setHeader("X-Accel-Buffering", "no"); } catch { /* optional proxy hint */ }
   // If served cross-origin (e.g. static site + separate API host), allow EventSource
   if (req.headers.origin) {
-    try { res.setHeader("Access-Control-Allow-Origin", req.headers.origin); } catch { }
+    try { res.setHeader("Access-Control-Allow-Origin", req.headers.origin); } catch { /* optional CORS header */ }
   }
   res.flushHeaders?.();
 
@@ -2122,17 +2113,17 @@ app.get("/api/events", authFromQueryOrHeader, (req, res) => {
   const ping = setInterval(() => {
     try {
       res.write("event: ping\ndata: {}\n\n");
-    } catch (error) {
+    } catch {
       clearInterval(ping);
       removeSseClient(req.user.id, res);
-      try { res.end(); } catch { }
+      try { res.end(); } catch { /* connection already gone */ }
     }
   }, 25000);
 
   req.on("close", () => {
     clearInterval(ping);
     removeSseClient(req.user.id, res);
-    try { res.end(); } catch { }
+    try { res.end(); } catch { /* connection already gone */ }
   });
 });
 
@@ -5194,7 +5185,7 @@ app.post("/api/admin/pending-users/:id/approve", auth, adminOnly, (req, res) => 
   cleanupPendingUserNotifications(id);
 
   // Check if this user should be auto-promoted to admin via env var
-  try { promoteToAdminIfNeeded(pending.email); } catch {}
+  try { promoteToAdminIfNeeded(pending.email); } catch { /* approval proceeds without the auto-promotion */ }
 
   const user = getUserById.get(info.lastInsertRowid);
   // Live-sync to every other admin session so their AdminPanel

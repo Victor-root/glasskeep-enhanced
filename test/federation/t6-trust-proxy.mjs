@@ -22,7 +22,7 @@
 //
 // EXPECT=fixed  attend un serveur où l'en-tête est ignoré (le limiteur mord).
 // sans variable, attend un serveur qui croit l'en-tête (le limiteur ne mord jamais).
-import { A, api, login, sleep, runner } from "./lib.mjs";
+import { A, api, login, runner } from "./lib.mjs";
 
 const FIXED = process.env.EXPECT === "fixed";
 const t = runner(`Scénario 6, contournement du limiteur de déverrouillage (attente: ${FIXED ? "corrigé" : "vulnérable"})`);

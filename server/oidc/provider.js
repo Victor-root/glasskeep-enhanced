@@ -238,7 +238,7 @@ async function completeAuthorization(provider, query, { state, nonce, codeVerifi
 async function testIssuer(issuer, clientId, access) {
   const config = await discover(issuer, clientId, null, access);
   const meta = config.serverMetadata();
-  let keyCount = 0;
+  let keyCount;
   try {
     const res = await fetcherFor(access.allowPrivate)(meta.jwks_uri, {
       redirect: "manual",

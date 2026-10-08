@@ -274,7 +274,7 @@ function attachUnlockRoutes(app, deps) {
     let dek;
     try {
       dek = vault.unlockWithPassphrase(db, passphrase);
-    } catch (e) {
+    } catch {
       runtime.recordAttempt(id, false);
       log.warn?.(`[unlock] passphrase rejected from ${id}`);
       return res.status(401).json({ error: "Invalid passphrase" });
@@ -289,17 +289,17 @@ function attachUnlockRoutes(app, deps) {
       // instance is back so other sessions leave the unlock screen without
       // waiting for the next status poll.
       if (typeof broadcastToAll === "function") {
-        try { broadcastToAll({ type: "instance_unlocked" }); } catch {}
+        try { broadcastToAll({ type: "instance_unlocked" }); } catch { /* best-effort notice */ }
       }
       // Nudge federation so peers re-probe us promptly (our /health now
       // reports unlocked) and our paused note-sync resumes.
       if (typeof onLockStateChanged === "function") {
-        try { onLockStateChanged(); } catch {}
+        try { onLockStateChanged(); } catch { /* best-effort peer ping */ }
       }
       return res.json({ ok: true });
     } finally {
       // The runtime made its own copy — zero ours.
-      try { dek.fill(0); } catch {}
+      try { dek.fill(0); } catch { /* best-effort wipe */ }
     }
   });
 
@@ -335,7 +335,7 @@ function attachUnlockRoutes(app, deps) {
     let dek;
     try {
       dek = vault.unlockWithRecoveryKey(db, raw);
-    } catch (e) {
+    } catch {
       runtime.recordAttempt(id, false);
       log.warn?.(`[unlock] recovery key rejected from ${id}`);
       return res.status(401).json({ error: "Invalid recovery key" });
@@ -347,14 +347,14 @@ function attachUnlockRoutes(app, deps) {
       log.info?.(`[unlock] success via recovery key from ${id}`);
       runUpgradeMigrations(db, log);
       if (typeof broadcastToAll === "function") {
-        try { broadcastToAll({ type: "instance_unlocked" }); } catch {}
+        try { broadcastToAll({ type: "instance_unlocked" }); } catch { /* best-effort notice */ }
       }
       if (typeof onLockStateChanged === "function") {
-        try { onLockStateChanged(); } catch {}
+        try { onLockStateChanged(); } catch { /* best-effort peer ping */ }
       }
       return res.json({ ok: true });
     } finally {
-      try { dek.fill(0); } catch {}
+      try { dek.fill(0); } catch { /* best-effort wipe */ }
     }
   });
 
@@ -370,7 +370,7 @@ function attachUnlockRoutes(app, deps) {
     // receives the heads-up and can redirect to the unlock screen
     // without waiting for the 30-second status poll.
     if (typeof broadcastToAll === "function") {
-      try { broadcastToAll({ type: "instance_locked" }); } catch {}
+      try { broadcastToAll({ type: "instance_locked" }); } catch { /* best-effort notice */ }
     }
     runtime.lock();
     log.info?.("[unlock] instance manually re-locked");
@@ -378,7 +378,7 @@ function attachUnlockRoutes(app, deps) {
     // locked now — symmetric with unlock (otherwise they'd only notice on
     // their next periodic health poll).
     if (typeof onLockStateChanged === "function") {
-      try { onLockStateChanged(); } catch {}
+      try { onLockStateChanged(); } catch { /* best-effort peer ping */ }
     }
     res.json({ ok: true });
   });
@@ -515,11 +515,11 @@ function attachUnlockRoutes(app, deps) {
       // error rather than a half-encrypted database.
       try {
         db.prepare("UPDATE instance_encryption SET enabled = 0 WHERE id = 1").run();
-      } catch {}
+      } catch { /* best-effort rollback, the runtime is reset below */ }
       runtime.lock();
       runtime.setEnabled(false);
       // Wipe our copy of the DEK before bailing.
-      try { init.dek.fill(0); } catch {}
+      try { init.dek.fill(0); } catch { /* best-effort wipe */ }
       log.error?.(`[encrypt] activation failed: ${e.message}`);
       return res.status(500).json({ error: "Activation failed: " + e.message });
     }
@@ -527,7 +527,7 @@ function attachUnlockRoutes(app, deps) {
     // Hand the recovery key to the caller exactly once. After this
     // response it is unrecoverable from the database.
     const recovery = init.recoveryKey;
-    try { init.dek.fill(0); } catch {}
+    try { init.dek.fill(0); } catch { /* best-effort wipe */ }
     log.info?.("[encrypt] instance activated and notes encrypted");
     res.json({
       ok: true,
@@ -568,7 +568,7 @@ function attachUnlockRoutes(app, deps) {
       return res.status(403).json({ error: "Current passphrase is incorrect" });
     } finally {
       // We don't need a second DEK in memory.
-      try { probeDek && probeDek.fill(0); } catch {}
+      try { probeDek && probeDek.fill(0); } catch { /* best-effort wipe */ }
     }
 
     try {
@@ -711,7 +711,7 @@ function attachUnlockRoutes(app, deps) {
     try {
       vault.rewrapWithNewPassphrase(db, dek, newPassphrase);
     } finally {
-      try { dek.fill(0); } catch {}
+      try { dek.fill(0); } catch { /* best-effort wipe */ }
     }
     res.json({ ok: true });
   });

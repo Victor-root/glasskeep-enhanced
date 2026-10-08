@@ -21,10 +21,10 @@
   var lang = "en";
 
   function store(key, value) {
-    try { localStorage.setItem(key, value); } catch (e) { /* storage blocked */ }
+    try { localStorage.setItem(key, value); } catch { /* storage blocked */ }
   }
   function read(key) {
-    try { return localStorage.getItem(key); } catch (e) { return null; }
+    try { return localStorage.getItem(key); } catch { return null; }
   }
 
   /* ── Language ─────────────────────────────────────────────────────── */
@@ -243,7 +243,7 @@
         var state = modeState();
         var next = state === "system" ? "light" : state === "light" ? "dark" : "system";
         if (next === "system") {
-          try { localStorage.removeItem(STORE_MODE); } catch (e) { /* storage blocked */ }
+          try { localStorage.removeItem(STORE_MODE); } catch { /* storage blocked */ }
         } else {
           store(STORE_MODE, next);
         }
@@ -349,7 +349,7 @@
           ta.value = text;
           document.body.appendChild(ta);
           ta.select();
-          try { document.execCommand("copy"); done(); } catch (e) { /* ignore */ }
+          try { document.execCommand("copy"); done(); } catch { /* ignore */ }
           document.body.removeChild(ta);
         }
       };

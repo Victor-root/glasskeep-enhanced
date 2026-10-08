@@ -149,7 +149,7 @@ function writeInitialStatus({ fromVersion, toVersion }) {
         fs.writeFileSync(p + ".tmp", JSON.stringify(data));
         fs.renameSync(p + ".tmp", p);
     } catch (e) {
-        throw new Error(`cannot write status file at ${p}: ${e.message}`);
+        throw new Error(`cannot write status file at ${p}: ${e.message}`, { cause: e });
     }
     return data;
 }

@@ -17,6 +17,7 @@ const { version } = JSON.parse(readFileSync(new URL("./package.json", import.met
 // before matching so the test isn't fooled by Vite dimming the size unit. Only
 // log output is filtered; the build artifacts are never touched.
 function quietAssetReport() {
+  // eslint-disable-next-line no-control-regex -- matches the ESC byte of ANSI colour codes on purpose
   const ANSI = /\x1b\[[0-9;]*m/g;
   const SIZE_LINE = /\d\s*kB\b/; // e.g. "363.03 kB" — not the PWA "KiB"
   const isAssetLine = (line) => SIZE_LINE.test(line.replace(ANSI, ""));

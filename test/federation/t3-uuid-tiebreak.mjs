@@ -43,7 +43,6 @@ t.check(FIXED ? "notre appairage légitime survit" : "notre appairage légitime 
         `statut=${legitRow?.status}`);
 
 // Le libellé fourni par l'appelant doit être borné.
-const forged = aLinks.find((l) => l.id === lowUuid);
 const longLabel = "X".repeat(200);
 await fetch(A + "/api/federation/pair/invite", {
   method: "POST", headers: { "content-type": "application/json" },

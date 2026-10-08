@@ -297,7 +297,7 @@ async function main() {
   try {
     Database = require("better-sqlite3");
     jwt = require("jsonwebtoken");
-  } catch (e) {
+  } catch {
     console.error("[error] missing native deps. Run from the project root:");
     console.error("        cd " + path.resolve(__dirname, "..") + " && npm install");
     process.exit(1);

@@ -103,7 +103,7 @@ function tlsOptionsFor({ host, httpsEnabled, insecure = false, caFile = null }) 
     try {
       ca = fs.readFileSync(caFile);
     } catch (e) {
-      throw new Error(`cannot read the authority file ${caFile}: ${e.message}`);
+      throw new Error(`cannot read the authority file ${caFile}: ${e.message}`, { cause: e });
     }
     return { rejectUnauthorized: true, ca };
   }
