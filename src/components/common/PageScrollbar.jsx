@@ -7,11 +7,14 @@ const MIN_THUMB_PX = 32;
 
 /**
  * Touch screens: the page's scrollbar, drawn by the page so it runs under the
- * sticky header, in the look of the inner touch scrollbars (globalCSS). In the
+ * sticky header, in the look of the inner touch scrollbars (globalCSS). It
+ * travels along a track between the system bars, clear of the screen's
+ * rounded corners. In the
  * Android app it stands in for the WebView's own scrollbar, turned off while
  * this is mounted; an app without that switch keeps its own one instead.
  */
 export default function PageScrollbar() {
+  const trackRef = useRef(null);
   const thumbRef = useRef(null);
   const [enabled] = useState(() =>
     !!window.matchMedia?.(TOUCH_QUERY).matches
@@ -19,6 +22,7 @@ export default function PageScrollbar() {
 
   useEffect(() => {
     if (!enabled) return undefined;
+    const track = trackRef.current;
     const thumb = thumbRef.current;
     const setNative = (on) => {
       try { window.AndroidTheme?.setNativePageScrollbar?.(on); } catch (_) { /* no app */ }
@@ -33,12 +37,13 @@ export default function PageScrollbar() {
       const view = window.innerHeight;
       const total = document.documentElement.scrollHeight;
       if (total <= view) return;
-      const next = Math.max(MIN_THUMB_PX, (view * view) / total);
+      const span = track.clientHeight;
+      const next = Math.max(MIN_THUMB_PX, (span * view) / total);
       if (next !== length) {
         length = next;
         thumb.style.height = `${next}px`;
       }
-      const top = (window.scrollY / (total - view)) * (view - next);
+      const top = (window.scrollY / (total - view)) * (span - next);
       thumb.style.transform = `translateY(${top}px)`;
     };
     const onScroll = () => {
@@ -57,5 +62,9 @@ export default function PageScrollbar() {
   }, [enabled]);
 
   if (!enabled) return null;
-  return <div ref={thumbRef} className="gk-page-scrollbar" aria-hidden="true" />;
+  return (
+    <div ref={trackRef} className="gk-page-scrollbar-track" aria-hidden="true">
+      <div ref={thumbRef} className="gk-page-scrollbar" />
+    </div>
+  );
 }
