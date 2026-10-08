@@ -33,7 +33,7 @@ export default function OidcLoginButton({ userId, defaultEmail = "", error, onEr
     onError("");
     setBusy(true);
     try {
-      await startOidcSignIn(who);
+      if (await startOidcSignIn(who)) setBusy(false);
     } catch (e) {
       onError(oidcErrorMessage(e));
       setBusy(false);

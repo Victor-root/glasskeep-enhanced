@@ -131,7 +131,7 @@ export default function OidcSettingsSection({ token, showToast, showGenericConfi
   const link = (which) => async (password) => {
     setBusy(true);
     try {
-      await startOidcLink(token, password, which);
+      if (await startOidcLink(token, password, which)) setBusy(false);
     } catch (err) {
       showToast?.(oidcErrorMessage(err), "error");
       setBusy(false);

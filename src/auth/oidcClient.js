@@ -12,6 +12,7 @@ import { t } from "../i18n";
 import { localizeServerError } from "../utils/serverErrors.js";
 
 const REDIRECT_PARAMS = ["oidc_ticket", "oidc_error", "oidc_linked"];
+const APP_SECRET_KEY = "glass-keep-oidc-app-secret";
 
 // Whether the login screen should offer the button at all.
 export async function fetchOidcAvailable() {
@@ -19,30 +20,50 @@ export async function fetchOidcAvailable() {
   return !!data?.available;
 }
 
-// The Android app opens other sites in a browser tab. The provider has to
-// load inside the app instead, where the cookie tying the attempt to this
-// browser lives, so the app is told which URL is coming.
+// The Android app opens the provider in the phone's browser, which does
+// not share the app's cookies: the attempt is tied to a secret kept here
+// instead, and the app brings the result back. See server/routes/oidcRoutes.js.
+const androidApp = () => typeof window.AndroidTheme?.openSingleSignOn === "function";
+
+function appBinding() {
+  if (!androidApp()) return {};
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const appSecret = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  localStorage.setItem(APP_SECRET_KEY, appSecret);
+  return { appSecret };
+}
+
+// Resolves true when the app took over (the page stays where it is),
+// false when the page itself is leaving for the provider. Older Android
+// apps load the provider in a WebView of their own, announced first.
 function goToProvider(authorizationUrl) {
+  if (androidApp()) {
+    window.AndroidTheme.openSingleSignOn(authorizationUrl);
+    return true;
+  }
   window.AndroidTheme?.beginSingleSignOn?.(authorizationUrl);
   window.location.assign(authorizationUrl);
+  return false;
 }
 
 // `who` is { email } typed on the login screen, or { userId } of the
 // profile picked there.
 export async function startOidcSignIn(who) {
-  const { authorizationUrl } = await api("/auth/oidc/login", { method: "POST", body: who });
-  goToProvider(authorizationUrl);
+  const { authorizationUrl } = await api("/auth/oidc/login", { method: "POST", body: { ...who, ...appBinding() } });
+  return goToProvider(authorizationUrl);
 }
 
 // Linking adds a way into the account, so the server asks for the
 // password first. `provider` is "instance" or "personal".
 export async function startOidcLink(token, password, provider) {
-  const { authorizationUrl } = await api("/auth/oidc/link", { method: "POST", token, body: { password, provider } });
-  goToProvider(authorizationUrl);
+  const { authorizationUrl } = await api("/auth/oidc/link", { method: "POST", token, body: { password, provider, ...appBinding() } });
+  return goToProvider(authorizationUrl);
 }
 
 export function exchangeOidcTicket(ticket) {
-  return api("/auth/oidc/exchange", { method: "POST", body: { ticket } });
+  const appSecret = localStorage.getItem(APP_SECRET_KEY) || undefined;
+  localStorage.removeItem(APP_SECRET_KEY);
+  return api("/auth/oidc/exchange", { method: "POST", body: { ticket, appSecret } });
 }
 
 export function getMyOidc(token) {
