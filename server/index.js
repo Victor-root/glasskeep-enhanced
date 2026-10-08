@@ -3,7 +3,7 @@
 
 const path = require("path");
 const fs = require("fs");
-const { restartSelf, shutdownSelf } = require("./services/updateOrchestrator");
+const { restartSelf, shutdownSelf, completeRuntimeUpgrade } = require("./services/updateOrchestrator");
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
@@ -2010,6 +2010,7 @@ passkeyVaultModule.ensureSchema(db);
 attachPasskeyRoutes(app, { db, auth, adminOnly, signToken, getUserById, log: console });
 attachUpdateRoutes(app, { db, auth, adminOnly, log: console });
 attachSelfUpdateRoutes(app, { auth, adminOnly, log: console });
+completeRuntimeUpgrade(console);
 
 // Digital Asset Links — must answer at /.well-known/assetlinks.json
 // before the production catch-all sends every unknown path to

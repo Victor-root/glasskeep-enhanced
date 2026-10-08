@@ -41,7 +41,7 @@ LOCK_FILE="${UPDATE_LOCK_FILE:-${DATA_DIR}/.update.lock}"
 # caused the original failure (OOM on small VMs is the classic case).
 BACKUP_DIR="${UPDATE_BACKUP_DIR:-${DATA_DIR}/.update-backup}"
 
-TOTAL_STEPS=4
+TOTAL_STEPS=5
 STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 PREV_COMMIT=""
 FROM_VERSION=""
@@ -146,6 +146,10 @@ write_status() {
     ' STATUS_FILE="$STATUS_FILE" || true
 }
 
+node_major() {
+    node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0
+}
+
 read_version_from_pkg() {
     # Reads .version from package.json without needing npm/jq.
     node -e '
@@ -184,6 +188,20 @@ take_snapshot() {
     # have access to this script's variables) can git-reset the
     # working tree back to the pre-update state.
     echo "$PREV_COMMIT" > "$BACKUP_DIR/PREV_COMMIT"
+    # And the Node major the snapshot's native modules were built for.
+    node_major > "$BACKUP_DIR/NODE_MAJOR"
+}
+
+# A run that upgraded Node and then failed restores node_modules built
+# for the previous Node, whose native modules the new one refuses to
+# load: rebuild them. Must run before the snapshot is wiped.
+rebuild_if_node_changed() {
+    local before
+    before="$(cat "$BACKUP_DIR/NODE_MAJOR" 2>/dev/null || true)"
+    if [[ -n "$before" && "$before" != "$(node_major)" ]]; then
+        echo "[self-update] Node changed from v$before to v$(node_major): rebuilding native modules"
+        (cd "$INSTALL_DIR" && npm rebuild --silent) || true
+    fi
 }
 
 # Move a directory from the snapshot back into the install dir. Uses
@@ -232,6 +250,7 @@ rollback() {
     if [[ -f "$BACKUP_DIR/package-lock.json" ]]; then
         cp "$BACKUP_DIR/package-lock.json" "$INSTALL_DIR/package-lock.json"
     fi
+    rebuild_if_node_changed
     # Snapshot served its purpose — wipe whatever's left so we don't
     # leak disk usage onto the data dir between updates.
     rm -rf "$BACKUP_DIR"
@@ -334,23 +353,46 @@ if [[ -n "$TARGET_VERSION" && "$TO_VERSION" != "$TARGET_VERSION" ]]; then
     false
 fi
 
-# ── Step 2: install dependencies ─────────────────────────────────────────────
+# ── Step 2: Node.js runtime ──────────────────────────────────────────────────
+# The release names the Node major it runs on (package.json engines).
+# Upgrading before the install gets the native modules built for it.
 CURRENT_STEP=2
+CURRENT_ACTION="upgrading Node.js"
+REQUIRED_NODE_MAJOR="$(cd "$INSTALL_DIR" && node -p '(require("./package.json").engines?.node || "").match(/\d+/)?.[0] || ""' 2>/dev/null || true)"
+if [[ -n "$REQUIRED_NODE_MAJOR" && "$(node_major)" -lt "$REQUIRED_NODE_MAJOR" ]]; then
+    write_status "upgrading_runtime" "$CURRENT_STEP" "Upgrading Node.js to v${REQUIRED_NODE_MAJOR}..." ""
+    echo "[self-update] upgrading Node.js from $(node --version) to v${REQUIRED_NODE_MAJOR}"
+    curl -fsSL "https://deb.nodesource.com/setup_${REQUIRED_NODE_MAJOR}.x" | bash -
+    # Waits for an apt run already holding the lock (unattended upgrades)
+    # instead of failing the update on it.
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -o DPkg::Lock::Timeout=300 nodejs
+    echo "[self-update] Node.js is now $(node --version)"
+    if [[ "$(node_major)" -lt "$REQUIRED_NODE_MAJOR" ]]; then
+        CURRENT_ACTION="Node.js v${REQUIRED_NODE_MAJOR} could not be installed"
+        false
+    fi
+fi
+
+# ── Step 3: install dependencies ─────────────────────────────────────────────
+CURRENT_STEP=3
 CURRENT_ACTION="installing dependencies"
 write_status "installing" "$CURRENT_STEP" "Installing dependencies..." ""
 (
     cd "$INSTALL_DIR"
     # systemd starts us with NODE_ENV=production (from /opt/glass-keep/.env),
-    # which makes `npm install` strip devDependencies — including vite and
+    # which makes npm strip devDependencies, including vite and
     # @vitejs/plugin-react, both of which are needed by the next step's
     # `vite build`. Scope NODE_ENV=development to just this command and
     # pass --include=dev for belt-and-suspenders so the build that follows
     # has everything it needs.
-    NODE_ENV=development npm install --silent --include=dev
+    # npm ci installs exactly the release's lockfile into a fresh
+    # node_modules, so native modules are always built for the Node that
+    # runs them, and the checkout's package-lock.json is never rewritten.
+    NODE_ENV=development npm ci --silent --include=dev
 )
 
-# ── Step 3: build the front-end ──────────────────────────────────────────────
-CURRENT_STEP=3
+# ── Step 4: build the front-end ──────────────────────────────────────────────
+CURRENT_STEP=4
 CURRENT_ACTION="building the application"
 write_status "building" "$CURRENT_STEP" "Building the application..." ""
 (
@@ -358,10 +400,10 @@ write_status "building" "$CURRENT_STEP" "Building the application..." ""
     npm run build
 )
 
-# ── Step 4: restart the service ──────────────────────────────────────────────
+# ── Step 5: restart the service ──────────────────────────────────────────────
 # This is the only moment the app is unreachable. The frontend will
 # briefly show "waiting for the server" here before resuming.
-CURRENT_STEP=4
+CURRENT_STEP=5
 CURRENT_ACTION="restarting the service"
 write_status "starting_service" "$CURRENT_STEP" "Restarting the service..." ""
 systemctl restart "$SERVICE_NAME"

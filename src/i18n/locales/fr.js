@@ -1282,6 +1282,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   selfUpdateStepFetching: "Téléchargement de la nouvelle version",
   selfUpdateStepRenaming: "Préparation pour la nouvelle version",
   selfUpdateStepCreating: "Création de la nouvelle instance",
+  selfUpdateStepRuntime: "Mise à jour de Node.js",
   selfUpdateStepInstalling: "Installation des dépendances",
   selfUpdateStepBuilding: "Compilation",
   selfUpdateStepStarting: "Redémarrage de l'application",
