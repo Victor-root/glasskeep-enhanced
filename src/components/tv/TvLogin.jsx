@@ -105,7 +105,9 @@ export default function TvLogin({
   // ABOVE the mode-specific card; the dynamic loginSlogan pill (with
   // i18n fallback so there's always one) BELOW it.
   const renderShell = (cardEl, { subtitle } = {}) => (
-    <div className="tv-screen">
+    // Rides up as one block when the soft keyboard would cover the field
+    // being typed in (useKeyboardInset), like the phone login does.
+    <div className="tv-screen" style={{ position: "relative", top: "calc(-1 * var(--keyboard-pan, 0px))" }}>
       <div className="tv-login">
         <img
           src="/pwa-192.png"
