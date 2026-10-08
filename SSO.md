@@ -193,13 +193,16 @@ someone else, even with the same email, is refused.
 
 ## 📱 Android app
 
-The app opens the provider in a separate screen, then comes back to
-GlassKeep by itself. That screen shares nothing with the app but its
-cookies: the provider's pages never get access to the app's native
-features (passkeys, files, reminders). Only the return to GlassKeep's
-callback leaves that screen, so a provider on the same machine as
-GlassKeep (same address, another port or path) stays in it too. Use the
-same server address in the app as the one the provider was set up from.
+The app opens the provider in the phone's default browser, as a sheet
+over the app (full screen when the browser has no such sheet). Passkeys
+work there as on a computer, and the provider's pages never run next to
+the app's native features (files, reminders, …). Once you are through,
+the browser hands you back to the app; if it asks, tap **Back to
+GlassKeep**. The browser does not share the app's cookies, so the
+attempt is tied to a secret only the app holds instead. Use the same
+server address in the app as the one the provider was set up from, and
+keep the app up to date: older versions open the provider inside the
+app, where passkeys are not available.
 
 ---
 
