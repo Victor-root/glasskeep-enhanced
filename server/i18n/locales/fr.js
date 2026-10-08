@@ -78,4 +78,7 @@ module.exports = {
   // in-app notification and the Web Push payload shown on the device.
   reminderNotificationTitle: "Rappel",
   reminderNotificationUntitled: "Note sans titre",
+
+  // Page the phone's browser shows when single sign-on hands back to the app.
+  oidcBackToApp: "Retourner dans GlassKeep",
 };

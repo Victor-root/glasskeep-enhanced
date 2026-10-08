@@ -186,7 +186,7 @@ async function parcours(inst, nav, { chemin = "/api/auth/oidc/login", token, cor
   const rappel = chezIdp.headers.get("location");
   if (avantRappel) await avantRappel(rappel);
   const retour = await fetch(rappel, { redirect: "manual", headers: nav.entetes() });
-  const location = retour.headers.get("location") || "";
+  const location = retour.headers.get("location") || retourVersAppli(await retour.text());
   return {
     authorizationUrl: new URL(reponse.authorizationUrl),
     location,
@@ -194,8 +194,15 @@ async function parcours(inst, nav, { chemin = "/api/auth/oidc/login", token, cor
   };
 }
 
-const echanger = (inst, nav, ticket) =>
-  inst.call("POST", "/api/auth/oidc/exchange", { body: { ticket }, headers: nav.entetes() });
+// Le retour vers l'application Android est une page dont le bouton
+// (et le script) ouvre l'adresse de l'application.
+function retourVersAppli(page) {
+  const lien = page.match(/<a id="back" href="([^"]*)"/);
+  return lien ? lien[1].replace(/&amp;/g, "&") : "";
+}
+
+const echanger = (inst, nav, ticket, appSecret) =>
+  inst.call("POST", "/api/auth/oidc/exchange", { body: { ticket, appSecret }, headers: nav.entetes() });
 
 const inst = await startInstance({ port: PORT });
 
@@ -471,6 +478,48 @@ try {
   idp.mauvaisNonce = true;
   const nonce = await parcours(inst, nav, { corps: { email: "chef@glasskeep.test" } });
   t.check("un jeton qui ne porte pas le nonce attendu est refusé", nonce.params.oidc_error === "oidc_failed", nonce.location);
+
+  // ───────────────────────────────────────────────────────────────────
+  // 6 bis. L'application Android: le fournisseur s'ouvre dans le navigateur
+  //    du téléphone, sans les cookies de l'application. Un secret gardé par
+  //    l'application tient le rôle du cookie.
+  // ───────────────────────────────────────────────────────────────────
+  const secretAppli = crypto.randomBytes(32).toString("base64url");
+  const navTelephone = navigateur();
+  const viaAppli = await parcours(inst, navTelephone, {
+    corps: { email: "chef@glasskeep.test", appSecret: secretAppli },
+    avantRappel: () => navTelephone.oublierCookie(),
+  });
+  t.check("depuis l'application, le retour rouvre l'application avec un ticket, sans cookie du navigateur",
+    viaAppli.location.startsWith("com.glasskeep.app:/oidc?") && !!viaAppli.params.oidc_ticket
+      && Object.keys(viaAppli.params).length === 1, viaAppli.location);
+  const sansSecret = await echanger(inst, navigateur(), viaAppli.params.oidc_ticket);
+  const viaAppli2 = await parcours(inst, navTelephone, { corps: { email: "chef@glasskeep.test", appSecret: secretAppli } });
+  const mauvaisSecret = await echanger(inst, navigateur(), viaAppli2.params.oidc_ticket, crypto.randomBytes(32).toString("base64url"));
+  t.check("un ticket de l'application ne s'échange pas sans son secret, ni avec un autre",
+    sansSecret.status === 401 && mauvaisSecret.status === 401, `${sansSecret.text} ${mauvaisSecret.text}`);
+  const viaAppli3 = await parcours(inst, navTelephone, { corps: { email: "chef@glasskeep.test", appSecret: secretAppli } });
+  const sessionAppli = await echanger(inst, navigateur(), viaAppli3.params.oidc_ticket, secretAppli);
+  t.check("avec son secret, le ticket de l'application ouvre le bon compte",
+    sessionAppli.json?.user?.id === chef.id, j(sessionAppli.json?.user));
+  const viaAppli4 = await parcours(inst, navTelephone, { corps: { email: "chef@glasskeep.test", appSecret: secretAppli } });
+  const avecCookieSeul = await echanger(inst, nav, viaAppli4.params.oidc_ticket);
+  t.check("le cookie d'un navigateur ne remplace pas le secret de l'application",
+    avecCookieSeul.status === 401, avecCookieSeul.text);
+  idp.personne = { sub: "u-intrus", email: "chef@glasskeep.test", name: "Intrus" };
+  const refusAppli = await parcours(inst, navTelephone, { corps: { email: "chef@glasskeep.test", appSecret: secretAppli } });
+  idp.personne = { sub: "u-chef", email: "chef@authentik.test", name: "Chef" };
+  t.check("un refus revient lui aussi dans l'application",
+    refusAppli.location.startsWith("com.glasskeep.app:/oidc?")
+      && refusAppli.params.oidc_error === "oidc_identity_mismatch", refusAppli.location);
+  idp.personne = { sub: "u-simple", email: "simple@authentik.test", name: "Simple" };
+  const lienAppli = await parcours(inst, navTelephone, {
+    chemin: "/api/auth/oidc/link", token: simple.token,
+    corps: { password: simple.password, provider: "instance", appSecret: crypto.randomBytes(32).toString("base64url") },
+  });
+  t.check("une association lancée depuis l'application y revient aussi",
+    lienAppli.location.startsWith("com.glasskeep.app:/oidc?") && lienAppli.params.oidc_linked === "1", lienAppli.location);
+  idp.personne = { sub: "u-chef", email: "chef@authentik.test", name: "Chef" };
 
   // ───────────────────────────────────────────────────────────────────
   // 7. Une identité n'appartient qu'à un compte, un compte n'en a qu'une,

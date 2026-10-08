@@ -35,6 +35,16 @@
 // a victim to open the callback link, signing the victim in as someone
 // else. The state, the ticket and the cookie must come from one browser.
 //
+// The Android app is the exception. Its WebView cannot run a provider's
+// page (no passkeys there, and the page must stay away from the app's
+// bridges), so the provider opens in the phone's browser, which does not
+// share the app's cookies. The app then starts the flow with a secret of
+// its own (`appSecret`), the callback sends the browser back to the app
+// (ANDROID_RETURN) instead of the web app, and only that secret redeems
+// the ticket. The browser may refuse to open an app without a fresh tap,
+// so that return is a page with a button, which also tries on its own. It plays the cookie's part: a ticket issued for someone
+// else's attempt is useless to an app that does not hold their secret.
+//
 // A provider never creates an account and never grants admin rights: it
 // only opens the account that linked it.
 
@@ -42,6 +52,7 @@ const SSO_POLICIES = new Set(["admin", "personal"]);
 
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
+const { t } = require("../i18n");
 const {
   normalizeIssuer,
   normalizeOrigin,
@@ -60,6 +71,8 @@ const MAX_DISPLAY_NAME_LEN = 40;
 const BINDING_COOKIE = "gk_oidc";
 const BINDING_COOKIE_PATH = "/api/auth/oidc";
 const BINDING_RE = /^[A-Za-z0-9_-]{43}$/;
+// The Android app's own scheme, registered by SsoReturnActivity.
+const ANDROID_RETURN = "com.glasskeep.app:/oidc";
 
 function sha256(value) {
   return crypto.createHash("sha256").update(value).digest("base64url");
@@ -192,6 +205,20 @@ function attachOidcRoutes(app, deps) {
       if (!res.headersSent) fail(res);
     });
   const backToApp = (res, params) => res.redirect(`/?${new URLSearchParams(params)}`);
+  const backToAndroidApp = (res, params) => {
+    const lang = res.req.acceptsLanguages("en", "fr") || "en";
+    const target = `${ANDROID_RETURN}?${new URLSearchParams(params)}`.replace(/&/g, "&amp;");
+    res.type("html").send(`<!doctype html>
+<html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GlassKeep</title>
+<style>
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;background:#f0e8ff;color:#1a1a1a}
+@media (prefers-color-scheme:dark){body{background:#1a1a1a;color:#f0e8ff}}
+a{padding:14px 28px;border-radius:999px;background:#4f46e5;color:#fff;font-weight:600;text-decoration:none}
+</style></head>
+<body><a id="back" href="${target}">${t(lang, "oidcBackToApp")}</a>
+<script>location.replace(document.getElementById("back").href)</script></body></html>`);
+  };
 
   // The provider sends the browser back to the address the configuration
   // was saved from, and the cookie tying the attempt to this browser lives
@@ -204,7 +231,9 @@ function attachOidcRoutes(app, deps) {
     try {
       const { url, state, nonce, codeVerifier } = await beginAuthorization(provider, accessFor(provider.owner_user_id));
       const binding = bindBrowser(req, res, provider.public_origin);
-      flows.put(state, { providerId: provider.id, state, nonce, codeVerifier, binding, purpose, userId });
+      const appSecret = req.body?.appSecret;
+      const appBinding = typeof appSecret === "string" && BINDING_RE.test(appSecret) ? sha256(appSecret) : null;
+      flows.put(state, { providerId: provider.id, state, nonce, codeVerifier, binding, appBinding, purpose, userId });
       res.json({ authorizationUrl: url });
     } catch (err) {
       const e = asProviderError(err);
@@ -257,9 +286,10 @@ function attachOidcRoutes(app, deps) {
   }));
 
   app.get("/api/auth/oidc/callback", safely(async (req, res) => {
-    const back = (params) => backToApp(res, params);
     const flow = flows.take(req.query.state);
-    if (!flow || !browserMatches(req, flow.binding)) {
+    res.locals.oidcReturn = flow?.appBinding ? backToAndroidApp : backToApp;
+    const back = (params) => res.locals.oidcReturn(res, params);
+    if (!flow || (!flow.appBinding && !browserMatches(req, flow.binding))) {
       return back({ oidc_error: "oidc_expired" });
     }
     if (typeof req.query.error === "string") {
@@ -291,14 +321,18 @@ function attachOidcRoutes(app, deps) {
       return back({ oidc_linked: "1" });
     }
     const ticket = crypto.randomBytes(32).toString("base64url");
-    tickets.put(ticket, { userId: flow.userId, providerId: provider.id, binding: flow.binding });
+    tickets.put(ticket, { userId: flow.userId, providerId: provider.id, binding: flow.binding, appBinding: flow.appBinding });
     log.info?.(`[oidc] sign-in user=${flow.userId}`);
     return back({ oidc_ticket: ticket });
-  }, (res) => backToApp(res, { oidc_error: "oidc_failed" })));
+  }, (res) => (res.locals.oidcReturn ?? backToApp)(res, { oidc_error: "oidc_failed" })));
 
   app.post("/api/auth/oidc/exchange", (req, res) => {
     const ticket = tickets.take(req.body?.ticket);
-    if (!ticket || !browserMatches(req, ticket.binding)
+    const appSecret = req.body?.appSecret;
+    const bound = ticket?.appBinding
+      ? typeof appSecret === "string" && sameDigest(sha256(appSecret), ticket.appBinding)
+      : !!ticket && browserMatches(req, ticket.binding);
+    if (!bound
         || !usableBy(store.getProvider(ticket.providerId), ticket.userId)) {
       return res.status(401).json({ error: "oidc_expired" });
     }
