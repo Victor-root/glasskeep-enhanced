@@ -286,36 +286,14 @@ export default function NotificationCard({
     };
   }, [swipeable]);
 
-  if (!notification) return null;
-  const { id, title, message, variant, dismissible, action, actions: rawActions, actionLayout, createdAt, duration, icon: iconKey } =
-    notification;
-  // Unified action list: prefer the multi-action `actions` field when
-  // present, fall back to the single legacy `action` field. Down the
-  // line each button calls onAction(notification, chosenAction) so the
-  // App-level dispatcher can branch on `chosenAction.kind`.
-  const actionList = Array.isArray(rawActions) && rawActions.length > 0
-    ? rawActions
-    : (action ? [action] : []);
-  // Default: a single action sits inline at the end of the message row
-  // (compact). Callers with a long message can pass actionLayout:"below"
-  // to push even a single button into the dedicated row underneath, so
-  // the message wraps naturally at full width instead of being squeezed
-  // next to the button.
-  const renderActionsBelow =
-    actionList.length > 1 || actionLayout === "below";
-  const klass = VARIANT_CLASS[variant] || VARIANT_CLASS.info;
-  const closeKlass =
-    closeSide === "right" ? " gk-notif-card--close-right" : "";
-  const modeKlass = mode === "center" ? " gk-notif-card--center" : "";
-  const swipeKlass = swipeable ? " gk-notif-card--swipeable" : "";
-  const time = formatRelativeTime(createdAt);
-  const headline = title || fallbackTitle(variant);
   // Countdown bar — only on floating toasts (not in the history panel,
   // which uses `compact`) with a finite auto-dismiss duration. Drawn
   // imperatively by a CSS animation whose duration matches the
   // provider's auto-dismiss timer so they finish together.
+  const createdAt = notification?.createdAt;
+  const duration = notification?.duration;
   const showCountdown =
-    !compact && typeof duration === "number" && duration > 0;
+    !!notification && !compact && typeof duration === "number" && duration > 0;
   // Sync the CSS animation with the provider's setTimeout: notify()
   // schedules the auto-dismiss the moment it runs (t = createdAt),
   // but the bar only starts animating once React commits and the
@@ -362,6 +340,31 @@ export default function NotificationCard({
       window.removeEventListener("focus", onVisible);
     };
   }, []);
+
+  if (!notification) return null;
+  const { id, title, message, variant, dismissible, action, actions: rawActions, actionLayout, icon: iconKey } =
+    notification;
+  // Unified action list: prefer the multi-action `actions` field when
+  // present, fall back to the single legacy `action` field. Down the
+  // line each button calls onAction(notification, chosenAction) so the
+  // App-level dispatcher can branch on `chosenAction.kind`.
+  const actionList = Array.isArray(rawActions) && rawActions.length > 0
+    ? rawActions
+    : (action ? [action] : []);
+  // Default: a single action sits inline at the end of the message row
+  // (compact). Callers with a long message can pass actionLayout:"below"
+  // to push even a single button into the dedicated row underneath, so
+  // the message wraps naturally at full width instead of being squeezed
+  // next to the button.
+  const renderActionsBelow =
+    actionList.length > 1 || actionLayout === "below";
+  const klass = VARIANT_CLASS[variant] || VARIANT_CLASS.info;
+  const closeKlass =
+    closeSide === "right" ? " gk-notif-card--close-right" : "";
+  const modeKlass = mode === "center" ? " gk-notif-card--center" : "";
+  const swipeKlass = swipeable ? " gk-notif-card--swipeable" : "";
+  const time = formatRelativeTime(createdAt);
+  const headline = title || fallbackTitle(variant);
 
   const card = (
     <div
