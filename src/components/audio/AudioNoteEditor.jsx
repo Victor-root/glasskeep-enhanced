@@ -45,6 +45,7 @@ export default function AudioNoteEditor({ body, setBody, title, readOnly = false
   const [currentIndex, setCurrentIndex] = useState(0);
   useEffect(() => {
     if (currentIndex >= clips.length) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clamp the selection when clips are removed so it never points past the list
       setCurrentIndex(Math.max(0, clips.length - 1));
     }
   }, [clips.length, currentIndex]);

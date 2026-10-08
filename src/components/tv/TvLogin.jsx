@@ -35,6 +35,7 @@ export default function TvLogin({
   // Update default mode when profiles arrive after first render.
   useEffect(() => {
     if (hasProfiles && mode === "manual" && !identifier && !password) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- switch to the profile list once profiles arrive, unless the user started typing
       setMode("profiles");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

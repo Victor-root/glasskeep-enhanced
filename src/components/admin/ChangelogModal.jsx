@@ -61,6 +61,7 @@ function clearShowFlag() {
 
 // Public helper: SelfUpdateProgress calls this just before reloading
 // the page so the post-reload mount knows it should pop the modal.
+// eslint-disable-next-line react-refresh/only-export-components -- flag helper shares SHOW_FLAG_KEY with consumeChangelogShowFlag, which App.jsx imports from here
 export function markChangelogToShow() {
     try {
         localStorage.setItem(SHOW_FLAG_KEY, "1");
@@ -73,6 +74,7 @@ export function markChangelogToShow() {
 // changelog" link in the admin panel, so admins can re-read the
 // release notes even outside of an update flow).
 const OPEN_EVENT = "glass-keep:open-changelog";
+// eslint-disable-next-line react-refresh/only-export-components -- event helper shares OPEN_EVENT with onOpenChangelogRequest, which App.jsx imports from here
 export function openChangelog() {
     try {
         window.dispatchEvent(new CustomEvent(OPEN_EVENT));
@@ -84,6 +86,7 @@ export function openChangelog() {
 // Read-and-clear the "show after update" flag. Called by App.jsx on
 // mount so the modal's open state can be lifted out of this file
 // (required for the Android back-button stack to know about it).
+// eslint-disable-next-line react-refresh/only-export-components -- imported from this module by App.jsx
 export function consumeChangelogShowFlag() {
     const flag = readShowFlag();
     if (flag) clearShowFlag();
@@ -92,6 +95,7 @@ export function consumeChangelogShowFlag() {
 
 // Subscribe to OPEN_EVENT requests. Returns an unsubscribe fn so
 // useEffect's cleanup can detach the listener.
+// eslint-disable-next-line react-refresh/only-export-components -- imported from this module by App.jsx
 export function onOpenChangelogRequest(cb) {
     const handler = () => { try { cb(); } catch { /* ignore */ } };
     window.addEventListener(OPEN_EVENT, handler);
@@ -218,6 +222,7 @@ export default function ChangelogModal({ open, onClose }) {
                 try { translateAbortRef.current.abort(); } catch { /* ignore */ }
                 translateAbortRef.current = null;
             }
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- reset translation state when the modal closes, together with aborting the stream
             setTranslatedRaw(null);
             setTranslateError(null);
             setShowOriginal(false);
@@ -273,7 +278,6 @@ export default function ChangelogModal({ open, onClose }) {
             // ("\n\n"); within an event each line is `<field>: <value>`.
             // We only care about `event:` (delta | done | error) and the
             // first `data:` line, which is JSON.
-            // eslint-disable-next-line no-constant-condition
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) break;

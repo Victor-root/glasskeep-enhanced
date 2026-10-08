@@ -20,8 +20,6 @@ function NotesSections({
   onDragLeave,
   onDrop,
   onDragEnd,
-  isOnline,
-  onUpdateChecklistItem,
   currentUser,
   listView,
   notesLoading,
@@ -80,8 +78,6 @@ function NotesSections({
                     onDragLeave={onDragLeave}
                     onDrop={onDrop}
                     onDragEnd={onDragEnd}
-                    isOnline={isOnline}
-                    onUpdateChecklistItem={onUpdateChecklistItem}
                     currentUser={currentUser}
                     maxPreviewItems={maxPreviewItems}
                   />
@@ -115,8 +111,6 @@ function NotesSections({
                     onDragLeave={onDragLeave}
                     onDrop={onDrop}
                     onDragEnd={onDragEnd}
-                    isOnline={isOnline}
-                    onUpdateChecklistItem={onUpdateChecklistItem}
                     currentUser={currentUser}
                     maxPreviewItems={maxPreviewItems}
                   />
@@ -164,8 +158,6 @@ function NotesSections({
                     onDragLeave={onDragLeave}
                     onDrop={onDrop}
                     onDragEnd={onDragEnd}
-                    isOnline={isOnline}
-                    onUpdateChecklistItem={onUpdateChecklistItem}
                     currentUser={currentUser}
                     maxPreviewItems={maxPreviewItems}
                   />
@@ -199,8 +191,6 @@ function NotesSections({
                     onDragLeave={onDragLeave}
                     onDrop={onDrop}
                     onDragEnd={onDragEnd}
-                    isOnline={isOnline}
-                    onUpdateChecklistItem={onUpdateChecklistItem}
                     currentUser={currentUser}
                     maxPreviewItems={maxPreviewItems}
                   />

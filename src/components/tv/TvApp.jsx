@@ -48,9 +48,6 @@ export default function TvApp() {
   const [notes, setNotes] = useState([]);
   const notesEtagRef = useRef("");
   const [loadError, setLoadError] = useState(null);
-  const [isOnline, setIsOnline] = useState(() =>
-    typeof navigator === "undefined" ? true : navigator.onLine
-  );
 
   // Public login slogan — set by the server admin, refreshed whenever
   // the login screen is on display. Empty string when unset; TvLogin
@@ -131,22 +128,17 @@ export default function TvApp() {
 
   useEffect(() => {
     if (!token) return undefined;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- poll the notes; state is set only after each request resolves
     loadNotes();
     const id = setInterval(loadNotes, 30 * 1000);
     return () => clearInterval(id);
   }, [token, loadNotes]);
 
-  // React to network changes — a TV on Wi-Fi is more likely to drop
-  // off than a phone, and we want the status pill to reflect reality.
+  // Refresh when the network comes back: a TV on Wi-Fi is more likely to
+  // drop off than a phone.
   useEffect(() => {
-    const onOnline = () => { setIsOnline(true); loadNotes(); };
-    const onOffline = () => setIsOnline(false);
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-    return () => {
-      window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOffline);
-    };
+    window.addEventListener("online", loadNotes);
+    return () => window.removeEventListener("online", loadNotes);
   }, [loadNotes]);
 
   // Window-focus refresh — the user may have unlocked the TV after
@@ -247,9 +239,6 @@ export default function TvApp() {
         currentUser={currentUser}
         onSignOut={signOut}
         onExitTvMode={!window.__isAndroidTV ? exitTvMode : undefined}
-        isOnline={isOnline}
-        sseConnected={true}
-        syncState={loadError ? "error" : "idle"}
       />
       {loadError && (
         <div

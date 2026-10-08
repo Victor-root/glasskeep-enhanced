@@ -15,7 +15,6 @@ import NoteReminderChip from "./NoteReminderChip.jsx";
  */
 export default function NoteCardFooter({
   tags = [],
-  icon = null,  // kept in signature for backward compat, no longer rendered
   maxChips = 3,
   collabs = [],
   isCollab = false,

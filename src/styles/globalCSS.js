@@ -2915,61 +2915,6 @@ body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split
   border-bottom: 1px solid var(--border-light);
 }
 
-/* formatting popover base */
-.fmt-pop {
-  border: 1px solid var(--border-light);
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 30px rgba(0,0,0,.2);
-  padding: .5rem;
-}
-.fmt-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: .35rem .5rem;
-  border-radius: .5rem;
-  font-size: .85rem;
-}
-@media (max-width: 639px) {
-  .fmt-pop {
-    position: fixed !important;
-    left: 0.5rem !important;
-    right: 0.5rem !important;
-    bottom: 52px !important;
-    top: auto !important;
-    width: auto !important;
-    border-radius: 1rem;
-    padding: 0.6rem 0.5rem;
-    backdrop-filter: blur(12px);
-  }
-  .fmt-pop::after {
-    content: "";
-    position: absolute;
-    bottom: -6px;
-    left: var(--fmt-arrow-left, 50%);
-    width: 12px;
-    height: 12px;
-    background: inherit;
-    border-right: 1px solid var(--border-light);
-    border-bottom: 1px solid var(--border-light);
-    transform: rotate(45deg);
-  }
-  .fmt-pop-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 0.3rem;
-  }
-  .fmt-pop-grid .fmt-sep {
-    display: none;
-  }
-  .fmt-pop-grid .fmt-btn {
-    width: 100%;
-    justify-content: center;
-    padding: 0.45rem 0;
-    font-size: 0.9rem;
-  }
-}
-
 /* Login decorative floating cards */
 /* Fade in from 0 to the element's own opacity, held at 0 through the delay
    (backwards fill). No forwards fill on purpose: a finished animation that

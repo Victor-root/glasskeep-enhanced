@@ -228,9 +228,9 @@ function HeaderUserChip({ currentUser, onSignOut }) {
         e.preventDefault();
         e.stopImmediatePropagation();
         const idx = list.indexOf(document.activeElement);
-        let nextIdx = idx;
-        if (e.key === "ArrowDown") nextIdx = Math.min(list.length - 1, (idx < 0 ? -1 : idx) + 1);
-        else nextIdx = Math.max(0, (idx < 0 ? list.length : idx) - 1);
+        const nextIdx = e.key === "ArrowDown"
+          ? Math.min(list.length - 1, (idx < 0 ? -1 : idx) + 1)
+          : Math.max(0, (idx < 0 ? list.length : idx) - 1);
         const target = list[nextIdx];
         if (target instanceof HTMLElement) {
           window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target } }));
@@ -323,8 +323,10 @@ export default function TvNotesViewer({
   // shrinks (filter changed, notes deleted from another device).
   const pagerTotalPages = Math.max(1, Math.ceil(visible.length / PAGER_PAGE_SIZE));
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clamp the page index when the visible list shrinks
     if (pagerPage >= pagerTotalPages) setPagerPage(Math.max(0, pagerTotalPages - 1));
   }, [pagerPage, pagerTotalPages]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- back to the first page when the filter changes
   useEffect(() => { setPagerPage(0); }, [filter]); // reset on filter change
   const pagerSlice = useMemo(() => {
     if (viewMode !== "carousel") return [];
@@ -430,6 +432,7 @@ export default function TvNotesViewer({
   useEffect(() => {
     if (!openNote) return;
     const stillThere = notes.find((n) => n.id === openNote.id);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close or refresh the open note when a poll removes or updates it
     if (!stillThere || stillThere.archived || stillThere.trashed) closeDetail();
     else if (stillThere !== openNote) setOpenNote(stillThere);
   }, [notes, openNote, closeDetail]);

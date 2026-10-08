@@ -555,6 +555,7 @@ const NOOP_VALUE = {
   cancelAutoDismiss: () => {},
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- consumer hook of this provider's context, imported from here by App.jsx
 export function useNotifications() {
   const ctx = useContext(NotificationContext);
   return ctx || NOOP_VALUE;

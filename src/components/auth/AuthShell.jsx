@@ -72,6 +72,7 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
   const [bgReady, setBgReady] = useState(false);
   useEffect(() => {
     if (!bgUrl) { removeBootBgLayer(); return undefined; }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hide the background until the new image has loaded and faded in
     setBgReady(false);
     const img = new Image();
     let timer;

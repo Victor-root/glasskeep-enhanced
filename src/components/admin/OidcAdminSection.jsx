@@ -38,6 +38,7 @@ export default function OidcAdminSection({ token, adminSettings, updateAdminSett
   }, [token]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load() fetches the provider and sets state only after the request resolves
     if (token) load();
   }, [token, load]);
 

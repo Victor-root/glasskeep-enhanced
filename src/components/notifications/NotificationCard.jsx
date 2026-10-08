@@ -85,7 +85,7 @@ function fallbackTitle(variant) {
   return t("notifFallbackInfo");
 }
 
-export function formatRelativeTime(ts) {
+function formatRelativeTime(ts) {
   if (!ts) return "";
   const diff = Date.now() - ts;
   if (diff < 60_000) return t("relativeJustNow");
@@ -215,7 +215,7 @@ export default function NotificationCard({
         locked = true;
         // Claim the pointer so subsequent moves arrive here even if
         // the finger leaves the card's bounding box mid-swipe.
-        try { el.setPointerCapture(activeId); } catch (_) {}
+        try { el.setPointerCapture(activeId); } catch { /* pointer already gone: the swipe still tracks via the card's own listeners */ }
       }
 
       deltaRef.current = dx;
@@ -233,7 +233,7 @@ export default function NotificationCard({
       if (!active || e.pointerId !== activeId) return;
       const wasLocked = locked;
       const dx = deltaRef.current;
-      try { el.releasePointerCapture(activeId); } catch (_) {}
+      try { el.releasePointerCapture(activeId); } catch { /* capture never taken or already released */ }
       reset();
       if (!wasLocked) return; // Was a tap or vertical scroll — nothing to animate.
 
@@ -307,7 +307,6 @@ export default function NotificationCard({
   // wall-clock instant the provider's timer fires. Mount-only deps
   // so we don't re-anchor on every render (which would restart the
   // CSS animation and re-create the very desync this fixes).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     if (!showCountdown) return undefined;
     const anchor = () => {
@@ -339,6 +338,7 @@ export default function NotificationCard({
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: re-anchoring on change would restart the CSS animation
   }, []);
 
   if (!notification) return null;

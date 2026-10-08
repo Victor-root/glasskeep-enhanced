@@ -31,9 +31,11 @@ export default function useNoteSaveState(noteId, hasLocalChanges, syncStatus) {
   const [track, setTrack] = useState(() => ({ id, phase: busy ? "busy" : "idle", start: Date.now() }));
   let next = track;
   if (track.id !== id) {
+    // eslint-disable-next-line react-hooks/purity -- stamps when this run of edits began; the value is kept in state, not recomputed
     next = { id, phase: busy ? "busy" : "idle", start: Date.now() };
   } else if (busy) {
     if (track.phase !== "busy") {
+      // eslint-disable-next-line react-hooks/purity -- same as above
       next = { id, phase: "busy", start: track.phase === "awaiting" ? track.start : Date.now() };
     }
   } else if (track.phase === "busy" || track.phase === "awaiting") {

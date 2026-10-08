@@ -27,11 +27,6 @@ export default function ModalHeader({
   windowWidth,
   isLandscapeMobile,
   isWebView,
-  // formatting (mobile popover)
-  modalFmtBtnRef,
-  showModalFmt,
-  setShowModalFmt,
-  onFormatModal,
   // pin
   onTogglePin,
   activeId,
@@ -46,7 +41,6 @@ export default function ModalHeader({
   // drawing
   drawMode,
   drawToolbarMount,
-  onToggleDrawMode,
   // keyboard: Tab from title → body (skip the toolbar buttons)
   onTitleTab,
   // External ref to the title <textarea> so the parent can focus it
@@ -97,10 +91,12 @@ export default function ModalHeader({
   // (used for auto-resize on content change) and the optional
   // titleInputRef the parent passes in (used for Shift+Tab focus
   // hand-back from the rich-text editor).
+  // eslint-disable-next-line react-hooks/immutability -- callback ref that forwards the node to the parent's ref object
   const setTitleRef = useCallback((node) => {
     mobileTitleRef.current = node;
     if (titleInputRef) {
       if (typeof titleInputRef === "function") titleInputRef(node);
+      // eslint-disable-next-line react-hooks/immutability -- writing .current of the parent's ref object is how a forwarded ref is filled
       else titleInputRef.current = node;
     }
   }, [titleInputRef]);

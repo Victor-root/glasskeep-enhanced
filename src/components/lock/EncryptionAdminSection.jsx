@@ -370,6 +370,7 @@ export default function EncryptionAdminSection({ token, showToast }) {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- poll the instance status; state is set only after each request resolves
     refresh();
     const id = setInterval(refresh, 30 * 1000);
     return () => clearInterval(id);

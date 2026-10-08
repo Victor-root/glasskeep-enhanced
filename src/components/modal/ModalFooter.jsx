@@ -72,7 +72,6 @@ export default function ModalFooter({
   modalFileRef,
   addImagesToState,
   setMImages,
-  mImages,
   // note icon (logo badge) — flows through addImagesToState too, then
   // gets stamped with role:"icon" via setNoteIconFromFile (handled in App).
   modalIconFileRef,
@@ -85,7 +84,6 @@ export default function ModalFooter({
   onPickIcon,
   // logo library (persistent, per-user)
   logoLibrary = [],
-  addLogoToLibrary,
   deleteLogoFromLibrary,
   // collaboration
   onOpenCollaboration,
@@ -553,6 +551,7 @@ export default function ModalFooter({
           </button>
 
           {/* Tag picker: dropdown on desktop, bottom sheet on mobile */}
+          {/* eslint-disable-next-line react-hooks/refs -- positions the portal dropdown from the tag button's rect, measured on each render while open */}
           {isDesktop ? modalTagFocused && (() => {
             const rect = modalTagBtnRef.current?.getBoundingClientRect();
             if (!rect) return null;

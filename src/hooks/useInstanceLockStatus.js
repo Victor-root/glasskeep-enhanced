@@ -25,8 +25,6 @@ export default function useInstanceLockStatus() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const cancelledRef = useRef(false);
-  const statusRef = useRef(null);
-  statusRef.current = status;
 
   const refresh = useCallback(async () => {
     try {
@@ -49,8 +47,9 @@ export default function useInstanceLockStatus() {
   // Adaptive polling: short interval when locked, long when unlocked.
   useEffect(() => {
     cancelledRef.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- polls the server; state is only set once each request resolves
     refresh();
-    const isLocked = !!(statusRef.current?.enabled && statusRef.current?.locked);
+    const isLocked = !!(status?.enabled && status?.locked);
     const interval = isLocked ? POLL_MS_LOCKED : POLL_MS_UNLOCKED;
     const id = setInterval(refresh, interval);
     return () => {
@@ -58,8 +57,7 @@ export default function useInstanceLockStatus() {
       clearInterval(id);
     };
     // Re-run when locked-ness changes so the interval matches the
-    // current state. Reading status (not statusRef) on purpose so the
-    // effect re-subscribes when the value flips.
+    // current state.
   }, [refresh, status?.enabled, status?.locked]);
 
   // Refresh when the tab regains focus or visibility — covers the

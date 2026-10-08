@@ -66,7 +66,7 @@ export const CodeBlockCopy = CodeBlock.extend({
         const text = code.textContent || "";
         try {
           navigator.clipboard?.writeText(text);
-        } catch (_e) {}
+        } catch { /* clipboard blocked: the label still confirms the tap */ }
         btn.textContent = doneLabel;
         clearTimeout(btn._gkResetTimer);
         btn._gkResetTimer = setTimeout(() => {

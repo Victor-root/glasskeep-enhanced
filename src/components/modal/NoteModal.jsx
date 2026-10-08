@@ -11,7 +11,7 @@ const handleNoteViewCopy = (event) => {
   let cleanText;
   try {
     cleanText = domSelectionToCleanPlainText();
-  } catch (e) {
+  } catch {
     return;
   }
   if (cleanText == null) return;
@@ -24,7 +24,7 @@ const handleNoteViewCopy = (event) => {
     event.clipboardData.setData("text/plain", cleanText);
     event.clipboardData.setData("text/html", container.innerHTML);
     event.preventDefault();
-  } catch (e) {
+  } catch {
     // Any failure → leave the default browser copy behaviour alone.
   }
 };
@@ -110,8 +110,6 @@ export default function NoteModal({
   setMImages,
   mItems,
   setMItems,
-  mInput,
-  setMInput,
   mDrawingData,
   setMDrawingData,
   mTagList,
@@ -126,7 +124,6 @@ export default function NoteModal({
   noteViewRef,
   modalFileRef,
   modalIconFileRef,
-  modalMenuBtnRef,
   modalFmtBtnRef,
   modalTagInputRef,
   modalTagBtnRef,
@@ -146,13 +143,9 @@ export default function NoteModal({
   handleTagKeyDown,
   handleTagBlur,
   handleTagPaste,
-  // modal menu
-  modalMenuOpen,
-  setModalMenuOpen,
   // formatting
   showModalFmt,
   setShowModalFmt,
-  formatModal,
   // color popover
   showModalColorPop,
   setShowModalColorPop,
@@ -178,25 +171,12 @@ export default function NoteModal({
   // collaboration
   collaborationModalOpen,
   setCollaborationModalOpen,
-  collaboratorUsername,
-  setCollaboratorUsername,
   addModalCollaborators,
-  remoteUsers,
-  showUserDropdown,
-  setShowUserDropdown,
-  filteredUsers,
-  setFilteredUsers,
-  loadingUsers,
-  dropdownPosition,
-  collaboratorInputRef,
-  addCollaborator,
   addCollaboratorsBatch,
   availableUsers,
   availableLoading,
   removeCollaborator,
   setCollaboratorAccess,
-  searchUsers,
-  updateDropdownPosition,
   loadCollaboratorsForAddModal,
   // image viewer
   imgViewOpen,
@@ -226,12 +206,10 @@ export default function NoteModal({
   noteIcon,
   onPickIcon,
   logoLibrary,
-  addLogoToLibrary,
   deleteLogoFromLibrary,
   isCollaborativeNote,
   syncState,
   onModalBodyClick,
-  resizeModalTextarea,
   // checklist handlers
   syncChecklistItems,
   checklistInsertPosition,
@@ -331,7 +309,7 @@ export default function NoteModal({
     // Drop the caret at the end so typing continues the existing title.
     if (typeof el.value === "string") {
       const len = el.value.length;
-      try { el.setSelectionRange(len, len); } catch {}
+      try { el.setSelectionRange(len, len); } catch { /* selection unsupported: focus alone is enough */ }
     }
   }, []);
   // Mobile-only: the rich-text toolbar moves out of the sticky header
@@ -368,12 +346,13 @@ export default function NoteModal({
         else el.setAttribute("inputmode", previous[i]);
       });
     };
-  }, [showModalFmt, isDesktopLayout, viewMode, mType]);
+  }, [showModalFmt, isDesktopLayout, viewMode, mType, modalScrollRef]);
 
   /* Set draw mode when modal opens (reset to view, or honour initialDrawMode) */
   React.useEffect(() => {
     if (open) {
       if (initialDrawMode) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- resets draw mode on open/note switch and consumes the one-shot initialDrawMode in the same pass
         setDrawMode(initialDrawMode);
         if (onConsumeInitialDrawMode) onConsumeInitialDrawMode();
       } else {
@@ -514,12 +493,14 @@ export default function NoteModal({
   const aiCloseTimerRef = React.useRef(null);
   const prevAiVisibleRef = React.useRef(false);
   const startingAiClose =
+    // eslint-disable-next-line react-hooks/refs -- previous visibility read during render on purpose so the closing class lands in the same paint (see above)
     prevAiVisibleRef.current && !noteAiPanelVisible && !isModalClosing;
   const isAiClosing = startingAiClose || aiClosing;
   React.useEffect(() => {
     prevAiVisibleRef.current = noteAiPanelVisible;
     if (startingAiClose) {
       if (aiCloseTimerRef.current) clearTimeout(aiCloseTimerRef.current);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- latches the closing state for the 620 ms timer once the render-time close is detected
       setAiClosing(true);
       aiCloseTimerRef.current = setTimeout(() => {
         setAiClosing(false);
@@ -628,11 +609,6 @@ export default function NoteModal({
               windowWidth={windowWidth}
               isLandscapeMobile={isLandscapeMobile}
               isWebView={isWebView}
-              // formatting
-              modalFmtBtnRef={modalFmtBtnRef}
-              showModalFmt={showModalFmt}
-              setShowModalFmt={setShowModalFmt}
-              onFormatModal={formatModal}
               // pin
               onTogglePin={togglePin}
               activeId={activeId}
@@ -647,7 +623,6 @@ export default function NoteModal({
               // drawing
               drawMode={drawMode}
               drawToolbarMount={setDrawToolbarEl}
-              onToggleDrawMode={() => setDrawMode((m) => m === "view" ? "draw" : "view")}
               toolbarSlotRef={setToolbarSlot}
               titleInputRef={modalTitleInputRef}
               // AI toggle in the header (mobile/non-sidebar only)
@@ -708,8 +683,6 @@ export default function NoteModal({
                   body={mBody}
                   setBody={setMBody}
                   title={mTitle}
-                  color={mColor}
-                  dark={dark}
                   readOnly={noteReadOnly}
                 />
               ) : mType === "text" ? (
@@ -915,14 +888,12 @@ export default function NoteModal({
             modalFileRef={modalFileRef}
             addImagesToState={addImagesToState}
             setMImages={setMImages}
-            mImages={mImages}
             modalIconFileRef={modalIconFileRef}
             setNoteIconFromFile={setNoteIconFromFile}
             removeNoteIcon={removeNoteIcon}
             noteIcon={noteIcon}
             onPickIcon={onPickIcon}
             logoLibrary={logoLibrary}
-            addLogoToLibrary={addLogoToLibrary}
             deleteLogoFromLibrary={deleteLogoFromLibrary}
             // collaboration
             onOpenCollaboration={async () => {
@@ -987,7 +958,6 @@ export default function NoteModal({
 
           <ConfirmDeleteDialog
             open={confirmDeleteOpen}
-            dark={dark}
             isTrashed={tagFilter === "TRASHED"}
             collabOwner={
               tagFilter !== "TRASHED"
@@ -1007,26 +977,13 @@ export default function NoteModal({
             activeId={activeId}
             notes={notes}
             currentUser={currentUser}
-            collaboratorUsername={collaboratorUsername}
-            setCollaboratorUsername={setCollaboratorUsername}
             addModalCollaborators={addModalCollaborators}
-            remoteUsers={remoteUsers}
-            showUserDropdown={showUserDropdown}
-            setShowUserDropdown={setShowUserDropdown}
-            filteredUsers={filteredUsers}
-            setFilteredUsers={setFilteredUsers}
-            loadingUsers={loadingUsers}
-            dropdownPosition={dropdownPosition}
-            collaboratorInputRef={collaboratorInputRef}
             onClose={() => setCollaborationModalOpen(false)}
-            onAddCollaborator={addCollaborator}
             onAddCollaborators={addCollaboratorsBatch}
             availableUsers={availableUsers}
             availableLoading={availableLoading}
             onRemoveCollaborator={removeCollaborator}
             onSetCollaboratorAccess={setCollaboratorAccess}
-            searchUsers={searchUsers}
-            updateDropdownPosition={updateDropdownPosition}
             asSheet={!isDesktopLayout}
             sheetBackground={modalBgFor(mColor, dark)}
           />

@@ -6,6 +6,7 @@ import { useRef, useEffect } from "react";
  */
 export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, group, onDragStart, onDrop, onDragEnd }) {
   const propsRef = useRef({ canDrag, multiMode, noteId, group, onDragStart, onDrop, onDragEnd });
+  // eslint-disable-next-line react-hooks/refs -- latest props for the touch listeners, which are attached once and read them at event time
   propsRef.current = { canDrag, multiMode, noteId, group, onDragStart, onDrop, onDragEnd };
 
   useEffect(() => {

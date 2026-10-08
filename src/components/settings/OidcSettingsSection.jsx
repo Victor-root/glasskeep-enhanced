@@ -103,6 +103,7 @@ export default function OidcSettingsSection({ token, showToast, showGenericConfi
   }, [token]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load() fetches the settings and sets state only after the request resolves
     if (visible && token) load();
   }, [visible, token, load]);
 

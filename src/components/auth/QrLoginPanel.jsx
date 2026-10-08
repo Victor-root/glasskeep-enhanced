@@ -68,6 +68,7 @@ export default function QrLoginPanel({ dark, onLoggedIn, onCancel }) {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- request a fresh link token and QR code on mount
     generate();
     return () => {
       tokenRef.current = null;
@@ -114,6 +115,7 @@ export default function QrLoginPanel({ dark, onLoggedIn, onCancel }) {
   }, [linkToken, status, pollIntervalMs, onLoggedIn]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the countdown when there is no expiry, then tick it every second
     if (!expiresAt) { setSecondsLeft(null); return undefined; }
     const update = () => {
       const ms = new Date(expiresAt).getTime() - Date.now();

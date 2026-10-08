@@ -32,14 +32,13 @@ export function useUpdateCheck({ token, isAdmin }) {
             data.currentVersion ||
             (typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null),
         });
-      } catch (_) {
+      } catch {
         /* fail silently */
       }
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, isAdmin]);
 
   return info;

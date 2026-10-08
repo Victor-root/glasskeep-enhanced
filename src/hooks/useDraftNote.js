@@ -23,7 +23,6 @@ import { contentToPlain } from "../utils/richText.js";
  *  - `pendingDraftRef` (the pending-draft marker)
  *  - `materializeDraftIfNeeded` (the create-on-first-edit routine)
  *  - `handleDirectText/Checklist/Draw` (the button entry points)
- *  - `isDraftId` (convenience predicate for the App guards)
  *
  * It does NOT own the intercept calls inside autosave effects nor the guards
  * in togglePin/handleArchiveNote/saveModal/deleteModal/closeModal — those
@@ -147,6 +146,7 @@ export default function useDraftNote(ctx) {
       images: newNote.images,
       color: newNote.color,
     };
+    // eslint-disable-next-line react-hooks/immutability -- ctx carries App's refs; writing .current from this event-time helper is intended
     ctx.initialModalStateRef.current = newBaseline;
     ctx.committedBaselineRef.current = { ...newBaseline };
     if (isDraw) {
@@ -170,18 +170,6 @@ export default function useDraftNote(ctx) {
       ? (ctx.getInitialTags() || [])
       : [];
 
-    // Reset composer state (mobile composer uses these)
-    ctx.setTitle("");
-    ctx.setContent("");
-    ctx.setComposerTagList(initialTags);
-    ctx.setComposerTagInput("");
-    ctx.setComposerTagFocused(false);
-    ctx.setComposerImages([]);
-    ctx.setComposerColor("default");
-    ctx.setComposerDrawingData({ paths: [], dimensions: null });
-    ctx.setComposerType("text");
-    ctx.setComposerCollapsed(true);
-
     // Audio notes seed mBody with an empty {clips, text} JSON so the
     // AudioNoteEditor can read/write directly to mBody without a special
     // initial-state branch. The autosave effect compares baseline.content
@@ -196,6 +184,7 @@ export default function useDraftNote(ctx) {
     ctx.setMType(type);
     ctx.setMTitle("");
     ctx.setMDrawingData({ paths: [], dimensions: null });
+    // eslint-disable-next-line react-hooks/immutability -- ctx carries App's refs; writing .current from this event-time helper is intended
     ctx.prevDrawingRef.current = { paths: [], dimensions: null };
     ctx.setMBody(initialBody);
     ctx.skipNextDrawingAutosave.current = true;
@@ -214,14 +203,10 @@ export default function useDraftNote(ctx) {
     ctx.committedBaselineRef.current = { ...baselineState };
     if (isDraw) ctx.setInitialDrawMode("draw");
     ctx.setViewMode(false);
-    ctx.setModalMenuOpen(false);
     pendingDraftRef.current = { id: tempId, type };
     freshlyCreatedNoteRef.current = tempId;
     ctx.setOpen(true);
   };
-
-  const isDraftId = (id) =>
-    !!pendingDraftRef.current && String(id) === String(pendingDraftRef.current.id);
 
   return {
     pendingDraftRef,
@@ -231,6 +216,5 @@ export default function useDraftNote(ctx) {
     handleDirectChecklist: () => createAndOpenBlankNote("checklist"),
     handleDirectDraw: () => createAndOpenBlankNote("draw"),
     handleDirectAudio: () => createAndOpenBlankNote("audio"),
-    isDraftId,
   };
 }

@@ -19,7 +19,6 @@ import {
   putNotes as idbPutNotes,
   deleteNote as idbDeleteNote,
   enqueue as idbEnqueue,
-  getQueueStats,
   hasPendingChanges,
   clearQueueForUser as idbClearQueueForUser,
   clearNotesForSession as idbClearNotesForSession,
@@ -29,7 +28,7 @@ import { api, getAuth, setAuth, AUTH_KEY, getClientId } from "./utils/api.js";
 import { netLog } from "./utils/netDebug.js";
 import { localizeServerError } from "./utils/serverErrors.js";
 import { mdForDownload } from "./utils/markdown.jsx";
-import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, fileToCompressedDataURL, setThemeColor, currentStatusBarColor } from "./utils/helpers.js";
+import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, fileToCompressedDataURL, setThemeColor, currentStatusBarColor } from "./utils/helpers.js";
 import { setShellTheme, isValidShellTheme } from "./theme/shellTheme.js";
 import { applyTaskStrikeClass, getStoredTaskStrike, TASK_STRIKE_EVENT } from "./theme/taskListStrike.js";
 import { textToChecklistItems, checklistItemsToText } from "./utils/noteConversion.js";
@@ -45,7 +44,6 @@ import { ALL_IMAGES, REMINDERS } from "./utils/constants.js";
 import { hasAndroidReminders, syncAndroidReminders, setAndroidReminderAuth, notifyAndroidNow } from "./utils/androidReminders.js";
 import { fetchLogoLibrary, createLogo, deleteLogo as apiDeleteLogo } from "./utils/logoLibrary.js";
 import { ColorDot } from "./components/common/ColorDot.jsx";
-import { handleSmartEnter } from "./components/common/FormatToolbar.jsx";
 import DrawingPreview from "./components/common/DrawingPreview.jsx";
 import UserAvatar from "./components/common/UserAvatar.jsx";
 import TooltipPortal from "./components/common/TooltipPortal.jsx";
@@ -88,7 +86,6 @@ import { useBranding } from "./branding/BrandingContext.jsx";
 import { useShareNotifications } from "./hooks/useShareNotifications.js";
 import useImportExport from "./hooks/useImportExport.js";
 import useCollaboration from "./hooks/useCollaboration.js";
-import useFormatting from "./hooks/useFormatting.js";
 import useInstanceLockStatus from "./hooks/useInstanceLockStatus.js";
 import useKeyboardInset from "./hooks/useKeyboardInset.js";
 import { useStableCallback } from "./hooks/useStableCallback.js";
@@ -147,14 +144,19 @@ export default function App() {
   const syncEngineRef = useRef(null);
   const reconnectSseRef = useRef(null); // called when server recovers to revive SSE
   const tokenRef = useRef(token);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
   tokenRef.current = token;
   const currentUserIdRef = useRef(currentUser?.id);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
   currentUserIdRef.current = currentUser?.id;
   const currentUserRef = useRef(currentUser);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
   currentUserRef.current = currentUser;
   const isAdminRef = useRef(!!currentUser?.is_admin);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
   isAdminRef.current = !!currentUser?.is_admin;
   const sessionIdRef = useRef(sessionId);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
   sessionIdRef.current = sessionId;
 
   // Refresh the cached profile (avatar / name / language) from the server
@@ -227,7 +229,7 @@ export default function App() {
       const stored = localStorage.getItem("sidebarAlwaysVisible");
       // Use localStorage value if available, otherwise null (wait for server)
       return stored !== null ? stored === "true" : null;
-    } catch (e) {
+    } catch {
       return null;
     }
   });
@@ -236,7 +238,7 @@ export default function App() {
       const stored = localStorage.getItem("sidebarBreakpoint");
       const n = stored !== null ? Number(stored) : NaN;
       return Number.isFinite(n) && n >= 600 && n <= 3000 ? Math.round(n) : 1280;
-    } catch (e) {
+    } catch {
       return 1280;
     }
   });
@@ -250,7 +252,7 @@ export default function App() {
     try {
       const stored = localStorage.getItem("readModeEnabled");
       return stored !== null ? stored === "true" : true;
-    } catch (e) {
+    } catch {
       return true;
     }
   });
@@ -272,7 +274,7 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try {
       return parseInt(localStorage.getItem("sidebarWidth")) || 288;
-    } catch (e) {
+    } catch {
       return 288;
     }
   });
@@ -284,17 +286,10 @@ export default function App() {
       if (stored !== null) return stored === "true";
       // Default: enabled on desktop (pointer:fine), disabled on mobile/tablet
       return window.matchMedia?.("(pointer: fine)").matches ?? true;
-    } catch (e) {
+    } catch {
       return true;
     }
   });
-  const toggleFloatingCards = useCallback(() => {
-    setFloatingCardsEnabled((v) => {
-      const next = !v;
-      try { localStorage.setItem("floatingCardsEnabled", String(next)); } catch (e) {}
-      return next;
-    });
-  }, []);
 
   // AI assistant — visibility flag mirrored from the server. The
   // authoritative state lives in user_ai_settings (loaded by
@@ -319,7 +314,7 @@ export default function App() {
     try {
       const stored = localStorage.getItem("checklistInsertPosition");
       return stored === "bottom" ? "bottom" : "top";
-    } catch (e) {
+    } catch {
       return "top";
     }
   });
@@ -329,7 +324,7 @@ export default function App() {
     try {
       const stored = localStorage.getItem("checklistRemoveSectionBehavior");
       return stored === "keep" ? "keep" : "cascade";
-    } catch (e) {
+    } catch {
       return "cascade";
     }
   });
@@ -338,7 +333,7 @@ export default function App() {
     try {
       const stored = localStorage.getItem("edgeToEdgeLandscape");
       return stored === null ? true : stored === "true";
-    } catch (e) {
+    } catch {
       return true;
     }
   });
@@ -347,7 +342,7 @@ export default function App() {
   const [edgeToEdgePortrait, setEdgeToEdgePortrait] = useState(() => {
     try {
       return localStorage.getItem("edgeToEdgePortrait") === "true";
-    } catch (e) {
+    } catch {
       return false;
     }
   });
@@ -355,7 +350,7 @@ export default function App() {
     try {
       const stored = localStorage.getItem("editorToolbarMode");
       return stored === "advanced" ? "advanced" : "simple";
-    } catch (e) {
+    } catch {
       return "simple";
     }
   });
@@ -366,7 +361,7 @@ export default function App() {
     try {
       const stored = localStorage.getItem("pasteMode");
       return stored === "plain" ? "plain" : "rich";
-    } catch (e) {
+    } catch {
       return "rich";
     }
   });
@@ -387,7 +382,7 @@ export default function App() {
     try {
       const stored = localStorage.getItem("notificationsPosition");
       if (validPositions.includes(stored)) return stored;
-    } catch (e) {}
+    } catch { /* storage unavailable or invalid value: use the default */ }
     return "top-center";
   });
   // Mobile-only position preference (top / bottom). Stored under a
@@ -399,7 +394,7 @@ export default function App() {
     try {
       const stored = localStorage.getItem("notificationsPositionMobile");
       if (stored === "top" || stored === "bottom") return stored;
-    } catch (e) {}
+    } catch { /* storage unavailable or invalid value: use the default */ }
     return "bottom";
   });
   // Notification sound toggle. Defaults to off — sound is opt-in so
@@ -410,7 +405,7 @@ export default function App() {
       const stored = localStorage.getItem("notificationsSound");
       if (stored === "0" || stored === "false") return false;
       if (stored === "1" || stored === "true") return true;
-    } catch (e) {}
+    } catch { /* storage unavailable or invalid value: use the default */ }
     return false;
   });
   // Per-category sound opt-out. Six buckets so the user can opt out
@@ -446,7 +441,7 @@ export default function App() {
           return { ...DEF, ...parsed };
         }
       }
-    } catch (e) {}
+    } catch { /* storage unavailable or invalid value: use the default */ }
     return DEF;
   });
   // Per-category display filter. When a category is set to false the
@@ -480,7 +475,7 @@ export default function App() {
           return { ...DEF, ...parsed };
         }
       }
-    } catch (e) {}
+    } catch { /* storage unavailable or invalid value: use the default */ }
     return DEF;
   });
   // Default duration (ms) for auto-dismissing notifications, or null
@@ -495,14 +490,14 @@ export default function App() {
       if (stored === "null" || stored === "persistent") return null;
       const n = Number(stored);
       if (allowed.includes(n)) return n;
-    } catch (e) {}
+    } catch { /* storage unavailable or invalid value: use the default */ }
     return 10000;
   });
   const [typographyPresets, setTypographyPresets] = useState(() => {
     try {
       const stored = localStorage.getItem(TYPOGRAPHY_STORAGE_KEY);
       if (stored) return normalizeTypographyPresets(JSON.parse(stored));
-    } catch (e) {}
+    } catch { /* storage unavailable or invalid value: use the default */ }
     return { ...DEFAULT_TYPOGRAPHY_PRESETS };
   });
   // Push the current presets onto :root as CSS variables whenever they change
@@ -527,39 +522,8 @@ export default function App() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiLoadingProgress, setAiLoadingProgress] = useState(null);
 
-  // Composer
-  const [composerType, setComposerType] = useState("text");
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [tags, setTags] = useState("");
-  const [composerTagList, setComposerTagList] = useState([]);
-  const [composerTagInput, setComposerTagInput] = useState("");
-  const [composerTagFocused, setComposerTagFocused] = useState(false);
-  const composerTagInputRef = useRef(null);
-  const [composerColor, setComposerColor] = useState("default");
-  const [composerImages, setComposerImages] = useState([]);
-  const contentRef = useRef(null);
-  const composerFileRef = useRef(null);
-
-  // Formatting (composer)
-  const [showComposerFmt, setShowComposerFmt] = useState(false);
-  const composerFmtBtnRef = useRef(null);
-
-  // Checklist composer
-  const [clItems, setClItems] = useState([]);
-  const [clInput, setClInput] = useState("");
-
-  // Drawing composer
-  const [composerDrawingData, setComposerDrawingData] = useState({
-    paths: [],
-    dimensions: null,
-  });
-
   // ─── Ref for closeModal (passed to useModalState for Escape handler) ───
   const closeModalRef = useRef(null);
-
-  // ─── Shared formatting helper (used by both composer and modal) ───
-  const runFormat = useFormatting();
 
   // ─── Modal state (hook) ───
   const {
@@ -576,12 +540,10 @@ export default function App() {
     viewMode, setViewMode,
     mImages, setMImages,
     savingModal, setSavingModal,
-    modalMenuOpen, setModalMenuOpen,
     confirmDeleteOpen, setConfirmDeleteOpen,
     isModalClosing, setIsModalClosing,
     modalClosingTimerRef,
     mItems, setMItems,
-    mInput, setMInput,
     mDrawingData, setMDrawingData,
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
@@ -594,9 +556,8 @@ export default function App() {
     // Refs
     modalTagInputRef, modalTagBtnRef, suppressTagBlurRef,
     mBodyRef, modalFileRef, modalIconFileRef, modalFmtBtnRef, modalColorBtnRef,
-    checklistDragId, modalMenuBtnRef, scrimClickStartRef,
+    scrimClickStartRef,
     noteViewRef, modalScrollRef, savedModalScrollRatioRef,
-    modalHistoryRef,
     // Derived
     activeNoteObj, editedStamp, modalHasChanges,
     // Tag helpers
@@ -604,8 +565,8 @@ export default function App() {
     // Image viewer
     openImageViewer, closeImageViewer, nextImage, prevImage, resetMobileNav,
     // Handlers
-    onModalBodyClick, isCollaborativeNote, formatModal, resizeModalTextarea,
-  } = useModalState({ notes, currentUser, closeModalRef, runFormat });
+    onModalBodyClick, isCollaborativeNote,
+  } = useModalState({ notes, currentUser, closeModalRef });
   const noteSaveState = useNoteSaveState(open ? activeId : null, modalHasChanges, syncStatus);
 
   // Reminder picker open state — lifted here (not in ModalFooter) so it joins
@@ -614,6 +575,7 @@ export default function App() {
   // overlay.
   const [reminderPopOpen, setReminderPopOpen] = useState(false);
   // Never leave the reminder picker "open" behind a closed note modal.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- close the reminder picker whenever the note modal closes, whatever closed it
   useEffect(() => { if (!open) setReminderPopOpen(false); }, [open]);
 
   // Generic confirmation dialog
@@ -648,6 +610,7 @@ export default function App() {
         url.searchParams.delete("qr");
         window.history.replaceState(null, "", url.pathname + url.search + url.hash);
       } catch { /* non-fatal */ }
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot consume of the ?qr=open launch parameter on mount
       if (token) setQrScannerOpen(true);
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -661,6 +624,7 @@ export default function App() {
   const [changelogOpen, setChangelogOpen] = useState(false);
   const closeChangelog = useCallback(() => setChangelogOpen(false), []);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads and clears a one-shot flag, kept out of render because of that side effect
     if (consumeChangelogShowFlag()) setChangelogOpen(true);
   }, []);
   useEffect(() => onOpenChangelogRequest(() => setChangelogOpen(true)), []);
@@ -813,7 +777,6 @@ export default function App() {
     });
   // filterCategoryFor is a stable function defined in this render scope;
   // only notificationsFilterTypes actually drives re-installation.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notificationsFilterTypes, setNotifyFilter]);
 
   // Discrete ding whenever a NEW notification appears. We compare
@@ -955,23 +918,6 @@ export default function App() {
   // Initial draw mode for the modal (null = default "view", "draw" = open in edit mode)
   const [initialDrawMode, setInitialDrawMode] = useState(null);
 
-  // Clear data when switching composer types
-  useEffect(() => {
-    if (composerType === "text") {
-      setClItems([]);
-      setClInput("");
-      setComposerDrawingData({ paths: [], dimensions: null });
-    } else if (composerType === "checklist") {
-      setComposerDrawingData({ paths: [], dimensions: null });
-    } else if (composerType === "draw") {
-      setClItems([]);
-      setClInput("");
-    }
-  }, [composerType]);
-
-  // Collaboration (ref must be declared before hook)
-  const collaboratorInputRef = useRef(null);
-
   // Drag
   const dragId = useRef(null);
   const dragGroup = useRef(null);
@@ -983,15 +929,6 @@ export default function App() {
   const importFileRef = useRef(null);
   const gkeepFileRef = useRef(null);
   const mdFileRef = useRef(null);
-
-  // Composer collapse + refs
-  const [composerCollapsed, setComposerCollapsed] = useState(true);
-  const titleRef = useRef(null);
-  const composerRef = useRef(null);
-
-  // Color dropdown (composer)
-  const colorBtnRef = useRef(null);
-  const [showColorPop, setShowColorPop] = useState(false);
 
   // Loading state for notes
   const [notesLoading, setNotesLoading] = useState(!!token);
@@ -1051,7 +988,7 @@ export default function App() {
   const enqueueWithLease = async (noteId, syncAction, leaseId) => {
     try {
       await enqueueAndSync(syncAction);
-    } catch (e) {
+    } catch {
       return false; // lease stays active — SSE protection maintained
     }
     releaseLocalLeaseWithPrune(noteId, leaseId);
@@ -1080,7 +1017,6 @@ export default function App() {
   // -------- Multi-select state --------
   const [multiMode, setMultiMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]); // array of string ids
-  const isSelected = (id) => selectedIds.includes(String(id));
   // On desktop the notes list scrolls inside .notes-scroll-area (so its
   // scrollbar starts below the sticky header) instead of the document;
   // on mobile that same element keeps overflow:visible and window scrolls
@@ -1150,14 +1086,6 @@ export default function App() {
       prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid],
     );
   };
-  const onSelectAllPinned = () => {
-    const ids = notes.filter((n) => n.pinned).map((n) => String(n.id));
-    setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])));
-  };
-  const onSelectAllOthers = () => {
-    const ids = notes.filter((n) => !n.pinned).map((n) => String(n.id));
-    setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])));
-  };
   const onSelectAll = (filteredNotes) => {
     const filteredIds = filteredNotes.map((n) => String(n.id));
     const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.includes(id));
@@ -1168,12 +1096,12 @@ export default function App() {
   const [listView, setListView] = useState(() => {
     try {
       return localStorage.getItem("viewMode") === "list";
-    } catch (e) {
+    } catch {
       return false;
     }
   });
   useEffect(() => {
-    try { localStorage.setItem("viewMode", listView ? "list" : "grid"); } catch (e) {}
+    try { localStorage.setItem("viewMode", listView ? "list" : "grid"); } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("viewMode")) {
       remoteSyncedKeysRef.current.delete("viewMode");
@@ -1206,13 +1134,15 @@ export default function App() {
   const remoteSyncedKeysRef = useRef(new Set());
   useEffect(() => {
     if (!token) return;
+    // eslint-disable-next-line react-hooks/immutability -- the ref is mutated inside the effect, not during render
     sidebarSettingsLoadedRef.current = false;
     // Immediately hide sidebar while loading server preference
     try {
       if (localStorage.getItem("sidebarAlwaysVisible") === null) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hide the sidebar until the server preference has loaded
         setAlwaysShowSidebarOnWide(null);
       }
-    } catch (e) {}
+    } catch { /* storage unavailable: keep the current visibility */ }
     (async () => {
       try {
         const settings = await api("/user/settings", { token });
@@ -1320,7 +1250,7 @@ export default function App() {
               "notificationsSoundTypes",
               JSON.stringify(next),
             );
-          } catch (e) {}
+          } catch { /* storage unavailable: preference not persisted */ }
         }
         if (
           settings?.notificationsFilterTypes &&
@@ -1344,7 +1274,7 @@ export default function App() {
               "notificationsFilterTypes",
               JSON.stringify(next),
             );
-          } catch (e) {}
+          } catch { /* storage unavailable: preference not persisted */ }
         }
         if ("notificationsDuration" in (settings || {})) {
           const raw = settings.notificationsDuration;
@@ -1360,39 +1290,39 @@ export default function App() {
         if (settings?.typographyPresets && typeof settings.typographyPresets === "object") {
           const normalized = normalizeTypographyPresets(settings.typographyPresets);
           setTypographyPresets(normalized);
-          try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(normalized)); } catch (e) {}
+          try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(normalized)); } catch { /* storage unavailable: preference not persisted */ }
         }
         if (typeof settings?.qrQuickEnabled === "boolean") {
           setQrQuickEnabledState(settings.qrQuickEnabled);
-          try { localStorage.setItem("glass-keep-qr-quick", settings.qrQuickEnabled ? "1" : "0"); } catch (e) {}
+          try { localStorage.setItem("glass-keep-qr-quick", settings.qrQuickEnabled ? "1" : "0"); } catch { /* storage unavailable: preference not persisted */ }
         }
         if (Array.isArray(settings?.reminderTimeChips) && settings.reminderTimeChips.length > 0) {
           setReminderTimeChips(settings.reminderTimeChips);
         }
         if (settings?.viewMode === "list" || settings?.viewMode === "grid") {
           setListView(settings.viewMode === "list");
-          try { localStorage.setItem("viewMode", settings.viewMode); } catch (_) {}
+          try { localStorage.setItem("viewMode", settings.viewMode); } catch { /* storage unavailable: preference not persisted */ }
         }
         if (typeof settings?.sidebarWidth === "number" && Number.isFinite(settings.sidebarWidth)) {
           const w = Math.max(200, Math.min(600, Math.round(settings.sidebarWidth)));
           setSidebarWidth(w);
-          try { localStorage.setItem("sidebarWidth", String(w)); } catch (_) {}
+          try { localStorage.setItem("sidebarWidth", String(w)); } catch { /* storage unavailable: preference not persisted */ }
         }
         if (typeof settings?.taskStrikeEnabled === "boolean") {
           applyTaskStrikeClass(settings.taskStrikeEnabled);
-          try { localStorage.setItem("gk:taskStrikeChecked", settings.taskStrikeEnabled ? "1" : "0"); } catch (_) {}
+          try { localStorage.setItem("gk:taskStrikeChecked", settings.taskStrikeEnabled ? "1" : "0"); } catch { /* storage unavailable: preference not persisted */ }
         }
         if (typeof settings?.language === "string") {
           if (syncLanguageFromServer(settings.language)) window.location.reload();
         }
-      } catch (e) {
+      } catch {
         // Network error — default to true
         setAlwaysShowSidebarOnWide((prev) => prev === null ? true : prev);
       } finally {
         sidebarSettingsLoadedRef.current = true;
       }
     })();
-  }, [token]);
+  }, [token, setSidebarBreakpoint]);
 
   // Save sidebar settings to localStorage and server
   useEffect(() => {
@@ -1401,7 +1331,7 @@ export default function App() {
         "sidebarAlwaysVisible",
         String(alwaysShowSidebarOnWide),
       );
-    } catch (e) {}
+    } catch { /* storage unavailable: preference not persisted */ }
     // Only sync to server after initial load from server is done
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("alwaysShowSidebarOnWide")) {
@@ -1415,12 +1345,13 @@ export default function App() {
         body: { alwaysShowSidebarOnWide },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [alwaysShowSidebarOnWide]);
 
   useEffect(() => {
     try {
       localStorage.setItem("sidebarBreakpoint", String(sidebarBreakpoint));
-    } catch (e) {}
+    } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("sidebarBreakpoint")) {
       remoteSyncedKeysRef.current.delete("sidebarBreakpoint");
@@ -1438,7 +1369,7 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem("readModeEnabled", String(readModeEnabled));
-    } catch (e) {}
+    } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("readModeEnabled")) {
       remoteSyncedKeysRef.current.delete("readModeEnabled");
@@ -1456,7 +1387,7 @@ export default function App() {
 
   // Save floating cards preference to localStorage and server
   useEffect(() => {
-    try { localStorage.setItem("floatingCardsEnabled", String(floatingCardsEnabled)); } catch (e) {}
+    try { localStorage.setItem("floatingCardsEnabled", String(floatingCardsEnabled)); } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("floatingCardsEnabled")) {
       remoteSyncedKeysRef.current.delete("floatingCardsEnabled");
@@ -1469,11 +1400,12 @@ export default function App() {
         body: { floatingCardsEnabled },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [floatingCardsEnabled]);
 
   const sidebarWidthPatchTimerRef = useRef(null);
   useEffect(() => {
-    try { localStorage.setItem("sidebarWidth", String(sidebarWidth)); } catch (e) {}
+    try { localStorage.setItem("sidebarWidth", String(sidebarWidth)); } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("sidebarWidth")) {
       remoteSyncedKeysRef.current.delete("sidebarWidth");
@@ -1500,6 +1432,7 @@ export default function App() {
 
   useEffect(() => {
     if (!aiAssistantEnabled) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the AI answer whenever the assistant gets disabled, from any source
       setAiResponse(null);
       setAiCitedNoteIds([]);
     }
@@ -1531,7 +1464,7 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem("checklistInsertPosition", checklistInsertPosition);
-    } catch (e) {}
+    } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("checklistInsertPosition")) {
       remoteSyncedKeysRef.current.delete("checklistInsertPosition");
@@ -1544,12 +1477,13 @@ export default function App() {
         body: { checklistInsertPosition },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [checklistInsertPosition]);
 
   useEffect(() => {
     try {
       localStorage.setItem("checklistRemoveSectionBehavior", checklistRemoveSectionBehavior);
-    } catch (e) {}
+    } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("checklistRemoveSectionBehavior")) {
       remoteSyncedKeysRef.current.delete("checklistRemoveSectionBehavior");
@@ -1562,10 +1496,11 @@ export default function App() {
         body: { checklistRemoveSectionBehavior },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [checklistRemoveSectionBehavior]);
 
   useEffect(() => {
-    try { localStorage.setItem("editorToolbarMode", editorToolbarMode); } catch (e) {}
+    try { localStorage.setItem("editorToolbarMode", editorToolbarMode); } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("editorToolbarMode")) {
       remoteSyncedKeysRef.current.delete("editorToolbarMode");
@@ -1578,10 +1513,11 @@ export default function App() {
         body: { editorToolbarMode },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [editorToolbarMode]);
 
   useEffect(() => {
-    try { localStorage.setItem("pasteMode", pasteMode); } catch (e) {}
+    try { localStorage.setItem("pasteMode", pasteMode); } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("pasteMode")) {
       remoteSyncedKeysRef.current.delete("pasteMode");
@@ -1594,10 +1530,11 @@ export default function App() {
         body: { pasteMode },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [pasteMode]);
 
   useEffect(() => {
-    try { localStorage.setItem("notificationsPosition", notificationsPosition); } catch (e) {}
+    try { localStorage.setItem("notificationsPosition", notificationsPosition); } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("notificationsPosition")) {
       remoteSyncedKeysRef.current.delete("notificationsPosition");
@@ -1610,6 +1547,7 @@ export default function App() {
         body: { notificationsPosition },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [notificationsPosition]);
 
   // Same outbound pattern as notificationsPosition but for the
@@ -1618,7 +1556,7 @@ export default function App() {
   // user_settings_updated SSE without ever touching the desktop
   // notificationsPosition value.
   useEffect(() => {
-    try { localStorage.setItem("notificationsPositionMobile", notificationsPositionMobile); } catch (e) {}
+    try { localStorage.setItem("notificationsPositionMobile", notificationsPositionMobile); } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("notificationsPositionMobile")) {
       remoteSyncedKeysRef.current.delete("notificationsPositionMobile");
@@ -1631,6 +1569,7 @@ export default function App() {
         body: { notificationsPositionMobile },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [notificationsPositionMobile]);
 
   useEffect(() => {
@@ -1639,7 +1578,7 @@ export default function App() {
         "notificationsSound",
         notificationsSound ? "1" : "0",
       );
-    } catch (e) {}
+    } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("notificationsSound")) {
       remoteSyncedKeysRef.current.delete("notificationsSound");
@@ -1652,6 +1591,7 @@ export default function App() {
         body: { notificationsSound },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [notificationsSound]);
 
   useEffect(() => {
@@ -1660,7 +1600,7 @@ export default function App() {
         "notificationsSoundTypes",
         JSON.stringify(notificationsSoundTypes),
       );
-    } catch (e) {}
+    } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("notificationsSoundTypes")) {
       remoteSyncedKeysRef.current.delete("notificationsSoundTypes");
@@ -1673,6 +1613,7 @@ export default function App() {
         body: { notificationsSoundTypes },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [notificationsSoundTypes]);
 
   useEffect(() => {
@@ -1681,7 +1622,7 @@ export default function App() {
         "notificationsFilterTypes",
         JSON.stringify(notificationsFilterTypes),
       );
-    } catch (e) {}
+    } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("notificationsFilterTypes")) {
       remoteSyncedKeysRef.current.delete("notificationsFilterTypes");
@@ -1694,6 +1635,7 @@ export default function App() {
         body: { notificationsFilterTypes },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [notificationsFilterTypes]);
 
   useEffect(() => {
@@ -1702,7 +1644,7 @@ export default function App() {
         "notificationsDuration",
         notificationsDuration == null ? "null" : String(notificationsDuration),
       );
-    } catch (e) {}
+    } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("notificationsDuration")) {
       remoteSyncedKeysRef.current.delete("notificationsDuration");
@@ -1715,11 +1657,12 @@ export default function App() {
         body: { notificationsDuration },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [notificationsDuration]);
 
   // Edge-to-edge landscape: save + dynamically toggle body padding-left
   useEffect(() => {
-    try { localStorage.setItem("edgeToEdgeLandscape", String(edgeToEdgeLandscape)); } catch (e) {}
+    try { localStorage.setItem("edgeToEdgeLandscape", String(edgeToEdgeLandscape)); } catch { /* storage unavailable: preference not persisted */ }
     document.body.style.paddingLeft = edgeToEdgeLandscape ? "" : "var(--safe-left)";
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("edgeToEdgeLandscape")) {
@@ -1733,13 +1676,14 @@ export default function App() {
         body: { edgeToEdgeLandscape },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [edgeToEdgeLandscape]);
 
   // Edge-to-edge portrait: save + hand it to the Android app, which owns the
   // system bars and marks <html> with data-gk-edge-to-edge while it applies.
   useEffect(() => {
-    try { localStorage.setItem("edgeToEdgePortrait", String(edgeToEdgePortrait)); } catch (e) {}
-    try { window.AndroidTheme?.setEdgeToEdgePortrait?.(edgeToEdgePortrait); } catch (_) {}
+    try { localStorage.setItem("edgeToEdgePortrait", String(edgeToEdgePortrait)); } catch { /* storage unavailable: preference not persisted */ }
+    try { window.AndroidTheme?.setEdgeToEdgePortrait?.(edgeToEdgePortrait); } catch { /* Android bridge best-effort */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("edgeToEdgePortrait")) {
       remoteSyncedKeysRef.current.delete("edgeToEdgePortrait");
@@ -1752,11 +1696,12 @@ export default function App() {
         body: { edgeToEdgePortrait },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [edgeToEdgePortrait]);
 
   // Typography presets: local-first + server sync, mirroring the other prefs.
   useEffect(() => {
-    try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(typographyPresets)); } catch (e) {}
+    try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(typographyPresets)); } catch { /* storage unavailable: preference not persisted */ }
     if (!sidebarSettingsLoadedRef.current) return;
     if (remoteSyncedKeysRef.current.has("typographyPresets")) {
       remoteSyncedKeysRef.current.delete("typographyPresets");
@@ -1769,6 +1714,7 @@ export default function App() {
         body: { typographyPresets },
       }).catch(() => {});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH only when the preference changes, not when the token changes
   }, [typographyPresets]);
 
   // Window resize listener for responsive sidebar behavior
@@ -1780,18 +1726,6 @@ export default function App() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  // Collapse composer when clicking outside
-  useEffect(() => {
-    if (composerCollapsed) return;
-    const handleClickOutside = (e) => {
-      if (composerRef.current && !composerRef.current.contains(e.target)) {
-        setComposerCollapsed(true);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [composerCollapsed]);
 
   const onBulkDelete = async () => {
     if (!selectedIds.length) return;
@@ -1908,7 +1842,7 @@ export default function App() {
     try {
       activeNotes = (await idbGetAllNotes(currentUser?.id, sessionId, "active"))
         .sort((a, b) => (+b.position || 0) - (+a.position || 0));
-    } catch (e) {}
+    } catch { /* IDB best-effort: positions computed without local notes */ }
     for (const id of selectedIds) {
       const nid = String(id);
       const leaseId = acquireLocalLease(nid);
@@ -1985,33 +1919,6 @@ export default function App() {
     );
   };
 
-  const onUpdateChecklistItem = async (noteId, itemId, checked) => {
-    const note = notes.find((n) => String(n.id) === String(noteId));
-    if (!note) return;
-
-    const nid = String(noteId);
-    const leaseId = acquireLocalLease(nid);
-    const nowIso = new Date().toISOString();
-
-    const updatedItems = (note.items || []).map((item) =>
-      item.id === itemId ? { ...item, done: checked } : item,
-    );
-    const updatedNote = { ...note, items: updatedItems };
-
-    // Local-first: update UI + IndexedDB, then enqueue
-    setNotes((prev) =>
-      prev.map((n) => (String(n.id) === nid ? updatedNote : n)),
-    );
-    try {
-      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-      if (existing) await idbPutNote({ ...existing, items: updatedItems, client_updated_at: nowIso }, currentUser?.id, sessionId);
-    } catch (e) { console.error(e); }
-
-    invalidateNotesCache();
-    invalidateArchivedNotesCache();
-    await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { items: updatedItems, type: "checklist", content: "", client_updated_at: nowIso } }, leaseId);
-  };
-
   const onBulkColor = async (colorName) => {
     if (!selectedIds.length) return;
     const nowIso = new Date().toISOString();
@@ -2076,23 +1983,6 @@ export default function App() {
     }
   };
 
-  // SSE connection status
-  const [sseConnected, setSseConnected] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-
-  // navigator.onLine is unreliable in the Android WebView: it can be stuck at
-  // `false` on a cold start (or after a spurious "offline" event) with no
-  // matching "online" event to correct it. That lit the header's offline badge
-  // even though the sync engine had actually reached the server (SSE connected,
-  // health checks 200). The engine's serverReachable comes from real HTTP
-  // health checks, so trust it: once the server is confirmed reachable we ARE
-  // online, regardless of what navigator.onLine claims. (We never force the
-  // flag the other way here — a real disconnect still flows through the
-  // window "offline" event and the engine's own serverReachable === false.)
-  useEffect(() => {
-    if (syncStatus.serverReachable === true) setIsOnline(true);
-  }, [syncStatus.serverReachable]);
-
   // Instance branding (custom app name / logo / login background +
   // blur). The provider owns the fetch; we only need refreshBranding to
   // re-pull after an admin saves so the live header / next login render
@@ -2102,7 +1992,7 @@ export default function App() {
   // Admin panel state (hook)
   const {
     adminPanelOpen, setAdminPanelOpen,
-    adminSettings, setAdminSettings,
+    adminSettings,
     allUsers,
     pendingUsers,
     newUserForm, setNewUserForm,
@@ -2142,6 +2032,7 @@ export default function App() {
   // back to unlocked (e.g. another tab unlocked, or this tab did).
   useEffect(() => {
     if (instanceLockStatus && !instanceLockStatus.locked) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- react to lock changes reported by the polling hook
       setLockBannerDismissed(false);
       setLockOverlayOpen(false);
     }
@@ -2149,6 +2040,7 @@ export default function App() {
     if (instanceLockStatus && instanceLockStatus.locked) {
       setLockBannerDismissed(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run only when the locked flag flips, not on every poll result
   }, [instanceLockStatus?.locked]);
 
   // Settings panel state
@@ -2158,9 +2050,11 @@ export default function App() {
   // what the user had expanded last time. NOT persisted: the panels
   // are deliberately ephemeral in their layout.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- collapse the sections whenever the panel closes, whatever closed it
     if (!settingsPanelOpen) setSettingsOpenSections({});
   }, [settingsPanelOpen]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- collapse the sections whenever the panel closes, whatever closed it
     if (!adminPanelOpen) setAdminOpenSections({});
   }, [adminPanelOpen]);
   // Lifted from SettingsPanel so the centralised overlay back-button
@@ -2244,6 +2138,7 @@ export default function App() {
     const savedDark = manualPref !== null
       ? manualPref === "true"
       : (androidDark != null ? androidDark : (mq?.matches ?? false));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- apply the stored or system theme on mount, together with the DOM class
     setDark(savedDark);
     document.documentElement.classList.toggle("dark", savedDark);
     setThemeColor(currentStatusBarColor());
@@ -2320,6 +2215,7 @@ export default function App() {
         syncEngineRef.current.destroy();
         syncEngineRef.current = null;
       }
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the sync status when the engine is torn down on sign-out
       setSyncStatus(SYNC_STATUS_RESET);
       return;
     }
@@ -2366,6 +2262,7 @@ export default function App() {
                     return updated;
                   }
                   // Note should appear in this view but isn't present — insert it
+                  // eslint-disable-next-line react-hooks/immutability -- called from a sync engine callback, after render
                   return sortNotesByRecency([...prev, canonical]);
                 }
                 // Note doesn't belong in this view — remove if present
@@ -2383,9 +2280,10 @@ export default function App() {
             const nid = String(item.noteId);
             console.warn(`[Sync] ${item.type} dropped (404) for note ${nid}, purging locally`);
             setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-            try { await idbDeleteNote(nid, uid, sid); } catch {}
+            try { await idbDeleteNote(nid, uid, sid); } catch { /* IDB best-effort */ }
             localLeaseRef.current.delete(nid);
             if (String(activeIdRef.current) === nid) {
+              // eslint-disable-next-line react-hooks/immutability -- called from a sync engine callback, after render
               forceCloseModalForRemoteDelete(nid);
             }
             return;
@@ -2469,7 +2367,7 @@ export default function App() {
                 return sortNotesByRecency([...prev, canonical]);
               });
             } else {
-              try { await idbDeleteNote(nid, uid, sid); } catch {}
+              try { await idbDeleteNote(nid, uid, sid); } catch { /* IDB best-effort */ }
             }
           } else if (item.type === "reorder" && item.payload?._reorderToken) {
             const token = item.payload._reorderToken;
@@ -2485,8 +2383,11 @@ export default function App() {
             if (result?.stale || result?.dropped) {
               console.warn("[Sync] Reorder not applied (stale/dropped), reloading notes for canonical order");
               const cf = tagFilterRef.current;
+              // eslint-disable-next-line react-hooks/immutability -- called from a sync engine callback, after render
               if (cf === "ARCHIVED") loadArchivedNotes().catch(() => {});
+              // eslint-disable-next-line react-hooks/immutability -- called from a sync engine callback, after render
               else if (cf === "TRASHED") loadTrashedNotes().catch(() => {});
+              // eslint-disable-next-line react-hooks/immutability -- called from a sync engine callback, after render
               else loadNotes().catch(() => {});
             }
           }
@@ -2519,6 +2420,7 @@ export default function App() {
       engine.destroy();
       syncEngineRef.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the sync engine must be rebuilt only when the user or the session changes
   }, [token, currentUser?.id, sessionId]);
 
   const triggerSync = useCallback(() => {
@@ -2579,7 +2481,7 @@ export default function App() {
         }
       }
       keys.forEach((k) => localStorage.removeItem(k));
-    } catch (e) {}
+    } catch { /* storage unavailable: nothing to clear */ }
   }, []);
 
   // Cache invalidation functions (no-op now, kept for call-site compatibility)
@@ -2588,14 +2490,6 @@ export default function App() {
   const invalidateArchivedNotesCache = () => {};
   const invalidateTrashedNotesCache = () => {};
 
-  const uniqueById = (arr) => {
-    const m = new Map();
-    for (const n of Array.isArray(arr) ? arr : []) {
-      if (!n) continue;
-      m.set(String(n.id), n);
-    }
-    return Array.from(m.values());
-  };
   const persistNotesCache = () => {};
   // Consistent ordering: pinned first, then by position (server-persisted DnD),
   // fallback to updated_at/timestamp when position is missing
@@ -2632,6 +2526,7 @@ export default function App() {
   // fresh, as the spec requires.
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the note AI panel when the note modal closes
       setNoteAiOpen(false);
       setNoteAiError(null);
       setNoteAiLoading(false);
@@ -2684,7 +2579,7 @@ export default function App() {
     if (!key) return;
     try {
       localStorage.removeItem(key);
-    } catch {}
+    } catch { /* storage unavailable: nothing to remove */ }
   };
 
   const openNoteAi = () => {
@@ -2753,6 +2648,7 @@ export default function App() {
     if (!activeId) return;
     if (noteAiLoading) return;
     persistNoteAiMessages(activeId, noteAiMessages);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- persistNoteAiMessages is recreated each render; persist only when a turn lands
   }, [noteAiMessages, noteAiSaved, activeId, noteAiOpen, noteAiLoading]);
   // AbortController for the in-flight Note-AI streaming request. The user
   // can interrupt mid-stream via the Stop button, which calls .abort() —
@@ -2763,7 +2659,7 @@ export default function App() {
   const stopNoteAi = () => {
     const ctrl = noteAiAbortRef.current;
     if (ctrl) {
-      try { ctrl.abort(); } catch {}
+      try { ctrl.abort(); } catch { /* abort is best-effort */ }
     }
   };
   const sendNoteAiMessage = async (question) => {
@@ -2965,7 +2861,7 @@ export default function App() {
             }
           }
         }
-      } catch (e) {}
+      } catch { /* IDB unavailable: keep the server notes only */ }
       // Purge dead notes from IDB in parallel
       if (deadIds.length > 0) {
         await Promise.allSettled(deadIds.map((id) => idbDeleteNote(id, currentUser?.id, sessionId)));
@@ -3031,7 +2927,7 @@ export default function App() {
           if (tagFilterRef.current !== expectedFilter) return;
           setNotes(sortNotesByRecency(localArchived));
         }
-      } catch (e) {}
+      } catch { /* IDB unavailable: wait for the server response */ }
 
       // If server status is unknown, resolve with a quick health check first (2s max)
       if (syncEngineRef.current && syncEngineRef.current.serverReachable === null) {
@@ -3072,7 +2968,7 @@ export default function App() {
             }
           }
         }
-      } catch (e) {}
+      } catch { /* IDB unavailable: keep the server notes only */ }
       if (deadIds.length > 0) {
         await Promise.allSettled(deadIds.map((id) => idbDeleteNote(id, currentUser?.id, sessionId)));
       }
@@ -3119,7 +3015,7 @@ export default function App() {
           if (tagFilterRef.current !== expectedFilter) return;
           setNotes(sortNotesByRecency(localTrashed));
         }
-      } catch (e) {}
+      } catch { /* IDB unavailable: wait for the server response */ }
 
       // If server status is unknown, resolve with a quick health check first (2s max)
       if (syncEngineRef.current && syncEngineRef.current.serverReachable === null) {
@@ -3160,7 +3056,7 @@ export default function App() {
             }
           }
         }
-      } catch (e) {}
+      } catch { /* IDB unavailable: keep the server notes only */ }
       if (deadIds.length > 0) {
         await Promise.allSettled(deadIds.map((id) => idbDeleteNote(id, currentUser?.id, sessionId)));
       }
@@ -3209,6 +3105,7 @@ export default function App() {
 
   // Keep ref up to date so handleSyncNow always calls the latest version
   // Returns true if server data was fetched, false/undefined if fallback to IDB
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by the sync recovery callbacks, outside render
   reloadCurrentViewRef.current = async () => {
     const currentFilter = tagFilterRef.current;
     try {
@@ -3219,7 +3116,7 @@ export default function App() {
       } else {
         return await loadNotes();
       }
-    } catch (_) {
+    } catch {
       return false;
     }
   };
@@ -3244,6 +3141,7 @@ export default function App() {
         console.error("Failed to load regular notes:", error);
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only when the token or the view filter changes
   }, [token, tagFilter]);
 
   // tagFilterRef is now updated inside the load useEffect above (before calling load functions)
@@ -3261,8 +3159,11 @@ export default function App() {
 
   // Check registration setting and login slogan on app load
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- mount-only effect, it runs after the later declaration exists
     checkRegistrationSetting();
+    // eslint-disable-next-line react-hooks/immutability -- mount-only effect, it runs after the later declaration exists
     fetchLoginSlogan();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch the public login data once on mount
     fetchLoginProfiles();
   }, []);
 
@@ -3449,7 +3350,7 @@ export default function App() {
             id: nid,
             user_id: serverNote.user_id || currentUser?.id,
           }, currentUser?.id, sessionId);
-        } catch (e) {}
+        } catch { /* IDB best-effort */ }
 
         if (belongsInView) {
           // Upsert into current notes list and re-sort (position/pinned may have changed)
@@ -3472,7 +3373,7 @@ export default function App() {
         // Fetch failed (404, network, etc.) — if 404, note was deleted
         if (e.status === 404) {
           setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-          try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (_) {}
+          try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch { /* IDB best-effort */ }
         }
         // Other errors: silently ignore, state stays as-is
       }
@@ -3489,7 +3390,6 @@ export default function App() {
         es.onopen = () => {
           console.log("SSE connected");
           netLog("sse: open");
-          setSseConnected(true);
           // SSE onopen through a reverse proxy does NOT prove the backend is
           // alive — the proxy accepts the TCP connection even when the backend
           // is down. Only a real SSE data message (onmessage) is proof.
@@ -3617,7 +3517,7 @@ export default function App() {
                 ) {
                   mark("notificationsPosition");
                   setNotificationsPosition(v);
-                  try { localStorage.setItem("notificationsPosition", v); } catch (_) {}
+                  try { localStorage.setItem("notificationsPosition", v); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("notificationsPositionMobile")) {
@@ -3625,7 +3525,7 @@ export default function App() {
                 if (v === "top" || v === "bottom") {
                   mark("notificationsPositionMobile");
                   setNotificationsPositionMobile(v);
-                  try { localStorage.setItem("notificationsPositionMobile", v); } catch (_) {}
+                  try { localStorage.setItem("notificationsPositionMobile", v); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("notificationsSound")) {
@@ -3633,7 +3533,7 @@ export default function App() {
                 if (typeof v === "boolean") {
                   mark("notificationsSound");
                   setNotificationsSound(v);
-                  try { localStorage.setItem("notificationsSound", v ? "1" : "0"); } catch (_) {}
+                  try { localStorage.setItem("notificationsSound", v ? "1" : "0"); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("notificationsSoundTypes")) {
@@ -3649,7 +3549,7 @@ export default function App() {
                   };
                   mark("notificationsSoundTypes");
                   setNotificationsSoundTypes(next);
-                  try { localStorage.setItem("notificationsSoundTypes", JSON.stringify(next)); } catch (_) {}
+                  try { localStorage.setItem("notificationsSoundTypes", JSON.stringify(next)); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("notificationsFilterTypes")) {
@@ -3667,7 +3567,7 @@ export default function App() {
                   };
                   mark("notificationsFilterTypes");
                   setNotificationsFilterTypes(next);
-                  try { localStorage.setItem("notificationsFilterTypes", JSON.stringify(next)); } catch (_) {}
+                  try { localStorage.setItem("notificationsFilterTypes", JSON.stringify(next)); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("notificationsDuration")) {
@@ -3676,11 +3576,11 @@ export default function App() {
                 if (raw === null) {
                   mark("notificationsDuration");
                   setNotificationsDuration(null);
-                  try { localStorage.setItem("notificationsDuration", "null"); } catch (_) {}
+                  try { localStorage.setItem("notificationsDuration", "null"); } catch { /* storage unavailable: preference not persisted */ }
                 } else if (typeof raw === "number" && allowed.includes(raw)) {
                   mark("notificationsDuration");
                   setNotificationsDuration(raw);
-                  try { localStorage.setItem("notificationsDuration", String(raw)); } catch (_) {}
+                  try { localStorage.setItem("notificationsDuration", String(raw)); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("pasteMode")) {
@@ -3688,7 +3588,7 @@ export default function App() {
                 if (v === "rich" || v === "plain") {
                   mark("pasteMode");
                   setPasteMode(v);
-                  try { localStorage.setItem("pasteMode", v); } catch (_) {}
+                  try { localStorage.setItem("pasteMode", v); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("readModeEnabled")) {
@@ -3696,7 +3596,7 @@ export default function App() {
                 if (typeof v === "boolean") {
                   mark("readModeEnabled");
                   setReadModeEnabled(v);
-                  try { localStorage.setItem("readModeEnabled", String(v)); } catch (_) {}
+                  try { localStorage.setItem("readModeEnabled", String(v)); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("viewMode")) {
@@ -3704,7 +3604,7 @@ export default function App() {
                 if (v === "list" || v === "grid") {
                   mark("viewMode");
                   setListView(v === "list");
-                  try { localStorage.setItem("viewMode", v); } catch (_) {}
+                  try { localStorage.setItem("viewMode", v); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("sidebarWidth")) {
@@ -3713,7 +3613,7 @@ export default function App() {
                   const w = Math.max(200, Math.min(600, Math.round(v)));
                   mark("sidebarWidth");
                   setSidebarWidth(w);
-                  try { localStorage.setItem("sidebarWidth", String(w)); } catch (_) {}
+                  try { localStorage.setItem("sidebarWidth", String(w)); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("taskStrikeEnabled")) {
@@ -3721,7 +3621,7 @@ export default function App() {
                 if (typeof v === "boolean") {
                   mark("taskStrikeEnabled");
                   applyTaskStrikeClass(v);
-                  try { localStorage.setItem("gk:taskStrikeChecked", v ? "1" : "0"); } catch (_) {}
+                  try { localStorage.setItem("gk:taskStrikeChecked", v ? "1" : "0"); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("alwaysShowSidebarOnWide")) {
@@ -3729,7 +3629,7 @@ export default function App() {
                 if (typeof v === "boolean") {
                   mark("alwaysShowSidebarOnWide");
                   setAlwaysShowSidebarOnWide(v);
-                  try { localStorage.setItem("sidebarAlwaysVisible", String(v)); } catch (_) {}
+                  try { localStorage.setItem("sidebarAlwaysVisible", String(v)); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("sidebarBreakpoint")) {
@@ -3737,7 +3637,7 @@ export default function App() {
                 if (Number.isFinite(Number(v))) {
                   mark("sidebarBreakpoint");
                   setSidebarBreakpoint(v);
-                  try { localStorage.setItem("sidebarBreakpoint", String(Number(v))); } catch (_) {}
+                  try { localStorage.setItem("sidebarBreakpoint", String(Number(v))); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("floatingCardsEnabled")) {
@@ -3745,7 +3645,7 @@ export default function App() {
                 if (typeof v === "boolean") {
                   mark("floatingCardsEnabled");
                   setFloatingCardsEnabled(v);
-                  try { localStorage.setItem("floatingCardsEnabled", String(v)); } catch (_) {}
+                  try { localStorage.setItem("floatingCardsEnabled", String(v)); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("checklistInsertPosition")) {
@@ -3753,7 +3653,7 @@ export default function App() {
                 if (v) {
                   mark("checklistInsertPosition");
                   setChecklistInsertPosition(v);
-                  try { localStorage.setItem("checklistInsertPosition", v); } catch (_) {}
+                  try { localStorage.setItem("checklistInsertPosition", v); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("checklistRemoveSectionBehavior")) {
@@ -3761,7 +3661,7 @@ export default function App() {
                 if (v === "keep" || v === "cascade") {
                   mark("checklistRemoveSectionBehavior");
                   setChecklistRemoveSectionBehavior(v);
-                  try { localStorage.setItem("checklistRemoveSectionBehavior", v); } catch (_) {}
+                  try { localStorage.setItem("checklistRemoveSectionBehavior", v); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("editorToolbarMode")) {
@@ -3769,7 +3669,7 @@ export default function App() {
                 if (v === "simple" || v === "advanced") {
                   mark("editorToolbarMode");
                   setEditorToolbarMode(v);
-                  try { localStorage.setItem("editorToolbarMode", v); } catch (_) {}
+                  try { localStorage.setItem("editorToolbarMode", v); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("edgeToEdgeLandscape")) {
@@ -3777,7 +3677,7 @@ export default function App() {
                 if (typeof v === "boolean") {
                   mark("edgeToEdgeLandscape");
                   setEdgeToEdgeLandscape(v);
-                  try { localStorage.setItem("edgeToEdgeLandscape", String(v)); } catch (_) {}
+                  try { localStorage.setItem("edgeToEdgeLandscape", String(v)); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("edgeToEdgePortrait")) {
@@ -3785,7 +3685,7 @@ export default function App() {
                 if (typeof v === "boolean") {
                   mark("edgeToEdgePortrait");
                   setEdgeToEdgePortrait(v);
-                  try { localStorage.setItem("edgeToEdgePortrait", String(v)); } catch (_) {}
+                  try { localStorage.setItem("edgeToEdgePortrait", String(v)); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("typographyPresets")) {
@@ -3794,7 +3694,7 @@ export default function App() {
                   const normalized = normalizeTypographyPresets(v);
                   mark("typographyPresets");
                   setTypographyPresets(normalized);
-                  try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(normalized)); } catch (_) {}
+                  try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(normalized)); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               // Quick-QR toggle and reminder-time chips are written from a
@@ -3805,7 +3705,7 @@ export default function App() {
                 const v = settings.qrQuickEnabled;
                 if (typeof v === "boolean") {
                   setQrQuickEnabledState(v);
-                  try { localStorage.setItem("glass-keep-qr-quick", v ? "1" : "0"); } catch (_) {}
+                  try { localStorage.setItem("glass-keep-qr-quick", v ? "1" : "0"); } catch { /* storage unavailable: preference not persisted */ }
                 }
               }
               if (keys.has("reminderTimeChips")) {
@@ -3839,7 +3739,7 @@ export default function App() {
               // has no reason to be held hostage to content protection.
               try {
                 window.dispatchEvent(new CustomEvent("note-updated", { detail: { noteId: msg.noteId } }));
-              } catch (_) { /* bus is best-effort */ }
+              } catch { /* bus is best-effort */ }
             } else if (msg && msg.type === "note_access_changed" && msg.noteId) {
               // The owner changed THIS user's read/write permission on a
               // shared note. Apply it immediately — even when the note is open
@@ -3855,6 +3755,7 @@ export default function App() {
                 return updated;
               }));
             } else if (msg && msg.type === "logo_added" && msg.logo) {
+              // eslint-disable-next-line react-hooks/immutability -- SSE handler, it runs after render once setLogoLibrary exists
               setLogoLibrary((prev) => {
                 if (prev.some((l) => l.id === msg.logo.id)) return prev;
                 return [...prev, msg.logo];
@@ -4075,7 +3976,7 @@ export default function App() {
                     window.dispatchEvent(
                       new CustomEvent("user-profile-updated", { detail: msg.profile }),
                     );
-                  } catch (_) { /* bus is best-effort */ }
+                  } catch { /* bus is best-effort */ }
                 }
                 if (
                   "avatar_url" in msg.profile &&
@@ -4095,7 +3996,7 @@ export default function App() {
                   window.dispatchEvent(
                     new CustomEvent("user-ai-settings-updated", { detail: msg.settings }),
                   );
-                } catch (_) { /* bus is best-effort */ }
+                } catch { /* bus is best-effort */ }
               }
             } else if (msg && msg.type === "admin_ai_settings_updated" && msg.settings) {
               // Live sync of the shared/server AI configuration to every
@@ -4105,7 +4006,7 @@ export default function App() {
                   window.dispatchEvent(
                     new CustomEvent("admin-ai-settings-updated", { detail: msg.settings }),
                   );
-                } catch (_) { /* bus is best-effort */ }
+                } catch { /* bus is best-effort */ }
               }
             } else if (msg && msg.type === "user_deleted_notification") {
               // Audit notification for OTHER admins: someone got
@@ -4162,7 +4063,7 @@ export default function App() {
                     const filtered = prev.filter((n) => String(n.id) !== nid);
                     return belongsInView ? sortNotesByRecency([...filtered, copy]) : filtered;
                   });
-                  try { await idbPutNote(copy, currentUser?.id, sessionId); } catch (_) {}
+                  try { await idbPutNote(copy, currentUser?.id, sessionId); } catch { /* IDB best-effort */ }
                   idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
                   idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
                   if (String(activeIdRef.current) === nid) {
@@ -4185,15 +4086,14 @@ export default function App() {
               // (useFederation hook) listens to.
               try {
                 window.dispatchEvent(new CustomEvent("federation-event", { detail: msg }));
-              } catch (_) {}
+              } catch { /* bus is best-effort */ }
             }
-          } catch (_) {}
+          } catch { /* malformed or unhandled event: skip it */ }
         };
 
         es.onerror = (error) => {
           console.log("SSE error, attempting reconnect...", error);
           netLog("sse: error, readyState=" + es.readyState, "onLine=" + navigator.onLine);
-          setSseConnected(false);
           const engine = syncEngineRef.current;
           if (engine) {
             engine.notifySseDisconnected();
@@ -4323,7 +4223,6 @@ export default function App() {
     // Handle online/offline events
     const handleOnline = async () => {
       netLog("browser online event");
-      setIsOnline(true);
       // Browser detected network recovery — run health check first,
       // then process queue and reconnect SSE only after confirming
       // the server is reachable. Avoids racing SSE reconnect against
@@ -4356,7 +4255,6 @@ export default function App() {
 
     const handleOffline = () => {
       netLog("browser offline event");
-      setIsOnline(false);
       // Immediately tell the sync engine — don't wait for the next health check.
       // The browser "offline" event is instant proof the network is down.
       const engine = syncEngineRef.current;
@@ -4370,8 +4268,7 @@ export default function App() {
     window.addEventListener("offline", handleOffline);
 
     return () => {
-      setSseConnected(false);
-      try { if (es) es.close(); } catch (e) {}
+      try { if (es) es.close(); } catch { /* close is best-effort */ }
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       if (patchBatchTimeout) clearTimeout(patchBatchTimeout);
       if (pollTimeout) clearTimeout(pollTimeout);
@@ -4380,6 +4277,7 @@ export default function App() {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the SSE connection must only be rebuilt when the token changes
   }, [token]);
 
   // Reconnect SSE and reload view when server recovers from offline
@@ -4424,7 +4322,7 @@ export default function App() {
             await new Promise((r) => setTimeout(r, 3000));
             await reloadCurrentViewRef.current?.();
           }
-        } catch (_) {}
+        } catch { /* reload is best-effort: the pull still ends below */ }
         if (engine) await engine.endPull();
       };
       // Small delay to let processQueue start (healthCheck triggers it)
@@ -4445,7 +4343,7 @@ export default function App() {
       setMItems(serverItems);
       prevItemsRef.current = serverItems;
     }
-  }, [notes, open, activeId, mType]);
+  }, [notes, open, activeId, mType, setMItems]);
 
   // Flush any pending drawing debounce — shared persist logic used by both
   // the debounce timeout and the flush-on-close path.
@@ -4534,6 +4432,7 @@ export default function App() {
     // A real draw stroke reached us — materialise the draft before we save
     // against it. The create payload will carry the new drawing, and the
     // effect returns because baselines are realigned to the current state.
+    // eslint-disable-next-line react-hooks/immutability -- the effect runs after render, once useDraftNote below has returned
     if (materializeDraftIfNeeded({ drawing: mDrawingData })) return;
     // If materialise was rejected because the draft is still empty (no
     // strokes, no caption, no metadata), keep the draft pending and skip
@@ -4542,6 +4441,7 @@ export default function App() {
     // subsequent modal opens (the user reported a flaky "modal opens
     // then closes immediately" after closing an empty drawing draft).
     if (
+      // eslint-disable-next-line react-hooks/immutability -- the effect runs after render, once useDraftNote below has returned
       pendingDraftRef.current &&
       String(activeId) === String(pendingDraftRef.current.id)
     ) {
@@ -4576,6 +4476,7 @@ export default function App() {
       clearTimeout(timeoutId);
       drawingDebounceTimerRef.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is declared below and recreated each render; autosave runs only on drawing edits
   }, [mDrawingData, open, activeId, mType, flushPendingDrawingSave]);
 
   // Flush pending drawing save when modal closes or active note changes
@@ -4598,26 +4499,19 @@ export default function App() {
         ? { paths: serverDrawingData, dimensions: null }
         : serverDrawingData;
       // Separate text body from drawing data
-      const { text: serverText, ...serverCleanData } = normalizedData;
+      const { text: _text, ...serverCleanData } = normalizedData;
       const prevJson = JSON.stringify(prevDrawingRef.current || []);
       const serverJson = JSON.stringify(serverCleanData);
       if (serverJson !== prevJson) {
         setMDrawingData(serverCleanData);
         prevDrawingRef.current = serverCleanData;
       }
-    } catch (e) {
+    } catch {
       // Invalid JSON, ignore
     }
-  }, [notes, open, activeId]);
+  }, [notes, open, activeId, setMDrawingData]);
 
   // No infinite scroll
-
-  // Auto-resize composer textarea
-  useEffect(() => {
-    if (!contentRef.current) return;
-    contentRef.current.style.height = "auto";
-    contentRef.current.style.height = contentRef.current.scrollHeight + "px";
-  }, [content, composerType]);
 
   /** -------- Auth actions -------- */
 
@@ -4674,7 +4568,7 @@ export default function App() {
       localStorage.removeItem(`glass-keep-archived-${uid}`);
       localStorage.removeItem(`glass-keep-trashed-${uid}`);
       localStorage.removeItem(`glass-keep-cache-timestamp-${uid}`);
-    } catch (e) {}
+    } catch { /* storage unavailable: nothing to clear */ }
     navigate("#/login");
   };
 
@@ -4721,6 +4615,7 @@ export default function App() {
         .then(completeLogin)
         .catch((e) => setOidcLoginError(e || "oidc_failed"));
     } else if (error && !token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot read of the sign-in redirect result at boot
       setOidcLoginError(error);
     } else if (error) {
       showToast(oidcErrorMessage(error), "error");
@@ -4771,6 +4666,7 @@ export default function App() {
     };
     window.addEventListener("auth-expired", handleAuthExpired);
     return () => window.removeEventListener("auth-expired", handleAuthExpired);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- listener registered once; cleanupClientSession is recreated each render
   }, []);
 
   // Pre-load pending registrations count when an admin is logged in
@@ -4779,100 +4675,6 @@ export default function App() {
       loadPendingUsers?.();
     }
   }, [token, currentUser?.is_admin, loadPendingUsers]);
-
-  /** -------- Composer helpers -------- */
-  const addComposerItem = () => {
-    const t = clInput.trim();
-    if (!t) return;
-    const newItem = { id: uid(), text: t, done: false };
-    setClItems((prev) =>
-      checklistInsertPosition === "top" ? [newItem, ...prev] : [...prev, newItem]
-    );
-    setClInput("");
-  };
-
-  const addNote = async () => {
-    const isText = composerType === "text";
-    const isChecklist = composerType === "checklist";
-    const isDraw = composerType === "draw";
-
-    if (isText) {
-      if (
-        !title.trim() &&
-        !content.trim() &&
-        composerTagList.length === 0 &&
-        composerImages.length === 0
-      )
-        return;
-    } else if (isChecklist) {
-      if (!title.trim() && clItems.length === 0) return;
-    } else if (isDraw) {
-      const drawPaths = Array.isArray(composerDrawingData)
-        ? composerDrawingData
-        : composerDrawingData?.paths || [];
-      if (!title.trim() && drawPaths.length === 0) return;
-    }
-
-    const nowIso = new Date().toISOString();
-    const newNote = {
-      id: uid(),
-      type: composerType,
-      title: title.trim(),
-      content: isText
-        ? content
-        : isDraw
-          ? JSON.stringify(composerDrawingData)
-          : "",
-      items: isChecklist ? clItems : [],
-      tags: composerTagList,
-      images: composerImages,
-      color: composerColor,
-      pinned: false,
-      position: Date.now(),
-      timestamp: nowIso,
-      updated_at: nowIso,
-      client_updated_at: nowIso,
-    };
-
-    // Local-first: apply immediately, then sync in background
-    const localNote = {
-      ...newNote,
-      user_id: currentUser?.id,
-      archived: false,
-      trashed: false,
-    };
-    const leaseId = acquireLocalLease(String(newNote.id));
-    try {
-      await idbPutNote(localNote, currentUser?.id, sessionId);
-    } catch (e) {
-      console.error("IndexedDB put failed:", e);
-    }
-
-    // Update UI immediately from local state
-    setNotes((prev) =>
-      sortNotesByRecency([localNote, ...(Array.isArray(prev) ? prev : [])]),
-    );
-    invalidateNotesCache();
-
-    // Enqueue for server sync (lease protects until queue takes over)
-    enqueueWithLease(String(newNote.id), { type: "create", noteId: newNote.id, payload: newNote }, leaseId);
-
-    // Reset composer immediately (don't wait for server)
-    setTitle("");
-    setContent("");
-    setTags("");
-    setComposerTagList([]);
-    setComposerTagInput("");
-    setComposerTagFocused(false);
-    setComposerImages([]);
-    setComposerColor("default");
-    setClItems([]);
-    setClInput("");
-    setComposerDrawingData({ paths: [], dimensions: null });
-    setComposerType("text");
-    setComposerCollapsed(true);
-    if (contentRef.current) contentRef.current.style.height = "auto";
-  };
 
   /** -------- Download single note .md (or audio file for audio notes) -------- */
   const handleDownloadNote = async (note) => {
@@ -4985,28 +4787,16 @@ export default function App() {
   // Collaboration actions (hook)
   const {
     collaborationModalOpen, setCollaborationModalOpen,
-    collaboratorUsername, setCollaboratorUsername,
     addModalCollaborators,
-    remoteUsers,
-    filteredUsers, setFilteredUsers,
-    showUserDropdown, setShowUserDropdown,
-    loadingUsers,
-    dropdownPosition,
-    loadNoteCollaborators,
-    showCollaborationDialog,
     removeCollaborator,
     loadCollaboratorsForAddModal,
-    searchUsers,
-    updateDropdownPosition,
-    addCollaborator,
     addCollaboratorsBatch,
     setCollaboratorAccess,
     availableUsers,
     availableLoading,
   } = useCollaboration(token, {
-    notes, currentUser, activeId,
-    showToast, invalidateNotesCache, setNotes,
-    collaboratorInputRef,
+    currentUser, activeId,
+    showToast, invalidateNotesCache,
   });
 
   // Side-by-side: open two selected notes simultaneously. The PRIMARY (left)
@@ -5039,9 +4829,9 @@ export default function App() {
 
   const overlayOpenCount = [
     imgViewOpen, confirmDeleteOpen, genericConfirmOpen,
-    collaborationModalOpen, showModalColorPop, showModalFmt, modalMenuOpen,
+    collaborationModalOpen, showModalColorPop, showModalFmt,
     modalKebabOpen, imageMenuOpen, logoPickerOpen, reminderPopOpen, modalTagFocused, notifCenterOpen, syncDropdownOpen, mobileSearchOpen,
-    showColorPop, showComposerFmt, headerMenuOpen, multiMode,
+    headerMenuOpen, multiMode,
     typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
     noteAiOpen, changelogOpen, qrScannerOpen, sbsSecondaryId,
   ].filter(Boolean).length;
@@ -5079,7 +4869,7 @@ export default function App() {
   useEffect(() => {
     const locked = overlayOpenCount > 0;
     document.documentElement.toggleAttribute("data-gk-overlay-locked", locked);
-    try { window.AndroidTheme?.setRefreshEnabled(!locked); } catch (_) {}
+    try { window.AndroidTheme?.setRefreshEnabled(!locked); } catch { /* Android bridge best-effort */ }
   }, [overlayOpenCount]);
 
   useEffect(() => {
@@ -5099,7 +4889,6 @@ export default function App() {
       if (collaborationModalOpen) { setCollaborationModalOpen(false); return; }
       if (showModalColorPop) { setShowModalColorPop(false); return; }
       if (showModalFmt) { setShowModalFmt(false); return; }
-      if (modalMenuOpen) { setModalMenuOpen(false); return; }
       if (modalKebabOpen) { setModalKebabOpen(false); return; }
       if (logoPickerOpen) { setLogoPickerOpen(false); return; }
       if (imageMenuOpen) { setImageMenuOpen(false); return; }
@@ -5114,8 +4903,6 @@ export default function App() {
       if (notifCenterOpen) { closeNotifBellRef.current?.(); return; }
       if (syncDropdownOpen) { setSyncDropdownOpen(false); return; }
       if (mobileSearchOpen) { setSearch(""); setMobileSearchOpen(false); return; }
-      if (showColorPop) { setShowColorPop(false); return; }
-      if (showComposerFmt) { setShowComposerFmt(false); return; }
       if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
       if (multiMode) { setMultiMode(false); return; }
       if (typographyModalOpen) { setTypographyModalOpen(false); return; }
@@ -5126,10 +4913,12 @@ export default function App() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
-      showModalColorPop, showModalFmt, modalMenuOpen, modalKebabOpen, imageMenuOpen, logoPickerOpen, reminderPopOpen, modalTagFocused,
-      notifCenterOpen, syncDropdownOpen, mobileSearchOpen, showColorPop, showComposerFmt,
+      showModalColorPop, showModalFmt, modalKebabOpen, imageMenuOpen, logoPickerOpen, reminderPopOpen, modalTagFocused,
+      notifCenterOpen, syncDropdownOpen, mobileSearchOpen,
       headerMenuOpen, multiMode, typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
-      noteAiOpen, changelogOpen, qrScannerOpen]);
+      noteAiOpen, changelogOpen, qrScannerOpen,
+      closeQrScanner, setImgViewOpen, setConfirmDeleteOpen, setCollaborationModalOpen, setShowModalColorPop, setShowModalFmt,
+      setModalKebabOpen, setLogoPickerOpen, setImageMenuOpen, setModalTagFocused, setAdminPanelOpen]);
 
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
@@ -5185,7 +4974,7 @@ export default function App() {
       console.error("[logoLibrary] create failed", e);
       return null;
     }
-  }, []);
+  }, [setLogoLibrary]);
 
   const deleteLogoFromLibrary = useCallback(async (id) => {
     const token = getAuth()?.token;
@@ -5202,7 +4991,7 @@ export default function App() {
       console.error("[logoLibrary] delete failed", e);
       if (removed) setLogoLibrary((prev) => [...prev, removed]);
     }
-  }, []);
+  }, [setLogoLibrary]);
 
   // Note icon (logo badge) — PER-USER and never synced to collaborators.
   // It lives on note.icon and persists through its own endpoint, NOT in the
@@ -5237,16 +5026,19 @@ export default function App() {
     } catch (e) {
       console.error("Note icon load failed", e);
     }
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- false positive: these memoized callbacks are never mutated
   }, [activeId, applyNoteIcon, addLogoToLibrary]);
 
   const removeNoteIcon = useCallback(() => {
     if (activeId) applyNoteIcon(activeId, null);
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- false positive: this memoized callback is never mutated
   }, [activeId, applyNoteIcon]);
 
   // Pick an existing logo from the library as the active note's icon.
   const pickNoteIcon = useCallback((logo) => {
     if (!activeId || !logo?.src) return;
     applyNoteIcon(activeId, { id: uid(), src: logo.src, name: logo.name });
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- false positive: this memoized callback is never mutated
   }, [activeId, applyNoteIcon]);
 
   // Track initial state when opening modal to detect if user actually edited
@@ -5304,14 +5096,10 @@ export default function App() {
     currentUser,
     sessionId,
     mTitle, mBody, mItems, mDrawingData, mTagList, mImages, mColor,
-    setTitle, setContent,
-    setComposerTagList, setComposerTagInput, setComposerTagFocused,
-    setComposerImages, setComposerColor, setComposerDrawingData,
-    setComposerType, setComposerCollapsed,
     setSidebarOpen, setActiveId, setOpen,
     setMType, setMTitle, setMBody, setMItems, setMTagList, setMImages,
     setMColor, setMDrawingData, setTagInput,
-    setInitialDrawMode, setViewMode, setModalMenuOpen, setNotes,
+    setInitialDrawMode, setViewMode, setNotes,
     skipNextDrawingAutosave, skipNextItemsAutosave,
     prevDrawingRef, prevItemsRef,
     initialModalStateRef, committedBaselineRef,
@@ -5348,6 +5136,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the service worker listener is re-attached each render so it always calls the latest openModal
   const openModal = (id) => {
     const n = notes.find((x) => String(x.id) === String(id));
     if (!n) return;
@@ -5368,11 +5157,12 @@ export default function App() {
           dismissNotification(notif.id);
         }
       });
-    } catch (_e) {
+    } catch {
       /* best-effort — never block opening the note */
     }
     // Clear any stale pending-draft state — we're opening a real, persisted
     // note, so the deferred-create path must not fire for it.
+    // eslint-disable-next-line react-hooks/immutability -- pendingDraftRef is a ref from useDraftNote, cleared when the note opens
     pendingDraftRef.current = null;
     setSidebarOpen(false);
     setSbsSuppressOpenReplay(false);
@@ -5394,7 +5184,7 @@ export default function App() {
         setMDrawingData(cleanDrawingData);
         prevDrawingRef.current = cleanDrawingData;
         setMBody(drawNoteText);
-      } catch (e) {
+      } catch {
         setMDrawingData({ paths: [], dimensions: null });
         prevDrawingRef.current = { paths: [], dimensions: null };
         setMBody("");
@@ -5430,7 +5220,6 @@ export default function App() {
     // edit mode so the experience is identical to creating a new audio note.
     // Users who disabled the read-mode setting always open in edit mode.
     setViewMode(n.type !== "audio" && readModeEnabled);
-    setModalMenuOpen(false);
     setOpen(true);
 
     // If this note has a saved AI conversation in localStorage, pre-load
@@ -5524,7 +5313,7 @@ export default function App() {
       const fire = () => {
         try {
           selfUpdate?.startUpdate({ latestVersion });
-        } catch (_e) {
+        } catch {
           /* startUpdate surfaces its own errors via the modal */
         }
       };
@@ -5543,7 +5332,7 @@ export default function App() {
       return;
     }
     if (a.noteId) {
-      try { openModal(String(a.noteId)); } catch (_e) {}
+      try { openModal(String(a.noteId)); } catch { /* opening the note is best-effort */ }
       dismissNotification(notif.id);
     }
   };
@@ -5551,12 +5340,13 @@ export default function App() {
   // Tapping a Web Push reminder focuses the app (handled by push-sw.js)
   // and posts { type: "gk-open-note", noteId } to this client; route it to
   // the note modal. Focusing is guaranteed by the SW regardless of this.
+  // eslint-disable-next-line react-hooks/immutability -- false positive: openModal only touches pendingDraftRef, a ref from useDraftNote, when called
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
     const onMessage = (event) => {
       const data = event.data;
       if (data && data.type === "gk-open-note" && data.noteId) {
-        try { openModal(String(data.noteId)); } catch (_e) {}
+        try { openModal(String(data.noteId)); } catch { /* opening the note is best-effort */ }
       }
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
@@ -5570,13 +5360,14 @@ export default function App() {
   // notes list may not be hydrated when the tap arrives, so we stash the id
   // and open it the moment the note shows up.
   const openModalRef = useRef(openModal);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by the native deep-link handler, outside render
   openModalRef.current = openModal;
   const pendingOpenNoteIdRef = useRef(null);
   useEffect(() => {
     const tryOpen = (id) => {
       const sid = String(id);
       if (notes.some((n) => String(n.id) === sid)) {
-        try { openModalRef.current?.(sid); } catch (_e) {}
+        try { openModalRef.current?.(sid); } catch { /* opening the note is best-effort */ }
         return true;
       }
       return false;
@@ -5673,7 +5464,7 @@ export default function App() {
         });
       });
     }, SBS_ANIM_MS);
-  }, [sbsSecondaryId, sbsClosingSide, cancelAndClearSbsAi]); // eslint-disable-line
+  }, [sbsSecondaryId, sbsClosingSide, cancelAndClearSbsAi]); // eslint-disable-line react-hooks/exhaustive-deps -- openModal is recreated on every render
 
   // Closing the RIGHT pane: the secondary instance only signals start
   // (via onRequestClosing) and then sits still while the shell drives
@@ -5712,6 +5503,7 @@ export default function App() {
     // alive for the AI close animation duration so the left pane stays hidden
     // and the wrapper keeps its absolute position at the left half.
     scheduleSbsAiClear();
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- false positive: scheduleSbsAiClear is a memoized callback never mutated
   }, [scheduleSbsAiClear]);
 
   // Backdrop click while in SBS mode: close BOTH notes together.
@@ -5738,12 +5530,11 @@ export default function App() {
       setOpen(false);
       setActiveId(null);
       setViewMode(true);
-      setModalMenuOpen(false);
       setConfirmDeleteOpen(false);
       setShowModalFmt(false);
       setIsModalClosing(false);
     }, MODAL_FADE_DURATION_SBS);
-  }, [sbsBothClosing, mType, flushPendingDrawingSave]); // eslint-disable-line
+  }, [sbsBothClosing, mType, flushPendingDrawingSave, setActiveId, setConfirmDeleteOpen, setIsModalClosing, setOpen, setShowModalFmt, setViewMode]);
 
   // Check if the note has been modified from initial state
   const hasNoteBeenModified = useCallback(() => {
@@ -5815,7 +5606,7 @@ export default function App() {
     // hasPendingChanges() now returns true → SSE protection via queue takes over
     releaseLocalLeaseWithPrune(nId, lid);
     return true;
-  }, [enqueueAndSync]);
+  }, [enqueueAndSync, currentUser?.id, sessionId]);
 
   // Local-first auto-save for metadata (color, tags, images) — immediate, no debounce
   // Works for text, checklist, AND draw notes (metadata fields are independent of content).
@@ -5850,11 +5641,13 @@ export default function App() {
     initialModalStateRef.current = { ...initial, ...committedFields };
 
     const noteType = mType || "text";
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the autosave updates the note list as part of persisting the edit
     autoSaveTextNote(activeId, metaPatch, leaseId, noteType).then((ok) => {
       if (ok && committedBaselineRef.current) {
         committedBaselineRef.current = { ...committedBaselineRef.current, ...committedFields };
       }
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
   }, [mColor, mTagList, mImages, open, activeId, mType, autoSaveTextNote]);
 
   // Auto-save text content (title + body): debounced local-first persist + patch sync.
@@ -5916,6 +5709,7 @@ export default function App() {
       // If it fired, autoSaveTextNote owns the lease and will release it.
       if (!transferred) releaseLocalLease(nId, leaseId);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
   }, [mBody, mTitle, open, activeId, mType, autoSaveTextNote]);
 
   // Auto-save draw note title + text body: debounced local-first persist + patch sync.
@@ -5974,6 +5768,7 @@ export default function App() {
       clearTimeout(timeoutId);
       if (!transferred) releaseLocalLease(nId, leaseId);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
   }, [mBody, mTitle, open, activeId, mType, mDrawingData, autoSaveTextNote]);
 
   // Update initial state reference when note is updated from server (for collaborative notes)
@@ -6019,6 +5814,7 @@ export default function App() {
       if (JSON.stringify(serverState.images) !== JSON.stringify(mImages)) setMImages(serverState.images);
       if (serverState.color !== mColor) setMColor(serverState.color);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only on server note changes, the edited fields must not re-run it on each keystroke
   }, [notes, open, activeId, hasNoteBeenModified]);
 
   // Force-close modal without any save/flush — used when a remote session
@@ -6050,7 +5846,6 @@ export default function App() {
     setOpen(false);
     setActiveId(null);
     setViewMode(true);
-    setModalMenuOpen(false);
     setConfirmDeleteOpen(false);
     setShowModalFmt(false);
     setIsModalClosing(false);
@@ -6072,7 +5867,6 @@ export default function App() {
         setOpen(false);
         setActiveId(null);
         setViewMode(true);
-        setModalMenuOpen(false);
         setConfirmDeleteOpen(false);
         setShowModalFmt(false);
         setIsModalClosing(false);
@@ -6118,6 +5912,7 @@ export default function App() {
     if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
       const draftId = String(pendingDraftRef.current.id);
       const draftType = pendingDraftRef.current.type;
+      // eslint-disable-next-line react-hooks/immutability -- pendingDraftRef is a ref from useDraftNote, cleared in the close handler
       pendingDraftRef.current = null;
       freshlyCreatedNoteRef.current = null;
       setNotes((prev) => {
@@ -6194,7 +5989,7 @@ export default function App() {
         (async () => {
           try {
             await idbDeleteNote(nid, currentUser?.id, sessionId);
-          } catch (e) {}
+          } catch { /* IDB best-effort */ }
           const trashLease = acquireLocalLease(nid);
           await enqueueWithLease(
             nid,
@@ -6582,7 +6377,7 @@ export default function App() {
     // covers the SSE debounce window.
     try {
       await enqueueAndSync({ type: "patch", noteId: nid, payload: { pinned: !!toPinned, client_updated_at: nowIso } });
-    } catch (e) {
+    } catch {
       // On failure, lease stays active — SSE protection maintained
       return;
     }
@@ -6639,7 +6434,7 @@ export default function App() {
         noteId: nid,
         payload: { reminderAt, client_updated_at: nowIso },
       });
-    } catch (e) {
+    } catch {
       // On failure the lease stays active so SSE patches can't clobber the
       // optimistic state; the queued op retries when connectivity returns.
       return;
@@ -6652,7 +6447,7 @@ export default function App() {
       } else {
         showToast(t("reminderRemovedToast"), "info", undefined, "reminder");
       }
-    } catch (_) {
+    } catch {
       /* toast is best-effort feedback */
     }
   };
@@ -6729,7 +6524,7 @@ export default function App() {
       try {
         const existing = await idbGetNote(String(n.id), currentUser?.id, sessionId);
         if (existing) await idbPutNote({ ...existing, position: n.position }, currentUser?.id, sessionId);
-      } catch (e) {}
+      } catch { /* IDB best-effort */ }
     }
 
     const pinnedIds = sorted.filter((n) => n.pinned).map((n) => String(n.id));
@@ -6739,7 +6534,7 @@ export default function App() {
     pendingReorderLeasesRef.current.set(reorderToken, noteLeases);
     try {
       await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds, otherIds, _reorderToken: reorderToken, client_reordered_at: new Date().toISOString() } });
-    } catch (e) {
+    } catch {
       // enqueue failed — leases stay active
     }
     showToast?.(t("noteOrderReset"));
@@ -6815,7 +6610,7 @@ export default function App() {
       try {
         const existing = await idbGetNote(id, currentUser?.id, sessionId);
         if (existing) await idbPutNote({ ...existing, position: pos }, currentUser?.id, sessionId);
-      } catch (e) {}
+      } catch { /* IDB best-effort */ }
     }
 
     invalidateNotesCache();
@@ -6826,7 +6621,7 @@ export default function App() {
     pendingReorderLeasesRef.current.set(reorderToken, noteLeases);
     try {
       await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds: newPinned, otherIds: newOthers, _reorderToken: reorderToken, client_reordered_at: new Date().toISOString() } });
-    } catch (e) {
+    } catch {
       // enqueue failed — leases stay active (SSE protection maintained)
     }
     dragGroup.current = null;
@@ -6843,6 +6638,7 @@ export default function App() {
   // useStableCallback keeps a stable identity while always invoking the
   // latest closure, so the memo holds and only the modal subtree re-renders.
   const sOpenModal = useStableCallback(openModal);
+  // eslint-disable-next-line react-hooks/immutability -- false positive: togglePin only touches freshlyCreatedNoteRef, a ref from useDraftNote, when called
   const sTogglePin = useStableCallback(togglePin);
   const sOnDragStart = useStableCallback(onDragStart);
   const sOnDragOver = useStableCallback(onDragOver);
@@ -6851,7 +6647,6 @@ export default function App() {
   const sOnDragEnd = useStableCallback(onDragEnd);
   const sOnToggleSelect = useStableCallback(onToggleSelect);
   const sOnCtrlSelect = useStableCallback(onCtrlSelect);
-  const sOnUpdateChecklistItem = useStableCallback(onUpdateChecklistItem);
   const sOnEmptyTrash = useStableCallback(onEmptyTrash);
 
   // Checklist item drag handlers (for modal reordering)
@@ -6957,6 +6752,7 @@ export default function App() {
 
     // Draft note: fold the conversion into the pending create payload.
     if (isDraft) {
+      // eslint-disable-next-line react-hooks/immutability -- pendingDraftRef is a ref from useDraftNote, updated in the conversion handler
       pendingDraftRef.current = { ...pendingDraftRef.current, type: targetType };
       materializeDraftIfNeeded({ items: newItems, body: newBody });
       showToast(t(toastKey), "success");
@@ -7196,32 +6992,6 @@ export default function App() {
     !!(deferredSearch || (tagFilter && tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED") || activeTagFilters.length > 0);
   const allEmpty = notes.length === 0;
 
-  const formatComposer = (type) =>
-    runFormat(() => content, setContent, contentRef, type);
-
-  /** Composer smart-enter handler */
-  const onComposerKeyDown = (e) => {
-    if (e.key !== "Enter" || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey)
-      return;
-    const el = contentRef.current;
-    if (!el) return;
-    const value = content;
-    const start = el.selectionStart ?? value.length;
-    const end = el.selectionEnd ?? value.length;
-    const res = handleSmartEnter(value, start, end);
-    if (res) {
-      e.preventDefault();
-      setContent(res.text);
-      requestAnimationFrame(() => {
-        try {
-          el.setSelectionRange(res.range[0], res.range[1]);
-        } catch (e) {}
-        el.style.height = "auto";
-        el.style.height = el.scrollHeight + "px";
-      });
-    }
-  };
-
   /** -------- Modal JSX -------- */
   // Side-by-side mode is active whenever a secondary note id is set.
   // Both panes render under a shared scrim overlay (the .sbs-active body
@@ -7262,6 +7032,7 @@ export default function App() {
   // the centre slot. Outside SBS, fall back to the regular closeModal.
   // Back and Escape close it the same way.
   const primaryCloseModal = sbsActive ? requestCloseLeftPaneSBS : closeModal;
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by useModalState's close path, outside render
   closeModalRef.current = primaryCloseModal;
 
   const modal = (
@@ -7295,8 +7066,6 @@ export default function App() {
       setMImages={setMImages}
       mItems={mItems}
       setMItems={setMItems}
-      mInput={mInput}
-      setMInput={setMInput}
       mDrawingData={mDrawingData}
       setMDrawingData={setMDrawingData}
       mTagList={mTagList}
@@ -7310,7 +7079,6 @@ export default function App() {
       noteViewRef={noteViewRef}
       modalFileRef={modalFileRef}
       modalIconFileRef={modalIconFileRef}
-      modalMenuBtnRef={modalMenuBtnRef}
       modalFmtBtnRef={modalFmtBtnRef}
       modalTagInputRef={modalTagInputRef}
       modalTagBtnRef={modalTagBtnRef}
@@ -7319,6 +7087,7 @@ export default function App() {
       scrimClickStartRef={scrimClickStartRef}
       savedModalScrollRatioRef={savedModalScrollRatioRef}
       activeNoteObj={activeNoteObj}
+      // eslint-disable-next-line react-hooks/immutability -- false positive: the handler only touches freshlyCreatedNoteRef, a ref from useDraftNote, when called
       onSetReminder={setNoteReminder}
       editedStamp={editedStamp}
       modalHasChanges={modalHasChanges}
@@ -7329,11 +7098,8 @@ export default function App() {
       handleTagKeyDown={handleTagKeyDown}
       handleTagBlur={handleTagBlur}
       handleTagPaste={handleTagPaste}
-      modalMenuOpen={modalMenuOpen}
-      setModalMenuOpen={setModalMenuOpen}
       showModalFmt={showModalFmt}
       setShowModalFmt={setShowModalFmt}
-      formatModal={formatModal}
       showModalColorPop={showModalColorPop}
       setShowModalColorPop={setShowModalColorPop}
       reminderPopOpen={reminderPopOpen}
@@ -7351,25 +7117,12 @@ export default function App() {
       savingModal={savingModal}
       collaborationModalOpen={collaborationModalOpen}
       setCollaborationModalOpen={setCollaborationModalOpen}
-      collaboratorUsername={collaboratorUsername}
-      setCollaboratorUsername={setCollaboratorUsername}
       addModalCollaborators={addModalCollaborators}
-      remoteUsers={remoteUsers}
-      showUserDropdown={showUserDropdown}
-      setShowUserDropdown={setShowUserDropdown}
-      filteredUsers={filteredUsers}
-      setFilteredUsers={setFilteredUsers}
-      loadingUsers={loadingUsers}
-      dropdownPosition={dropdownPosition}
-      collaboratorInputRef={collaboratorInputRef}
-      addCollaborator={addCollaborator}
       addCollaboratorsBatch={addCollaboratorsBatch}
       availableUsers={availableUsers}
       availableLoading={availableLoading}
       removeCollaborator={removeCollaborator}
       setCollaboratorAccess={setCollaboratorAccess}
-      searchUsers={searchUsers}
-      updateDropdownPosition={updateDropdownPosition}
       loadCollaboratorsForAddModal={loadCollaboratorsForAddModal}
       imgViewOpen={imgViewOpen}
       imgViewIndex={imgViewIndex}
@@ -7384,9 +7137,12 @@ export default function App() {
       tagFilter={tagFilter}
       onScrimClose={sbsActive ? closeBothSBS : undefined}
       closeModal={primaryCloseModal}
+      // eslint-disable-next-line react-hooks/immutability -- false positive: the handler only touches freshlyCreatedNoteRef, a ref from useDraftNote, when called
       saveModal={saveModal}
+      // eslint-disable-next-line react-hooks/immutability -- false positive: the handler only touches freshlyCreatedNoteRef, a ref from useDraftNote, when called
       deleteModal={deleteModal}
       restoreFromTrash={restoreFromTrash}
+      // eslint-disable-next-line react-hooks/immutability -- false positive: the handler only touches freshlyCreatedNoteRef, a ref from useDraftNote, when called
       handleArchiveNote={handleArchiveNote}
       handleDownloadNote={handleDownloadNote}
       togglePin={togglePin}
@@ -7396,12 +7152,10 @@ export default function App() {
       noteIcon={activeNoteObj?.icon || null}
       onPickIcon={pickNoteIcon}
       logoLibrary={logoLibrary}
-      addLogoToLibrary={addLogoToLibrary}
       deleteLogoFromLibrary={deleteLogoFromLibrary}
       isCollaborativeNote={isCollaborativeNote}
       syncState={syncStatus.syncState}
       onModalBodyClick={onModalBodyClick}
-      resizeModalTextarea={resizeModalTextarea}
       syncChecklistItems={syncChecklistItems}
       checklistInsertPosition={checklistInsertPosition}
       checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
@@ -7432,13 +7186,17 @@ export default function App() {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (currentUser?.email && route !== "#/notes" && route !== "#/admin")
+    if (currentUser?.email && route !== "#/notes" && route !== "#/admin") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- redirect a signed-in user away from the auth routes
       navigate("#/notes");
-  }, [currentUser]); // eslint-disable-line
+    }
+  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps -- only when the signed-in user changes, not on every route change
 
   // Close sidebar when navigating away or opening modal
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close the sidebar when a note opens
     if (open && !(activeTagFilters && window.matchMedia?.("(min-width: 1024px)")?.matches)) setSidebarOpen(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run only when the modal opens or closes, not when the filters change
   }, [open]);
 
   // ---- Routing ----
@@ -7516,12 +7274,7 @@ export default function App() {
     }
     return (
       <AdminView
-        token={token}
-        currentUser={currentUser}
-        dark={dark}
         showGenericConfirm={showGenericConfirm}
-        onToggleDark={toggleDark}
-        onBackToNotes={() => (window.location.hash = "#/notes")}
       />
     );
   }
@@ -7666,7 +7419,6 @@ export default function App() {
           setHighlightPasskeyDomain(true);
           openAdminPanel();
         }}
-        aiAssistantEnabled={aiAssistantEnabled}
         setAiAssistantEnabled={setAiAssistantEnabled}
         floatingCardsEnabled={floatingCardsEnabled}
         setFloatingCardsEnabled={setFloatingCardsEnabled}
@@ -7721,7 +7473,6 @@ export default function App() {
         openSections={adminOpenSections}
         setOpenSections={setAdminOpenSections}
         adminSettings={adminSettings}
-        setAdminSettings={setAdminSettings}
         allUsers={allUsers}
         pendingUsers={pendingUsers}
         newUserForm={newUserForm}
@@ -7758,35 +7509,6 @@ export default function App() {
         notes={notes}
         search={search}
         setSearch={setSearch}
-        composerType={composerType}
-        setComposerType={setComposerType}
-        title={title}
-        setTitle={setTitle}
-        content={content}
-        setContent={setContent}
-        contentRef={contentRef}
-        clInput={clInput}
-        setClInput={setClInput}
-        addComposerItem={addComposerItem}
-        clItems={clItems}
-        composerDrawingData={composerDrawingData}
-        setComposerDrawingData={setComposerDrawingData}
-        composerImages={composerImages}
-        setComposerImages={setComposerImages}
-        composerFileRef={composerFileRef}
-        tags={tags}
-        composerTagList={composerTagList}
-        setComposerTagList={setComposerTagList}
-        composerTagInput={composerTagInput}
-        setComposerTagInput={setComposerTagInput}
-        composerTagFocused={composerTagFocused}
-        setComposerTagFocused={setComposerTagFocused}
-        composerTagInputRef={composerTagInputRef}
-        tagsWithCounts={tagsWithCounts}
-        setTags={setTags}
-        composerColor={composerColor}
-        setComposerColor={setComposerColor}
-        addNote={addNote}
         onDirectDraw={handleDirectDraw}
         onDirectText={handleDirectText}
         onDirectChecklist={handleDirectChecklist}
@@ -7800,14 +7522,11 @@ export default function App() {
         onDrop={sOnDrop}
         onDragEnd={sOnDragEnd}
         togglePin={sTogglePin}
-        addImagesToState={addImagesToState}
         filteredEmptyWithSearch={filteredEmptyWithSearch}
         allEmpty={allEmpty}
-        onExportAll={exportAll}
         onImportAll={importAll}
         onImportGKeep={importGKeep}
         onImportMd={importMd}
-        onDownloadSecretKey={downloadSecretKey}
         importFileRef={importFileRef}
         gkeepFileRef={gkeepFileRef}
         mdFileRef={mdFileRef}
@@ -7835,21 +7554,6 @@ export default function App() {
         isAiLoading={isAiLoading}
         aiLoadingProgress={aiLoadingProgress}
         onAiSearch={handleAiSearch}
-        // formatting props
-        formatComposer={formatComposer}
-        showComposerFmt={showComposerFmt}
-        setShowComposerFmt={setShowComposerFmt}
-        composerFmtBtnRef={composerFmtBtnRef}
-        onComposerKeyDown={onComposerKeyDown}
-        // collapsed composer
-        composerCollapsed={composerCollapsed}
-        setComposerCollapsed={setComposerCollapsed}
-        titleRef={titleRef}
-        composerRef={composerRef}
-        // color popover
-        colorBtnRef={colorBtnRef}
-        showColorPop={showColorPop}
-        setShowColorPop={setShowColorPop}
         // loading
         notesLoading={notesLoading}
         // multi-select
@@ -7859,8 +7563,6 @@ export default function App() {
         onExitMulti={onExitMulti}
         onToggleSelect={sOnToggleSelect}
         onCtrlSelect={sOnCtrlSelect}
-        onSelectAllPinned={onSelectAllPinned}
-        onSelectAllOthers={onSelectAllOthers}
         onBulkDelete={onBulkDelete}
         onBulkPin={onBulkPin}
         onBulkArchive={onBulkArchive}
@@ -7877,11 +7579,6 @@ export default function App() {
         // view mode
         listView={listView}
         onToggleViewMode={onToggleViewMode}
-        // SSE connection status
-        sseConnected={sseConnected}
-        isOnline={isOnline}
-        loadNotes={loadNotes}
-        loadArchivedNotes={loadArchivedNotes}
         // sync
         syncStatus={syncStatus}
         handleSyncNow={handleSyncNow}
@@ -7891,8 +7588,6 @@ export default function App() {
         setMobileSearchOpen={setMobileSearchOpen}
         fabOpen={fabOpen}
         setFabOpen={setFabOpen}
-        // checklist update
-        onUpdateChecklistItem={sOnUpdateChecklistItem}
         // Admin panel
         openAdminPanel={openAdminPanel}
         hasUpdate={!!updateInfo?.updateAvailable && !!currentUser?.is_admin}
@@ -7904,12 +7599,10 @@ export default function App() {
         // header auto-hide (mobile)
         windowWidth={windowWidth}
         isLandscapeMobile={isLandscapeMobile}
-        // floating cards toggle
-        floatingCardsEnabled={floatingCardsEnabled}
-        onToggleFloatingCards={toggleFloatingCards}
         notificationBellDesktop={
           <NotificationBell
             dark={dark}
+            // eslint-disable-next-line react-hooks/immutability -- false positive: the handler only touches pendingDraftRef, a ref from useDraftNote, when called
             onAction={handleNotificationAction}
             onClearAll={clearAllNotificationsSynced}
             onOpenChange={setNotifCenterOpen}
@@ -7976,7 +7669,6 @@ export default function App() {
           addDeleteTombstone={addDeleteTombstone}
           showToast={showToast}
           showGenericConfirm={showGenericConfirm}
-          runFormat={runFormat}
           isCollaborativeNote={isCollaborativeNote}
           readModeEnabled={readModeEnabled}
         />
@@ -7984,7 +7676,6 @@ export default function App() {
 
       <GenericConfirmDialog
         open={genericConfirmOpen}
-        dark={dark}
         config={genericConfirmConfig}
         onClose={() => setGenericConfirmOpen(false)}
       />
@@ -8043,7 +7734,6 @@ export default function App() {
         <ChangePasswordModal
           forced
           token={token}
-          dark={dark}
           onSuccess={(res) => {
             setMustChangePassword(false);
             if (res.token && res.user) {
@@ -8059,7 +7749,6 @@ export default function App() {
       {changePasswordOpen && !mustChangePassword && (
         <ChangePasswordModal
           token={token}
-          dark={dark}
           onClose={() => setChangePasswordOpen(false)}
           onSuccess={(res) => {
             setChangePasswordOpen(false);

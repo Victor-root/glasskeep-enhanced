@@ -90,6 +90,7 @@ export default function ChecklistRow({
   // External focus trigger: parent bumps focusToken to request this row.
   React.useEffect(() => {
     if (focusItemId !== item.id || focusToken == null) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- enter edit mode when the parent requests focus on this row
     enterEdit(focusCaret);
   }, [focusToken, focusItemId, item.id, focusCaret, enterEdit]);
 

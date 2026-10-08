@@ -8,6 +8,7 @@ export default function Popover({ anchorRef, open, onClose, children, offset = 8
   const boxRef = useRef(null);
 
   useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on close so the next opening stays hidden until it is placed
     if (!open) { setReady(false); return; }
     const place = () => {
       const a = anchorRef?.current;

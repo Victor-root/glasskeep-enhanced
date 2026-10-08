@@ -31,10 +31,6 @@ function NoteCard({
   onDragLeave,
   onDrop,
   onDragEnd,
-  // online status
-  isOnline = true,
-  // checklist update callback
-  onUpdateChecklistItem,
   currentUser,
   maxPreviewItems = 8,
 }) {
@@ -400,7 +396,6 @@ function NoteCard({
         return (
           <NoteCardFooter
             tags={allTags}
-            icon={noteIcon}
             collabs={collabs}
             isCollab={isCollab}
             dark={dark}

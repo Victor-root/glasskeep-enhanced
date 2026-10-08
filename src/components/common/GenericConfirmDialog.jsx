@@ -20,7 +20,7 @@ const VARIANT_CLASSES = {
         "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none",
 };
 
-export default function GenericConfirmDialog({ open, dark, config, onClose }) {
+export default function GenericConfirmDialog({ open, config, onClose }) {
   if (!open) return null;
 
   const variantClass = VARIANT_CLASSES[resolveVariant(config)] || VARIANT_CLASSES.default;

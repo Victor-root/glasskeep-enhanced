@@ -118,6 +118,7 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
     if (!open) return undefined;
     let cancelled = false;
     submittedRef.current = null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the scan state each time the modal opens, before starting the camera
     setLinkToken(null);
     setInfo(null);
     setErrorText("");

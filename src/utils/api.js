@@ -17,7 +17,7 @@ export function getClientId() {
 export const getAuth = () => {
   try {
     return JSON.parse(localStorage.getItem(AUTH_KEY) || "null");
-  } catch (e) {
+  } catch {
     return null;
   }
 };
@@ -52,7 +52,7 @@ export async function api(path, { method = "GET", body, token, timeoutMs } = {})
     let data = null;
     try {
       data = await res.json();
-    } catch (e) {
+    } catch {
       data = null;
     }
 

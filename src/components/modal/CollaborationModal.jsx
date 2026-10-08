@@ -539,7 +539,6 @@ export default function CollaborationModal({
   const confirmRemoveDialog = (
     <ConfirmRemoveCollaboratorDialog
       open={!!confirmRemove}
-      dark={dark}
       collaboratorName={confirmRemove?.name || confirmRemove?.email || ""}
       onClose={() => setConfirmRemove(null)}
       onConfirm={async (mode) => {

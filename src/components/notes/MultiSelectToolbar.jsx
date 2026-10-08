@@ -197,6 +197,7 @@ export default function MultiSelectToolbar({
   // Mount/exit animation lifecycle
   useEffect(() => {
     if (multiMode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- drives the mount/exit animation from the multiMode prop
       setShouldRender(true);
       setExiting(false);
       return;
@@ -212,7 +213,7 @@ export default function MultiSelectToolbar({
       }, exitMs);
       return () => clearTimeout(id);
     }
-  }, [multiMode, isMobile]); // eslint-disable-line
+  }, [multiMode, isMobile]); // eslint-disable-line react-hooks/exhaustive-deps -- enter or exit when the mode flips, not when the render flag it sets changes
 
   // Click outside the kebab menu
   useEffect(() => {
@@ -294,6 +295,7 @@ export default function MultiSelectToolbar({
         menuTone: "emerald",
       });
     } else {
+      // eslint-disable-next-line react-hooks/refs -- attachRef is a callback ref, only invoked by React on commit
       list.push({
         id: "color",
         label: t("color"),
@@ -303,6 +305,7 @@ export default function MultiSelectToolbar({
         menuTone: "violet",
         attachRef: colorBtnAttachRef,
       });
+      // eslint-disable-next-line react-hooks/refs -- attachRef is a callback ref, only invoked by React on commit
       list.push({
         id: "logo",
         label: t("addLogo"),
@@ -360,7 +363,6 @@ export default function MultiSelectToolbar({
     onOpenSideBySide,
     onBulkDelete,
     onBulkRestore,
-    onBulkColor,
     onBulkPin,
     onBulkArchive,
     onBulkDownloadZip,
@@ -388,6 +390,7 @@ export default function MultiSelectToolbar({
       // Compact buttons are all 36px — skip ghost DOM queries.
       const mobileWidths = {};
       for (const a of actions) mobileWidths[a.id] = 36;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- layout measurement feeding the overflow split
       setActionWidths(mobileWidths);
       if (fixedRef.current) setCounterWidth(fixedRef.current.offsetWidth);
       if (closeRef.current) setCloseWidth(closeRef.current.offsetWidth);
@@ -401,7 +404,7 @@ export default function MultiSelectToolbar({
     setActionWidths(widths);
     if (fixedRef.current) setCounterWidth(fixedRef.current.offsetWidth);
     if (closeRef.current) setCloseWidth(closeRef.current.offsetWidth);
-  }, [shouldRender, isMobile ? mobileActionsKey : actionsKey, compact, isMobile]); // eslint-disable-line
+  }, [shouldRender, isMobile ? mobileActionsKey : actionsKey, compact, isMobile]); // eslint-disable-line react-hooks/exhaustive-deps -- the action keys stand for the actions list, remeasured only when the set of buttons changes
 
   // Compute the visible / overflow split based on real measurements.
   // Two passes: first without reserving kebab space; if that overflows,
@@ -451,6 +454,7 @@ export default function MultiSelectToolbar({
     actions,
     counterWidth,
     closeWidth,
+    DIVIDER,
   ]);
 
   if (!shouldRender) return null;
@@ -564,12 +568,6 @@ export default function MultiSelectToolbar({
     );
   };
 
-  // The color popover is anchored to wherever the color action is
-  // currently rendered: the visible button if it fits, the kebab menu
-  // item otherwise (we re-point multiColorBtnRef when the menu item
-  // mounts via callback ref).
-  const colorInOverflow = overflowActions.some((a) => a.id === "color");
-
   // When the sidebar is permanent, push the dock's left edge past it so
   // the wrapper spans only the content area. CSS handles the default
   // (left:12px desktop / 8px mobile) when the sidebar isn't permanent.
@@ -628,6 +626,7 @@ export default function MultiSelectToolbar({
             </button>
             {showMoreMenu && (
               <div ref={moreMenuRef} className="multi-select-dock__menu" role="menu">
+                {/* eslint-disable-next-line react-hooks/refs -- passes callback refs, only invoked by React on commit */}
                 {overflowActions.map((action) =>
                   renderActionButton(action, {
                     menuItem: true,

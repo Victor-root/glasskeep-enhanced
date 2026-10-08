@@ -26,7 +26,7 @@ export function getStoredTaskStrike() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === "1") return true;
     if (saved === "0") return false;
-  } catch (_) {
+  } catch {
     /* storage blocked — fall through to default */
   }
   return DEFAULT_ON;
@@ -45,7 +45,7 @@ export function applyTaskStrikeClass(on) {
   document.documentElement.classList.toggle(TASK_STRIKE_CLASS, enabled);
   try {
     document.dispatchEvent(new CustomEvent(TASK_STRIKE_EVENT, { detail: enabled }));
-  } catch (_) {
+  } catch {
     /* CustomEvent unavailable — listeners just won't fire */
   }
   return enabled;
@@ -62,7 +62,7 @@ export function setTaskStrike(on) {
   const enabled = applyTaskStrikeClass(on);
   try {
     localStorage.setItem(STORAGE_KEY, enabled ? "1" : "0");
-  } catch (_) {
+  } catch {
     /* storage blocked — selection still applies for this session */
   }
   return enabled;

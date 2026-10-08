@@ -22,7 +22,7 @@ export function currentStatusBarColor() {
       .getPropertyValue("--gk-statusbar")
       .trim();
     if (v) return v;
-  } catch (_) {
+  } catch {
     /* getComputedStyle unavailable — fall through */
   }
   return document.documentElement.classList.contains("dark")
@@ -48,26 +48,26 @@ export function setThemeColor(color) {
   meta.setAttribute("content", color);
   document.head.appendChild(meta);
   // Direct call to Android WebView bridge (bypasses MutationObserver)
-  try { window.AndroidTheme?.onThemeColor(color); } catch (_) {}
+  try { window.AndroidTheme?.onThemeColor(color); } catch { /* bridge error: the meta tag above still applies */ }
 }
 
 /** Android app (1.4.8+) only: paints the navigation bar in its own colour
  *  instead of the theme colour; null hands it back to the theme colour. */
 export function setNavBarColor(color) {
-  try { window.AndroidTheme?.onNavBarColor?.(color || ""); } catch (_) {}
+  try { window.AndroidTheme?.onNavBarColor?.(color || ""); } catch { /* bridge error: nav bar keeps its current colour */ }
 }
 
 /** Android app (1.4.8+) only: darkens the painted status and navigation bars
  *  by this share of black, in step with a dimming overlay over the page. */
 export function setSystemBarsScrim(alpha) {
-  try { window.AndroidTheme?.setBarsScrim?.(alpha); } catch (_) {}
+  try { window.AndroidTheme?.setBarsScrim?.(alpha); } catch { /* bridge error: system bars stay unscrimmed */ }
 }
 
 export const sanitizeFilename = (name, fallback = "note") =>
   (name || fallback)
     .toString()
     .trim()
-    .replace(/[\/\\?%*:|"<>]/g, "-")
+    .replace(/[/\\?%*:|"<>]/g, "-")
     .slice(0, 64);
 
 export const downloadText = (filename, content) => {

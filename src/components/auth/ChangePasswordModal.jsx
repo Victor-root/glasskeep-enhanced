@@ -10,11 +10,10 @@ import { localizeServerError } from "../../utils/serverErrors.js";
  * Props:
  *  - forced: boolean — if true, hides cancel and requires change (first login temp password)
  *  - token: string — current JWT
- *  - dark: boolean
  *  - onSuccess({ token, user }) — called after password changed successfully
  *  - onClose() — called when cancelled (only when !forced)
  */
-export default function ChangePasswordModal({ forced, token, dark, onSuccess, onClose }) {
+export default function ChangePasswordModal({ forced, token, onSuccess, onClose }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

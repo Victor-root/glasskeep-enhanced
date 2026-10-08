@@ -36,7 +36,7 @@ function hasCoarsePointer() {
   if (typeof window === "undefined") return false;
   try {
     return window.matchMedia?.("(pointer: coarse)").matches || false;
-  } catch (_e) {
+  } catch {
     return false;
   }
 }
@@ -76,7 +76,7 @@ function focusEditorAtClientPoint(view, x, y) {
       const $pos = view.state.doc.resolve(found.pos);
       view.dispatch(view.state.tr.setSelection(TextSelection.near($pos)));
     }
-  } catch (_e) {}
+  } catch { /* stale position: keep the current caret */ }
 }
 
 function ensureSchemeURL(raw) {
@@ -163,7 +163,7 @@ function getInlineCopyEl(host) {
       const text = inlineCopyTarget.textContent || "";
       try {
         navigator.clipboard?.writeText(text);
-      } catch (_e) {}
+      } catch { /* clipboard blocked: the label still confirms the tap */ }
       const old = t("copy");
       inlineCopyEl.textContent = t("copied");
       clearTimeout(inlineCopyEl._gkResetTimer);
@@ -244,7 +244,7 @@ function findBlockAncestor(node) {
     let display;
     try {
       display = window.getComputedStyle(cur).display;
-    } catch (_e) {
+    } catch {
       display = "";
     }
     if (display && display !== "inline" && display !== "contents") return cur;
@@ -326,7 +326,7 @@ function showInlineCopyFor(codeEl, { sticky = false } = {}) {
     if (nc && nc.trim()) el.style.setProperty("--note-color", nc.trim());
     if (nco && nco.trim())
       el.style.setProperty("--note-color-opaque", nco.trim());
-  } catch (_e) {}
+  } catch { /* styles unreadable: the button keeps its default colours */ }
   el.textContent = t("copy");
   el.classList.add("rt-inline-code-copy--visible");
   el.classList.toggle("rt-inline-code-copy--sticky", sticky);
@@ -413,7 +413,7 @@ function showLinkPopover(anchor, href, view) {
       view.dispatch(
         view.state.tr.setSelection(TextSelection.create(view.state.doc, pos)),
       );
-    } catch (_e) {
+    } catch {
       view.focus();
     }
   });
@@ -581,7 +581,7 @@ export const EditExtras = Extension.create({
             if (ae && (ae === dom || dom.contains(ae))) {
               try {
                 ae.blur();
-              } catch (_e) {}
+              } catch { /* element already detached: nothing to blur */ }
             }
           };
           const armSyntheticGuard = () => {

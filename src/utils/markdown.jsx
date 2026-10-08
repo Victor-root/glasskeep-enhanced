@@ -47,6 +47,7 @@ export const renderSafeMarkdown = (md) => {
       const blanks = match.length - 1;
       return "\n\n" + '<div class="md-blank-line"></div>\n\n'.repeat(blanks);
     });
+    // eslint-disable-next-line no-control-regex -- NUL sentinels mark the protected code blocks
     text = text.replace(/\x00CODE(\d+)\x00/g, (_, i) => codeBlocks[+i]);
 
     const raw = marked.parse(text, { breaks: true });
@@ -70,6 +71,7 @@ export const renderSafeMarkdown = (md) => {
     });
     cleaned = cleaned.replace(/<br\s*\/?>\s*\n/g, "<br>");
     cleaned = cleaned.replace(/>[ \t]*\n[ \t\n]*</g, "><");
+    // eslint-disable-next-line no-control-regex -- NUL sentinels mark the protected <pre> blocks
     cleaned = cleaned.replace(/\x00PRE(\d+)\x00/g, (_, i) => preBlocks[+i]);
     return DOMPurify.sanitize(cleaned, _PURIFY_CONFIG);
   } catch {
@@ -84,7 +86,7 @@ export const mdToPlain = (md) => {
     tmp.innerHTML = html;
     const text = tmp.textContent || tmp.innerText || "";
     return text.replace(/\n{3,}/g, "\n\n");
-  } catch (e) {
+  } catch {
     return md || "";
   }
 };

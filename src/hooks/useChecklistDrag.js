@@ -269,7 +269,7 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     if (!ds) return;
 
     if (ds.autoScrollRaf) cancelAnimationFrame(ds.autoScrollRaf);
-    try { ds.handle.releasePointerCapture(ds.pointerId); } catch (_) {}
+    try { ds.handle.releasePointerCapture(ds.pointerId); } catch { /* capture already released */ }
 
     if (ds.mode === "horizontal") {
       const slideEl = ds.slideEl;
@@ -400,7 +400,7 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
         // Locate the target section's range [sectionStart, sectionEnd)
         // in the rebuilt (post-removal) entries array.
         let sectionStart = 0;
-        let sectionEnd = src.length;
+        let sectionEnd;
         if (targetSection === DEFAULT) {
           const firstMarker = src.findIndex(isSection);
           sectionEnd = firstMarker === -1 ? src.length : firstMarker;
@@ -560,7 +560,7 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
       if (i !== fromIndex) el.style.transition = "transform 0.2s cubic-bezier(.2,0,0,1)";
     });
 
-    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    try { handle.setPointerCapture(e.pointerId); } catch { /* pointer no longer active: continue without capture */ }
 
     sectionDragState.current = {
       id: String(sectionId),
@@ -613,7 +613,7 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     const ds = sectionDragState.current;
     if (!ds) return;
     if (ds.autoScrollRaf) cancelAnimationFrame(ds.autoScrollRaf);
-    try { ds.handle.releasePointerCapture(ds.pointerId); } catch (_) {}
+    try { ds.handle.releasePointerCapture(ds.pointerId); } catch { /* capture already released */ }
 
     const scrollDelta = ds.scrollEl ? (ds.scrollEl.scrollTop - ds.startScrollTop) : 0;
     const targetRect = ds.rects[ds.currentIndex];
