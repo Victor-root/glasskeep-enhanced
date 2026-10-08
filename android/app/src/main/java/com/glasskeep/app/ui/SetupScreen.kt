@@ -248,7 +248,7 @@ internal fun FloatingCardsBackground(dark: Boolean) {
  *  layout (same vibe as the in-app TvLogin) without touching the
  *  phone / tablet experience. */
 @Composable
-private fun isTelevision(): Boolean {
+internal fun isTelevision(): Boolean {
     val ctx = LocalContext.current
     val uiMode = ctx.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
     if (uiMode == Configuration.UI_MODE_TYPE_TELEVISION) return true

@@ -1,9 +1,9 @@
 package com.glasskeep.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,25 +17,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.glasskeep.app.R
@@ -69,60 +59,32 @@ fun OnboardingPager(
     )
     val scope = rememberCoroutineScope()
     val dark = isSystemInDarkTheme()
+    val tv = isTelevision()
 
-    // With a remote, focus stays on the button that changed the page,
-    // left behind on the page now off screen: the page that comes into
-    // view takes it instead. Touch screens never see a D-pad key, so no
-    // control gets focus (or a keyboard) there.
-    var remote by remember { mutableStateOf(false) }
-    val pageFocus = remember { List(2) { FocusRequester() } }
-    LaunchedEffect(pagerState.settledPage) {
-        if (remote) pageFocus[pagerState.settledPage].requestFocus()
+    // A remote has no swipe, and a pager that scrolls under its focus
+    // moved it from page to page. On TV the two pages are therefore shown
+    // one at a time, through their buttons only.
+    var tvPage by remember { mutableIntStateOf(if (startAtSetup) 1 else 0) }
+    val currentPage = if (tv) tvPage else pagerState.currentPage
+    val goTo: (Int) -> Unit = { page ->
+        if (tv) tvPage = page else scope.launch { pagerState.animateScrollToPage(page) }
     }
+    BackHandler(enabled = tv && tvPage == 1) { tvPage = 0 }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .onPreviewKeyEvent {
-                if (it.type == KeyEventType.KeyDown && it.key in DpadKeys) remote = true
-                false
-            },
-    ) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-        ) { page ->
-            // A remote moving sideways stays on its page: letting focus
-            // cross over had the pager follow it to the other page and
-            // back, endlessly. Pages change through their buttons.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .focusRequester(pageFocus[page])
-                    .focusProperties {
-                        onExit = {
-                            if (requestedFocusDirection == FocusDirection.Left ||
-                                requestedFocusDirection == FocusDirection.Right
-                            ) cancelFocusChange()
-                        }
-                    }
-                    .focusGroup(),
-            ) {
-                when (page) {
-                    0 -> WelcomeScreen(onContinue = {
-                        // Persist the ack THEN animate so a user who quits
-                        // mid-scroll still gets the "welcome already seen"
-                        // skip on next launch.
-                        onWelcomeCompleted()
-                        scope.launch { pagerState.animateScrollToPage(1) }
-                    })
-                    1 -> SetupScreen(initialUrl = initialUrl, onConnect = onConnect)
-                }
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (tv) {
+            OnboardingPage(tvPage, initialUrl, onWelcomeCompleted, goTo, onConnect)
+        } else {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+            ) { page ->
+                OnboardingPage(page, initialUrl, onWelcomeCompleted, goTo, onConnect)
             }
         }
 
         PageDots(
-            currentPage = pagerState.currentPage,
+            currentPage = currentPage,
             pageCount = 2,
             dark = dark,
             modifier = Modifier
@@ -133,21 +95,37 @@ fun OnboardingPager(
         // Back-arrow overlay only visible on the setup page. Swipe-back
         // still works alongside it, but a discoverable tap target at
         // the top-left covers users who don't know about the swipe.
-        if (pagerState.currentPage == 1) {
+        if (currentPage == 1) {
             BackButton(
                 dark = dark,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(start = 12.dp, top = 12.dp),
-                onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
+                onClick = { goTo(0) },
             )
         }
     }
 }
 
-private val DpadKeys = setOf(
-    Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight, Key.DirectionCenter,
-)
+@Composable
+private fun OnboardingPage(
+    page: Int,
+    initialUrl: String,
+    onWelcomeCompleted: () -> Unit,
+    goTo: (Int) -> Unit,
+    onConnect: (String) -> Unit,
+) {
+    when (page) {
+        0 -> WelcomeScreen(onContinue = {
+            // Persist the ack THEN move on so a user who quits
+            // mid-scroll still gets the "welcome already seen"
+            // skip on next launch.
+            onWelcomeCompleted()
+            goTo(1)
+        })
+        1 -> SetupScreen(initialUrl = initialUrl, onConnect = onConnect)
+    }
+}
 
 @Composable
 private fun BackButton(
