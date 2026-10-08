@@ -64,6 +64,7 @@ function ClipRow({ clip, index, isCurrent, isPlaying, readOnly, onPlay, onRename
   // (e.g. another device synced an updated name). Avoid clobbering the
   // user's in-progress edit.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resync the draft with an external rename while not editing
     if (!editing) setDraft(clip.name || "");
   }, [clip.name, editing]);
 

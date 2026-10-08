@@ -19,7 +19,7 @@ function getCtx() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
   if (!audioCtx) {
-    try { audioCtx = new AC(); } catch (_e) { return null; }
+    try { audioCtx = new AC(); } catch { return null; }
   }
   // Resume on demand — Chrome suspends the context on idle pages.
   if (audioCtx.state === "suspended") {
@@ -51,7 +51,7 @@ export function playNotificationDing() {
     // the sound subdued at default system volume.
     blip(ctx, 880, 0, 140, 0.05);
     blip(ctx, 660, 0.07, 200, 0.04);
-  } catch (_e) {
+  } catch {
     // Some browsers throw if the context was closed; nothing to do.
   }
 }

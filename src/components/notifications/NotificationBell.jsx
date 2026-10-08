@@ -123,6 +123,7 @@ export default function NotificationBell({
       </button>
       <NotificationCenter
         open={open}
+        // eslint-disable-next-line react-hooks/refs -- the bell button is mounted before the panel can open, so its node is available when the anchor matters
         anchor={buttonRef.current}
         onClose={() => setOpen(false)}
         onAction={onAction}

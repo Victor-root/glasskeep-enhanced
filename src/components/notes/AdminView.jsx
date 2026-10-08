@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { t } from "../../i18n";
-import { api, getAuth, API_BASE } from "../../utils/api.js";
+import { getAuth, API_BASE } from "../../utils/api.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
 
-export default function AdminView({ dark, showGenericConfirm }) {
+export default function AdminView({ showGenericConfirm }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const sess = getAuth();
@@ -49,8 +49,10 @@ export default function AdminView({ dark, showGenericConfirm }) {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches the user list once on mount
     load();
-  }, []); // load once
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once on mount
+  }, []);
 
   return (
     <div className="min-h-screen px-4 sm:px-6 md:px-8 lg:px-12 py-8">

@@ -63,7 +63,7 @@ export function setLanguageOverride(lang) {
     } else {
       localStorage.removeItem(LANG_STORAGE_KEY);
     }
-  } catch {}
+  } catch { /* storage unavailable: choice not persisted */ }
 }
 
 // Sync server-side language preference to the local override. Returns

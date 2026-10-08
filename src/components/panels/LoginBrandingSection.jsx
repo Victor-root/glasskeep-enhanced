@@ -34,6 +34,7 @@ function AppNameRow({ value, onSave, showToast }) {
   const [savedFlash, setSavedFlash] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resync the editable draft with the persisted value
     setDraft((prev) => (prev === (value || "") ? prev : value || ""));
   }, [value]);
 
@@ -102,6 +103,7 @@ export default function LoginBrandingSection({ dark, adminSettings, updateAdminS
   // release so dragging stays smooth and doesn't spam PATCHes.
   const [blur, setBlur] = useState(persistedBlur);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- follow the persisted value while the slider keeps its own live value
     setBlur(persistedBlur);
   }, [persistedBlur]);
 

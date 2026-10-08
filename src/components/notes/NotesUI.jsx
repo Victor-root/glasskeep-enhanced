@@ -16,35 +16,6 @@ function NotesUI({
   notes,
   search,
   setSearch,
-  composerType,
-  setComposerType,
-  title,
-  setTitle,
-  content,
-  setContent,
-  contentRef,
-  clInput,
-  setClInput,
-  addComposerItem,
-  clItems,
-  composerDrawingData,
-  setComposerDrawingData,
-  composerImages,
-  setComposerImages,
-  composerFileRef,
-  tags,
-  setTags,
-  composerTagList,
-  setComposerTagList,
-  composerTagInput,
-  setComposerTagInput,
-  composerTagFocused,
-  setComposerTagFocused,
-  composerTagInputRef,
-  tagsWithCounts,
-  composerColor,
-  setComposerColor,
-  addNote,
   onDirectDraw,
   onDirectText,
   onDirectChecklist,
@@ -58,12 +29,9 @@ function NotesUI({
   onDrop,
   onDragEnd,
   togglePin,
-  addImagesToState,
-  onExportAll,
   onImportAll,
   onImportGKeep,
   onImportMd,
-  onDownloadSecretKey,
   importFileRef,
   gkeepFileRef,
   mdFileRef,
@@ -82,21 +50,6 @@ function NotesUI({
   activeTagFilters = [],
   sidebarPermanent,
   sidebarWidth,
-  // formatting
-  formatComposer,
-  showComposerFmt,
-  setShowComposerFmt,
-  composerFmtBtnRef,
-  onComposerKeyDown,
-  // collapsed composer
-  composerCollapsed,
-  setComposerCollapsed,
-  titleRef,
-  composerRef,
-  // color popover
-  colorBtnRef,
-  showColorPop,
-  setShowColorPop,
   // loading state
   notesLoading,
   // multi-select
@@ -106,8 +59,6 @@ function NotesUI({
   onExitMulti,
   onToggleSelect,
   onCtrlSelect,
-  onSelectAllPinned,
-  onSelectAllOthers,
   onBulkDelete,
   onBulkPin,
   onBulkArchive,
@@ -124,13 +75,6 @@ function NotesUI({
   // view mode
   listView,
   onToggleViewMode,
-  // SSE connection status
-  sseConnected,
-  isOnline,
-  loadNotes,
-  loadArchivedNotes,
-  // checklist update
-  onUpdateChecklistItem,
   // Admin panel
   openAdminPanel,
   hasUpdate = false,
@@ -151,9 +95,6 @@ function NotesUI({
   // header auto-hide (mobile)
   windowWidth,
   isLandscapeMobile,
-  // floating cards toggle
-  floatingCardsEnabled,
-  onToggleFloatingCards,
   // sync
   syncStatus,
   instanceLocked = false,
@@ -178,6 +119,7 @@ function NotesUI({
   const lastScrollYRef = useRef(0);
   useEffect(() => {
     if (windowWidth >= 700 && !isLandscapeMobile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- header auto-hide only runs on mobile: force the header back when switching to desktop
       setHeaderVisible(true);
       return;
     }
@@ -195,6 +137,7 @@ function NotesUI({
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-evaluated on width changes only, as before; isLandscapeMobile is read at that time
   }, [windowWidth]);
   const sectionLabel = (() => {
     // Multiple tags selected: show a compact count badge instead of the
@@ -252,7 +195,6 @@ function NotesUI({
         windowWidth={windowWidth}
         isLandscapeMobile={isLandscapeMobile}
         sidebarPermanent={sidebarPermanent}
-        multiMode={multiMode}
         mobileSearchOpen={mobileSearchOpen}
         setMobileSearchOpen={setMobileSearchOpen}
         mobileSearchRef={mobileSearchRef}
@@ -260,7 +202,6 @@ function NotesUI({
         setSearch={setSearch}
         aiAssistantEnabled={aiAssistantEnabled}
         onAiSearch={onAiSearch}
-        isOnline={isOnline}
         listView={listView}
         onToggleViewMode={onToggleViewMode}
         toggleDark={toggleDark}
@@ -292,7 +233,6 @@ function NotesUI({
         sectionLabel={sectionLabel}
         SectionIcon={SectionIcon}
         openSidebar={openSidebar}
-        activeTagFilter={activeTagFilter}
         notificationBellDesktop={notificationBellDesktop}
         notificationBellMobile={notificationBellMobile}
       />
@@ -311,33 +251,6 @@ function NotesUI({
       <NotesComposer
         dark={dark}
         activeTagFilter={activeTagFilter}
-        composerType={composerType}
-        setComposerType={setComposerType}
-        title={title}
-        setTitle={setTitle}
-        content={content}
-        setContent={setContent}
-        contentRef={contentRef}
-        clInput={clInput}
-        setClInput={setClInput}
-        addComposerItem={addComposerItem}
-        clItems={clItems}
-        composerDrawingData={composerDrawingData}
-        setComposerDrawingData={setComposerDrawingData}
-        composerImages={composerImages}
-        setComposerImages={setComposerImages}
-        composerFileRef={composerFileRef}
-        composerTagList={composerTagList}
-        setComposerTagList={setComposerTagList}
-        composerTagInput={composerTagInput}
-        setComposerTagInput={setComposerTagInput}
-        composerTagFocused={composerTagFocused}
-        setComposerTagFocused={setComposerTagFocused}
-        composerTagInputRef={composerTagInputRef}
-        tagsWithCounts={tagsWithCounts}
-        composerColor={composerColor}
-        setComposerColor={setComposerColor}
-        addNote={addNote}
         onDirectDraw={onDirectDraw}
         onDirectText={onDirectText}
         onDirectChecklist={onDirectChecklist}
@@ -346,18 +259,6 @@ function NotesUI({
         setFabOpen={setFabOpen}
         isDesktop={windowWidth >= 700 && !isLandscapeMobile}
         multiMode={multiMode}
-        formatComposer={formatComposer}
-        showComposerFmt={showComposerFmt}
-        setShowComposerFmt={setShowComposerFmt}
-        composerFmtBtnRef={composerFmtBtnRef}
-        onComposerKeyDown={onComposerKeyDown}
-        composerCollapsed={composerCollapsed}
-        setComposerCollapsed={setComposerCollapsed}
-        titleRef={titleRef}
-        composerRef={composerRef}
-        colorBtnRef={colorBtnRef}
-        showColorPop={showColorPop}
-        setShowColorPop={setShowColorPop}
         aiAssistantEnabled={aiAssistantEnabled}
         aiResponse={aiResponse}
         setAiResponse={setAiResponse}
@@ -365,15 +266,10 @@ function NotesUI({
         setAiCitedNoteIds={setAiCitedNoteIds}
         isAiLoading={isAiLoading}
         aiLoadingProgress={aiLoadingProgress}
-        onAiSearch={onAiSearch}
-        search={search}
         setSearch={setSearch}
-        syncStatus={syncStatus}
         notes={notes}
         currentUser={currentUser}
         openModal={openModal}
-        isOnline={isOnline}
-        onUpdateChecklistItem={onUpdateChecklistItem}
       />
 
       <NotesSections
@@ -392,8 +288,6 @@ function NotesUI({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         onDragEnd={onDragEnd}
-        isOnline={isOnline}
-        onUpdateChecklistItem={onUpdateChecklistItem}
         currentUser={currentUser}
         listView={listView}
         notesLoading={notesLoading}

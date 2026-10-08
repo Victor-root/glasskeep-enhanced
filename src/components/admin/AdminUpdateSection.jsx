@@ -34,7 +34,7 @@ function CommandRow({ icon: Icon, label, description, command }) {
       }
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
-    } catch (_) {
+    } catch {
       /* clipboard blocked — silent */
     }
   };

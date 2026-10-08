@@ -1,6 +1,5 @@
 import { useState, useCallback } from "react";
 import { api } from "../utils/api.js";
-import { t } from "../i18n";
 import { localizeServerError } from "../utils/serverErrors.js";
 
 /**
@@ -153,11 +152,8 @@ export default function useAdminActions(token, { onSettingsUpdated } = {}) {
     adminPanelOpen,
     setAdminPanelOpen,
     adminSettings,
-    setAdminSettings,
     allUsers,
-    setAllUsers,
     pendingUsers,
-    setPendingUsers,
     newUserForm,
     setNewUserForm,
     loadAdminSettings,

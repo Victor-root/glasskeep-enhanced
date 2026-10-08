@@ -15,7 +15,7 @@ import { attachStickyCopyButton } from "../utils/codeCopySticky.js";
  * openModal, closeModal, saveModal, deleteModal, or any sync-coupled refs
  * (initialModalStateRef, committedBaselineRef, prevItemsRef, prevDrawingRef, etc.).
  */
-export default function useModalState({ notes, currentUser, closeModalRef, runFormat }) {
+export default function useModalState({ notes, currentUser, closeModalRef }) {
   // ─── Modal state ───
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState(null);
@@ -39,12 +39,10 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
   // Separate hidden file input for the note icon (logo badge) — keeps
   // the OS picker semantics independent from the regular images flow.
   const modalIconFileRef = useRef(null);
-  const [modalMenuOpen, setModalMenuOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isModalClosing, setIsModalClosing] = useState(false);
   const modalClosingTimerRef = useRef(null);
   const [mItems, setMItems] = useState([]);
-  const [mInput, setMInput] = useState("");
   const [mDrawingData, setMDrawingData] = useState({ paths: [], dimensions: null });
 
   // Modal formatting
@@ -72,12 +70,6 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
     mobileNavTimer.current = setTimeout(() => setMobileNavVisible(false), 3000);
   };
 
-  // Checklist item drag (for modal reordering)
-  const checklistDragId = useRef(null);
-
-  // Modal kebab anchor
-  const modalMenuBtnRef = useRef(null);
-
   // Scrim click tracking to avoid closing when drag starts inside modal
   const scrimClickStartRef = useRef(false);
 
@@ -88,9 +80,6 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
   const modalScrollRef = useRef(null);
   const [modalScrollable, setModalScrollable] = useState(false);
   const savedModalScrollRatioRef = useRef(0);
-
-  // Track if we pushed a history entry for the modal (Android back button support)
-  const modalHistoryRef = useRef(false);
 
 
 
@@ -238,49 +227,41 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
     [notes, currentUser],
   );
 
-  // ─── formatModal ───
-  const formatModal = useCallback(
-    (type) => runFormat(() => mBody, setMBody, mBodyRef, type),
-    [mBody, runFormat],
-  );
-
   // ─── Auto-resize modal textarea with debouncing ───
-  const resizeModalTextarea = useMemo(() => {
-    let timeoutId = null;
-    return () => {
-      const el = mBodyRef.current;
-      if (!el) return;
+  const resizeTimeoutRef = useRef(null);
+  const resizeModalTextarea = useCallback(() => {
+    const el = mBodyRef.current;
+    if (!el) return;
 
-      // Clear previous timeout
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+    // Clear previous timeout
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current);
+    }
 
-      // Debounce the resize to prevent excessive updates
-      timeoutId = setTimeout(() => {
-        const modalScrollEl = modalScrollRef.current;
+    // Debounce the resize to prevent excessive updates
+    resizeTimeoutRef.current = setTimeout(() => {
+      const modalScrollEl = modalScrollRef.current;
 
-        // Save scroll position before collapsing textarea height
-        const savedScrollTop = modalScrollEl ? modalScrollEl.scrollTop : 0;
+      // Save scroll position before collapsing textarea height
+      const savedScrollTop = modalScrollEl ? modalScrollEl.scrollTop : 0;
 
-        const MIN = 160;
-        el.style.height = "0px";
-        el.style.height = Math.max(el.scrollHeight, MIN) + "px";
+      const MIN = 160;
+      el.style.height = "0px";
+      el.style.height = Math.max(el.scrollHeight, MIN) + "px";
 
-        requestAnimationFrame(() => {
-          if (!modalScrollEl) return;
-          // Mode-switch ratio takes priority, otherwise restore pre-resize position
-          const ratio = savedModalScrollRatioRef.current;
-          if (ratio > 0) {
-            const maxScroll = modalScrollEl.scrollHeight - modalScrollEl.clientHeight;
-            modalScrollEl.scrollTop = ratio * maxScroll;
-            savedModalScrollRatioRef.current = 0;
-          } else {
-            modalScrollEl.scrollTop = savedScrollTop;
-          }
-        });
-      }, 10); // Small delay to batch rapid changes
-    };
+      requestAnimationFrame(() => {
+        if (!modalScrollEl) return;
+        // Mode-switch ratio takes priority, otherwise restore pre-resize position
+        const ratio = savedModalScrollRatioRef.current;
+        if (ratio > 0) {
+          const maxScroll = modalScrollEl.scrollHeight - modalScrollEl.clientHeight;
+          modalScrollEl.scrollTop = ratio * maxScroll;
+          savedModalScrollRatioRef.current = 0;
+        } else {
+          modalScrollEl.scrollTop = savedScrollTop;
+        }
+      });
+    }, 10); // Small delay to batch rapid changes
   }, []);
 
   // ─── UI Effects ───
@@ -301,6 +282,7 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
 
   // Close image viewer if modal closes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the image viewer is also opened and closed on its own; this only reacts to the modal closing
     if (!open) setImgViewOpen(false);
   }, [open]);
 
@@ -341,7 +323,7 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [activeId, imgViewOpen]);
+  }, [activeId, imgViewOpen, closeModalRef]);
 
   // Note: Android back button (popstate) for the modal is handled centrally in App.jsx
 
@@ -349,7 +331,7 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
   useEffect(() => {
     if (!open || mType !== "text") return;
     if (!viewMode) resizeModalTextarea();
-  }, [open, viewMode, mBody, mType]);
+  }, [open, viewMode, mBody, mType, resizeModalTextarea]);
 
   // Restore scroll ratio when switching edit→view (no textarea resize in this direction)
   useEffect(() => {
@@ -366,6 +348,7 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
 
   // Ensure modal formatting menu hides when switching to view mode or non-text
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the menu is toggled by the user; this only forces it closed when it no longer applies
     if (viewMode || mType !== "text") setShowModalFmt(false);
   }, [viewMode, mType]);
 
@@ -457,7 +440,7 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
     const mo = new MutationObserver(() => attach());
     try {
       mo.observe(root, { childList: true, subtree: true });
-    } catch (e) {}
+    } catch { /* root not observable: timed attach() calls still run */ }
 
     // Force plain-text clipboard payload when the user selects inside
     // a <pre>/<code>. The dedicated copy button already does the right
@@ -493,12 +476,10 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
     viewMode, setViewMode,
     mImages, setMImages,
     savingModal, setSavingModal,
-    modalMenuOpen, setModalMenuOpen,
     confirmDeleteOpen, setConfirmDeleteOpen,
     isModalClosing, setIsModalClosing,
     modalClosingTimerRef,
     mItems, setMItems,
-    mInput, setMInput,
     mDrawingData, setMDrawingData,
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
@@ -517,13 +498,10 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
     modalIconFileRef,
     modalFmtBtnRef,
     modalColorBtnRef,
-    checklistDragId,
-    modalMenuBtnRef,
     scrimClickStartRef,
     noteViewRef,
     modalScrollRef,
     savedModalScrollRatioRef,
-    modalHistoryRef,
     // Derived
     activeNoteObj,
     editedStamp,
@@ -542,7 +520,5 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
     // Handlers
     onModalBodyClick,
     isCollaborativeNote,
-    formatModal,
-    resizeModalTextarea,
   };
 }

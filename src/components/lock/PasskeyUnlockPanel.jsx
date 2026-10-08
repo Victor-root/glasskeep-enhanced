@@ -27,6 +27,7 @@ export default function PasskeyUnlockPanel({ onUnlocked }) {
   const [err, setErr] = useState("");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- probe WebAuthn support once after mount
     setSupported(isWebAuthnSupported());
   }, []);
 

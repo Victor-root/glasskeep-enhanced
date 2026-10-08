@@ -214,7 +214,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
 
   const {
     syncState, serverReachable, hasPendingChanges, lastSyncAt, lastSyncError,
-    pending, processing, retry, failed, total, items, failedChecks,
+    pending, processing, failed, total, items, failedChecks,
   } = syncStatus;
 
   const config = getStatusConfig(syncState, dark);
@@ -470,6 +470,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
         )}
       </button>
 
+      {/* eslint-disable-next-line react-hooks/refs -- reads the button's live layout to let only the visible instance render the panel */}
       {open && !isMobileSheet && !isHiddenInstance() && (
         <div
           ref={menuRef}
@@ -481,6 +482,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
           {renderDetails(false)}
         </div>
       )}
+      {/* eslint-disable-next-line react-hooks/refs -- same check for the mobile sheet */}
       {isMobileSheet && !isHiddenInstance() && (
         <Sheet edge="top" open={open} onClose={() => setOpen(false)} title={t("syncPanelTitle")} background="var(--gk-statusbar)">
           {renderDetails(true)}

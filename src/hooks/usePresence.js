@@ -12,6 +12,7 @@ export function usePresence(open, ref, exitMs) {
   const [shown, setShown] = useState(false);
 
   useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mounts or starts closing the overlay before paint when `open` flips
     if (open) setMounted(true);
     else setShown(false);
   }, [open]);

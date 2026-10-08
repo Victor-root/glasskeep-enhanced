@@ -25,7 +25,7 @@ export default function PageScrollbar() {
     const track = trackRef.current;
     const thumb = thumbRef.current;
     const setNative = (on) => {
-      try { window.AndroidTheme?.setNativePageScrollbar?.(on); } catch (_) { /* no app */ }
+      try { window.AndroidTheme?.setNativePageScrollbar?.(on); } catch { /* no app */ }
     };
     setNative(false);
 

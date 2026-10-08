@@ -9,33 +9,6 @@ import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 export default function NotesComposer({
   dark,
   activeTagFilter,
-  composerType,
-  setComposerType,
-  title,
-  setTitle,
-  content,
-  setContent,
-  contentRef,
-  clInput,
-  setClInput,
-  addComposerItem,
-  clItems,
-  composerDrawingData,
-  setComposerDrawingData,
-  composerImages,
-  setComposerImages,
-  composerFileRef,
-  composerTagList,
-  setComposerTagList,
-  composerTagInput,
-  setComposerTagInput,
-  composerTagFocused,
-  setComposerTagFocused,
-  composerTagInputRef,
-  tagsWithCounts,
-  composerColor,
-  setComposerColor,
-  addNote,
   onDirectDraw,
   onDirectText,
   onDirectChecklist,
@@ -44,19 +17,6 @@ export default function NotesComposer({
   setFabOpen,
   isDesktop,
   multiMode,
-  addImagesToState,
-  formatComposer,
-  showComposerFmt,
-  setShowComposerFmt,
-  composerFmtBtnRef,
-  onComposerKeyDown,
-  composerCollapsed,
-  setComposerCollapsed,
-  titleRef,
-  composerRef,
-  colorBtnRef,
-  showColorPop,
-  setShowColorPop,
   aiAssistantEnabled,
   aiResponse,
   setAiResponse,
@@ -64,15 +24,10 @@ export default function NotesComposer({
   setAiCitedNoteIds,
   isAiLoading,
   aiLoadingProgress,
-  onAiSearch,
-  search,
   setSearch,
-  syncStatus,
   notes,
   currentUser,
   openModal,
-  isOnline,
-  onUpdateChecklistItem,
 }) {
   // Resolve cited IDs back to note objects. The server returned only
   // IDs that were in the picked context, but the user may have deleted
@@ -149,8 +104,6 @@ export default function NotesComposer({
                       onDragLeave={() => {}}
                       onDrop={() => {}}
                       onDragEnd={() => {}}
-                      isOnline={isOnline}
-                      onUpdateChecklistItem={onUpdateChecklistItem}
                       currentUser={currentUser}
                       maxPreviewItems={4}
                     />

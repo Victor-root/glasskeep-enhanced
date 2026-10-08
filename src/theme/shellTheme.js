@@ -37,7 +37,7 @@ export function getStoredShellTheme() {
   let saved = null;
   try {
     saved = localStorage.getItem(STORAGE_KEY);
-  } catch (_) {
+  } catch {
     /* storage blocked — fall through to default */
   }
   return isValidShellTheme(saved) ? saved : DEFAULT_SHELL_THEME;
@@ -77,7 +77,7 @@ export function applyShellThemeClass(id) {
   // there are simply no listeners, so this is a harmless no-op).
   try {
     document.dispatchEvent(new CustomEvent(SHELL_THEME_EVENT, { detail: theme }));
-  } catch (_) {
+  } catch {
     /* CustomEvent unavailable (very old engines) — listeners just won't fire */
   }
   return theme;
@@ -97,7 +97,7 @@ export function setShellTheme(id) {
   const theme = applyShellThemeClass(id);
   try {
     localStorage.setItem(STORAGE_KEY, theme);
-  } catch (_) {
+  } catch {
     /* storage blocked — selection still applies for this session */
   }
   if (!window.__noteModalOpen) {

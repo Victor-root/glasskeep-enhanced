@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { renderPaths } from "../../DrawingCanvas";
+import { renderPaths } from "../../utils/drawingRender";
 import { t } from "../../i18n";
 
 // Parses the drawing and fits it into the preview box. Returns null when the

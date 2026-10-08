@@ -28,6 +28,7 @@ function LoginSloganRow({ value, onSave, showToast }) {
   React.useEffect(() => {
     // Keep the draft in sync when the panel re-opens with fresh data,
     // but don't clobber typing in progress.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resync the editable draft with the persisted value
     setDraft((prev) => (prev === (value || "") ? prev : (value || "")));
   }, [value]);
 
@@ -104,6 +105,7 @@ function PasskeyDomainRow({ state, onSave, showToast, highlight, onHighlightDone
 
   React.useEffect(() => {
     const wanted = declared || (undecided ? suggested : "");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resync the editable draft with the server state
     setDraft((prev) => (prev === wanted ? prev : wanted));
   }, [declared, suggested, undecided]);
 
@@ -804,7 +806,7 @@ export default function AdminPanel({
                                       "user-x",
                                     );
                                   }
-                                } catch (_e) {
+                                } catch {
                                   // Error already surfaced by deleteUser
                                 }
                               },

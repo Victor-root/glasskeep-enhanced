@@ -248,7 +248,7 @@ export async function askNoteAIStream({ note, messages, question, onChunk, signa
     try {
       const data = await res.json();
       if (data?.error) msg = data.error;
-    } catch {}
+    } catch { /* non-JSON error body: keep the HTTP status message */ }
     const err = new Error(msg);
     err.status = res.status;
     throw err;

@@ -28,6 +28,7 @@ export default function LinkPopover({ editor, anchorRef, open, onClose }) {
 
   useEffect(() => {
     if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- prefill the URL field with the current link each time the popover opens
     setHref(existingHref || "");
     // Focus the URL field on open so the user can type immediately. Defer
     // to the next frame so the popover is already positioned.

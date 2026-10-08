@@ -186,6 +186,7 @@ export function useFederation({ token, enabled = false } = {}) {
   // Initial load + light polling while the section is open.
   useEffect(() => {
     if (!enabled || !token) return undefined;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch of the federation links from the server
     load();
     const id = setInterval(() => load({ silent: true }), POLL_INTERVAL_MS);
     return () => clearInterval(id);

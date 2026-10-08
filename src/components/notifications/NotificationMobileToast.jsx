@@ -155,6 +155,7 @@ export default function NotificationMobileToast({ onAction, suppressed = false, 
   // a burst we fall back to sticky displayedIdRef + first active
   // (handles persistent notifs and the brief settling window before
   // the first burst snapshot is taken).
+  /* eslint-disable react-hooks/refs, react-hooks/purity -- the sticky display tracker is updated during render on purpose so the cycler and countdown read the stamp of the slot being rendered */
   let current = null;
   if (burst && burst.ids[burst.cursor]) {
     const id = burst.ids[burst.cursor];
@@ -188,6 +189,7 @@ export default function NotificationMobileToast({ onAction, suppressed = false, 
     displayedIdRef.current = current.id;
     displayStartRef.current = Date.now();
   }
+  /* eslint-enable react-hooks/refs, react-hooks/purity */
 
   // burstSlice derived from burst object — keeps the rest of the
   // component (bar duration, cycler, layout effect) reading from
@@ -211,6 +213,7 @@ export default function NotificationMobileToast({ onAction, suppressed = false, 
   // closing the panel reveals nothing (until a fresh notif arrives).
   useEffect(() => {
     if (suppressed && burst != null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- drop the burst snapshot once the notification centre opens
       setBurst(null);
     }
   }, [suppressed, burst]);
@@ -271,7 +274,8 @@ export default function NotificationMobileToast({ onAction, suppressed = false, 
       if (hasAndroidBridge()) {
         try {
           window.AndroidToast.show(buildToastText(current), shouldUseLong(current));
-        } catch (_e) {}
+        } catch { /* native toast unavailable: nothing else to show */ }
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- the native toast replaces the web pill when a new notification shows
         setVisible(false);
       } else {
         setVisible(true);
@@ -280,7 +284,6 @@ export default function NotificationMobileToast({ onAction, suppressed = false, 
       setVisible(false);
       lastIdRef.current = null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 
   // Cycler — advances the burst cursor after burstSlice ms. Anchored
@@ -312,6 +315,7 @@ export default function NotificationMobileToast({ onAction, suppressed = false, 
       });
     }, remaining);
     return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the id: a new object for the same notification must not restart the slice timer
   }, [current?.id, burst, dismissLocal]);
 
   const showCountdown = !!(burstSlice && burstSlice > 0 && current);

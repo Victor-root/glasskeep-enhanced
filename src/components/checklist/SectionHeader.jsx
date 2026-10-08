@@ -2,17 +2,9 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { t } from "../../i18n";
 import { useSwallowClosingClick } from "../../hooks/useSwallowClosingClick.js";
+import { useDark } from "./useDark.js";
 
-export function useDark() {
-  const [dark, setDark] = React.useState(() => document.documentElement.classList.contains("dark"));
-  React.useEffect(() => {
-    const obs = new MutationObserver(() => setDark(document.documentElement.classList.contains("dark")));
-    obs.observe(document.documentElement, { attributeFilter: ["class"] });
-    return () => obs.disconnect();
-  }, []);
-  return dark;
-}
-
+// eslint-disable-next-line react-refresh/only-export-components -- also imported from this module by notes/NoteCard.jsx
 export const SECTION_COLORS = [
   { key: "slate",   hex: "#64748b" },
   { key: "indigo",  hex: "#6366f1" },
@@ -25,6 +17,7 @@ export const SECTION_COLORS = [
 ];
 export const DEFAULT_SECTION_COLOR = "indigo";
 
+// eslint-disable-next-line react-refresh/only-export-components -- also imported from this module by notes/NoteCard.jsx
 export function hexAlpha(hex, alpha) {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);

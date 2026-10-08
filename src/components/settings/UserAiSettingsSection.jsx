@@ -10,6 +10,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { api } from "../../utils/api.js";
 import { t } from "../../i18n";
 import { localizeServerError } from "../../utils/serverErrors.js";
+import { useStableCallback } from "../../hooks/useStableCallback.js";
 import TI from "../../icons/editor/index.jsx";
 
 const FIELD_INPUT_CLASSES =
@@ -79,16 +80,15 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
       !!data.enabled && data.adminAiEnabled !== false,
     );
   };
-  const applyConfigRef = useRef(applyConfig);
-  applyConfigRef.current = applyConfig;
+  const applyRemoteConfig = useStableCallback(applyConfig);
 
   useEffect(() => {
     const onRemote = (e) => {
-      if (e.detail) applyConfigRef.current(e.detail);
+      if (e.detail) applyRemoteConfig(e.detail);
     };
     window.addEventListener("user-ai-settings-updated", onRemote);
     return () => window.removeEventListener("user-ai-settings-updated", onRemote);
-  }, []);
+  }, [applyRemoteConfig]);
 
   useEffect(() => {
     let cancelled = false;

@@ -12,7 +12,6 @@ import { t } from "../../i18n";
  */
 export default function ConfirmDeleteDialog({
   open,
-  dark,
   isTrashed,
   collabOwner,
   onClose,

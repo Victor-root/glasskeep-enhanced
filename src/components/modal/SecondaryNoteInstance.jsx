@@ -16,6 +16,34 @@ import { mdForDownload } from "../../utils/markdown.jsx";
 import { askNoteAIStream } from "../../ai.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
 
+const noteAiStorageKey = (id) =>
+  id != null && id !== "" ? `glass-keep-note-ai-${id}` : null;
+const loadSavedNoteAiMessages = (id) => {
+  const key = noteAiStorageKey(id);
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter(
+      (m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string",
+    );
+  } catch {
+    return null;
+  }
+};
+const persistNoteAiMessages = (id, messages) => {
+  const key = noteAiStorageKey(id);
+  if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify(messages)); } catch { /* ignore */ }
+};
+const removeSavedNoteAi = (id) => {
+  const key = noteAiStorageKey(id);
+  if (!key) return;
+  try { localStorage.removeItem(key); } catch { /* ignore */ }
+};
+
 /**
  * SecondaryNoteInstance — self-contained per-note modal controller used as
  * the right-hand pane in side-by-side mode. Maintains feature parity with
@@ -64,7 +92,6 @@ export default function SecondaryNoteInstance({
   // UI helpers
   showToast,
   showGenericConfirm,
-  runFormat,
   isCollaborativeNote,
   readModeEnabled = true,
 }) {
@@ -83,12 +110,10 @@ export default function SecondaryNoteInstance({
     viewMode, setViewMode,
     mImages, setMImages,
     savingModal, setSavingModal,
-    modalMenuOpen, setModalMenuOpen,
     confirmDeleteOpen, setConfirmDeleteOpen,
     isModalClosing, setIsModalClosing,
     modalClosingTimerRef,
     mItems, setMItems,
-    mInput, setMInput,
     mDrawingData, setMDrawingData,
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
@@ -100,37 +125,27 @@ export default function SecondaryNoteInstance({
     modalScrollable,
     modalTagInputRef, modalTagBtnRef, suppressTagBlurRef,
     mBodyRef, modalFileRef, modalIconFileRef, modalFmtBtnRef, modalColorBtnRef,
-    modalMenuBtnRef, scrimClickStartRef,
+    scrimClickStartRef,
     noteViewRef, modalScrollRef, savedModalScrollRatioRef,
     activeNoteObj, editedStamp, modalHasChanges,
     addTags, handleTagKeyDown, handleTagBlur, handleTagPaste,
     openImageViewer, closeImageViewer, nextImage, prevImage, resetMobileNav,
-    onModalBodyClick, formatModal, resizeModalTextarea,
-  } = useModalState({ notes, currentUser, closeModalRef, runFormat });
+    onModalBodyClick,
+  } = useModalState({ notes, currentUser, closeModalRef });
 
   // ─── Collaboration (own instance) ──────────────────────────────────────
-  const collaboratorInputRef = useRef(null);
   const {
     collaborationModalOpen, setCollaborationModalOpen,
-    collaboratorUsername, setCollaboratorUsername,
     addModalCollaborators,
-    filteredUsers, setFilteredUsers,
-    showUserDropdown, setShowUserDropdown,
-    loadingUsers,
-    dropdownPosition,
     removeCollaborator,
     loadCollaboratorsForAddModal,
-    searchUsers,
-    updateDropdownPosition,
-    addCollaborator,
     addCollaboratorsBatch,
     setCollaboratorAccess,
     availableUsers,
     availableLoading,
   } = useCollaboration(token, {
-    notes, currentUser, activeId,
-    showToast, invalidateNotesCache, setNotes,
-    collaboratorInputRef,
+    currentUser, activeId,
+    showToast, invalidateNotesCache,
   });
 
   // ─── Note-AI chat (own instance) ───────────────────────────────────────
@@ -141,34 +156,6 @@ export default function SecondaryNoteInstance({
   const [noteAiError, setNoteAiError] = useState(null);
   const [noteAiSaved, setNoteAiSaved] = useState(false);
   const noteAiAbortRef = useRef(null);
-
-  const noteAiStorageKey = (id) =>
-    id != null && id !== "" ? `glass-keep-note-ai-${id}` : null;
-  const loadSavedNoteAiMessages = (id) => {
-    const key = noteAiStorageKey(id);
-    if (!key) return null;
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return null;
-      return parsed.filter(
-        (m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string",
-      );
-    } catch {
-      return null;
-    }
-  };
-  const persistNoteAiMessages = (id, messages) => {
-    const key = noteAiStorageKey(id);
-    if (!key) return;
-    try { localStorage.setItem(key, JSON.stringify(messages)); } catch { /* ignore */ }
-  };
-  const removeSavedNoteAi = (id) => {
-    const key = noteAiStorageKey(id);
-    if (!key) return;
-    try { localStorage.removeItem(key); } catch { /* ignore */ }
-  };
 
   const stopNoteAi = () => {
     const ctrl = noteAiAbortRef.current;
@@ -216,6 +203,7 @@ export default function SecondaryNoteInstance({
 
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the AI chat when the pane closes and notifies the shell in the same pass
       setNoteAiOpen(false);
       setNoteAiError(null);
       setNoteAiLoading(false);
@@ -315,6 +303,7 @@ export default function SecondaryNoteInstance({
   const [initialDrawMode, setInitialDrawMode] = useState(null);
 
   // ─── Generic auto-save for text content, used by every flow below ──────
+  const currentUserId = currentUser?.id;
   const autoSaveTextNote = useCallback(
     async (id, fields, existingLeaseId, noteType = "text") => {
       const nId = String(id);
@@ -330,11 +319,11 @@ export default function SecondaryNoteInstance({
       );
 
       try {
-        const existing = await idbGetNote(nId, currentUser?.id, sessionId);
+        const existing = await idbGetNote(nId, currentUserId, sessionId);
         if (existing) {
           await idbPutNote(
             { ...existing, ...fields, updated_at: nowIso, client_updated_at: nowIso },
-            currentUser?.id,
+            currentUserId,
             sessionId,
           );
         }
@@ -361,7 +350,7 @@ export default function SecondaryNoteInstance({
       acquireLocalLease, releaseLocalLeaseWithPrune,
       enqueueAndSync, idbGetNote, idbPutNote,
       invalidateNotesCache, setNotes,
-      currentUser?.id, sessionId,
+      currentUserId, sessionId,
     ],
   );
 
@@ -414,7 +403,6 @@ export default function SecondaryNoteInstance({
     committedBaselineRef.current = { ...baselineState };
 
     setViewMode(n.type !== "audio" && readModeEnabled);
-    setModalMenuOpen(false);
     setOpen(true);
 
     const savedMsgs = loadSavedNoteAiMessages(id);
@@ -423,18 +411,19 @@ export default function SecondaryNoteInstance({
       setNoteAiSaved(true);
       setNoteAiHasBeenOpened(true);
     }
-  }, [notes, setActiveId, setMType, setMTitle, setMDrawingData, setMBody, setMItems, setMTagList, setMImages, setTagInput, setMColor, setViewMode, setModalMenuOpen, setOpen]);
+  }, [notes, setActiveId, setMType, setMTitle, setMDrawingData, setMBody, setMItems, setMTagList, setMImages, setTagInput, setMColor, setViewMode, setOpen, readModeEnabled]);
 
   // Open whenever the controlled noteId prop changes
   useEffect(() => {
     if (noteId && (!open || String(activeId) !== String(noteId))) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the note whenever the controlled noteId prop changes
       openNoteIntoModal(noteId);
     } else if (!noteId && open) {
       // External request to drop without animation
       setOpen(false);
       setActiveId(null);
     }
-  }, [noteId]); // eslint-disable-line
+  }, [noteId]); // eslint-disable-line react-hooks/exhaustive-deps -- reacts to the requested note only, not to its own open state
 
   // ─── Auto-save metadata (color/tags/images) ────────────────────────────
   useEffect(() => {
@@ -530,11 +519,11 @@ export default function SecondaryNoteInstance({
       ),
     );
     try {
-      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
+      const existing = await idbGetNote(nid, currentUserId, sessionId);
       if (existing) {
         await idbPutNote(
           { ...existing, content: drawingContent, updated_at: nowIso, client_updated_at: nowIso },
-          currentUser?.id, sessionId,
+          currentUserId, sessionId,
         );
       }
     } catch (e) {
@@ -557,7 +546,7 @@ export default function SecondaryNoteInstance({
     prevDrawingRef.current = drawingData;
     releaseLocalLeaseWithPrune(nid, leaseId);
   }, [
-    currentUser?.id, sessionId, enqueueAndSync,
+    currentUserId, sessionId, enqueueAndSync,
     idbGetNote, idbPutNote, invalidateNotesCache, setNotes,
     releaseLocalLeaseWithPrune,
   ]);
@@ -677,7 +666,6 @@ export default function SecondaryNoteInstance({
         setOpen(false);
         setActiveId(null);
         setViewMode(true);
-        setModalMenuOpen(false);
         setConfirmDeleteOpen(false);
         setShowModalFmt(false);
         setIsModalClosing(false);
@@ -770,6 +758,7 @@ export default function SecondaryNoteInstance({
       onRequestClose?.();
     });
   };
+  // eslint-disable-next-line react-hooks/refs -- keeps the ref given to useModalState pointing at the latest closeModal
   closeModalRef.current = closeModal;
 
   // ─── saveModal ─────────────────────────────────────────────────────────
@@ -1048,7 +1037,7 @@ export default function SecondaryNoteInstance({
       if (icon) await api(`/notes/${nid}/icon`, { method: "PUT", token, body: { icon } });
       else await api(`/notes/${nid}/icon`, { method: "DELETE", token });
     } catch (e) { console.error("[SBS] icon save failed", e); }
-  }, [activeId, setNotes, currentUser, sessionId, token]);
+  }, [activeId, setNotes, currentUser, sessionId, token, idbGetNote, idbPutNote]);
 
   const setNoteIconFromFile = useCallback(async (file) => {
     if (!file) return;
@@ -1199,8 +1188,6 @@ export default function SecondaryNoteInstance({
       setMImages={setMImages}
       mItems={mItems}
       setMItems={setMItems}
-      mInput={mInput}
-      setMInput={setMInput}
       mDrawingData={mDrawingData}
       setMDrawingData={setMDrawingData}
       mTagList={mTagList}
@@ -1214,7 +1201,6 @@ export default function SecondaryNoteInstance({
       noteViewRef={noteViewRef}
       modalFileRef={modalFileRef}
       modalIconFileRef={modalIconFileRef}
-      modalMenuBtnRef={modalMenuBtnRef}
       modalFmtBtnRef={modalFmtBtnRef}
       modalTagInputRef={modalTagInputRef}
       modalTagBtnRef={modalTagBtnRef}
@@ -1231,11 +1217,8 @@ export default function SecondaryNoteInstance({
       handleTagKeyDown={handleTagKeyDown}
       handleTagBlur={handleTagBlur}
       handleTagPaste={handleTagPaste}
-      modalMenuOpen={modalMenuOpen}
-      setModalMenuOpen={setModalMenuOpen}
       showModalFmt={showModalFmt}
       setShowModalFmt={setShowModalFmt}
-      formatModal={formatModal}
       showModalColorPop={showModalColorPop}
       setShowModalColorPop={setShowModalColorPop}
       modalKebabOpen={modalKebabOpen}
@@ -1249,24 +1232,12 @@ export default function SecondaryNoteInstance({
       savingModal={savingModal}
       collaborationModalOpen={collaborationModalOpen}
       setCollaborationModalOpen={setCollaborationModalOpen}
-      collaboratorUsername={collaboratorUsername}
-      setCollaboratorUsername={setCollaboratorUsername}
       addModalCollaborators={addModalCollaborators}
-      showUserDropdown={showUserDropdown}
-      setShowUserDropdown={setShowUserDropdown}
-      filteredUsers={filteredUsers}
-      setFilteredUsers={setFilteredUsers}
-      loadingUsers={loadingUsers}
-      dropdownPosition={dropdownPosition}
-      collaboratorInputRef={collaboratorInputRef}
-      addCollaborator={addCollaborator}
       addCollaboratorsBatch={addCollaboratorsBatch}
       availableUsers={availableUsers}
       availableLoading={availableLoading}
       removeCollaborator={removeCollaborator}
       setCollaboratorAccess={setCollaboratorAccess}
-      searchUsers={searchUsers}
-      updateDropdownPosition={updateDropdownPosition}
       loadCollaboratorsForAddModal={loadCollaboratorsForAddModal}
       imgViewOpen={imgViewOpen}
       imgViewIndex={imgViewIndex}
@@ -1292,12 +1263,10 @@ export default function SecondaryNoteInstance({
       noteIcon={activeNoteObj?.icon || null}
       onPickIcon={pickNoteIconCb}
       logoLibrary={logoLibrary}
-      addLogoToLibrary={addLogoToLibrary}
       deleteLogoFromLibrary={deleteLogoFromLibrary}
       isCollaborativeNote={isCollaborativeNote}
       syncState={syncState}
       onModalBodyClick={onModalBodyClick}
-      resizeModalTextarea={resizeModalTextarea}
       syncChecklistItems={syncChecklistItems}
       checklistInsertPosition={checklistInsertPosition}
       checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}

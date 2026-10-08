@@ -68,6 +68,7 @@ export default function AudioPlayer({
   const trackRef = useRef(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset playback state when the clip source changes
     setPlaying(false);
     setCurrentTime(0);
     setScrubRatio(null);

@@ -67,6 +67,7 @@ export default function FederationSection({
 
   // Keep the name field in sync with what the server reports.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the editable draft whenever the server-reported name changes
     setNameDraft(fed.selfName || "");
   }, [fed.selfName]);
 

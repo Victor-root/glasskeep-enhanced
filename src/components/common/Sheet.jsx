@@ -60,7 +60,7 @@ export default function Sheet({ open, onClose, title, titleAction, edge = "botto
     };
     sheet.dataset.dragging = "";
     scrimRef.current?.setAttribute("data-dragging", "");
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* pointer already gone: drag works without capture */ }
   };
 
   const onPointerMove = (e) => {
@@ -77,7 +77,7 @@ export default function Sheet({ open, onClose, title, titleAction, edge = "botto
     const drag = dragRef.current;
     if (!drag) return;
     dragRef.current = null;
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* capture already released */ }
     const offset = Math.max(0, (e.clientY - drag.startY) * dir);
     const close = offset > drag.height * CLOSE_DISTANCE_RATIO || drag.velocity > CLOSE_VELOCITY;
     // Handing the position back to the stylesheet with transitions restored

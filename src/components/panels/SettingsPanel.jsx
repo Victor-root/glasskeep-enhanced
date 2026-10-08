@@ -43,7 +43,6 @@ export default function SettingsPanel({
   openSections = {},
   setOpenSections,
   onOpenPasskeyDomainSetting,
-  aiAssistantEnabled,
   setAiAssistantEnabled,
   floatingCardsEnabled,
   setFloatingCardsEnabled,
@@ -143,12 +142,13 @@ export default function SettingsPanel({
     if (!isWebView) return;
     try {
       const v = window?.AndroidTheme?.getAppVersion?.();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- read the app info from the Android bridge each time the panel opens
       if (typeof v === "string" && v.length) setAppVersion(v);
-    } catch (e) {}
+    } catch { /* bridge unavailable: keep the default */ }
     try {
       const fd = window?.AndroidTheme?.isFdroidInstall?.();
       setInstalledFromFdroid(fd === true);
-    } catch (e) {}
+    } catch { /* bridge unavailable: keep the default */ }
     try {
       const json = window?.AndroidTheme?.getAvailableUpdate?.();
       if (typeof json === "string" && json.length) {
@@ -158,7 +158,7 @@ export default function SettingsPanel({
           return;
         }
       }
-    } catch (e) {}
+    } catch { /* bridge or JSON failure: treated as no update below */ }
     setAvailableUpdate(null);
   }, [open, isWebView]);
   // Hook the Android-side notification callbacks for the manual check
@@ -1450,7 +1450,7 @@ export default function SettingsPanel({
                     <button
                       type="button"
                       onClick={() => {
-                        try { window.AndroidTheme?.openFdroidPage?.(); } catch (e) {}
+                        try { window.AndroidTheme?.openFdroidPage?.(); } catch { /* bridge unavailable: nothing to open */ }
                       }}
                       className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                     >
@@ -1489,7 +1489,7 @@ export default function SettingsPanel({
                         <button
                           type="button"
                           onClick={() => {
-                            try { window.AndroidTheme?.dismissAvailableUpdate?.(); } catch (e) {}
+                            try { window.AndroidTheme?.dismissAvailableUpdate?.(); } catch { /* bridge unavailable: the card is still hidden below */ }
                             setAvailableUpdate(null);
                           }}
                           className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
@@ -1499,7 +1499,7 @@ export default function SettingsPanel({
                         <button
                           type="button"
                           onClick={() => {
-                            try { window.AndroidTheme?.installAvailableUpdate?.(); } catch (e) {}
+                            try { window.AndroidTheme?.installAvailableUpdate?.(); } catch { /* bridge unavailable: nothing to install */ }
                           }}
                           className="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                         >
@@ -1511,7 +1511,7 @@ export default function SettingsPanel({
                     <button
                       className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                       onClick={() => {
-                        try { window.AndroidTheme.checkForUpdate(); } catch (e) {}
+                        try { window.AndroidTheme.checkForUpdate(); } catch { /* bridge unavailable: no check to run */ }
                       }}
                     >
                       <RowIcon icon={TI.Download} />

@@ -464,7 +464,7 @@ export class SyncEngine {
               await this._emitStatus();
               return false;
             }
-          } catch (_) {
+          } catch {
             // JSON parse failed — not a valid GlassKeep response
             console.warn("[SyncEngine] healthCheck: invalid JSON in health response");
             this._serverReachable = false;
@@ -558,7 +558,6 @@ export class SyncEngine {
         "timeouts=" + (this._consecutiveTimeouts + (err?.name === "AbortError" ? 1 : 0)),
         "swController=" + !!navigator.serviceWorker?.controller);
       const isAbort = err?.name === "AbortError";
-      const browserSaysOnline = typeof navigator !== "undefined" && navigator.onLine;
 
       // Hard network error (TypeError: Failed to fetch) = real proof the
       // server is unreachable. The _sseConnected flag is NOT reliable here:
@@ -830,7 +829,7 @@ export class SyncEngine {
 
         if (!res.ok) {
           let data = null;
-          try { data = await res.json(); } catch {}
+          try { data = await res.json(); } catch { /* non-JSON body: data stays null */ }
           const err = new Error(data?.error || `HTTP ${res.status}`);
           err.status = res.status;
           throw err;

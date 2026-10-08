@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import { api } from "../utils/api.js";
 import { uid, sanitizeFilename, downloadText, fileToCompressedDataURL, ensureJSZip } from "../utils/helpers.js";
 import { t } from "../i18n";
@@ -343,7 +342,7 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
             position: ms,
             timestamp,
           });
-        } catch (e) {}
+        } catch { /* malformed Keep file: skip it */ }
       }
       if (!notesArr.length) {
         alert(t("noValidGoogleKeepNotesFound"));

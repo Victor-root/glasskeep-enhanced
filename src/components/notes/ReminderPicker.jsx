@@ -47,9 +47,6 @@ const intlLocale = locale === "fr" ? "fr-FR" : "en-US";
 const DEFAULT_TIME_CHIPS = ["09:00", "12:00", "15:00", "18:00", "20:00"];
 const MAX_TIME_CHIPS = 5;
 
-function isValidHHMM(s) {
-  return typeof s === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
-}
 // Coerce free-typed digits into a valid "HH:MM" (clamped), or null.
 function normalizeChip(s) {
   const digits = String(s).replace(/[^0-9]/g, "").slice(0, 4);
@@ -156,6 +153,7 @@ function TimeField({ val, max, onChange, label }) {
   const [draft, setDraft] = useState(pad(val));
   // Keep the visible draft in sync when the value changes via the steppers
   // or a quick-chip, but not while the user is mid-edit (handled by focus).
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- resyncs the editable draft when val changes from outside
   useEffect(() => { setDraft(pad(val)); }, [val]);
 
   const commit = (raw) => {
@@ -212,6 +210,7 @@ function TimePicker({ value, onChange, serverChips, onServerChipsChange }) {
   const resolvedChips = (Array.isArray(serverChips) && serverChips.length > 0) ? serverChips : DEFAULT_TIME_CHIPS;
   const [chips, setChips] = useState(resolvedChips);
   // Keep local edit state in sync if the server value arrives after mount.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- resyncs the editable chips when the server value arrives
   useEffect(() => { setChips(resolvedChips); }, [serverChips]); // eslint-disable-line react-hooks/exhaustive-deps
   const [editing, setEditing] = useState(false);
 
@@ -337,6 +336,7 @@ export default function ReminderPicker({ value, onSave, onClear, onClose, timeCh
   }, [dateStr]);
 
   const combined = combineLocal(dateStr, timeStr);
+  // eslint-disable-next-line react-hooks/purity -- the past check is re-evaluated against the current time on each render
   const isPast = combined ? combined.getTime() <= Date.now() : false;
   const canSet = !!combined && !isPast;
 

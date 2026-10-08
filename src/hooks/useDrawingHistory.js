@@ -68,7 +68,9 @@ export default function useDrawingHistory(initialPaths = []) {
     pushPaths,
     undo,
     redo,
+    // eslint-disable-next-line react-hooks/refs -- the stacks live in refs and tick() re-renders whenever their length changes
     canUndo: undoStack.current.length > 0,
+    // eslint-disable-next-line react-hooks/refs -- same as canUndo
     canRedo: redoStack.current.length > 0,
     resetHistory,
   };

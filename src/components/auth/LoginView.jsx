@@ -56,6 +56,7 @@ export default function LoginView({
     fetchOidcAvailable().then(setOidcAvailable).catch(() => setOidcAvailable(false));
   }, []);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- show a provider error that arrives after mount; the user can clear it locally
     if (oidcError) setOidcErr(oidcErrorMessage(oidcError));
   }, [oidcError]);
   const oidcButton = (oidcAvailable || oidcErr) && (
@@ -141,7 +142,7 @@ export default function LoginView({
             the OS pick which credential to use; the QR flow just opens
             a side panel) so hiding them behind "Manual login" was an
             unnecessary extra click. */}
-        <PasskeyLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
+        <PasskeyLoginButton onLoggedIn={onPasskeyLogin} />
         {oidcButton}
         <QrLoginButton open={qrOpen} onToggle={setQrOpen} />
         <div className="mt-4 text-center">
@@ -192,7 +193,7 @@ export default function LoginView({
             className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
           >{t("signIn")}</button>
         </form>
-        <PasskeyLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
+        <PasskeyLoginButton onLoggedIn={onPasskeyLogin} />
         {oidcButton}
         <QrLoginButton open={qrOpen} onToggle={setQrOpen} />
         <div className="mt-4 text-sm text-center flex justify-center gap-4">
@@ -246,7 +247,7 @@ export default function LoginView({
         >{t("signIn")}</button>
       </form>
 
-      <PasskeyLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
+      <PasskeyLoginButton onLoggedIn={onPasskeyLogin} />
       {oidcButton}
       <QrLoginButton open={qrOpen} onToggle={setQrOpen} />
 

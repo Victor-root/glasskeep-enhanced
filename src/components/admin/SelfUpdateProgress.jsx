@@ -99,6 +99,7 @@ function SystemMonitor({ token, active }) {
 
     useEffect(() => {
         if (!active || !token) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the gauges when monitoring stops or the token goes away
             setInfo(null);
             setStaleStreak(0);
             return;
@@ -305,7 +306,7 @@ function SystemMonitor({ token, active }) {
     );
 }
 
-function TechnicalLog({ token, phase, showDetails, onTextChanged }) {
+function TechnicalLog({ token, phase, onTextChanged }) {
     const [text, setText] = useState("");
 
     // Tell the parent every time the log text changes so the modal's
@@ -982,14 +983,11 @@ export default function SelfUpdateProgress({
                     )}
                     {/* Always-mounted (hidden via CSS) so the
                         accumulated log + scroll position survive a
-                        toggle of "Show details". The polling effect
-                        inside is gated on `showDetails` so we don't
-                        chat with the server while the log is hidden. */}
+                        toggle of "Show details". */}
                     <div className={showDetails ? "" : "hidden"}>
                         <TechnicalLog
                             token={token}
                             phase={phase}
-                            showDetails={showDetails}
                             onTextChanged={onLogTextChanged}
                         />
                     </div>

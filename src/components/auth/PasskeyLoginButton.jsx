@@ -15,12 +15,13 @@ import { t } from "../../i18n";
 import { isWebAuthnSupported, loginWithPasskey } from "../../auth/passkeyClient.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
 
-export default function PasskeyLoginButton({ onLoggedIn, dark }) {
+export default function PasskeyLoginButton({ onLoggedIn }) {
   const [supported, setSupported] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- probe WebAuthn support once after mount
     setSupported(isWebAuthnSupported());
   }, []);
 

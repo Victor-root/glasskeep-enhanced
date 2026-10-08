@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
 import LinkPopover from "./LinkPopover.jsx";
 import RichIcons from "./RichIcons.jsx";

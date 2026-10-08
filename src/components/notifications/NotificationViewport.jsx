@@ -19,19 +19,6 @@ import NotificationCard from "./NotificationCard.jsx";
 
 const MAX_VISIBLE = 4;
 
-export const NOTIFICATION_POSITIONS = [
-  "top-left",
-  "top-center",
-  "top-right",
-  "bottom-left",
-  "bottom-center",
-  "bottom-right",
-];
-
-export function isValidPosition(p) {
-  return NOTIFICATION_POSITIONS.includes(p);
-}
-
 const POSITION_CLASS = {
   "top-left": "gk-notif-viewport--top-left",
   "top-center": "gk-notif-viewport--top-center",

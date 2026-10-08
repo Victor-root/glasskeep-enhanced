@@ -236,7 +236,7 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     const id = requestAnimationFrame(() => {
       try {
         editor.commands.focus("end", { scrollIntoView: false });
-      } catch {}
+      } catch { /* editor destroyed before the frame: nothing to focus */ }
     });
     return () => cancelAnimationFrame(id);
     // We only want this on true mount (per editor instance).

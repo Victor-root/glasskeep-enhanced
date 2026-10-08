@@ -79,6 +79,7 @@ export default function useModalHistory({
       indexRef.current = -1;
       lastSnapRef.current = null;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- re-renders so canUndo/canRedo reflect the history just reset in refs
     bump((n) => n + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, activeId]);
@@ -181,7 +182,9 @@ export default function useModalHistory({
   return {
     undo,
     redo,
+    // eslint-disable-next-line react-hooks/refs -- the history lives in refs and bump() re-renders whenever it moves
     canUndo: active && indexRef.current > 0,
+    // eslint-disable-next-line react-hooks/refs -- same as canUndo
     canRedo: active && indexRef.current < historyRef.current.length - 1,
   };
 }

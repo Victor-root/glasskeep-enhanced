@@ -13,7 +13,7 @@ import { createPortal } from "react-dom";
 const POP_GAP = 6;
 const POP_EDGE_MARGIN = 8;
 
-export function usePopoverPosition(anchorRef, open, popRef, preferredWidth = 220) {
+function usePopoverPosition(anchorRef, open, popRef, preferredWidth = 220) {
   const [pos, setPos] = useState(null);
 
   useLayoutEffect(() => {

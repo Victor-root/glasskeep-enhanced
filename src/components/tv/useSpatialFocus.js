@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 // 2D spatial navigation for the D-pad / arrow keys.
 //
@@ -150,11 +150,13 @@ function focusFirst() {
 
 export default function useSpatialFocus({ enabled, onBack, onEdgeReached, onZoneChange } = {}) {
   const onBackRef = useRef(onBack);
-  onBackRef.current = onBack;
   const onEdgeReachedRef = useRef(onEdgeReached);
-  onEdgeReachedRef.current = onEdgeReached;
   const onZoneChangeRef = useRef(onZoneChange);
-  onZoneChangeRef.current = onZoneChange;
+  useLayoutEffect(() => {
+    onBackRef.current = onBack;
+    onEdgeReachedRef.current = onEdgeReached;
+    onZoneChangeRef.current = onZoneChange;
+  });
 
   useEffect(() => {
     if (!enabled) return undefined;

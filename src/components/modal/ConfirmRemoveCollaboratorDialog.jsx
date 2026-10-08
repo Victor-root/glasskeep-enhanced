@@ -10,7 +10,6 @@ import { t } from "../../i18n";
  */
 export default function ConfirmRemoveCollaboratorDialog({
   open,
-  dark,
   collaboratorName,
   onClose,
   onConfirm,

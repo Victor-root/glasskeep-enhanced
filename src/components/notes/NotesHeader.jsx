@@ -58,9 +58,7 @@ export default function NotesHeader({
   sectionLabel,
   SectionIcon,
   openSidebar,
-  activeTagFilter,
   isLandscapeMobile,
-  multiMode,
   qrQuickEnabled = false,
   onOpenQrScanner,
   // Notification bell slots. Two separate instances are passed because
@@ -187,8 +185,6 @@ export default function NotesHeader({
   // In landscape mobile, force mobile layout regardless of sm: breakpoint
   const mobileOnly = isLandscapeMobile ? "" : "sm:hidden";
   const desktopOnly = isLandscapeMobile ? "hidden" : "hidden sm:flex";
-  const desktopOnlyBlock = isLandscapeMobile ? "hidden" : "hidden sm:block";
-  const desktopOnlyInline = isLandscapeMobile ? "hidden" : "hidden sm:inline-block";
   const desktopOnlyInlineText = isLandscapeMobile ? "hidden" : "hidden sm:inline";
   // Drive the offline badge from the sync engine's real reachability, NOT
   // navigator.onLine. The latter is a stale `false` at cold start in the

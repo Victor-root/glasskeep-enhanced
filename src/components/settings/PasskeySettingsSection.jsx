@@ -108,11 +108,13 @@ export default function PasskeySettingsSection({
   }, [token]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- probe WebAuthn support once after mount
     setSupported(isWebAuthnSupported());
   }, []);
 
   useEffect(() => {
     if (!visible) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- refresh() fetches the list and sets state only after the request resolves
     refresh();
   }, [refresh, visible]);
 
@@ -503,6 +505,7 @@ function PasskeyTextDialog({ prompt, onClose }) {
   // dance.
   useEffect(() => {
     if (prompt) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- re-seed the field each time a fresh prompt opens
       setValue(prompt.defaultValue || "");
       // The focus has to happen *after* the input mounts. A microtask
       // tick is enough — requestAnimationFrame would also work but

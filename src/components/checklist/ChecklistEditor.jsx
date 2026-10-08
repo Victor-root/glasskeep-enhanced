@@ -1,7 +1,8 @@
 import React from "react";
 import { t } from "../../i18n";
 import ChecklistRow from "../common/ChecklistRow.jsx";
-import SectionHeader, { SECTION_COLORS, DEFAULT_SECTION_COLOR, hexAlpha, useDark } from "./SectionHeader.jsx";
+import SectionHeader, { SECTION_COLORS, DEFAULT_SECTION_COLOR, hexAlpha } from "./SectionHeader.jsx";
+import { useDark } from "./useDark.js";
 import useChecklistDrag from "../../hooks/useChecklistDrag.js";
 import {
   DEFAULT_SECTION_ID,
@@ -67,7 +68,7 @@ export default function ChecklistEditor({
   });
   React.useEffect(() => {
     if (!noteId) return;
-    try { localStorage.setItem(`ck-done-${noteId}`, doneCollapsed ? "1" : "0"); } catch {}
+    try { localStorage.setItem(`ck-done-${noteId}`, doneCollapsed ? "1" : "0"); } catch { /* storage unavailable: state stays in memory */ }
   }, [doneCollapsed, noteId]);
 
   // Section collapsed/expanded state is persisted ON the section entry

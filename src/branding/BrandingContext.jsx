@@ -206,6 +206,7 @@ export function BrandingProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches branding from the server; state is only set once the request resolves
     refreshBranding();
   }, [refreshBranding]);
 
@@ -224,6 +225,7 @@ export function BrandingProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- context hook shares the module-private BrandingContext with its provider
 export function useBranding() {
   return useContext(BrandingContext);
 }

@@ -45,7 +45,7 @@ export default function WorkspaceThemeSection({ token, showToast }) {
         body: { shellTheme: id },
         token,
       });
-    } catch (_) {
+    } catch {
       showToast?.(t("workspaceThemeSaveError"), "error");
     }
   };

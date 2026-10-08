@@ -113,6 +113,7 @@ function ToolbarPopover({ anchorRef, open, onClose, darkMode, children }) {
   const [ready, setReady] = useState(false);
 
   React.useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on close so the next opening stays hidden until it is placed
     if (!open) { setReady(false); return; }
     const place = () => {
       const a = anchorRef?.current;
@@ -213,7 +214,6 @@ export default function DrawingToolbar({
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  const [showCustomColor, setShowCustomColor] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [colorPopOpen, setColorPopOpen] = useState(false);
   const [sizePopOpen, setSizePopOpen] = useState(false);
@@ -244,14 +244,12 @@ export default function DrawingToolbar({
 
   const handleCustomColorChange = (e) => {
     setColor(e.target.value);
-    setShowCustomColor(false);
   };
 
   const isCustomColor = !QUICK_COLORS.includes(color);
 
   const colorSize = compact ? 'w-7 h-7' : 'w-7 h-7';
   const sizeBtn = compact ? 'w-8 h-8 rounded-lg' : 'w-9 h-9 rounded-xl';
-  const iconCls = compact ? 'w-5 h-5' : 'w-5 h-5';
 
   return (
     <div className={compact

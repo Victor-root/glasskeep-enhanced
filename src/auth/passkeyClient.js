@@ -73,8 +73,8 @@ function authHeaders(token) {
 // this, a stale token sitting in localStorage would keep producing 401s
 // every time the settings panel re-fetched the passkey list.
 function _handleAuthExpired() {
-  try { localStorage.removeItem("glass-keep-auth"); } catch {}
-  try { window.dispatchEvent(new CustomEvent("auth-expired")); } catch {}
+  try { localStorage.removeItem("glass-keep-auth"); } catch { /* storage unavailable: nothing cached to clear */ }
+  try { window.dispatchEvent(new CustomEvent("auth-expired")); } catch { /* CustomEvent unsupported: skip the notification */ }
 }
 
 async function postJSON(path, body, token) {
@@ -84,7 +84,7 @@ async function postJSON(path, body, token) {
     body: JSON.stringify(body || {}),
   });
   let data = null;
-  try { data = await res.json(); } catch {}
+  try { data = await res.json(); } catch { /* non-JSON body: data stays null */ }
   if (res.status === 401 && token) _handleAuthExpired();
   if (!res.ok) {
     const e = new Error((data && data.error) || `HTTP ${res.status}`);
@@ -97,7 +97,7 @@ async function postJSON(path, body, token) {
 async function getJSON(path, token) {
   const res = await fetch(`${API}${path}`, { headers: authHeaders(token) });
   let data = null;
-  try { data = await res.json(); } catch {}
+  try { data = await res.json(); } catch { /* non-JSON body: data stays null */ }
   if (res.status === 401 && token) _handleAuthExpired();
   if (!res.ok) {
     const e = new Error((data && data.error) || `HTTP ${res.status}`);
