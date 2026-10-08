@@ -432,7 +432,6 @@ function createNoteFederation(ctx) {
   async function shareWithRemote({ note, owner, targetRef, peerHost, canWrite = 1 }) {
     const link = activeLinkForHost(peerHost);
     if (!link) return { ok: false, error: "peer_not_paired" };
-    if (!peer && false) return { ok: false, error: "internal" };
 
     const path = "/api/federation/notes/share";
     let resp;

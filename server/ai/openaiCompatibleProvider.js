@@ -135,7 +135,7 @@ async function chatCompletion(cfg, { messages, temperature, maxTokens, signal } 
   // The deadline covers the body as well as the connection, so it is only
   // cleared once the payload has been read.
   const { init, done } = await requestInit(cfg, { body, signal });
-  let payload = null;
+  let payload;
   try {
     try {
       res = await fetch(url, init);
@@ -232,7 +232,7 @@ async function* chatCompletionStream(
 
   if (!res.ok) {
     let payload = null;
-    try { payload = await res.json(); } catch {}
+    try { payload = await res.json(); } catch { /* body is not JSON: fall back to the status text */ }
     const providerMessage =
       (payload && (payload.error?.message || payload.message)) ||
       describeProviderStatus(res.status);

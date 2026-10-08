@@ -114,7 +114,7 @@ function androidApkOrigins() {
     let b64;
     try {
       b64 = Buffer.from(hex, "hex").toString("base64url");
-    } catch (_) {
+    } catch {
       continue;
     }
     const origin = `android:apk-key-hash:${b64}`;
@@ -557,7 +557,7 @@ function attachPasskeyRoutes(app, deps) {
       log.error?.(`[passkey] wrap failed: ${e.message}`);
       return res.status(500).json({ error: "Could not save unlock wrap" });
     } finally {
-      try { prfBuf.fill(0); } catch {}
+      try { prfBuf.fill(0); } catch { /* best-effort wipe */ }
     }
 
     res.json({ ok: true });
@@ -798,7 +798,7 @@ function attachPasskeyRoutes(app, deps) {
       log.warn?.(`[passkey] unwrap failed credential=${credentialId}: ${e.message}`);
       return res.status(401).json({ error: "Could not unwrap DEK with this passkey" });
     } finally {
-      try { prfBuf.fill(0); } catch {}
+      try { prfBuf.fill(0); } catch { /* best-effort wipe */ }
     }
 
     // Verify against the sentinel before promoting to runtime so a
@@ -811,7 +811,7 @@ function attachPasskeyRoutes(app, deps) {
       if (row) vault.verifyDek(row, dek);
     } catch (e) {
       runtime.recordAttempt(id, false);
-      try { dek.fill(0); } catch {}
+      try { dek.fill(0); } catch { /* best-effort wipe */ }
       log.warn?.(`[passkey] DEK self-check failed credential=${credentialId}: ${e.message}`);
       return res.status(401).json({ error: "DEK self-check failed" });
     }
@@ -821,7 +821,7 @@ function attachPasskeyRoutes(app, deps) {
     passkeyVault.touchInstanceUnlockWrap(db, credentialId);
     passkeyVault.updateCounter(db, credentialId, verification.authenticationInfo.newCounter);
     runtime.recordAttempt(id, true);
-    try { dek.fill(0); } catch {}
+    try { dek.fill(0); } catch { /* best-effort wipe */ }
 
     const token = signToken(user);
     log.info?.(`[passkey] instance unlocked + admin signed in user=${user.id}`);

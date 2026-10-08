@@ -2,7 +2,7 @@
 // Avant correctif, tout doit réussir pour l'attaquant. Après, tout doit échouer.
 // Le script ne juge pas: il rapporte l'état observé, et une variable d'attente
 // dit ce qu'on considère comme normal.
-import { A, B, login, setSelfName, invite, links, reset, sleep, waitFor, runner } from "./lib.mjs";
+import { A, B, login, setSelfName, invite, links, reset, sleep, runner } from "./lib.mjs";
 
 const FIXED = process.env.EXPECT === "fixed"; // attentes d'après correctif
 const t = runner(`Scénario 2, attaque sur l'appairage (attente: ${FIXED ? "corrigé" : "vulnérable"})`);

@@ -77,7 +77,7 @@ const corpus = [
 // ── Variant tests ─────────────────────────────────────────────────────
 console.log("\n[plural variants]");
 const {
-  expandPluralVariants, expandToken, normalize, tokenize, WEAK_TOKENS,
+  expandPluralVariants, expandToken, WEAK_TOKENS,
 } = r.__internals;
 eq("wallets → wallet", [...expandPluralVariants("wallets")].sort(), ["wallet", "wallets"]);
 eq("cryptos → crypto", [...expandPluralVariants("cryptos")].sort(), ["crypto", "cryptos"]);

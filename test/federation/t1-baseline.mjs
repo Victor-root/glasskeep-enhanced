@@ -1,7 +1,7 @@
 // Scénario 1 — l'appairage nominal fonctionne, de bout en bout.
 // Sert de garde-fou: si ce scénario casse après un correctif, le correctif
 // a cassé la fonctionnalité.
-import { A, B, login, setSelfName, invite, accept, links, reset, waitFor, runner } from "./lib.mjs";
+import { A, B, login, setSelfName, invite, accept, reset, waitFor, runner } from "./lib.mjs";
 
 const t = runner("Scénario 1, appairage nominal");
 const tA = await login(A), tB = await login(B);

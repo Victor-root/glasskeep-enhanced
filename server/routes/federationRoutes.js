@@ -189,7 +189,7 @@ function attachFederationRoutes(
   // instance was just locked or unlocked. Best-effort: if a peer is
   // unreachable, their periodic poll remains the fallback.
   async function notifyPeersStateChanged() {
-    let links = [];
+    let links;
     try { links = store.listActive(); } catch { return; }
     const path = "/api/federation/peer-changed";
     await Promise.all(links.map(async (link) => {
@@ -705,7 +705,7 @@ function attachFederationRoutes(
     if (!link) return;
     const query = String((req.body || {}).query || "").trim().slice(0, 100);
     const term = `%${query}%`;
-    let users = [];
+    let users;
     try {
       users = searchLocalUsersStmt.all(term, term).map((u) => ({
         name: u.name,

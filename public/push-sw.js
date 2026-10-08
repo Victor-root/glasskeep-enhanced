@@ -12,10 +12,10 @@
 
 // A reminder (or any server push) arrives. Show a system notification.
 self.addEventListener("push", (event) => {
-  let data = {};
+  let data;
   try {
     data = event.data ? event.data.json() : {};
-  } catch (_e) {
+  } catch {
     data = { body: event.data ? event.data.text() : "" };
   }
 
