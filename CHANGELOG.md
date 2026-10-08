@@ -1,24 +1,46 @@
 # 📋 Changelog
 
-## 🚧 Unreleased
+## 🚀 v2.7.0 (2026-10-08)
+
+Headline feature: **single sign-on** with any OpenID Connect provider (Pocket ID, Authentik, Keycloak, Authelia, …), passkeys included, on the web and in the Android app. Also in this release: GlassKeep now runs on **Node.js 26**, installed for you by the updater, every library moves to its latest version, and the phone interface gets a large round of polish.
 
 ### ➕ Added
-- 🔐 **Single sign-on (OpenID Connect)**: sign in through an identity provider (Authentik, Keycloak, Authelia, Zitadel, Pocket ID, or any standard OpenID Connect provider). An admin allows it in Admin → *Login page settings* and picks a policy: the **instance's provider only**, which the admin sets up there, or **personal providers allowed**, where each user may also declare their own in Settings → Security. Each user links their account by signing in at the provider once, then uses **Sign in with my provider** on the login screen. Works in the web app and the Android app.
-- 📱 **Edge-to-edge in portrait** (Android app 1.4.8+): a new switch in Settings → *UI Preferences* makes the status bar and the navigation bar transparent in portrait, so the notes scroll behind them. Off by default; landscape keeps its own option.
-- 📘 **Single sign-on setup guide** on the [project website](https://victor-root.github.io/glasskeep-enhanced/sso.html): the exact values for Authentik, Keycloak and Authelia, annotated screenshots and troubleshooting.
+- 🔐 **Single sign-on (OpenID Connect)**: sign in through an identity provider (Pocket ID, Authentik, Keycloak, Authelia, Zitadel, or any standard OpenID Connect provider). An admin allows it in Admin → *Login page settings* and picks a policy: the **instance's provider only**, which the admin sets up there, or **personal providers allowed**, where each user may also declare their own in Settings → Security. Each user links their account by signing in at the provider once, then uses **Sign in with my provider** on the login screen.
+- 📱 **Single sign-on in the Android app** (1.5.0): the provider opens in the phone's default browser, as a sheet over the app, so passkeys work there (Pocket ID signs in with passkeys only) and you come back to GlassKeep signed in.
+- 📘 **Single sign-on setup guide** on the [project website](https://victor-root.github.io/glasskeep-enhanced/sso.html): the exact values for Pocket ID, Authentik, Keycloak and Authelia, annotated screenshots and troubleshooting.
+- 📱 **Edge-to-edge in portrait** (Android app 1.5.0): a new switch in Settings → *UI Preferences* makes the status bar and the navigation bar transparent in portrait, so the notes scroll behind them. Off by default; landscape keeps its own option.
+- 📲 **Phone menus as sheets**: a note's colour, tags, more options, image menu, collaboration, reminder picker and formatting tools open as bottom sheets, tinted with the note's colour; the notification and sync panels drop down as top sheets.
+- ✋ **Finger-sized note footer on phones**: bigger buttons and icons, the title in the note's header, the save state along the footer, and pin moved to the ⋮ menu.
+
+### 🔄 Changed
+- 🟢 **Node.js 26** (from 24), and the Docker image moves to Debian 13. Updates now bring the Node.js version a release needs: the one-click update from the admin panel and `install.sh`'s update option install it on their own.
+- 📦 **Every library on its latest version**: Vite 8, Express 5, SimpleWebAuthn 14, marked 18, bcryptjs 3, undici 8, ESLint 10, and the rest within their versions; unused packages are removed. `npm audit` reports nothing.
+- 🤖 **Android app built with the current toolchain** (Gradle 9.8, AGP 9.4, Kotlin 2.4, current AndroidX); its behaviour on every Android version is unchanged.
+- ✨ **Smoother phone interface**: the search bar unfolds from its icon in the header's colour, the header menu and the sidebar drawer slide in and out, and every scrollbar on touch screens is thin and follows the theme.
+- ⚡ **Faster scrolling and filtering**: the notes grid, the open note and the side panels scroll without repainting on every frame (most visible on integrated graphics), and search and filters re-render note cards at a fraction of the cost.
 
 ### 🐛 Fixed
-- 📶 **Android app stuck offline after a while in the background**, often until it was force-closed: API requests no longer go through the service worker (Chrome / WebView 123+), and the app (1.4.8+) now lets the WebView detect network changes, so connections to the server that died during sleep are dropped instead of reused.
+- 📶 **Android app stuck offline after a while in the background**, often until it was force-closed: API requests no longer go through the service worker (Chrome / WebView 123+), and the app now lets the WebView detect network changes, so connections to the server that died during sleep are dropped instead of reused.
+- ⌨️ **Android: the keyboard covered the sign-in fields**: the sign-in screen now moves up just enough to keep the field being typed in visible.
+- A wrong current password (password or instance passphrase change) signed you out instead of just showing the error.
+- A popover closed by scrolling swallowed the next tap.
+- Back in side-by-side view left the second note in its half of the screen; it now takes the whole screen, and a second back closes it.
+- Read mode showed lists twice as short as the editor when their items ended with a line break.
+- Removing a colour, size or font in a list or quote also removed the other text styles.
+- Phones showed the keyboard shortcut in the Undo and Redo labels.
+- With 3-button navigation, Android laid a white veil over the transparent navigation bar in portrait edge-to-edge.
+- `install.sh` stopped before showing the access details behind a reverse proxy.
 
 ### 🔒 Security
-- The flow runs on the server (Authorization Code with PKCE, state and nonce, ID token verified against the provider's keys); the client secret never reaches a browser.
+- Single sign-on runs on the server (Authorization Code with PKCE, state and nonce, ID token verified against the provider's keys); the client secret never reaches a browser.
 - An account is opened only by the identity it linked (issuer + subject), never by a matching e-mail; a provider never creates accounts or grants rights. Linking asks for the account password.
 - A regular user's own provider must be on a public address, so no account can use the server to probe its network, unless the admin turns on *Allow providers on the local network*. The instance's provider and an admin's own may always be local.
-- On Android, the provider's pages stay in a separate screen without the app's native features, even when the provider runs on the same machine as GlassKeep.
+- On Android, the provider's pages never load next to the app's native features: they open in the phone's browser, and the sign-in attempt is tied to a secret only the app holds.
+- The library updates close every known vulnerability (among them a ProseMirror XSS and an IP spoofing flaw in `proxy-addr`).
 
 ### 🛠️ Upgrade
 
-No new setting to configure: single sign-on is off until an admin allows it, and the database migrates automatically on restart.
+Nothing to do by hand: the one-click update (and `install.sh`'s update option) installs Node.js 26 before the new version, and Docker users get it with the new image. Single sign-on is off until an admin allows it, and the database migrates automatically on restart. Install the Android app **1.5.0** for single sign-on with passkeys; older versions keep working but open the provider inside the app, where passkeys are not available.
 
 ## 🚀 v2.6.0 (2026-09-08)
 
