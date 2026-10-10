@@ -200,6 +200,14 @@ export function hasAndroidPasskeyBridge() {
   return !!getAndroidBridge();
 }
 
+/** True when a ceremony failed because the user dismissed it (a
+ *  NotAllowedError, or a cancel / abort message from the OS picker or the
+ *  Android bridge) rather than because it really failed. */
+export function isPasskeyCancellation(e) {
+  const msg = (e && e.message) || "";
+  return e?.name === "NotAllowedError" || /not[\s_-]*allowed|cancel|abort|interrupt|annul/i.test(msg);
+}
+
 // ── User passkey list / management ────────────────────────────────────
 // `available` says whether a passkey can be created on this instance at
 // all: it is false while the administrator has not declared the domain

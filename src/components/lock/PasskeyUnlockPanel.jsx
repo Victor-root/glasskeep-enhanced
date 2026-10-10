@@ -18,6 +18,7 @@ import { t } from "../../i18n";
 import {
   isWebAuthnSupported,
   unlockInstanceWithPasskey,
+  isPasskeyCancellation,
 } from "../../auth/passkeyClient.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
 
@@ -50,8 +51,7 @@ export default function PasskeyUnlockPanel({ onUnlocked }) {
       }
     } catch (e) {
       const msg = (e && e.message) || "unlockFailed";
-      const isCancelled = e?.name === "NotAllowedError" || /not[\s_-]*allowed|cancel|abort|interrupt|annul/i.test(msg);
-      setErr(isCancelled ? t("passkeyUnlockCancelled") : localizeServerError(msg, "unlockFailed"));
+      setErr(isPasskeyCancellation(e) ? t("passkeyUnlockCancelled") : localizeServerError(msg, "unlockFailed"));
     } finally {
       setLoading(false);
     }

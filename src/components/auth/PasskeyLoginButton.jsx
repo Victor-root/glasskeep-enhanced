@@ -12,7 +12,7 @@
 
 import React, { useEffect, useState } from "react";
 import { t } from "../../i18n";
-import { isWebAuthnSupported, loginWithPasskey } from "../../auth/passkeyClient.js";
+import { isWebAuthnSupported, loginWithPasskey, isPasskeyCancellation } from "../../auth/passkeyClient.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
 
 export default function PasskeyLoginButton({ onLoggedIn }) {
@@ -43,8 +43,7 @@ export default function PasskeyLoginButton({ onLoggedIn }) {
       // button stays available so they can retry, and the password
       // form is right there.
       const msg = (e && e.message) || "passkeyLoginFailed";
-      const isCancelled = e?.name === "NotAllowedError" || /not[\s_-]*allowed|cancel|abort|interrupt|annul/i.test(msg);
-      setErr(isCancelled ? t("passkeyLoginCancelled") : localizeServerError(msg, "passkeyLoginFailed"));
+      setErr(isPasskeyCancellation(e) ? t("passkeyLoginCancelled") : localizeServerError(msg, "passkeyLoginFailed"));
     } finally {
       setLoading(false);
     }
