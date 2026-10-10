@@ -1,78 +1,11 @@
 import React from "react";
-import UserAvatar from "../common/UserAvatar.jsx";
 import Sheet from "../common/Sheet.jsx";
 import ConfirmRemoveCollaboratorDialog from "./ConfirmRemoveCollaboratorDialog.jsx";
-import TI from "../../icons/editor/index.jsx";
+import CurrentCollaboratorsList from "./CurrentCollaboratorsList.jsx";
+import CollaboratorPicker from "./CollaboratorPicker.jsx";
+import AccessToggle from "./AccessToggle.jsx";
 import { t } from "../../i18n";
 import { setThemeColor, currentThemeColor } from "../../utils/helpers.js";
-
-const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-// Only surface the A–Z index once the candidate list is long enough that
-// scrolling becomes tedious; below this it just gets in the way.
-const LETTER_INDEX_MIN = 15;
-
-// Bucket a display name under A–Z, or "#" for anything else (digits,
-// accents that don't normalise, symbols), so the alphabet index is total.
-function firstLetter(name) {
-  const c = (name || "").trim().charAt(0).toUpperCase();
-  return c >= "A" && c <= "Z" ? c : "#";
-}
-
-// Small themed badge marking a collaborator (or option) that lives on a
-// paired peer server — the friendly server name, never a URL. Accent
-// colours come from the active shell theme, so it follows every theme.
-function ServerBadge({ label }) {
-  return (
-    <span className="shrink-0 inline-flex items-center gap-1 align-middle text-[11px] font-medium pl-1 pr-1.5 py-0.5 rounded-md bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)] border border-[var(--gk-accent-soft-border)]">
-      <TI.Server className="tabler-icon w-3.5 h-3.5 shrink-0" />
-      <span className="truncate max-w-[10rem]">{label || t("fedRemoteServer")}</span>
-    </span>
-  );
-}
-
-// Read-only / read-write chooser. A compact segmented control: the active
-// half is filled with the soft theme accent, matching the app's other
-// two-option pickers. Eye = read-only, Pencil = can edit; tooltips/aria
-// carry the labels so it stays small.
-//
-// Deliberately never disabled while the change is in flight. Disabling it
-// bought nothing — the row already flips optimistically, and setting the
-// same access twice is a no-op server-side — but it meant a click landing
-// in that window did absolutely nothing, which is indistinguishable from
-// the app ignoring you. Clicking the half that is already active is
-// likewise a no-op, so there is nothing to guard against.
-function AccessToggle({ canWrite, onChange }) {
-  const ro = canWrite === 0;
-  const cell =
-    "inline-flex items-center justify-center px-2 py-1 transition-colors";
-  // --gk-accent-text: lighter in dark sheets (globalCSS, .gk-sheet).
-  const active = "bg-[var(--gk-accent-soft-bg)] text-[var(--gk-accent-text,var(--gk-chrome-accent))]";
-  const idle = "text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/10";
-  return (
-    <div className="inline-flex rounded-lg border border-[var(--border-light)] overflow-hidden">
-      <button
-        type="button"
-        aria-pressed={ro}
-        aria-label={t("accessReadOnly")}
-        data-tooltip={t("accessReadOnly")}
-        onClick={(e) => { e.stopPropagation(); if (!ro) onChange("read"); }}
-        className={`${cell} ${ro ? active : idle}`}
-      >
-        <TI.Eye className="tabler-icon w-3.5 h-3.5" />
-      </button>
-      <button
-        type="button"
-        aria-pressed={!ro}
-        aria-label={t("accessReadWrite")}
-        data-tooltip={t("accessReadWrite")}
-        onClick={(e) => { e.stopPropagation(); if (ro) onChange("write"); }}
-        className={`${cell} border-l border-[var(--border-light)] ${!ro ? active : idle}`}
-      >
-        <TI.Pencil className="tabler-icon w-3.5 h-3.5" />
-      </button>
-    </div>
-  );
-}
 
 /**
  * Collaboration modal — manage who a note is shared with.
@@ -166,14 +99,6 @@ export default function CollaborationModal({
     .filter((u) => !isTaken(u))
     .sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
 
-  const letterSet = new Set(candidates.map((u) => firstLetter(u.name)));
-  const q = search.trim().toLowerCase();
-  const visible = candidates.filter((u) => {
-    if (q) return (u.name || "").toLowerCase().includes(q);
-    if (letter) return firstLetter(u.name) === letter;
-    return true;
-  });
-
   const selectedUsers = candidates.filter((u) => selected.has(u.key));
 
   // Selection is a Map<key, access>. Picking a user defaults them to the
@@ -231,246 +156,40 @@ export default function CollaborationModal({
     }
   };
 
-  const chipCls = (active, disabled) =>
-    `px-1.5 py-0.5 rounded-md text-[11px] font-semibold leading-none transition-colors ${
-      disabled
-        ? "opacity-25 cursor-default"
-        : active
-          ? "bg-[var(--gk-chrome-accent)] text-white"
-          : "text-gray-600 dark:text-gray-300 hover:bg-black/10 dark:hover:bg-white/10"
-    }`;
-
   const title = isOwner ? t("addCollaborator") : t("collaborators");
 
   const body = (
     <>
       {/* ── Current collaborators (with per-row access + remove) ── */}
       {addModalCollaborators.length > 0 && (
-        <div className="mb-4">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            {t("currentCollaborators")}
-          </p>
-          <div className={asSheet ? undefined : "space-y-2"}>
-            {addModalCollaborators
-              // The owner doesn't need to see their own row when managing;
-              // but a collaborator viewing the list SHOULD see themselves
-              // (with a "Moi" badge) so it's clear they're on the note.
-              .filter((c) => (isOwner ? c.id !== currentUser?.id : true))
-              .map((collab) => {
-                const isSelf = collab.id === currentUser?.id;
-                // Owner removes collaborators; a non-owner can't remove
-                // anyone (their own row is display-only).
-                const canRemove = isOwner && !collab.isOwner;
-                const showAccess =
-                  isOwner && !collab.isOwner &&
-                  typeof onSetCollaboratorAccess === "function";
-
-                return (
-                  <div
-                    key={collab.id}
-                    // Single aligned row: fixed square avatar, the name
-                    // truncates (badge stays beside it), actions pinned
-                    // right and vertically centred. No wrapping: that
-                    // looked unbalanced on mobile.
-                    className={asSheet ? "gk-sheet-row" : "flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
-                      <UserAvatar
-                        name={collab.name}
-                        email={collab.email}
-                        avatarUrl={collab.avatar_url}
-                        size="w-8 h-8"
-                        textSize="text-xs"
-                        dark={dark}
-                        className="shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <div className="font-medium text-sm flex items-center gap-1.5 min-w-0">
-                          <span className="truncate">{collab.name || collab.email}</span>
-                          {collab.federated && <ServerBadge label={collab.serverLabel} />}
-                          {isSelf && (
-                            <span className="shrink-0 inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)] border border-[var(--gk-accent-soft-border)]">
-                              {t("youLabel")}
-                            </span>
-                          )}
-                          {collab.isOwner && (
-                            <span className="shrink-0 text-xs text-indigo-500 dark:text-indigo-400 font-normal">
-                              {t("owner")}
-                            </span>
-                          )}
-                        </div>
-                        {!collab.federated && collab.email && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                            {collab.email}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {showAccess && (
-                        <AccessToggle
-                          canWrite={collab.canWrite}
-                          onChange={(access) => onSetCollaboratorAccess(collab.id, access)}
-                        />
-                      )}
-                      {canRemove && (
-                        <button
-                          onClick={async () => {
-                            if (collab.id === currentUser?.id) {
-                              await onRemoveCollaborator(collab.id, activeId);
-                            } else {
-                              setConfirmRemove(collab);
-                            }
-                          }}
-                          className="shrink-0 p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                          data-tooltip={t("removeCollaborator")}
-                          aria-label={t("remove")}
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M6 6l12 12" />
-                            <path d="M6 18L18 6" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
+        <CurrentCollaboratorsList
+          collaborators={addModalCollaborators}
+          isOwner={isOwner}
+          currentUser={currentUser}
+          activeId={activeId}
+          dark={dark}
+          asSheet={asSheet}
+          onSetCollaboratorAccess={onSetCollaboratorAccess}
+          onRemoveCollaborator={onRemoveCollaborator}
+          onConfirmRemove={setConfirmRemove}
+        />
       )}
 
       {/* ── Add picker (owner only) ── */}
       {isOwner && (
-        <>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-            {t("selectCollaboratorsHint")}
-          </p>
-
-          {/* Search */}
-          <div className={asSheet ? "gk-sheet-field relative mb-3" : "relative mb-2"}>
-            <svg
-              className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none"
-              viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4.3 -4.3" />
-            </svg>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setLetter(null); }}
-              placeholder={t("searchByUsernameOrEmail")}
-              className={asSheet
-                ? "w-full h-12 pl-10 pr-4 text-base bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none"
-                : "w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-white dark:bg-black/30 border border-[var(--border-light)] text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"}
-            />
-          </div>
-
-          {/* Alphabet index, only meaningful when not searching */}
-          {candidates.length >= LETTER_INDEX_MIN && !q && (
-            <div className="flex flex-wrap items-center gap-0.5 mb-2">
-              <button type="button" onClick={() => setLetter(null)} className={chipCls(letter === null, false)}>
-                {t("letterAll")}
-              </button>
-              {ALPHABET.map((L) => {
-                const has = letterSet.has(L);
-                return (
-                  <button
-                    key={L}
-                    type="button"
-                    disabled={!has}
-                    onClick={() => has && setLetter(L)}
-                    className={chipCls(letter === L, !has)}
-                  >
-                    {L}
-                  </button>
-                );
-              })}
-              {letterSet.has("#") && (
-                <button type="button" onClick={() => setLetter("#")} className={chipCls(letter === "#", false)}>
-                  #
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* People list */}
-          <div className={asSheet ? "min-h-[6rem] space-y-1" : "min-h-[6rem] space-y-1 rounded-lg border border-[var(--border-light)] p-1.5 bg-gray-50/50 dark:bg-black/20"}>
-            {availableLoading ? (
-              <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                {t("searching")}
-              </div>
-            ) : candidates.length === 0 ? (
-              <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                {t("noUsersAvailable")}
-              </div>
-            ) : visible.length === 0 ? (
-              <div className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">{t("noUsersFound")}</div>
-            ) : (
-              visible.map((u) => {
-                const sel = selected.has(u.key);
-                const access = selected.get(u.key);
-                return (
-                  <div
-                    key={u.key}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => toggleSelect(u.key)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        toggleSelect(u.key);
-                      }
-                    }}
-                    className={`w-full flex items-center gap-2 p-2 rounded-lg text-left cursor-pointer transition-colors border ${
-                      sel
-                        ? "bg-[var(--gk-accent-soft-bg)] border-[var(--gk-accent-soft-border)]"
-                        : "border-transparent hover:bg-black/5 dark:hover:bg-white/10"
-                    }`}
-                  >
-                    <UserAvatar
-                      name={u.name}
-                      email={u.email || u.ref || ""}
-                      avatarUrl={u.avatar}
-                      size="w-8 h-8"
-                      textSize="text-xs"
-                      dark={dark}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-sm flex items-center gap-2">
-                        <span className="truncate">{u.name}</span>
-                        {u.federated && <ServerBadge label={u.serverLabel} />}
-                      </div>
-                      {!u.federated && u.email && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {u.email}
-                        </div>
-                      )}
-                    </div>
-                    {sel && (
-                      <AccessToggle
-                        canWrite={access === "write" ? 1 : 0}
-                        onChange={(a) => setAccessFor(u.key, a)}
-                      />
-                    )}
-                    <span
-                      className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
-                        sel
-                          ? "bg-[var(--gk-chrome-accent)] border-[var(--gk-chrome-accent)] text-white"
-                          : "border-gray-300 dark:border-gray-600"
-                      }`}
-                    >
-                      {sel && <TI.Check className="tabler-icon w-3.5 h-3.5" />}
-                    </span>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-        </>
+        <CollaboratorPicker
+          candidates={candidates}
+          availableLoading={availableLoading}
+          search={search}
+          setSearch={setSearch}
+          letter={letter}
+          setLetter={setLetter}
+          selected={selected}
+          onToggleSelect={toggleSelect}
+          onSetAccessFor={setAccessFor}
+          dark={dark}
+          asSheet={asSheet}
+        />
       )}
     </>
   );
