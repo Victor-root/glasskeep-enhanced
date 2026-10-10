@@ -187,8 +187,8 @@ export default function useDraftNote(ctx) {
     // eslint-disable-next-line react-hooks/immutability -- ctx carries App's refs; writing .current from this event-time helper is intended
     ctx.prevDrawingRef.current = { paths: [], dimensions: null };
     ctx.setMBody(initialBody);
-    ctx.skipNextDrawingAutosave.current = true;
-    ctx.skipNextItemsAutosave.current = true;
+    ctx.skipNextDrawingAutosaveRef.current = true;
+    ctx.skipNextItemsAutosaveRef.current = true;
     ctx.setMItems([]);
     ctx.prevItemsRef.current = [];
     ctx.setMTagList(initialTags);
