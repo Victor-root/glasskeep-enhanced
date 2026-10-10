@@ -1,34 +1,20 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { t } from "../../i18n";
-import { bgFor, solid, parseRGBA } from "../../utils/colors.js";
-import { isRichContent, contentToHTML } from "../../utils/richText.js";
-import { renderSafeMarkdown } from "../../utils/markdown.jsx";
+import { bgFor, solid } from "../../utils/colors.js";
 import { getSections, isItem, DEFAULT_SECTION_ID } from "../../utils/checklist.js";
 import { getContentImages } from "../../utils/noteIcon.js";
 import { parseAudioContent, formatDuration } from "../../utils/audioNote.js";
 import { Mic } from "lucide-react";
 import DrawingPreview from "../common/DrawingPreview.jsx";
-
-function isColorDark(rgba) {
-  const { r, g, b } = parseRGBA(rgba);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance < 0.55;
-}
+import { isColorDark, textToHtml, drawingTextHtml } from "./tvNoteContent.js";
 
 function buildBodyHtml(note) {
   if (note.type === "text") {
     const raw = note.content || "";
     if (!raw) return "";
-    return isRichContent(raw) ? contentToHTML(raw) : renderSafeMarkdown(raw);
+    return textToHtml(raw);
   }
-  if (note.type === "draw") {
-    try {
-      const parsed = typeof note.content === "string" ? JSON.parse(note.content) : note.content;
-      const txt = parsed?.text || "";
-      if (!txt) return "";
-      return isRichContent(txt) ? contentToHTML(txt) : renderSafeMarkdown(txt);
-    } catch { return ""; }
-  }
+  if (note.type === "draw") return drawingTextHtml(note.content);
   return "";
 }
 

@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { api, getAuth, setAuth } from "../../utils/api.js";
 import { TV_CSS, TV_STYLE_ID } from "./tvStyles.js";
 import TvLogin from "./TvLogin.jsx";
 import TvNotesViewer from "./TvNotesViewer.jsx";
+import useTvLoginScreenData from "./useTvLoginScreenData.js";
+import useTvNotes from "./useTvNotes.js";
 import { setTvModeOverride } from "../../utils/tvMode.js";
-import { t } from "../../i18n";
 
 // TV-mode entry point. Used in place of the phone/desktop tree whenever
 // the app boots on Android TV (or with the ?tv=1 override). Owns its own
@@ -45,46 +46,12 @@ export default function TvApp() {
   const token = session?.token;
   const currentUser = session?.user || null;
 
-  const [notes, setNotes] = useState([]);
-  const notesEtagRef = useRef("");
-  const [loadError, setLoadError] = useState(null);
+  const clearSession = useCallback(() => {
+    setSession(null);
+    setAuth(null);
+  }, []);
 
-  // Public login slogan — set by the server admin, refreshed whenever
-  // the login screen is on display. Empty string when unset; TvLogin
-  // hides the slogan pill entirely in that case.
-  const [loginSlogan, setLoginSlogan] = useState("");
-  useEffect(() => {
-    if (token) return; // only fetched while the user is signed out
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await api("/admin/login-slogan");
-        if (!cancelled) setLoginSlogan(res?.loginSlogan || "");
-      } catch {
-        if (!cancelled) setLoginSlogan("");
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [token]);
-
-  // Public login profiles (Jellyfin-style avatar list). Lets users sign
-  // in by picking their face + typing the password — no email required,
-  // which matters because the original phone account may not have one.
-  const [loginProfiles, setLoginProfiles] = useState([]);
-  useEffect(() => {
-    if (token) return; // already signed in, profiles list is irrelevant
-    let cancelled = false;
-    (async () => {
-      try {
-        const profiles = await api("/login/profiles");
-        if (cancelled) return;
-        setLoginProfiles(Array.isArray(profiles) ? profiles : []);
-      } catch {
-        if (!cancelled) setLoginProfiles([]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [token]);
+  const { loginSlogan, loginProfiles } = useTvLoginScreenData(token);
 
   // Mark <html data-tv="1"> + inject the TV stylesheet before the first
   // paint. useLayoutEffect makes sure the regular phone UI never flashes
@@ -98,70 +65,14 @@ export default function TvApp() {
     };
   }, []);
 
-  // Notes loader. Polls every 30s (very cheap on a LAN server) so the
-  // viewer keeps up with edits made from the phone, even though we don't
-  // attach an SSE listener in TV mode.
-  const loadNotes = useCallback(async () => {
-    if (!token) return;
-    try {
-      const data = await api("/notes", { token });
-      const list = Array.isArray(data?.notes) ? data.notes : Array.isArray(data) ? data : [];
-      // Cheap signature: id+updated_at per note. If nothing actually
-      // changed since the last poll, skip setState so React doesn't
-      // re-render the whole grid on a no-op tick — big perf win on
-      // older Shields where re-rendering 100+ cards is ~150ms.
-      const sig = list.map((n) => `${n.id}:${n.updated_at || n.created_at || ""}`).join("|");
-      if (sig !== notesEtagRef.current) {
-        notesEtagRef.current = sig;
-        setNotes(list);
-      }
-      setLoadError(null);
-    } catch (err) {
-      if (err?.isAuthError || err?.status === 401) {
-        setSession(null);
-        setAuth(null);
-        return;
-      }
-      setLoadError(err?.message || t("tvFailedToLoadNotes"));
-    }
-  }, [token]);
-
-  useEffect(() => {
-    if (!token) return undefined;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- poll the notes; state is set only after each request resolves
-    loadNotes();
-    const id = setInterval(loadNotes, 30 * 1000);
-    return () => clearInterval(id);
-  }, [token, loadNotes]);
-
-  // Refresh when the network comes back: a TV on Wi-Fi is more likely to
-  // drop off than a phone.
-  useEffect(() => {
-    window.addEventListener("online", loadNotes);
-    return () => window.removeEventListener("online", loadNotes);
-  }, [loadNotes]);
-
-  // Window-focus refresh — the user may have unlocked the TV after
-  // hours of standby; pull the latest notes so they're current.
-  useEffect(() => {
-    const refresh = () => { if (token) loadNotes(); };
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") refresh();
-    });
-    return () => window.removeEventListener("focus", refresh);
-  }, [token, loadNotes]);
+  const { notes, setNotes, loadError } = useTvNotes(token, clearSession);
 
   // Sync localStorage auth back into state if it changes from elsewhere
   // (e.g. WebView background tab logged out).
   useEffect(() => {
-    const onAuthExpired = () => {
-      setSession(null);
-      setAuth(null);
-    };
-    window.addEventListener("auth-expired", onAuthExpired);
-    return () => window.removeEventListener("auth-expired", onAuthExpired);
-  }, []);
+    window.addEventListener("auth-expired", clearSession);
+    return () => window.removeEventListener("auth-expired", clearSession);
+  }, [clearSession]);
 
   const completeLogin = useCallback((res) => {
     if (!res?.token) throw new Error("No token returned");
@@ -204,10 +115,9 @@ export default function TvApp() {
   }, [completeLogin]);
 
   const signOut = useCallback(() => {
-    setSession(null);
-    setAuth(null);
+    clearSession();
     setNotes([]);
-  }, []);
+  }, [clearSession, setNotes]);
 
   const exitTvMode = useCallback(() => {
     // Force the phone layout from this device. Persisted so the next

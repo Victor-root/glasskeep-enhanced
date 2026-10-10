@@ -1,6 +1,6 @@
 import React, { memo, useMemo } from "react";
 import { t } from "../../i18n";
-import { bgFor, solid, parseRGBA } from "../../utils/colors.js";
+import { bgFor, solid } from "../../utils/colors.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { isRichContent, contentToHTML } from "../../utils/richText.js";
 import { getContentImages } from "../../utils/noteIcon.js";
@@ -8,6 +8,7 @@ import { Image as ImageLucide, Mic, Pencil, CheckSquare } from "lucide-react";
 import { countItems, countChecked, isItem } from "../../utils/checklist.js";
 import { parseAudioContent } from "../../utils/audioNote.js";
 import DrawingPreview from "../common/DrawingPreview.jsx";
+import { isColorDark, drawingTextHtml } from "./tvNoteContent.js";
 
 // Closed note card for TV. Renders into the dark 10-foot palette and
 // is wrapped in React.memo so an unrelated parent rerender (clock tick,
@@ -15,11 +16,6 @@ import DrawingPreview from "../common/DrawingPreview.jsx";
 // hardware where each card costs ~3ms to first-paint.
 
 const PREVIEW_MAX_CHARS = 360;
-
-function isColorDark(rgba) {
-  const { r, g, b } = parseRGBA(rgba);
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.55;
-}
 
 function buildPreviewHtml(n) {
   if (n.type === "text") {
@@ -31,14 +27,7 @@ function buildPreviewHtml(n) {
       : raw;
     return renderSafeMarkdown(sliced);
   }
-  if (n.type === "draw") {
-    try {
-      const parsed = typeof n.content === "string" ? JSON.parse(n.content) : n.content;
-      const txt = parsed?.text || "";
-      if (!txt) return "";
-      return isRichContent(txt) ? contentToHTML(txt) : renderSafeMarkdown(txt);
-    } catch { return ""; }
-  }
+  if (n.type === "draw") return drawingTextHtml(n.content);
   return "";
 }
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
-import useSpatialFocus from "./useSpatialFocus.js";
+import useSpatialFocus, { requestTvFocus } from "./useSpatialFocus.js";
 import useKeyboardInset from "../../hooks/useKeyboardInset.js";
 import UserAvatar from "../common/UserAvatar.jsx";
 
@@ -68,9 +68,7 @@ export default function TvLogin({
       if (mode === "profiles") target = firstProfileRef.current;
       else if (mode === "password") target = passwordRef.current;
       else if (mode === "manual") target = identifierRef.current;
-      if (target instanceof HTMLElement) {
-        window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target } }));
-      }
+      requestTvFocus(target);
     });
     return () => cancelAnimationFrame(id);
   }, [mode, selectedProfile]);
