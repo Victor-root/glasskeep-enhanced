@@ -2,8 +2,8 @@
 //
 // Thin API wrappers for the federation actions that can be triggered
 // from a notification toast (Accept / Decline a pairing request). Kept
-// out of App.jsx so its notification dispatcher only does wiring —
-// branch on the action kind and call one of these.
+// apart so the notification dispatcher (utils/notificationActions.js)
+// only does wiring: branch on the action kind and call one of these.
 
 import { api } from "../../../utils/api";
 import { t } from "../../../i18n";

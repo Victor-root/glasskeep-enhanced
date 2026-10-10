@@ -257,7 +257,7 @@ export default function useCollaboration(token, {
   // loaded when the note or the modal opened, and after actions taken on
   // THIS device — so a collaborator removed by the owner (or by a peer's
   // roster sync) stayed on screen until the modal was closed and reopened.
-  // App.jsx forwards the server's note_updated on the "note-updated" bus,
+  // dispatchServerEvent forwards the server's note_updated on the "note-updated" bus,
   // which the server emits for exactly these participant changes.
   useEffect(() => {
     if (!activeId) return undefined;

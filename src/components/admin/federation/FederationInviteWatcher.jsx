@@ -13,7 +13,7 @@
 //        - live: it raises the notification the moment a new invitation
 //          arrives.
 //      The Accept / Decline buttons carry a `kind` + `linkId`; the API
-//      call is dispatched centrally by App.jsx's handleNotificationAction
+//      call is dispatched centrally by runNotificationAction
 //      (mirroring the existing pending-user approve/reject toasts).
 //
 //   2. Connectivity changes — when an active link flips (peer goes
@@ -21,7 +21,7 @@
 //      server pushes a federation_link_state event and we toast it, so
 //      admins learn fast without staring at the panel.
 //
-// Both arrive via the `federation-event` window bus (App.jsx forwards the
+// Both arrive via the `federation-event` window bus (dispatchServerEvent forwards the
 // server's SSE federation_* events there), keeping this decoupled.
 
 import { useEffect, useRef } from "react";

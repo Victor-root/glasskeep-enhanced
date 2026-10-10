@@ -15,7 +15,7 @@ import { sortNotesByRecency } from "../utils/noteList.js";
  * item, pinning, archiving, or pressing save. Closing the modal without
  * any such action simply discards the pending draft — no trash pollution.
  *
- * The autosave effects in App.jsx call `materializeDraftIfNeeded()` _after_
+ * The autosave effects in useNoteEditor call `materializeDraftIfNeeded()` _after_
  * their own diff check, so the create runs synchronously and lands in the
  * FIFO queue before any follow-up patch. The effect then exits because
  * materialise aligns baselines to the current state.
@@ -25,14 +25,14 @@ import { sortNotesByRecency } from "../utils/noteList.js";
  *  - `materializeDraftIfNeeded` (the create-on-first-edit routine)
  *  - `handleDirectText/Checklist/Draw` (the button entry points)
  *
- * It does NOT own the intercept calls inside autosave effects nor the guards
- * in togglePin/handleArchiveNote/saveModal/deleteModal/closeModal — those
- * remain in App.jsx as part of the existing note-lifecycle orchestration.
+ * It does NOT own the intercept calls inside the autosave effects
+ * (useNoteEditor) nor the guards in togglePin/handleArchiveNote/saveModal/
+ * deleteModal/closeModal (useNoteActions).
  */
 export default function useDraftNote(ctx) {
   const pendingDraftRef = useRef(null); // { id, type } | null
   // Stays set across the note's whole "first session" — from creation until
-  // the modal closes. Lets closeModal in App.jsx auto-trash a freshly-created
+  // the modal closes. Lets closeModal (useNoteActions) auto-trash a freshly-created
   // note that the user emptied before closing (typed something, autosave
   // materialised the draft, then user erased everything). Cleared on close,
   // pin, archive or explicit delete — durable actions imply intent to keep.

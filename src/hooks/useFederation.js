@@ -2,7 +2,7 @@
 //
 // Data + actions for the Federation admin section. Owns the list of
 // links, the pairing actions, light polling while the section is open,
-// and a subscription to the `federation-event` window bus (App.jsx
+// and a subscription to the `federation-event` window bus (dispatchServerEvent
 // forwards the server's SSE federation_* events there) so the panel
 // refreshes the instant a peer accepts, an invitation arrives, etc.
 //

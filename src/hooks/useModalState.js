@@ -325,7 +325,7 @@ export default function useModalState({ notes, currentUser, closeModalRef }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [activeId, imgViewOpen, closeModalRef]);
 
-  // Note: Android back button (popstate) for the modal is handled centrally in App.jsx
+  // Note: Android back button (popstate) for the modal is handled centrally by useOverlayBackStack
 
   // Auto-resize modal textarea effect
   useEffect(() => {

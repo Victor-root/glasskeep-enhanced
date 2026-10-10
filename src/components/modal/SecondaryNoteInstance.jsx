@@ -831,7 +831,7 @@ export default function SecondaryNoteInstance({
 
   // ─── Note icon (PER-USER, never synced) ────────────────────────────────
   // Persisted via the dedicated per-user endpoint and stored on note.icon,
-  // not in the shared images_json — mirrors App.jsx's applyNoteIcon.
+  // not in the shared images_json — mirrors useLogoLibrary's applyNoteIcon.
   const applyNoteIcon = useCallback(async (icon) => {
     if (!activeId) return;
     const nid = String(activeId);
