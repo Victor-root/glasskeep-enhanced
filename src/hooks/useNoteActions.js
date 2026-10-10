@@ -12,34 +12,40 @@ import { textToChecklistItems, checklistItemsToText } from "../utils/noteConvers
 import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "../utils/richText.js";
 import { parseAudioContent, isAudioContentEmpty, extensionForMime } from "../utils/audioNote.js";
 import { dataUrlToBlob } from "../utils/audioConvert.js";
-import { parseDrawingContent } from "../utils/drawingContent.js";
 
 /**
- * What can be done to a note from the app: open it in the primary
- * modal, close it (flushing pending edits, and trashing a note left
- * empty), save, delete in its several flavours, restore, archive, pin,
- * set a reminder, convert text/checklist, duplicate, download.
+ * What can be done to the note open in a note pane: close it (flushing
+ * pending edits, and trashing a note left empty), save, delete in its
+ * several flavours, restore, archive, pin, set a reminder, convert
+ * text/checklist, duplicate, download.
  *
  * All local-first, like the autosave: React state and IndexedDB first,
  * then a queued sync action under a lease.
+ *
+ * Both panes run it, each with its own modal state and editor.
+ * finishClose ends every closeModal once the edits are flushed: the
+ * primary modal animates out, the side-by-side right pane hands over to
+ * the shell. The last options keep the points where the right pane has
+ * always behaved differently:
+ *  - audioNotes: save and download know audio notes;
+ *  - trashEmptyNoteOnClose: a note left empty is trashed on close;
+ *  - restoreAtChronologicalPosition: a restored note gets a position
+ *    among the active notes by its creation date;
+ *  - leaveArchiveViewOnUnarchive: unarchiving from the Archive view goes
+ *    back to all notes (needs setTagFilter);
+ *  - duplicateKeepsIcon: a duplicate gets the note icon too (needs
+ *    applyNoteIcon).
  */
 export default function useNoteActions({
   modal,
   editor,
-  noteAi,
   notes,
   setNotes,
   currentUser,
   sessionId,
   tagFilter,
   setTagFilter,
-  readModeEnabled,
-  setSidebarOpen,
-  setSbsSuppressOpenReplay,
-  allNotifications,
-  dismissNotification,
   acquireLocalLease,
-  releaseLocalLease,
   releaseLocalLeaseWithPrune,
   addDeleteTombstone,
   enqueueAndSync,
@@ -47,28 +53,31 @@ export default function useNoteActions({
   showToast,
   showGenericConfirm,
   applyNoteIcon,
+  finishClose,
+  audioNotes = true,
+  trashEmptyNoteOnClose = true,
+  restoreAtChronologicalPosition = true,
+  leaveArchiveViewOnUnarchive = true,
+  duplicateKeepsIcon = true,
 }) {
   const {
-    activeId, setActiveId, activeIdRef, setOpen,
-    mType, setMType, mTitle, setMTitle, mBody, setMBody,
-    mItems, setMItems, mDrawingData, setMDrawingData,
-    mTagList, setMTagList, mImages, setMImages, mColor, setMColor,
-    setTagInput, setViewMode, setSavingModal, setConfirmDeleteOpen,
-    setIsModalClosing, modalClosingTimerRef, setShowModalFmt, setImgViewOpen,
+    activeId,
+    mType, setMType, mTitle, mBody, setMBody,
+    mItems, setMItems, mDrawingData,
+    mTagList, mImages, mColor,
+    setSavingModal, modalClosingTimerRef,
     activeNoteObj,
   } = modal;
   const {
-    skipNextItemsAutosaveRef, prevItemsRef, skipNextDrawingAutosaveRef, prevDrawingRef,
-    pendingDrawingSaveRef, drawingDebounceTimerRef,
+    skipNextItemsAutosaveRef, prevItemsRef, prevDrawingRef,
     initialModalStateRef, committedBaselineRef,
     pendingDraftRef, freshlyCreatedNoteRef, materializeDraftIfNeeded,
-    flushPendingDrawingSave, autoSaveTextNote, syncChecklistItems,
+    autoSaveTextNote, flushOpenNote,
   } = editor;
-  const { noteAiOpen, setNoteAiOpen } = noteAi;
 
   /** -------- Download single note .md (or audio file for audio notes) -------- */
   const handleDownloadNote = async (note) => {
-    if (note?.type === "audio") {
+    if (audioNotes && note?.type === "audio") {
       const parsed = parseAudioContent(note.content);
       // Multi-clip notes still download from the kebab as a single file:
       // the first clip. The themed player offers per-clip downloads with
@@ -118,7 +127,7 @@ export default function useNoteActions({
     if (tagFilter === "ARCHIVED") {
       if (!archived) {
         setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-        setTagFilter(null);
+        if (leaveArchiveViewOnUnarchive) setTagFilter(null);
       }
     } else {
       if (archived) {
@@ -154,174 +163,9 @@ export default function useNoteActions({
     if (results.length) setter((prev) => [...prev, ...results]);
   };
 
-  const openModal = (id) => {
-    const n = notes.find((x) => String(x.id) === String(id));
-    if (!n) return;
-    // Opening a note acknowledges any pending reminder for it: clear the
-    // in-app reminder notification(s) for this note so they don't linger
-    // after you've opened it (e.g. by tapping the system/push notification,
-    // which deep-links here without going through the card's own button).
-    // dismiss() acks "delivered", which also clears the card on the user's
-    // other devices, so desktop ↔ mobile stay in sync.
-    try {
-      const sid = String(id);
-      (allNotifications || []).forEach((notif) => {
-        if (
-          notif &&
-          notif.type === "reminder" &&
-          (String(notif.metadata?.noteId) === sid || String(notif.action?.noteId) === sid)
-        ) {
-          dismissNotification(notif.id);
-        }
-      });
-    } catch {
-      /* best-effort: never block opening the note */
-    }
-    // Clear any stale pending-draft state: we're opening a real, persisted
-    // note, so the deferred-create path must not fire for it.
-    pendingDraftRef.current = null;
-    setSidebarOpen(false);
-    setSbsSuppressOpenReplay(false);
-    setActiveId(String(id));
-    setMType(n.type || "text");
-    setMTitle(n.title || "");
-    let drawNoteText = "";
-    if (n.type === "draw") {
-      try {
-        const { drawing: cleanDrawingData, text } = parseDrawingContent(n.content);
-        drawNoteText = text;
-        setMDrawingData(cleanDrawingData);
-        prevDrawingRef.current = cleanDrawingData;
-        setMBody(drawNoteText);
-      } catch {
-        setMDrawingData({ paths: [], dimensions: null });
-        prevDrawingRef.current = { paths: [], dimensions: null };
-        setMBody("");
-      }
-      skipNextDrawingAutosaveRef.current = true;
-    } else {
-      setMBody(n.content || "");
-      setMDrawingData({ paths: [], dimensions: null });
-      prevDrawingRef.current = { paths: [], dimensions: null };
-    }
-    skipNextItemsAutosaveRef.current = true;
-    setMItems(Array.isArray(n.items) ? n.items : []);
-    prevItemsRef.current = Array.isArray(n.items) ? n.items : [];
-    setMTagList(Array.isArray(n.tags) ? n.tags : []);
-    setMImages(Array.isArray(n.images) ? n.images : []);
-    setTagInput("");
-    setMColor(n.color || "default");
-
-    // Store initial state to detect if user actually edited
-    // For draw notes, baseline.content holds the text body (extracted from drawing JSON)
-    const baselineState = {
-      title: n.title || "",
-      content: n.type === "draw" ? drawNoteText : (n.content || ""),
-      tags: Array.isArray(n.tags) ? n.tags : [],
-      images: Array.isArray(n.images) ? n.images : [],
-      color: n.color || "default",
-    };
-    initialModalStateRef.current = baselineState;
-    committedBaselineRef.current = { ...baselineState };
-
-    // Audio notes have no read/edit distinction: the AudioNoteEditor always
-    // shows the player + recorder controls regardless of viewMode. Open in
-    // edit mode so the experience is identical to creating a new audio note.
-    // Users who disabled the read-mode setting always open in edit mode.
-    setViewMode(n.type !== "audio" && readModeEnabled);
-    setOpen(true);
-
-    // If this note has a saved AI conversation in localStorage, pre-load
-    // the messages and mark the panel as "has been opened" so the header
-    // toggle is immediately visible (the user can resume the saved chat
-    // without having to re-open via the kebab menu).
-    noteAi.restoreSavedNoteAi(id);
-  };
-
-  // The note no longer exists for this user (deleted elsewhere, access
-  // revoked): close it if it is the one open, without saving anything.
-  const closeNoteIfOpen = (noteId) => {
-    if (String(activeIdRef.current) === noteId) {
-      forceCloseModalForRemoteDelete(noteId);
-    }
-  };
-
-  // Force-close modal without any save/flush: used when a remote session
-  // permanently deletes the note that is currently open. Must not trigger
-  // autoSaveTextNote, flushPendingDrawingSave, or any enqueueAndSync.
-  const forceCloseModalForRemoteDelete = (noteId) => {
-    const nid = String(noteId);
-
-    // Cancel any pending drawing debounce so flush never fires.
-    // Release the lease since the note no longer exists.
-    const pending = pendingDrawingSaveRef.current;
-    if (pending && String(pending.noteId) === nid) {
-      if (drawingDebounceTimerRef.current) {
-        clearTimeout(drawingDebounceTimerRef.current);
-        drawingDebounceTimerRef.current = null;
-      }
-      if (pending.leaseId) releaseLocalLease(nid, pending.leaseId);
-      pendingDrawingSaveRef.current = null;
-    }
-
-    // Cancel in-flight close animation (if any)
-    if (modalClosingTimerRef.current) {
-      clearTimeout(modalClosingTimerRef.current);
-      modalClosingTimerRef.current = null;
-    }
-
-    // Reset all modal state immediately: no animation, no save
-    // (history cleanup is handled by the centralized overlay back-button system)
-    setOpen(false);
-    setActiveId(null);
-    setViewMode(true);
-    setConfirmDeleteOpen(false);
-    setShowModalFmt(false);
-    setIsModalClosing(false);
-    setImgViewOpen(false);
-  };
-
-  // Run the modal exit animation. If the AI side panel is open, close
-  // it first with its own slide-back animation, then kick off the modal
-  // fade-out: this gives a clean sequential close instead of both
-  // animations playing at the same time. The same modalClosingTimerRef
-  // guards re-entry through both phases.
-  const startModalExitAnimation = () => {
-    const PANEL_CLOSE_DURATION = 640; // matches NoteModal's aiClosing window
-    const MODAL_FADE_DURATION = 180;
-    const beginFade = () => {
-      setIsModalClosing(true);
-      modalClosingTimerRef.current = setTimeout(() => {
-        modalClosingTimerRef.current = null;
-        setOpen(false);
-        setActiveId(null);
-        setViewMode(true);
-        setConfirmDeleteOpen(false);
-        setShowModalFmt(false);
-        setIsModalClosing(false);
-        noteAi.resetNoteAiAfterClose();
-      }, MODAL_FADE_DURATION);
-    };
-    if (noteAiOpen) {
-      setNoteAiOpen(false);
-      // Cancel any in-flight AI request so chunks don't arrive after
-      // the note has unmounted.
-      noteAi.stopNoteAi();
-      modalClosingTimerRef.current = setTimeout(() => {
-        modalClosingTimerRef.current = null;
-        beginFade();
-      }, PANEL_CLOSE_DURATION);
-    } else {
-      beginFade();
-    }
-  };
-
   const closeModal = () => {
     // Prevent double-triggering while exit animation is running
     if (modalClosingTimerRef.current) return;
-    // Clear the post-SBS replay-suppression flag so noteModalOut can run
-    // unblocked when the user closes the survivor.
-    setSbsSuppressOpenReplay(false);
 
     // Unmaterialised draft: the user opened a blank note via the creation
     // buttons and never touched it, so nothing was ever persisted. Just run
@@ -344,7 +188,7 @@ export default function useNoteActions({
       if (draftType === "draw") {
         showToast(t("emptyNoteDeleted"), "info", 3000, "trash");
       }
-      startModalExitAnimation();
+      finishClose();
       return;
     }
 
@@ -358,7 +202,7 @@ export default function useNoteActions({
     // DO count as content though: a note that only carries pictures
     // (typical of Google Keep imports) is just as valid as a text-only
     // one and must NOT be auto-deleted on close.
-    if (activeId) {
+    if (trashEmptyNoteOnClose && activeId) {
       const drawPaths = mType === "draw"
         ? (mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []))
         : [];
@@ -424,99 +268,14 @@ export default function useNoteActions({
           );
         })();
 
-        startModalExitAnimation();
+        finishClose();
         return;
       }
     }
     freshlyCreatedNoteRef.current = null;
 
-    // Flush any pending drawing debounce before closing.
-    // flushPendingDrawingSave restores pendingDrawingSaveRef on failure,
-    // so a second close attempt can retry.
-    if (activeId && mType === "draw") {
-      flushPendingDrawingSave();
-    }
-
-    // Flush title/text/metadata changes for draw notes on close.
-    // flushPendingDrawingSave only covers drawing data changes (paths/dimensions).
-    // Title, text body, color, tags, images need a separate flush.
-    if (activeId && mType === "draw") {
-      const baseline = committedBaselineRef.current;
-      if (baseline) {
-        const patch = {};
-        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
-        if (baseline.color !== mColor) patch.color = mColor;
-        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
-        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
-        // For text body changes, re-serialize full drawing content
-        const textChanged = baseline.content !== mBody;
-        if (textChanged) {
-          patch.content = JSON.stringify({ ...(mDrawingData || { paths: [], dimensions: null }), text: mBody || "" });
-        }
-        if (Object.keys(patch).length > 0) {
-          autoSaveTextNote(activeId, patch, null, "draw");
-        }
-      }
-    }
-
-    // Retry checklist if the last autosave failed (prevItemsRef wasn't advanced).
-    if (activeId && mType === "checklist" && mItems) {
-      const prevJson = JSON.stringify(prevItemsRef.current || []);
-      const currentJson = JSON.stringify(mItems);
-      if (prevJson !== currentJson) {
-        syncChecklistItems(mItems);
-      }
-    }
-
-    // Flush pending title/metadata changes for checklists on close.
-    // syncChecklistItems only covers the items array; title, color, tags
-    // and images go through autoSaveTextNote with the debounced effect,
-    // so closing within the debounce window could otherwise lose them.
-    if (activeId && mType === "checklist") {
-      const baseline = committedBaselineRef.current;
-      if (baseline) {
-        const patch = {};
-        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
-        if (baseline.color !== mColor) patch.color = mColor;
-        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
-        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
-        if (Object.keys(patch).length > 0) {
-          autoSaveTextNote(activeId, patch, null, "checklist");
-        }
-      }
-    }
-
-    // Flush any pending text changes immediately before closing (local-first).
-    // Use committedBaselineRef (not initialModalStateRef) so that a failed
-    // autosave still produces a diff here and gets retried.
-    // Runs for both view and edit mode: a user may edit, toggle to view
-    // to preview before the 1s debounce fires, then close: the change is
-    // still dirty in mBody/mTitle and must be flushed.
-    // Audio shares this path: its mBody is the {clips, text} JSON, so a
-    // freshly-recorded clip whose autosave hasn't fired yet still gets
-    // flushed here on close.
-    if (activeId && (mType === "text" || mType === "audio")) {
-      const baseline = committedBaselineRef.current;
-      if (baseline) {
-        const patch = {};
-        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
-        if (baseline.content !== mBody) patch.content = mBody;
-        if (baseline.color !== mColor) patch.color = mColor;
-        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
-        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
-        if (Object.keys(patch).length > 0) {
-          autoSaveTextNote(activeId, patch, undefined, mType);
-        }
-      }
-    }
-
-    // No dirty flag management needed here: each flow (text, draw, checklist)
-    // owns its own lease via acquireLocalLease/releaseLocalLease,
-    // released only after successful enqueueAndSync.
-
-    // Start exit animation, then actually unmount after it completes.
-    // Sequential close: if the AI panel is open, it animates out first.
-    startModalExitAnimation();
+    flushOpenNote();
+    finishClose();
   };
 
   const saveModal = async () => {
@@ -538,7 +297,7 @@ export default function useNoteActions({
     const noteId = String(activeId);
     const nowIso = new Date().toISOString();
 
-    if (mType === "text" || mType === "audio") {
+    if (mType === "text" || (audioNotes && mType === "audio")) {
       // Text + audio notes: use targeted patch with only changed fields.
       // Use committedBaselineRef so a failed autosave is retried here.
       // Audio's mBody is the serialised {clips, text} JSON; same diff logic
@@ -710,10 +469,13 @@ export default function useNoteActions({
     try {
       const existing = await idbGetNote(nid, currentUser?.id, sessionId);
       if (existing) {
-        const activeNotes = await idbGetAllNotes(currentUser?.id, sessionId, "active");
-        const sorted = sortByPositionDesc(activeNotes.filter((n) => String(n.id) !== nid));
-        const restoredPosition = computeRestoredPosition(existing, sorted);
-        await idbPutNote({ ...existing, trashed: false, position: restoredPosition, client_updated_at: nowIso }, currentUser?.id, sessionId);
+        let placement = {};
+        if (restoreAtChronologicalPosition) {
+          const activeNotes = await idbGetAllNotes(currentUser?.id, sessionId, "active");
+          const sorted = sortByPositionDesc(activeNotes.filter((n) => String(n.id) !== nid));
+          placement = { position: computeRestoredPosition(existing, sorted) };
+        }
+        await idbPutNote({ ...existing, trashed: false, ...placement, client_updated_at: nowIso }, currentUser?.id, sessionId);
       }
     } catch (e) { console.error(e); }
     setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
@@ -1013,7 +775,7 @@ export default function useNoteActions({
     // The icon (logo badge) is per-user and lives outside the note payload
     // (its own table + endpoint: see applyNoteIcon), so it isn't carried by
     // the "create" enqueue above and must be copied over explicitly.
-    if (activeNoteObj?.icon) {
+    if (duplicateKeepsIcon && activeNoteObj?.icon) {
       applyNoteIcon(newId, activeNoteObj.icon);
     }
     showToast(t("noteDuplicated"), "success", undefined, "copy");
@@ -1023,9 +785,7 @@ export default function useNoteActions({
   // Checklist drag-and-drop is handled by useChecklistDrag inside NoteModal
 
   return {
-    openModal,
     closeModal,
-    closeNoteIfOpen,
     saveModal,
     deleteModal,
     restoreFromTrash,

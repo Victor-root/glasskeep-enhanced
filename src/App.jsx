@@ -5,11 +5,7 @@ import React, {
   useCallback,
 } from "react";
 import { t } from "./i18n";
-import {
-  getNote as idbGetNote,
-  putNote as idbPutNote,
-  deleteNote as idbDeleteNote,
-} from "./sync/localDb.js";
+import { deleteNote as idbDeleteNote } from "./sync/localDb.js";
 import { normalizeTypographyPresets } from "./utils/typographyPresets.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES, REMINDERS } from "./utils/constants.js";
@@ -65,6 +61,7 @@ import useNoteDeepLinks from "./hooks/useNoteDeepLinks.js";
 import useAndroidReminderBridge from "./hooks/useAndroidReminderBridge.js";
 import useNoteEditor from "./hooks/useNoteEditor.js";
 import useNoteActions from "./hooks/useNoteActions.js";
+import usePrimaryNoteModal from "./hooks/usePrimaryNoteModal.js";
 import useNoteReorder from "./hooks/useNoteReorder.js";
 import useNoteFilters from "./hooks/useNoteFilters.js";
 import { initialTagsForNewNote } from "./utils/noteFilters.js";
@@ -510,6 +507,7 @@ export default function App() {
     setNotes,
     currentUser,
     sessionId,
+    readModeEnabled,
     setSidebarOpen,
     getInitialTags: () => initialTagsForNewNote(tagFilter, activeTagFilters),
     acquireLocalLease,
@@ -604,27 +602,32 @@ export default function App() {
   // on mobile). Cleared whenever a note opens or the modal closes.
   const [sbsSuppressOpenReplay, setSbsSuppressOpenReplay] = useState(false);
 
+  const { openModal, closeNoteIfOpen, animateClose } = usePrimaryNoteModal({
+    modal: modalState,
+    editor,
+    noteAi,
+    notes,
+    setSidebarOpen,
+    setSbsSuppressOpenReplay,
+    allNotifications,
+    dismissNotification,
+    releaseLocalLease,
+  });
+
   const {
-    openModal, closeModal, closeNoteIfOpen, saveModal, deleteModal, restoreFromTrash,
+    closeModal, saveModal, deleteModal, restoreFromTrash,
     handleArchiveNote, togglePin, setNoteReminder, convertNoteType, duplicateActiveNote,
     handleDownloadNote, addImagesToState,
   } = useNoteActions({
     modal: modalState,
     editor,
-    noteAi,
     notes,
     setNotes,
     currentUser,
     sessionId,
     tagFilter,
     setTagFilter,
-    readModeEnabled,
-    setSidebarOpen,
-    setSbsSuppressOpenReplay,
-    allNotifications,
-    dismissNotification,
     acquireLocalLease,
-    releaseLocalLease,
     releaseLocalLeaseWithPrune,
     addDeleteTombstone,
     enqueueAndSync,
@@ -632,6 +635,7 @@ export default function App() {
     showToast,
     showGenericConfirm,
     applyNoteIcon,
+    finishClose: animateClose,
   });
 
   // Re-created each render so it always uses the latest openModal.
@@ -653,7 +657,7 @@ export default function App() {
     sbsActive, sbsSecondaryId, sbsClosingSide, sbsBothClosing,
     sbsHandoffNoTransition,
     sbsAiActiveSide, setSbsAiActiveSide, scheduleSbsAiClear,
-    onOpenSideBySide, requestCloseLeftPaneSBS, onSbsRightClosing, onSbsRightClosed,
+    onOpenSideBySide, requestCloseLeftPaneSBS, onSbsRightClosing,
     onSecondaryAiOpen, onSecondaryAiClose, closeBothSBS,
   } = useSideBySide({
     openModal,
@@ -1324,7 +1328,6 @@ export default function App() {
           splitClosing={sbsClosingSide === "right"}
           forceClosing={sbsBothClosing}
           onRequestClosing={onSbsRightClosing}
-          onRequestClose={onSbsRightClosed}
           aiPanelSide="left"
           sbsOppositeHidden={sbsAiActiveSide === "left"}
           onAiOpen={onSecondaryAiOpen}
@@ -1344,6 +1347,7 @@ export default function App() {
           logoLibrary={logoLibrary}
           addLogoToLibrary={addLogoToLibrary}
           deleteLogoFromLibrary={deleteLogoFromLibrary}
+          applyNoteIcon={applyNoteIcon}
           editorToolbarMode={editorToolbarMode}
           pasteMode={pasteMode}
           checklistInsertPosition={checklistInsertPosition}
@@ -1355,9 +1359,6 @@ export default function App() {
           releaseLocalLeaseWithPrune={releaseLocalLeaseWithPrune}
           enqueueAndSync={enqueueAndSync}
           enqueueWithLease={enqueueWithLease}
-          idbGetNote={idbGetNote}
-          idbPutNote={idbPutNote}
-          idbDeleteNote={idbDeleteNote}
           addDeleteTombstone={addDeleteTombstone}
           showToast={showToast}
           showGenericConfirm={showGenericConfirm}
