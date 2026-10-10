@@ -31,7 +31,7 @@ export default function NotificationBell({
   // up rendering two NotificationCenter portals at once.
   onOpenChange,
   // Optional ref the parent can use to close the panel from outside
-  // (e.g. App.jsx's popstate handler for the Android back button).
+  // (e.g. useOverlayBackStack, for the Android back button).
   // Whichever instance is currently open writes its close fn into the
   // ref; the closed one leaves it alone. Cleared on close.
   closeRef,

@@ -65,9 +65,10 @@ function isValidRpId(value) {
   return RP_ID_RE.test(v);
 }
 
-// The domain an admin declared in the panel. index.js seeds this at boot
-// from app_settings and rewrites it on every change, the same way it
-// mirrors the other admin settings in memory.
+// The domain an admin declared in the panel. services/appSettings.js
+// seeds this at boot from app_settings and adminSettingsRoutes.js
+// rewrites it on every change, like the other admin settings mirrored in
+// memory.
 let declaredRpId = "";
 
 function setDeclaredRpId(value) {

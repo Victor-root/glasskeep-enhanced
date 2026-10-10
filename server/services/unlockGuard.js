@@ -60,7 +60,7 @@ function isLocalhost(req) {
 function isSecureRequest(req) {
   // req.secure is true when Node terminated TLS itself, and also when a
   // TRUSTED hop forwarded X-Forwarded-Proto: https. Since trust is now
-  // scoped to the addresses a proxy actually sits on (see server/index.js),
+  // scoped to the addresses a proxy actually sits on (see server/middleware/trustProxy.js),
   // that second case is a statement from the proxy, not from the client.
   if (req.secure === true) return true;
 

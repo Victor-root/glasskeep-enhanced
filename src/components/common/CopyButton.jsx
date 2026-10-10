@@ -4,22 +4,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
-
-async function writeClipboard(value) {
-  if (navigator?.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-  const ta = document.createElement("textarea");
-  ta.value = value;
-  ta.setAttribute("readonly", "");
-  ta.style.position = "absolute";
-  ta.style.left = "-9999px";
-  document.body.appendChild(ta);
-  ta.select();
-  document.execCommand("copy");
-  document.body.removeChild(ta);
-}
+import { writeClipboard } from "../../utils/clipboard.js";
 
 export default function CopyButton({ value }) {
   const [copied, setCopied] = useState(false);
