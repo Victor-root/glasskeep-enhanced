@@ -13,6 +13,8 @@ import CreateUserSection from "../admin/CreateUserSection.jsx";
 import EditUserModal from "../admin/EditUserModal.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import { SettingsSection } from "../common/SettingsAccordion.jsx";
+import useServerPowerActions from "./useServerPowerActions.js";
+import ServerPowerOverlay from "./ServerPowerOverlay.jsx";
 
 export default function AdminPanel({
   open,
@@ -56,146 +58,18 @@ export default function AdminPanel({
     is_admin: false,
   });
   const [isUpdatingUser, setIsUpdatingUser] = useState(false);
-  const [isRestarting, setIsRestarting] = useState(false);
-  const [restartPhase, setRestartPhase] = useState(null); // null | "waiting" | "countdown"
-  const [restartCountdown, setRestartCountdown] = useState(5);
-  const [isShuttingDown, setIsShuttingDown] = useState(false);
-  const [shutdownPhase, setShutdownPhase] = useState(null); // null | "waiting" | "countdown"
-  const [shutdownCountdown, setShutdownCountdown] = useState(3);
+  const {
+    isRestarting,
+    restartPhase,
+    restartCountdown,
+    isShuttingDown,
+    shutdownPhase,
+    shutdownCountdown,
+    handleRestart,
+    handleShutdown,
+  } = useServerPowerActions({ showGenericConfirm, showToast, authToken });
 
   const serverOffline = syncStatus?.syncState === "offline" || syncStatus?.serverReachable === false;
-
-  const handleRestart = () => {
-    showGenericConfirm({
-      title: t("restartServerTitle"),
-      message: t("restartServerConfirm"),
-      confirmText: t("restartServerConfirmBtn"),
-      danger: true,
-      onConfirm: async () => {
-        setIsRestarting(true);
-        setRestartPhase("waiting");
-        try {
-          const healthBefore = await fetch("/api/health").then((r) => r.json()).catch(() => null);
-          const startedAtBefore = healthBefore?.startedAt ?? Date.now();
-
-          const res = await fetch("/api/admin/restart", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${authToken}` },
-          });
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            showToast(localizeServerError(data.error, "error"), "error");
-            setIsRestarting(false);
-            setRestartPhase(null);
-            return;
-          }
-
-          // Poll /api/health until startedAt is newer → confirmed new instance.
-          const deadline = Date.now() + 60_000;
-          const poll = async () => {
-            if (Date.now() > deadline) {
-              setIsRestarting(false);
-              setRestartPhase(null);
-              showToast(t("restartServerTimeout"), "error");
-              return;
-            }
-            try {
-              const h = await fetch("/api/health").then((r) => r.json());
-              if (h?.startedAt && h.startedAt > startedAtBefore) {
-                setIsRestarting(false);
-                setRestartPhase("countdown");
-                setRestartCountdown(5);
-                let n = 5;
-                const tick = setInterval(() => {
-                  n -= 1;
-                  setRestartCountdown(n);
-                  if (n <= 0) {
-                    clearInterval(tick);
-                    window.location.reload();
-                  }
-                }, 1000);
-                return;
-              }
-            } catch {
-              // Server still down — keep polling.
-            }
-            setTimeout(poll, 1500);
-          };
-          setTimeout(poll, 1500);
-        } catch {
-          showToast(t("error"), "error");
-          setIsRestarting(false);
-          setRestartPhase(null);
-        }
-      },
-    });
-  };
-
-  const handleShutdown = () => {
-    showGenericConfirm({
-      title: t("shutdownServerTitle"),
-      message: t("shutdownServerConfirm"),
-      confirmText: t("shutdownServerConfirmBtn"),
-      danger: true,
-      onConfirm: async () => {
-        setIsShuttingDown(true);
-        setShutdownPhase("waiting");
-        try {
-          const res = await fetch("/api/admin/shutdown", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${authToken}` },
-          });
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            showToast(localizeServerError(data.error, "error"), "error");
-            setIsShuttingDown(false);
-            setShutdownPhase(null);
-            return;
-          }
-
-          // Poll /api/health until it fails → server is stopped.
-          // AbortController caps each attempt at 3 s so a hanging TCP
-          // connection doesn't block detection of the server going down.
-          const deadline = Date.now() + 30_000;
-          const poll = async () => {
-            if (Date.now() > deadline) {
-              setIsShuttingDown(false);
-              setShutdownPhase(null);
-              showToast(t("shutdownServerTimeout"), "error");
-              return;
-            }
-            try {
-              const ctrl = new AbortController();
-              const t0 = setTimeout(() => ctrl.abort(), 3000);
-              await fetch("/api/health", { signal: ctrl.signal });
-              clearTimeout(t0);
-              // Still responding — keep polling.
-              setTimeout(poll, 1500);
-            } catch {
-              // Fetch failed or aborted → server is down. Start 3s countdown then reload.
-              setIsShuttingDown(false);
-              setShutdownPhase("countdown");
-              setShutdownCountdown(3);
-              let n = 3;
-              const tick = setInterval(() => {
-                n -= 1;
-                setShutdownCountdown(n);
-                if (n <= 0) {
-                  clearInterval(tick);
-                  window.location.reload();
-                }
-              }, 1000);
-            }
-          };
-          setTimeout(poll, 1500);
-        } catch {
-          showToast(t("error"), "error");
-          setIsShuttingDown(false);
-          setShutdownPhase(null);
-        }
-      },
-    });
-  };
 
   const openEditUserModal = (user) => {
     setEditingUser(user);
@@ -432,60 +306,24 @@ export default function AdminPanel({
       )}
 
       {restartPhase && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" />
-          <div
-            className="rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative text-center bg-white dark:bg-[#282828] border border-[var(--border-light)]"
-          >
-            {restartPhase === "waiting" ? (
-              <>
-                <div className="flex justify-center mb-4">
-                  <TI.Refresh className="tabler-icon w-10 h-10 text-[var(--gk-chrome-accent)] animate-spin" />
-                </div>
-                <h3 className="text-lg font-semibold mb-1">{t("restartServerInProgress")}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t("restartServerWaiting")}</p>
-              </>
-            ) : (
-              <>
-                <div className="flex justify-center mb-4">
-                  <TI.Check className="tabler-icon w-10 h-10 text-emerald-500" />
-                </div>
-                <h3 className="text-lg font-semibold mb-1">{t("restartServerDone")}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t("restartServerReloadIn").replace("{n}", restartCountdown)}
-                </p>
-              </>
-            )}
-          </div>
-        </div>
+        <ServerPowerOverlay
+          phase={restartPhase}
+          Icon={TI.Refresh}
+          inProgressTitle={t("restartServerInProgress")}
+          waitingText={t("restartServerWaiting")}
+          doneTitle={t("restartServerDone")}
+          countdown={restartCountdown}
+        />
       )}
       {shutdownPhase && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" />
-          <div
-            className="rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative text-center bg-white dark:bg-[#282828] border border-[var(--border-light)]"
-          >
-            {shutdownPhase === "waiting" ? (
-              <>
-                <div className="flex justify-center mb-4">
-                  <TI.Power className="tabler-icon w-10 h-10 text-[var(--gk-chrome-accent)] animate-spin" />
-                </div>
-                <h3 className="text-lg font-semibold mb-1">{t("shutdownServerInProgress")}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t("shutdownServerWaiting")}</p>
-              </>
-            ) : (
-              <>
-                <div className="flex justify-center mb-4">
-                  <TI.Check className="tabler-icon w-10 h-10 text-emerald-500" />
-                </div>
-                <h3 className="text-lg font-semibold mb-1">{t("shutdownServerDone")}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t("restartServerReloadIn").replace("{n}", shutdownCountdown)}
-                </p>
-              </>
-            )}
-          </div>
-        </div>
+        <ServerPowerOverlay
+          phase={shutdownPhase}
+          Icon={TI.Power}
+          inProgressTitle={t("shutdownServerInProgress")}
+          waitingText={t("shutdownServerWaiting")}
+          doneTitle={t("shutdownServerDone")}
+          countdown={shutdownCountdown}
+        />
       )}
     </>
   );
