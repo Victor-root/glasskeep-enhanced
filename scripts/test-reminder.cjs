@@ -48,6 +48,14 @@ const {
   requestJson,
   TLS_USAGE,
 } = require("./lib/secureRequest.cjs");
+const {
+  envFilePath,
+  parseEnvFile,
+  isLocalHttpsEnabled,
+  requireNativeDeps,
+  findAdmin,
+  signAdminToken,
+} = require("./lib/instanceEnv.cjs");
 
 function parseArgs(argv) {
   const out = {
@@ -87,35 +95,13 @@ function usage() {
   );
 }
 
-function parseEnvFile(p) {
-  const out = {};
-  if (!fs.existsSync(p)) return out;
-  const txt = fs.readFileSync(p, "utf8");
-  for (const raw of txt.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq <= 0) continue;
-    out[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
-  }
-  return out;
-}
-
 function loadConfig(args) {
-  const envFile = process.env.GLASSKEEP_ENV || "/opt/glass-keep/.env";
+  const envFile = envFilePath();
   const env = parseEnvFile(envFile);
   const merged = { ...env, ...process.env };
   const port = args.port || Number(merged.API_PORT || merged.PORT) || 8080;
   const host = args.host || "127.0.0.1";
-  // Describes THIS machine only; usesHttps turns it into the answer for
-  // the target actually being addressed.
-  const localHttpsEnabled = Boolean(
-    merged.HTTPS_ENABLED !== "false" &&
-    merged.SSL_CERT &&
-    merged.SSL_KEY &&
-    fs.existsSync(merged.SSL_CERT) &&
-    fs.existsSync(merged.SSL_KEY),
-  );
+  const localHttpsEnabled = isLocalHttpsEnabled(merged);
   const httpsEnabled = usesHttps({ host, localHttpsEnabled });
   const jwtSecret = merged.JWT_SECRET;
   if (!jwtSecret) {
@@ -126,32 +112,6 @@ function loadConfig(args) {
   const dbFile =
     merged.DB_FILE || merged.SQLITE_FILE || path.join(serverDir, "data.sqlite");
   return { host, port, httpsEnabled, jwtSecret, dbFile, envFile };
-}
-
-function pickAdmin(db, args) {
-  if (args.as) {
-    const row = db
-      .prepare("SELECT id, email, name, is_admin FROM users WHERE lower(email) = lower(?)")
-      .get(args.as);
-    if (!row) {
-      console.error(`[error] no user found with email ${args.as}`);
-      process.exit(1);
-    }
-    if (!row.is_admin) {
-      console.error(`[error] user ${row.email} is not admin (endpoint requires admin)`);
-      process.exit(1);
-    }
-    return row;
-  }
-  const admin = db
-    .prepare("SELECT id, email, name, is_admin FROM users WHERE is_admin = 1 ORDER BY id LIMIT 1")
-    .get();
-  if (!admin) {
-    console.error("[error] no admin user found in the database");
-    console.error("        Create an admin first or pass --as <admin-email>");
-    process.exit(1);
-  }
-  return admin;
 }
 
 async function main() {
@@ -168,16 +128,7 @@ async function main() {
 
   const cfg = loadConfig(args);
 
-  let Database;
-  let jwt;
-  try {
-    Database = require("better-sqlite3");
-    jwt = require("jsonwebtoken");
-  } catch {
-    console.error("[error] missing native deps. Run from the project root:");
-    console.error("        cd " + path.resolve(__dirname, "..") + " && npm install");
-    process.exit(1);
-  }
+  const { Database, jwt } = requireNativeDeps();
 
   if (!fs.existsSync(cfg.dbFile)) {
     console.error(`[error] database not found at ${cfg.dbFile}`);
@@ -186,7 +137,7 @@ async function main() {
   }
 
   const db = new Database(cfg.dbFile, { readonly: true });
-  const admin = pickAdmin(db, args);
+  const admin = findAdmin(db, args.as);
   const note = db
     .prepare("SELECT id, user_id FROM notes WHERE id = ?")
     .get(String(args.note));
@@ -196,11 +147,7 @@ async function main() {
     process.exit(1);
   }
 
-  const token = jwt.sign(
-    { uid: admin.id, email: admin.email, name: admin.name, is_admin: !!admin.is_admin },
-    cfg.jwtSecret,
-    { expiresIn: "5m" },
-  );
+  const token = signAdminToken(jwt, admin, cfg.jwtSecret);
 
   const res = await requestJson({
     host: cfg.host,
