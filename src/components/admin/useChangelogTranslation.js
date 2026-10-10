@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import changelogRaw from "../../../CHANGELOG.md?raw";
 import { t, locale } from "../../i18n";
 import { api, getAuth, API_BASE } from "../../utils/api.js";
 import { readSseFrames } from "../../utils/sse.js";
-import { compileMarkdown, compiledChangelog } from "./changelogContent.js";
 
 // True when the requesting user has a usable AI config (either the
 // shared "server" provider opted-in by the admin, or their own custom
@@ -22,7 +21,7 @@ async function fetchAiAvailable(token) {
 }
 
 // "Translate with AI" for the changelog modal: availability, the streamed
-// translation, the original / translated toggle and the HTML to show.
+// translation and the original / translated toggle.
 export default function useChangelogTranslation(open) {
     const [aiAvailable, setAiAvailable] = useState(false);
     const [translating, setTranslating] = useState(false);
@@ -157,16 +156,6 @@ export default function useChangelogTranslation(open) {
         }
     };
 
-    // Translated markdown is compiled on the fly; the original is
-    // pre-compiled once at module load. The "Show original" toggle
-    // flips between the two without re-parsing the source.
-    const translatedHtml = useMemo(
-        () => (translatedRaw ? compileMarkdown(translatedRaw) : ""),
-        [translatedRaw],
-    );
-    const displayHtml =
-        translatedRaw && !showOriginal ? translatedHtml : compiledChangelog;
-
     return {
         aiAvailable,
         translating,
@@ -175,6 +164,5 @@ export default function useChangelogTranslation(open) {
         showOriginal,
         setShowOriginal,
         onTranslate,
-        displayHtml,
     };
 }

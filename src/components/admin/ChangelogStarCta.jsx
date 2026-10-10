@@ -1,6 +1,6 @@
 import React from "react";
 import { t } from "../../i18n";
-import { openExternalUrl } from "./changelogContent.js";
+import { openExternalUrl } from "./changelogLinks.js";
 
 // GitHub star prompt at the bottom of the changelog.
 export default function ChangelogStarCta({ onDismiss }) {

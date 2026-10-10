@@ -1,7 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+import { installStyleGuard } from "../../utils/safeStyle.js";
+import changelogRaw from "../../../CHANGELOG.md?raw";
 import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
-import { resolveChangelogHref, openExternalUrl } from "./changelogContent.js";
+import { resolveChangelogHref, openExternalUrl } from "./changelogLinks.js";
 import useChangelogTranslation from "./useChangelogTranslation.js";
 import ChangelogStarCta from "./ChangelogStarCta.jsx";
 import { readStarDismissed, dismissStarCta } from "./changelogFlags.js";
@@ -23,6 +27,27 @@ import { readStarDismissed, dismissStarCta } from "./changelogFlags.js";
 // eslint-disable-next-line react-refresh/only-export-components -- App.jsx imports these flag helpers from here
 export { consumeChangelogShowFlag, onOpenChangelogRequest } from "./changelogFlags.js";
 
+// One filter for every sanitizing path in the app. See safeStyle.js.
+installStyleGuard(DOMPurify);
+
+function compileMarkdown(md) {
+    try {
+        const html = marked.parse(String(md || ""), {
+            breaks: false,
+            gfm: true,
+        });
+        return DOMPurify.sanitize(html);
+    } catch {
+        return "";
+    }
+}
+
+// Compile the bundled changelog once at module load — it is identical
+// for every render and parsing 5 KB of changelog on every mount would
+// be silly. AI-translated variants are compiled on the fly when the
+// user clicks "Translate with AI".
+const compiledChangelog = compileMarkdown(changelogRaw);
+
 // Controlled component: `open` / `onClose` are owned by App.jsx so the
 // modal can be registered with the central Android-back-button stack
 // (overlayOpenCount + popstate handler). The localStorage "show after
@@ -37,7 +62,6 @@ export default function ChangelogModal({ open, onClose }) {
         showOriginal,
         setShowOriginal,
         onTranslate,
-        displayHtml,
     } = useChangelogTranslation(open);
     // Whether the user has permanently dismissed the GitHub star footer.
     const [starDismissed, setStarDismissed] = useState(readStarDismissed);
@@ -52,6 +76,16 @@ export default function ChangelogModal({ open, onClose }) {
             document.body.style.overflow = prev;
         };
     }, [open]);
+
+    // Translated markdown is compiled on the fly; the original is
+    // pre-compiled once at module load. The "Show original" toggle
+    // flips between the two without re-parsing the source.
+    const translatedHtml = useMemo(
+        () => (translatedRaw ? compileMarkdown(translatedRaw) : ""),
+        [translatedRaw],
+    );
+    const displayHtml =
+        translatedRaw && !showOriginal ? translatedHtml : compiledChangelog;
 
     if (!open) return null;
 
