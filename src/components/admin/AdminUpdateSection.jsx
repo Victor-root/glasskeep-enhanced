@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
 import { openChangelog } from "./changelogFlags.js";
+import UpdateCommandRow from "./UpdateCommandRow.jsx";
+import { DockerSocketHint, DockerNoticeHint } from "./DockerUpdateHints.jsx";
 
 const REPO_URL = "https://github.com/Victor-root/glasskeep-enhanced";
 
@@ -9,134 +11,6 @@ const INSTALL_COMMAND =
   "curl -fsSL https://raw.githubusercontent.com/Victor-root/glasskeep-enhanced/main/install.sh | sudo bash";
 const DOCKER_COMMAND =
   "cd ~/glasskeep && docker compose pull && docker compose up -d";
-
-// The exact line users with an older docker-compose.yml need to add to
-// unlock the one-click update. Kept here so we can show it inline.
-const DOCKER_SOCKET_MOUNT_HINT = "- /var/run/docker.sock:/var/run/docker.sock";
-
-function CommandRow({ icon: Icon, label, description, command }) {
-  const [copied, setCopied] = useState(false);
-
-  const onCopy = async () => {
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(command);
-      } else {
-        const ta = document.createElement("textarea");
-        ta.value = command;
-        ta.setAttribute("readonly", "");
-        ta.style.position = "absolute";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      /* clipboard blocked — silent */
-    }
-  };
-
-  return (
-    <div className="rounded-lg border border-[var(--border-light)] bg-gray-50 dark:bg-black/30 p-3">
-      {/* Title row: icon + label left, copy button right */}
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
-          <Icon className="tabler-icon w-4 h-4" />
-          {label}
-        </div>
-        <button
-          type="button"
-          onClick={onCopy}
-          className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md bg-white dark:bg-white/10 border border-[var(--border-light)] hover:bg-gray-100 dark:hover:bg-white/15"
-          aria-label={t("copyCommand")}
-        >
-          {copied ? (
-            <TI.Check className="tabler-icon w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" />
-          ) : (
-            <TI.Download className="tabler-icon w-3.5 h-3.5 opacity-70" />
-          )}
-          {copied ? t("copied") : t("copy")}
-        </button>
-      </div>
-      {/* Description and command: full width, no icon indentation */}
-      {description && (
-        <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">
-          {description}
-        </p>
-      )}
-      <code
-        className="block w-full text-xs font-mono text-gray-800 dark:text-gray-100 bg-white dark:bg-black/40 border border-[var(--border-light)] rounded-md px-2 py-1.5 whitespace-nowrap overflow-x-auto"
-        title={command}
-      >
-        {command}
-      </code>
-    </div>
-  );
-}
-
-// Inline hint shown when running in Docker without the socket mount —
-// guides the admin through the one-time docker-compose.yml edit that
-// unlocks the one-click button.
-function DockerSocketHint() {
-  const [copied, setCopied] = useState(false);
-  const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(DOCKER_SOCKET_MOUNT_HINT);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      /* ignore */
-    }
-  };
-  return (
-    <div className="rounded-lg border border-[var(--gk-accent-soft-border)] bg-[var(--gk-accent-soft-bg)] p-3 mb-3">
-      <p className="text-xs text-[var(--gk-chrome-accent)] mb-2">
-        {t("selfUpdateDockerHintIntro")}
-      </p>
-      <div className="flex items-center gap-2">
-        <code className="flex-1 text-xs font-mono text-[var(--gk-chrome-accent)] bg-white dark:bg-black/40 border border-[var(--gk-accent-soft-border)] rounded-md px-2 py-1.5 whitespace-nowrap overflow-x-auto">
-          {DOCKER_SOCKET_MOUNT_HINT}
-        </code>
-        <button
-          type="button"
-          onClick={onCopy}
-          className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md bg-white dark:bg-white/10 border border-[var(--gk-accent-soft-border)] hover:bg-[var(--gk-accent-soft-bg)] dark:hover:bg-white/15"
-        >
-          {copied ? (
-            <TI.Check className="tabler-icon w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" />
-          ) : (
-            <TI.Download className="tabler-icon w-3.5 h-3.5 opacity-70" />
-          )}
-          {copied ? t("copied") : t("copy")}
-        </button>
-      </div>
-      <p className="text-[11px] text-[var(--gk-chrome-accent)] opacity-80 mt-2">
-        {t("selfUpdateDockerHintFootnote")}
-      </p>
-    </div>
-  );
-}
-
-// Shown when the socket IS mounted but the app still can't drive Docker:
-// permission denied (the Synology root:root case) or the daemon not
-// answering. Unlike DockerSocketHint there is no line to copy — the
-// remedy is to recreate/restart the container or fix the daemon — so
-// this is a text-only notice in a distinct (amber) colour.
-function DockerNoticeHint({ intro, footnote }) {
-  return (
-    <div className="rounded-lg border border-amber-300/60 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-3 mb-3">
-      <p className="text-xs text-amber-900 dark:text-amber-200">{intro}</p>
-      {footnote && (
-        <p className="text-[11px] font-mono text-amber-800/80 dark:text-amber-200/70 mt-2">
-          {footnote}
-        </p>
-      )}
-    </div>
-  );
-}
 
 export default function AdminUpdateSection({
   updateInfo,
@@ -298,13 +172,13 @@ export default function AdminUpdateSection({
           {/* Manual commands stay around as a fallback for either mode. */}
           {showManualCommands && (
             <div className="space-y-3 mb-3">
-              <CommandRow
+              <UpdateCommandRow
                 icon={TI.Terminal2}
                 label={t("updateMethodTerminal")}
                 description={t("updateMethodTerminalDescription")}
                 command={INSTALL_COMMAND}
               />
-              <CommandRow
+              <UpdateCommandRow
                 icon={TI.BrandDocker}
                 label={t("updateMethodDocker")}
                 description={t("updateMethodDockerDescription")}

@@ -17,6 +17,7 @@ import { useFederation } from "../../../hooks/useFederation.js";
 import FederationLinkCard from "./FederationLinkCard.jsx";
 import { ServerPlusIcon, ServerUserIcon, WorldWwwIcon } from "./FederationIcons.jsx";
 import { federationErrorMessage } from "./federationActions.js";
+import { writeClipboard } from "../../../utils/clipboard.js";
 
 // The app's primary themed button — the exact gradient / theme / hover
 // treatment of the admin panel's "Create user" button. `.btn-gradient`
@@ -45,19 +46,7 @@ export default function FederationSection({
     const value = fed.localBaseUrl || "";
     if (!value) return;
     try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
-      } else {
-        const ta = document.createElement("textarea");
-        ta.value = value;
-        ta.setAttribute("readonly", "");
-        ta.style.position = "absolute";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
+      await writeClipboard(value);
       setCopiedAddr(true);
       window.setTimeout(() => setCopiedAddr(false), 1800);
     } catch {
