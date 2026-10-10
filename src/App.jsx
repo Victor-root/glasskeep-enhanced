@@ -1,23 +1,15 @@
 import React, {
   useEffect,
-  useMemo,
   useRef,
   useState,
   useCallback,
-  useDeferredValue,
 } from "react";
 import { t } from "./i18n";
 import {
-  getAllNotes as idbGetAllNotes,
   getNote as idbGetNote,
   putNote as idbPutNote,
   deleteNote as idbDeleteNote,
 } from "./sync/localDb.js";
-import { mdForDownload } from "./utils/markdown.jsx";
-import { uid, sanitizeFilename, downloadText, triggerBlobDownload, fileToCompressedDataURL } from "./utils/helpers.js";
-import { sortNotesByRecency, sortNotesForOrderReset, computeRestoredPosition, sortByPositionDesc } from "./utils/noteList.js";
-import { textToChecklistItems, checklistItemsToText } from "./utils/noteConversion.js";
-import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "./utils/richText.js";
 import { normalizeTypographyPresets } from "./utils/typographyPresets.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES, REMINDERS } from "./utils/constants.js";
@@ -43,12 +35,9 @@ import QrScannerModal from "./components/auth/QrScannerModal.jsx";
 import FloatingCardsBackground from "./components/common/FloatingCardsBackground.jsx";
 import NoteModal from "./components/modal/NoteModal.jsx";
 import SecondaryNoteInstance from "./components/modal/SecondaryNoteInstance.jsx";
-import { parseAudioContent, isAudioContentEmpty, extensionForMime } from "./utils/audioNote.js";
-import { dataUrlToBlob } from "./utils/audioConvert.js";
 import useModalState from "./hooks/useModalState.js";
 import useTouchScrollbars from "./hooks/useTouchScrollbars.js";
 import useNoteSaveState from "./hooks/useNoteSaveState.js";
-import useDraftNote from "./hooks/useDraftNote.js";
 import useAdminActions from "./hooks/useAdminActions.js";
 import { useBranding } from "./branding/BrandingContext.jsx";
 import useImportExport from "./hooks/useImportExport.js";
@@ -74,6 +63,11 @@ import useSideBySide from "./hooks/useSideBySide.js";
 import useLaunchShortcuts from "./hooks/useLaunchShortcuts.js";
 import useNoteDeepLinks from "./hooks/useNoteDeepLinks.js";
 import useAndroidReminderBridge from "./hooks/useAndroidReminderBridge.js";
+import useNoteEditor from "./hooks/useNoteEditor.js";
+import useNoteActions from "./hooks/useNoteActions.js";
+import useNoteReorder from "./hooks/useNoteReorder.js";
+import useNoteFilters from "./hooks/useNoteFilters.js";
+import { initialTagsForNewNote } from "./utils/noteFilters.js";
 import { runNotificationAction } from "./utils/notificationActions.js";
 import useLocalLeases from "./sync/useLocalLeases.js";
 import useNoteSync from "./sync/useNoteSync.js";
@@ -110,7 +104,6 @@ export default function App() {
 
   // Notes & search
   const [notes, setNotes] = useState([]);
-  const [allNotesForTags, setAllNotesForTags] = useState([]);
   const [search, setSearch] = useState("");
 
   // Local-first sync: leases protecting unsent local changes, the sync
@@ -198,11 +191,11 @@ export default function App() {
   const closeModalRef = useRef(null);
 
   // ─── Modal state (hook) ───
+  const modalState = useModalState({ notes, currentUser, closeModalRef });
   const {
     open, setOpen,
     activeId, setActiveId,
-    activeIdRef,
-    mType, setMType,
+    mType,
     mTitle, setMTitle,
     mBody, setMBody,
     mTagList, setMTagList,
@@ -211,10 +204,9 @@ export default function App() {
     mColor, setMColor,
     viewMode, setViewMode,
     mImages, setMImages,
-    savingModal, setSavingModal,
+    savingModal,
     confirmDeleteOpen, setConfirmDeleteOpen,
     isModalClosing, setIsModalClosing,
-    modalClosingTimerRef,
     mItems, setMItems,
     mDrawingData, setMDrawingData,
     showModalFmt, setShowModalFmt,
@@ -238,7 +230,7 @@ export default function App() {
     openImageViewer, closeImageViewer, nextImage, prevImage, resetMobileNav,
     // Handlers
     onModalBodyClick, isCollaborativeNote,
-  } = useModalState({ notes, currentUser, closeModalRef });
+  } = modalState;
   const noteSaveState = useNoteSaveState(open ? activeId : null, modalHasChanges, syncStatus);
 
   // Per-note AI chat panel. In side-by-side mode the panel takes over the
@@ -287,7 +279,7 @@ export default function App() {
   // Without lifting, pressing back on Android while the changelog was
   // open backgrounded the entire app.
   const [changelogOpen, setChangelogOpen] = useState(false);
-  const closeChangelog = useCallback(() => setChangelogOpen(false), []);
+  const closeChangelog = useCallback(() => setChangelogOpen(false), [setChangelogOpen]);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads and clears a one-shot flag, kept out of render because of that side effect
     if (consumeChangelogShowFlag()) setChangelogOpen(true);
@@ -323,23 +315,6 @@ export default function App() {
   };
 
   const { updateInfo, selfUpdate } = useServerUpdate({ token, currentUser, notify });
-
-  // Sync-domain refs (owned by autosave, not by modal UI hook)
-  const skipNextItemsAutosave = useRef(false);
-  const prevItemsRef = useRef([]);
-  const skipNextDrawingAutosave = useRef(false);
-  const prevDrawingRef = useRef({ paths: [], dimensions: null });
-  const pendingDrawingSaveRef = useRef(null);
-  const drawingDebounceTimerRef = useRef(null);
-  // Tracks latest mBody for draw notes so flushPendingDrawingSave can include text
-  const drawNoteBodyRef = useRef("");
-
-  // Initial draw mode for the modal (null = default "view", "draw" = open in edit mode)
-  const [initialDrawMode, setInitialDrawMode] = useState(null);
-
-  // Drag
-  const dragId = useRef(null);
-  const dragGroup = useRef(null);
 
   // Header menu refs + state
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
@@ -532,188 +507,26 @@ export default function App() {
     }),
   });
 
-  // Live-sync checklist items in open modal when remote updates arrive
-  useEffect(() => {
-    if (!open || !activeId) return;
-    const n = notes.find((x) => String(x.id) === String(activeId));
-    if (!n) return;
-    if ((mType || n.type) !== "checklist") return;
-    const serverItems = Array.isArray(n.items) ? n.items : [];
-    const prevJson = JSON.stringify(prevItemsRef.current || []);
-    const serverJson = JSON.stringify(serverItems);
-    if (serverJson !== prevJson) {
-      setMItems(serverItems);
-      prevItemsRef.current = serverItems;
-    }
-  }, [notes, open, activeId, mType, setMItems]);
-
-  // Flush any pending drawing debounce — shared persist logic used by both
-  // the debounce timeout and the flush-on-close path.
-  // Async: dirty flag stays active until queue write completes, closing the
-  // micro-window where SSE patchSingleNote could slip through.
-  const flushPendingDrawingSave = useCallback(async () => {
-    const pending = pendingDrawingSaveRef.current;
-    if (!pending) return;
-    // Clear pending ref eagerly to prevent double-flush from concurrent callers,
-    // but restore it on failure so closeModal retry can still pick it up.
-    pendingDrawingSaveRef.current = null;
-
-    if (drawingDebounceTimerRef.current) {
-      clearTimeout(drawingDebounceTimerRef.current);
-      drawingDebounceTimerRef.current = null;
-    }
-
-    const { noteId, drawingData, leaseId } = pending;
-    const nowIso = new Date().toISOString();
-    // Include text body alongside drawing data so it's not lost on draw saves
-    const textBody = drawNoteBodyRef.current || "";
-    const drawingContent = JSON.stringify({ ...drawingData, text: textBody });
-
-    setNotes((prev) =>
-      prev.map((n) =>
-        String(n.id) === noteId
-          ? { ...n, content: drawingContent, updated_at: nowIso, client_updated_at: nowIso }
-          : n,
-      ),
-    );
-
-    // Persist to IDB first — hasPendingChanges() reads from this store
-    try {
-      const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
-      if (existing) {
-        await idbPutNote({ ...existing, content: drawingContent, updated_at: nowIso, client_updated_at: nowIso }, currentUser?.id, sessionId);
-      }
-    } catch (e) {
-      console.error("IndexedDB drawing flush failed:", e);
-      // IDB failed — restore pending ref so closeModal can retry
-      pendingDrawingSaveRef.current = pending;
-      return;
-    }
-
-    // Write queue item — after this, hasPendingChanges() returns true for noteId
-    try {
-      await enqueueAndSync({
-        type: "patch",
-        noteId,
-        payload: { content: drawingContent, type: "draw", client_updated_at: nowIso },
-      });
-    } catch (e) {
-      console.error("Drawing enqueue failed:", e);
-      // Enqueue failed — restore pending ref so closeModal can retry.
-      // Don't release lease on failure — keep SSE guard active.
-      pendingDrawingSaveRef.current = pending;
-      return;
-    }
-
-    // IDB + enqueue both succeeded — advance committed baseline
-    prevDrawingRef.current = drawingData;
-    // Queue item exists — release this lease + prune older zombies for this note
-    releaseLocalLeaseWithPrune(noteId, leaseId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- the lease helpers only touch refs
-  }, [currentUser?.id, sessionId, enqueueAndSync]);
-
-  // Keep drawNoteBodyRef in sync with mBody for draw notes
-  useEffect(() => { drawNoteBodyRef.current = mBody; }, [mBody]);
-
-  // Auto-save drawing changes (local-first)
-  useEffect(() => {
-    if (!open || !activeId || mType !== "draw") return;
-    if (skipNextDrawingAutosave.current) {
-      skipNextDrawingAutosave.current = false;
-      return;
-    }
-
-    const prevJson = JSON.stringify(
-      prevDrawingRef.current || { paths: [], dimensions: null },
-    );
-    const currentJson = JSON.stringify(
-      mDrawingData || { paths: [], dimensions: null },
-    );
-    if (prevJson === currentJson) return;
-
-    // A real draw stroke reached us — materialise the draft before we save
-    // against it. The create payload will carry the new drawing, and the
-    // effect returns because baselines are realigned to the current state.
-    // eslint-disable-next-line react-hooks/immutability -- the effect runs after render, once useDraftNote below has returned
-    if (materializeDraftIfNeeded({ drawing: mDrawingData })) return;
-    // If materialise was rejected because the draft is still empty (no
-    // strokes, no caption, no metadata), keep the draft pending and skip
-    // the autosave — there's nothing to patch, and acquiring a lease /
-    // scheduling a flush for a non-existent server row destabilises
-    // subsequent modal opens (the user reported a flaky "modal opens
-    // then closes immediately" after closing an empty drawing draft).
-    if (
-      // eslint-disable-next-line react-hooks/immutability -- the effect runs after render, once useDraftNote below has returned
-      pendingDraftRef.current &&
-      String(activeId) === String(pendingDraftRef.current.id)
-    ) {
-      return;
-    }
-
-    const dirtyNoteId = String(activeId);
-
-    // Release the lease from the previous superseded debounce (if it didn't fire yet).
-    // If it DID fire, flush already consumed pendingDrawingSaveRef (set to null).
-    const prev = pendingDrawingSaveRef.current;
-    if (prev && prev.leaseId) {
-      releaseLocalLease(prev.noteId, prev.leaseId);
-    }
-
-    // Acquire a fresh lease BEFORE debounce fires — prevents SSE patchSingleNote()
-    // from overwriting local drawing state during the 500ms debounce window.
-    const leaseId = acquireLocalLease(dirtyNoteId);
-
-    // Store pending payload + lease so flush can pick it up if modal closes mid-debounce
-    pendingDrawingSaveRef.current = { noteId: dirtyNoteId, drawingData: mDrawingData, leaseId };
-
-    // Debounce local-first save by 500ms — timeout calls flush which consumes
-    // and clears pendingDrawingSaveRef, so no double-execute is possible.
-    const timeoutId = setTimeout(() => {
-      drawingDebounceTimerRef.current = null;
-      flushPendingDrawingSave();
-    }, 500);
-    drawingDebounceTimerRef.current = timeoutId;
-
-    return () => {
-      clearTimeout(timeoutId);
-      drawingDebounceTimerRef.current = null;
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is declared below and recreated each render; autosave runs only on drawing edits
-  }, [mDrawingData, open, activeId, mType, flushPendingDrawingSave]);
-
-  // Flush pending drawing save when modal closes or active note changes
-  useEffect(() => {
-    if (!open || !activeId || mType !== "draw") {
-      flushPendingDrawingSave();
-    }
-  }, [open, activeId, mType, flushPendingDrawingSave]);
-
-  // Live-sync drawing data in open modal when remote updates arrive
-  useEffect(() => {
-    if (!open || !activeId) return;
-    const n = notes.find((x) => String(x.id) === String(activeId));
-    if (!n || n.type !== "draw") return;
-
-    try {
-      const serverDrawingData = JSON.parse(n.content || "[]");
-      // Handle backward compatibility: if it's an array, convert to new format
-      const normalizedData = Array.isArray(serverDrawingData)
-        ? { paths: serverDrawingData, dimensions: null }
-        : serverDrawingData;
-      // Separate text body from drawing data
-      const { text: _text, ...serverCleanData } = normalizedData;
-      const prevJson = JSON.stringify(prevDrawingRef.current || []);
-      const serverJson = JSON.stringify(serverCleanData);
-      if (serverJson !== prevJson) {
-        setMDrawingData(serverCleanData);
-        prevDrawingRef.current = serverCleanData;
-      }
-    } catch {
-      // Invalid JSON, ignore
-    }
-  }, [notes, open, activeId, setMDrawingData]);
-
-  // No infinite scroll
+  const editor = useNoteEditor({
+    modal: modalState,
+    notes,
+    setNotes,
+    currentUser,
+    sessionId,
+    setSidebarOpen,
+    getInitialTags: () => initialTagsForNewNote(tagFilter, activeTagFilters),
+    acquireLocalLease,
+    releaseLocalLease,
+    releaseLocalLeaseWithPrune,
+    isNoteLocallyProtected,
+    enqueueAndSync,
+    enqueueWithLease,
+  });
+  const {
+    initialDrawMode, setInitialDrawMode,
+    handleDirectText, handleDirectChecklist, handleDirectDraw, handleDirectAudio,
+    flushPendingDrawingSave, syncChecklistItems,
+  } = editor;
 
   const { signOut, signIn, signInById, signInWithSecret, register, oidcLoginError } = useAuthActions({
     token,
@@ -730,80 +543,6 @@ export default function App() {
       loadPendingUsers?.();
     }
   }, [token, currentUser?.is_admin, loadPendingUsers]);
-
-  /** -------- Download single note .md (or audio file for audio notes) -------- */
-  const handleDownloadNote = async (note) => {
-    if (note?.type === "audio") {
-      const parsed = parseAudioContent(note.content);
-      // Multi-clip notes still download from the kebab as a single file —
-      // the first clip. The themed player offers per-clip downloads with
-      // an explicit format choice (original / WAV); that's the richer UX.
-      const clip = parsed.clips[0];
-      if (clip?.audioDataUrl) {
-        try {
-          const blob = dataUrlToBlob(clip.audioDataUrl);
-          const ext = extensionForMime(clip.mimeType || blob.type);
-          const fname = sanitizeFilename(note.title || `audio-${note.id}`) + "." + ext;
-          await triggerBlobDownload(fname, blob);
-          return;
-        } catch (e) {
-          console.error("Audio download failed:", e);
-        }
-      }
-      return;
-    }
-    const md = mdForDownload(note);
-    const fname = sanitizeFilename(note.title || `note-${note.id}`) + ".md";
-    downloadText(fname, md);
-  };
-
-  /** -------- Archive/Unarchive note -------- */
-  const handleArchiveNote = async (noteId, archived) => {
-    // Archiving a draft counts as a real action — materialise it first so the
-    // create reaches the queue before the archive patch follows.
-    if (pendingDraftRef.current && String(noteId) === String(pendingDraftRef.current.id)) {
-      materializeDraftIfNeeded();
-    }
-    // Archiving is a durable commitment — clear the freshly-created marker
-    // so the empty-on-close auto-trash doesn't undo it for an empty note.
-    if (freshlyCreatedNoteRef.current === String(noteId)) {
-      freshlyCreatedNoteRef.current = null;
-    }
-    const nid = String(noteId);
-    const leaseId = acquireLocalLease(nid);
-    const nowIso = new Date().toISOString();
-
-    // Local-first: apply archive state immediately
-    try {
-      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-      if (existing) await idbPutNote({ ...existing, archived: !!archived, client_updated_at: nowIso }, currentUser?.id, sessionId);
-    } catch (e) { console.error(e); }
-
-    // Update UI: remove note from current view (it moved to another view)
-    if (tagFilter === "ARCHIVED") {
-      if (!archived) {
-        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-        setTagFilter(null);
-      }
-    } else {
-      if (archived) {
-        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-      }
-    }
-
-    if (archived) {
-      closeModal();
-    }
-
-    showToast(
-      t(archived ? "noteArchived" : "noteUnarchived"),
-      "success",
-      undefined,
-      archived ? "archive" : "archive-off",
-    );
-
-    await enqueueWithLease(nid, { type: "archive", noteId: nid, payload: { archived: !!archived, client_updated_at: nowIso } }, leaseId);
-  };
 
   const openSettingsPanel = () => {
     setSettingsPanelOpen(true);
@@ -827,20 +566,6 @@ export default function App() {
     currentUser, activeId,
     showToast,
   });
-
-  const addImagesToState = async (fileList, setter) => {
-    const files = Array.from(fileList || []);
-    const results = [];
-    for (const f of files) {
-      try {
-        const src = await fileToCompressedDataURL(f);
-        results.push({ id: uid(), src, name: f.name });
-      } catch (e) {
-        console.error("Image load failed", e);
-      }
-    }
-    if (results.length) setter((prev) => [...prev, ...results]);
-  };
 
   const {
     logoLibrary, setLogoLibrary,
@@ -869,73 +594,6 @@ export default function App() {
     addLogoToLibrary,
   });
 
-  // Track initial state when opening modal to detect if user actually edited
-  // Must be defined before openModal
-  const initialModalStateRef = useRef(null);
-  // Committed baseline: only advances when autoSaveTextNote actually succeeds
-  // (IDB write + enqueue). closeModal uses this to detect unsaved diffs, so a
-  // failed autosave still gets retried on close. initialModalStateRef may advance
-  // eagerly to prevent effect re-triggers — this ref is the safety net.
-  const committedBaselineRef = useRef(null);
-
-  // Compute the tag context that should pre-fill a freshly created note.
-  // Rule:
-  //  - Special filters (ARCHIVED / TRASHED / ALL_IMAGES / REMINDERS) → no auto-tag.
-  //  - activeTagFilters (real multi-tag selection, OR logic) → apply them all:
-  //    the new note then satisfies the current filter and stays visible.
-  //    Single-tag clicks also land in activeTagFilters, so this covers both.
-  //  - Fallback on tagFilter if it ever held a real tag (defensive; the
-  //    current sidebar never sets it to a tag string).
-  const getInitialTagsForNewNote = useCallback(() => {
-    const isSpecial =
-      tagFilter === "ARCHIVED" || tagFilter === "TRASHED" || tagFilter === ALL_IMAGES || tagFilter === REMINDERS;
-    if (isSpecial) return [];
-    const collected = [];
-    if (Array.isArray(activeTagFilters) && activeTagFilters.length > 0) {
-      collected.push(...activeTagFilters);
-    } else if (typeof tagFilter === "string" && tagFilter) {
-      collected.push(tagFilter);
-    }
-    const seen = new Set();
-    const out = [];
-    for (const t of collected) {
-      const key = String(t).toLowerCase();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      out.push(String(t));
-    }
-    return out;
-  }, [tagFilter, activeTagFilters]);
-
-  // Deferred-create lifecycle for the desktop creation buttons — see
-  // src/hooks/useDraftNote.js. App.jsx keeps only the intercept calls in
-  // autosave effects, the guard branches in togglePin/archive/save/delete,
-  // and the closeModal early-exit branch; those are orchestration.
-  const {
-    pendingDraftRef,
-    freshlyCreatedNoteRef,
-    materializeDraftIfNeeded,
-    handleDirectText,
-    handleDirectChecklist,
-    handleDirectDraw,
-    handleDirectAudio,
-  } = useDraftNote({
-    activeId,
-    currentUser,
-    sessionId,
-    mTitle, mBody, mItems, mDrawingData, mTagList, mImages, mColor,
-    setSidebarOpen, setActiveId, setOpen,
-    setMType, setMTitle, setMBody, setMItems, setMTagList, setMImages,
-    setMColor, setMDrawingData, setTagInput,
-    setInitialDrawMode, setViewMode, setNotes,
-    skipNextDrawingAutosave, skipNextItemsAutosave,
-    prevDrawingRef, prevItemsRef,
-    initialModalStateRef, committedBaselineRef,
-    acquireLocalLease, enqueueWithLease,
-    idbPutNote,
-    getInitialTags: getInitialTagsForNewNote,
-  });
-
   useLaunchShortcuts({
     token,
     openQrScanner,
@@ -949,97 +607,35 @@ export default function App() {
   // on mobile). Cleared whenever a note opens or the modal closes.
   const [sbsSuppressOpenReplay, setSbsSuppressOpenReplay] = useState(false);
 
-  const openModal = (id) => {
-    const n = notes.find((x) => String(x.id) === String(id));
-    if (!n) return;
-    // Opening a note acknowledges any pending reminder for it: clear the
-    // in-app reminder notification(s) for this note so they don't linger
-    // after you've opened it (e.g. by tapping the system/push notification,
-    // which deep-links here without going through the card's own button).
-    // dismiss() acks "delivered", which also clears the card on the user's
-    // other devices, so desktop ↔ mobile stay in sync.
-    try {
-      const sid = String(id);
-      (allNotifications || []).forEach((notif) => {
-        if (
-          notif &&
-          notif.type === "reminder" &&
-          (String(notif.metadata?.noteId) === sid || String(notif.action?.noteId) === sid)
-        ) {
-          dismissNotification(notif.id);
-        }
-      });
-    } catch {
-      /* best-effort — never block opening the note */
-    }
-    // Clear any stale pending-draft state — we're opening a real, persisted
-    // note, so the deferred-create path must not fire for it.
-    // eslint-disable-next-line react-hooks/immutability -- pendingDraftRef is a ref from useDraftNote, cleared when the note opens
-    pendingDraftRef.current = null;
-    setSidebarOpen(false);
-    setSbsSuppressOpenReplay(false);
-    setActiveId(String(id));
-    setMType(n.type || "text");
-    setMTitle(n.title || "");
-    let drawNoteText = "";
-    if (n.type === "draw") {
-      try {
-        const drawingData = JSON.parse(n.content || "[]");
-        // Handle backward compatibility: if it's an array, convert to new format
-        const normalizedData = Array.isArray(drawingData)
-          ? { paths: drawingData, dimensions: null }
-          : drawingData;
-        // Extract text body from drawing JSON (stored alongside paths/dimensions)
-        drawNoteText = normalizedData.text || "";
-        // Remove text from the drawing data object to keep mDrawingData clean
-        const { text: _discardText, ...cleanDrawingData } = normalizedData;
-        setMDrawingData(cleanDrawingData);
-        prevDrawingRef.current = cleanDrawingData;
-        setMBody(drawNoteText);
-      } catch {
-        setMDrawingData({ paths: [], dimensions: null });
-        prevDrawingRef.current = { paths: [], dimensions: null };
-        setMBody("");
-      }
-      skipNextDrawingAutosave.current = true;
-    } else {
-      setMBody(n.content || "");
-      setMDrawingData({ paths: [], dimensions: null });
-      prevDrawingRef.current = { paths: [], dimensions: null };
-    }
-    skipNextItemsAutosave.current = true;
-    setMItems(Array.isArray(n.items) ? n.items : []);
-    prevItemsRef.current = Array.isArray(n.items) ? n.items : [];
-    setMTagList(Array.isArray(n.tags) ? n.tags : []);
-    setMImages(Array.isArray(n.images) ? n.images : []);
-    setTagInput("");
-    setMColor(n.color || "default");
-
-    // Store initial state to detect if user actually edited
-    // For draw notes, baseline.content holds the text body (extracted from drawing JSON)
-    const baselineState = {
-      title: n.title || "",
-      content: n.type === "draw" ? drawNoteText : (n.content || ""),
-      tags: Array.isArray(n.tags) ? n.tags : [],
-      images: Array.isArray(n.images) ? n.images : [],
-      color: n.color || "default",
-    };
-    initialModalStateRef.current = baselineState;
-    committedBaselineRef.current = { ...baselineState };
-
-    // Audio notes have no read/edit distinction — the AudioNoteEditor always
-    // shows the player + recorder controls regardless of viewMode. Open in
-    // edit mode so the experience is identical to creating a new audio note.
-    // Users who disabled the read-mode setting always open in edit mode.
-    setViewMode(n.type !== "audio" && readModeEnabled);
-    setOpen(true);
-
-    // If this note has a saved AI conversation in localStorage, pre-load
-    // the messages and mark the panel as "has been opened" so the header
-    // toggle is immediately visible (the user can resume the saved chat
-    // without having to re-open via the kebab menu).
-    noteAi.restoreSavedNoteAi(id);
-  };
+  const {
+    openModal, closeModal, closeNoteIfOpen, saveModal, deleteModal, restoreFromTrash,
+    handleArchiveNote, togglePin, setNoteReminder, convertNoteType, duplicateActiveNote,
+    handleDownloadNote, addImagesToState,
+  } = useNoteActions({
+    modal: modalState,
+    editor,
+    noteAi,
+    notes,
+    setNotes,
+    currentUser,
+    sessionId,
+    tagFilter,
+    setTagFilter,
+    readModeEnabled,
+    setSidebarOpen,
+    setSbsSuppressOpenReplay,
+    allNotifications,
+    dismissNotification,
+    acquireLocalLease,
+    releaseLocalLease,
+    releaseLocalLeaseWithPrune,
+    addDeleteTombstone,
+    enqueueAndSync,
+    enqueueWithLease,
+    showToast,
+    showGenericConfirm,
+    applyNoteIcon,
+  });
 
   // Re-created each render so it always uses the latest openModal.
   const handleNotificationAction = (notif, chosenAction) => runNotificationAction(notif, chosenAction, {
@@ -1110,1019 +706,18 @@ export default function App() {
     { open: !!sbsSecondaryId },
   ]);
 
-  // Check if the note has been modified from initial state
-  const hasNoteBeenModified = useCallback(() => {
-    if (!initialModalStateRef.current || !activeId) return false;
-    const initial = initialModalStateRef.current;
-    const current = {
-      title: mTitle.trim(),
-      content: mBody,
-      tags: mTagList,
-      images: mImages,
-      color: mColor,
-    };
-    // Compare all fields
-    return (
-      initial.title !== current.title ||
-      initial.content !== current.content ||
-      JSON.stringify(initial.tags) !== JSON.stringify(current.tags) ||
-      JSON.stringify(initial.images) !== JSON.stringify(current.images) ||
-      initial.color !== current.color
-    );
-  }, [activeId, mTitle, mBody, mTagList, mImages, mColor]);
-
-
-  // Local-first auto-save for text notes: persist to IndexedDB + enqueue patch
-  // Works for ALL text notes (not just collaborative) — mirrors drawing/checklist pattern
-  // If existingLeaseId is provided, this function owns that lease and releases it on
-  // success. Otherwise acquires its own (used when called directly from closeModal).
-  // Returns true if IDB + enqueue both succeeded, false otherwise.
-  // Callers use this to decide whether to advance committedBaselineRef.
-  const autoSaveTextNote = useCallback(async (noteId, fields, existingLeaseId, noteType = "text") => {
-    const nId = String(noteId);
-    const lid = existingLeaseId || acquireLocalLease(nId);
-    const nowIso = new Date().toISOString();
-
-    // Update notes state with only provided fields
-    setNotes((prev) =>
-      prev.map((n) =>
-        String(n.id) === nId
-          ? { ...n, ...fields, updated_at: nowIso, client_updated_at: nowIso }
-          : n,
-      ),
-    );
-
-    // Persist to IndexedDB
-    try {
-      const existing = await idbGetNote(nId, currentUser?.id, sessionId);
-      if (existing) {
-        await idbPutNote({ ...existing, ...fields, updated_at: nowIso, client_updated_at: nowIso }, currentUser?.id, sessionId);
-      }
-    } catch (e) {
-      console.error("IndexedDB text auto-save failed:", e);
-      // IDB failed — don't enqueue, keep lease, signal failure
-      return false;
-    }
-
-    // Enqueue targeted patch (only the changed fields)
-    try {
-      await enqueueAndSync({
-        type: "patch",
-        noteId: nId,
-        payload: { ...fields, type: noteType, client_updated_at: nowIso },
-      });
-    } catch (e) {
-      console.error("Text enqueue failed:", e);
-      // Don't release lease on failure — keep SSE guard active
-      return false;
-    }
-    // hasPendingChanges() now returns true → SSE protection via queue takes over
-    releaseLocalLeaseWithPrune(nId, lid);
-    return true;
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- the lease helpers only touch refs
-  }, [enqueueAndSync, currentUser?.id, sessionId]);
-
-  // Local-first auto-save for metadata (color, tags, images) — immediate, no debounce
-  // Works for text, checklist, AND draw notes (metadata fields are independent of content).
-  useEffect(() => {
-    if (!open || !activeId) return;
-    const initial = initialModalStateRef.current;
-    if (!initial) return;
-
-    const colorChanged = initial.color !== mColor;
-    const tagsChanged = JSON.stringify(initial.tags) !== JSON.stringify(mTagList);
-    const imagesChanged = JSON.stringify(initial.images) !== JSON.stringify(mImages);
-
-    if (!colorChanged && !tagsChanged && !imagesChanged) return;
-
-    // A real metadata change reached us — materialise the draft before saving.
-    // The create payload carries the new metadata so the subsequent patch is
-    // redundant and the effect exits.
-    if (materializeDraftIfNeeded()) return;
-
-    // Acquire lease before async enqueue (prevents SSE overwrite)
-    const leaseId = acquireLocalLease(String(activeId));
-
-    // Build patch with only changed metadata fields
-    const metaPatch = {};
-    if (colorChanged) metaPatch.color = mColor;
-    if (tagsChanged) metaPatch.tags = mTagList;
-    if (imagesChanged) metaPatch.images = mImages;
-
-    // Advance initialModalStateRef eagerly to prevent effect re-trigger,
-    // but only advance committedBaselineRef after confirmed persistence.
-    const committedFields = { ...(colorChanged ? { color: mColor } : {}), ...(tagsChanged ? { tags: mTagList } : {}), ...(imagesChanged ? { images: mImages } : {}) };
-    initialModalStateRef.current = { ...initial, ...committedFields };
-
-    const noteType = mType || "text";
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the autosave updates the note list as part of persisting the edit
-    autoSaveTextNote(activeId, metaPatch, leaseId, noteType).then((ok) => {
-      if (ok && committedBaselineRef.current) {
-        committedBaselineRef.current = { ...committedBaselineRef.current, ...committedFields };
-      }
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
-  }, [mColor, mTagList, mImages, open, activeId, mType, autoSaveTextNote]);
-
-  // Auto-save text content (title + body): debounced local-first persist + patch sync.
-  // Checklists share this effect for title changes (their body is always "").
-  // NOTE: runs in BOTH view and edit mode. Toggling to view mode after a pending
-  // edit used to cancel the debounce and leak the change (only a manual save or
-  // closing from edit-mode would catch it). Read/write mode is a pure display
-  // concern — the underlying mBody/mTitle state is equally dirty either way.
-  useEffect(() => {
-    if (!open || !activeId) return;
-    if (mType !== "text" && mType !== "checklist" && mType !== "audio") return;
-    const initial = initialModalStateRef.current;
-    if (!initial) return;
-
-    const titleChanged = initial.title !== mTitle.trim();
-    // Audio notes piggyback on the text autosave path: their `content` field
-    // is the serialised {clips, text} JSON stored in mBody. Treat it like
-    // text-note content so PATCH carries the JSON when clips are added or
-    // removed, materialising the draft on first recording.
-    const bodyAppliesToType = mType === "text" || mType === "audio";
-    const contentChanged = bodyAppliesToType && initial.content !== mBody;
-    if (!titleChanged && !contentChanged) return;
-
-    // Real keystroke reached us — materialise the draft. The create carries
-    // the typed content and baselines are aligned, so the effect exits.
-    if (materializeDraftIfNeeded()) return;
-
-    // Acquire lease IMMEDIATELY (before debounce fires).
-    // Prevents SSE overwriting IDB during the debounce window.
-    const nId = String(activeId);
-    const leaseId = acquireLocalLease(nId);
-    let transferred = false;
-
-    const timeoutId = setTimeout(() => {
-      transferred = true;
-      // Build patch with only changed content fields
-      const contentPatch = {};
-      if (titleChanged) contentPatch.title = mTitle.trim();
-      if (contentChanged) contentPatch.content = mBody;
-
-      // Transfer lease ownership to autoSaveTextNote — it will release after enqueue.
-      // Advance initialModalStateRef eagerly (prevent re-trigger), but only advance
-      // committedBaselineRef after confirmed IDB + enqueue success.
-      const committedFields = { ...(titleChanged ? { title: mTitle.trim() } : {}), ...(contentChanged ? { content: mBody } : {}) };
-      if (initialModalStateRef.current) {
-        initialModalStateRef.current = { ...initialModalStateRef.current, ...committedFields };
-      }
-
-      autoSaveTextNote(activeId, contentPatch, leaseId, mType).then((ok) => {
-        if (ok && committedBaselineRef.current) {
-          committedBaselineRef.current = { ...committedBaselineRef.current, ...committedFields };
-        }
-      });
-    }, 1000); // 1 second debounce
-
-    return () => {
-      clearTimeout(timeoutId);
-      // If debounce was cancelled (new keystroke / modal close), release this lease.
-      // If it fired, autoSaveTextNote owns the lease and will release it.
-      if (!transferred) releaseLocalLease(nId, leaseId);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
-  }, [mBody, mTitle, open, activeId, mType, autoSaveTextNote]);
-
-  // Auto-save draw note title + text body: debounced local-first persist + patch sync.
-  // Drawing data changes are handled by the drawing autosave effect above.
-  // This effect handles title and text body changes only.
-  useEffect(() => {
-    if (!open || !activeId || mType !== "draw") return;
-    const initial = initialModalStateRef.current;
-    if (!initial) return;
-
-    const titleChanged = initial.title !== mTitle.trim();
-    const textChanged = initial.content !== mBody;
-    if (!titleChanged && !textChanged) return;
-
-    if (materializeDraftIfNeeded()) return;
-    // Empty-draft rejection: keep pending, skip the patch enqueue.
-    if (
-      pendingDraftRef.current &&
-      String(activeId) === String(pendingDraftRef.current.id)
-    ) {
-      return;
-    }
-
-    const nId = String(activeId);
-    const leaseId = acquireLocalLease(nId);
-    let transferred = false;
-
-    const timeoutId = setTimeout(() => {
-      transferred = true;
-      const patch = {};
-      if (titleChanged) patch.title = mTitle.trim();
-      // For text body changes, re-serialize full drawing content (paths + dimensions + text)
-      if (textChanged) {
-        patch.content = JSON.stringify({
-          ...(mDrawingData || { paths: [], dimensions: null }),
-          text: mBody || "",
-        });
-      }
-
-      const committedFields = {};
-      if (titleChanged) committedFields.title = mTitle.trim();
-      if (textChanged) committedFields.content = mBody;
-
-      if (initialModalStateRef.current) {
-        initialModalStateRef.current = { ...initialModalStateRef.current, ...committedFields };
-      }
-
-      autoSaveTextNote(activeId, patch, leaseId, "draw").then((ok) => {
-        if (ok && committedBaselineRef.current) {
-          committedBaselineRef.current = { ...committedBaselineRef.current, ...committedFields };
-        }
-      });
-    }, 1000);
-
-    return () => {
-      clearTimeout(timeoutId);
-      if (!transferred) releaseLocalLease(nId, leaseId);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
-  }, [mBody, mTitle, open, activeId, mType, mDrawingData, autoSaveTextNote]);
-
-  // Update initial state reference when note is updated from server (for collaborative notes)
-  // This prevents overwriting server changes when user hasn't edited locally
-  // Must be after hasNoteBeenModified is defined
-  useEffect(() => {
-    if (!open || !activeId || !initialModalStateRef.current) return;
-    const n = notes.find((x) => String(x.id) === String(activeId));
-    if (!n || n.type === "draw") return;
-
-    // Check if server version is different from our initial state
-    const serverState = {
-      title: n.title || "",
-      content: n.type === "draw" ? "" : n.content || "",
-      tags: Array.isArray(n.tags) ? n.tags : [],
-      images: Array.isArray(n.images) ? n.images : [],
-      color: n.color || "default",
-    };
-
-    const initial = initialModalStateRef.current;
-    const serverChanged =
-      initial.title !== serverState.title ||
-      initial.content !== serverState.content ||
-      JSON.stringify(initial.tags) !== JSON.stringify(serverState.tags) ||
-      JSON.stringify(initial.images) !== JSON.stringify(serverState.images) ||
-      initial.color !== serverState.color;
-
-    // If server changed and user hasn't edited locally, update initial state to server state
-    // This prevents overwriting server changes when user closes without editing.
-    // Skip if the note has an active local lease — a local save (auto-save metadata,
-    // auto-save text, drawing save) is in flight and the `notes` state hasn't caught up
-    // yet with the optimistic setNotes. Without this guard, the stale `notes` value
-    // would briefly reset modal state, causing a visible flicker (e.g. deleted image
-    // reappearing then disappearing).
-    if (serverChanged && !hasNoteBeenModified() && !isNoteLocallyProtected(String(activeId))) {
-      initialModalStateRef.current = serverState;
-      committedBaselineRef.current = { ...serverState };
-      // Only update fields that actually changed to avoid re-rendering
-      // (re-render kills text selection in view mode)
-      if (serverState.title !== mTitle) setMTitle(serverState.title);
-      if (serverState.content !== mBody) setMBody(serverState.content);
-      if (JSON.stringify(serverState.tags) !== JSON.stringify(mTagList)) setMTagList(serverState.tags);
-      if (JSON.stringify(serverState.images) !== JSON.stringify(mImages)) setMImages(serverState.images);
-      if (serverState.color !== mColor) setMColor(serverState.color);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only on server note changes, the edited fields must not re-run it on each keystroke
-  }, [notes, open, activeId, hasNoteBeenModified]);
-
-  // The note no longer exists for this user (deleted elsewhere, access
-  // revoked): close it if it is the one open, without saving anything.
-  const closeNoteIfOpen = (noteId) => {
-    if (String(activeIdRef.current) === noteId) {
-      forceCloseModalForRemoteDelete(noteId);
-    }
-  };
-
-  // Force-close modal without any save/flush — used when a remote session
-  // permanently deletes the note that is currently open. Must not trigger
-  // autoSaveTextNote, flushPendingDrawingSave, or any enqueueAndSync.
-  const forceCloseModalForRemoteDelete = (noteId) => {
-    const nid = String(noteId);
-
-    // Cancel any pending drawing debounce so flush never fires.
-    // Release the lease since the note no longer exists.
-    const pending = pendingDrawingSaveRef.current;
-    if (pending && String(pending.noteId) === nid) {
-      if (drawingDebounceTimerRef.current) {
-        clearTimeout(drawingDebounceTimerRef.current);
-        drawingDebounceTimerRef.current = null;
-      }
-      if (pending.leaseId) releaseLocalLease(nid, pending.leaseId);
-      pendingDrawingSaveRef.current = null;
-    }
-
-    // Cancel in-flight close animation (if any)
-    if (modalClosingTimerRef.current) {
-      clearTimeout(modalClosingTimerRef.current);
-      modalClosingTimerRef.current = null;
-    }
-
-    // Reset all modal state immediately — no animation, no save
-    // (history cleanup is handled by the centralized overlay back-button system)
-    setOpen(false);
-    setActiveId(null);
-    setViewMode(true);
-    setConfirmDeleteOpen(false);
-    setShowModalFmt(false);
-    setIsModalClosing(false);
-    setImgViewOpen(false);
-  };
-
-  // Run the modal exit animation. If the AI side panel is open, close
-  // it first with its own slide-back animation, then kick off the modal
-  // fade-out — this gives a clean sequential close instead of both
-  // animations playing at the same time. The same modalClosingTimerRef
-  // guards re-entry through both phases.
-  const startModalExitAnimation = () => {
-    const PANEL_CLOSE_DURATION = 640; // matches NoteModal's aiClosing window
-    const MODAL_FADE_DURATION = 180;
-    const beginFade = () => {
-      setIsModalClosing(true);
-      modalClosingTimerRef.current = setTimeout(() => {
-        modalClosingTimerRef.current = null;
-        setOpen(false);
-        setActiveId(null);
-        setViewMode(true);
-        setConfirmDeleteOpen(false);
-        setShowModalFmt(false);
-        setIsModalClosing(false);
-        noteAi.resetNoteAiAfterClose();
-      }, MODAL_FADE_DURATION);
-    };
-    if (noteAiOpen) {
-      setNoteAiOpen(false);
-      // Cancel any in-flight AI request so chunks don't arrive after
-      // the note has unmounted.
-      noteAi.stopNoteAi();
-      modalClosingTimerRef.current = setTimeout(() => {
-        modalClosingTimerRef.current = null;
-        beginFade();
-      }, PANEL_CLOSE_DURATION);
-    } else {
-      beginFade();
-    }
-  };
-
-  const closeModal = () => {
-    // Prevent double-triggering while exit animation is running
-    if (modalClosingTimerRef.current) return;
-    // Clear the post-SBS replay-suppression flag so noteModalOut can run
-    // unblocked when the user closes the survivor.
-    setSbsSuppressOpenReplay(false);
-
-    // Unmaterialised draft: the user opened a blank note via the creation
-    // buttons and never touched it, so nothing was ever persisted. Just run
-    // the exit animation and drop the pending state — no IDB/queue work.
-    // Defensive: also remove the draft id from `notes` in case some path
-    // accidentally added it before closeModal fired (this should be a no-op
-    // in the normal flow, but it covers any reproducer where the user
-    // reports "empty note appeared in the list" without a materialise step
-    // they can identify). Drawing notes additionally fire the empty-note
-    // toast so the user gets feedback that the discard happened.
-    if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
-      const draftId = String(pendingDraftRef.current.id);
-      const draftType = pendingDraftRef.current.type;
-      // eslint-disable-next-line react-hooks/immutability -- pendingDraftRef is a ref from useDraftNote, cleared in the close handler
-      pendingDraftRef.current = null;
-      freshlyCreatedNoteRef.current = null;
-      setNotes((prev) => {
-        const next = prev.filter((n) => String(n.id) !== draftId);
-        return next.length === prev.length ? prev : next;
-      });
-      if (draftType === "draw") {
-        showToast(t("emptyNoteDeleted"), "info", 3000, "trash");
-      }
-      startModalExitAnimation();
-      return;
-    }
-
-    // Auto-trash any note the user emptied before closing — fresh or not.
-    // Body emptiness is checked through contentToPlain so the Tiptap JSON
-    // envelope (which is never an empty STRING even when the doc is empty)
-    // collapses to its actual user-visible text before the trim test.
-    //
-    // Tags don't count — a fresh note opened from inside a tag filter
-    // auto-inherits the tag and would otherwise never qualify. Images
-    // DO count as content though: a note that only carries pictures
-    // (typical of Google Keep imports) is just as valid as a text-only
-    // one and must NOT be auto-deleted on close.
-    if (activeId) {
-      const drawPaths = mType === "draw"
-        ? (mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []))
-        : [];
-      // A "real" stroke needs at least 2 points. A single tap on the
-      // canvas (no drag) still commits a one-point path which the user
-      // perceives as "I didn't draw anything" — without filtering, the
-      // auto-trash would skip the note because drawPaths.length is
-      // non-zero, and an empty card would stick around in the list.
-      // The combination titleEmpty + bodyEmpty + noImages is already
-      // conservative enough that a deliberate dot-only drawing with no
-      // title and no images is vanishingly rare; applying the filter
-      // here lets accidental taps on the canvas resolve to "empty"
-      // without keeping a junk card around.
-      const meaningfulPaths = drawPaths.filter(
-        (p) => Array.isArray(p?.points) && p.points.length >= 2,
-      );
-      // For each note type, "body" means what the user actually authored —
-      // the rich-text doc for text notes, the items list for checklists,
-      // the drawing strokes (+ optional inline text) for draw notes.
-      // Draw notes' body is the Tiptap text caption envelope (an empty
-      // editor still serialises to {"v":1,"format":"tiptap","doc":{...}})
-      // so we must collapse it through contentToPlain before trimming —
-      // a raw `!mBody?.trim()` would always be false on an empty draw
-      // caption and would block the auto-trash entirely.
-      const bodyEmpty = mType === "text"
-        ? !contentToPlain(mBody).trim()
-        : mType === "checklist"
-          ? !Array.isArray(mItems) || mItems.length === 0
-          : mType === "audio"
-            ? isAudioContentEmpty(mBody)
-            : !contentToPlain(mBody).trim() && meaningfulPaths.length === 0;
-      const titleEmpty = !mTitle?.trim();
-      const noImages = !Array.isArray(mImages) || mImages.length === 0;
-      if (titleEmpty && bodyEmpty && noImages) {
-        const nid = String(activeId);
-        const nowIso = new Date().toISOString();
-        // Server contract: a note must be trashed before it can be
-        // permanently deleted (DELETE /notes/:id/permanent returns 400
-        // otherwise). Locally we still want the note gone immediately
-        // — tombstone + idbDeleteNote handle the UI/storage side. The
-        // queue then plays out in FIFO order: trash THEN permanent
-        // delete, so the server walks through the legal transition
-        // and the note doesn't end up stuck mid-pipeline.
-        addDeleteTombstone(nid);
-        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-        showToast(t("emptyNoteDeleted"), "info", 3000, "trash");
-        freshlyCreatedNoteRef.current = null;
-        (async () => {
-          try {
-            await idbDeleteNote(nid, currentUser?.id, sessionId);
-          } catch { /* IDB best-effort */ }
-          const trashLease = acquireLocalLease(nid);
-          await enqueueWithLease(
-            nid,
-            { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } },
-            trashLease,
-          );
-          const purgeLease = acquireLocalLease(nid);
-          await enqueueWithLease(
-            nid,
-            { type: "permanentDelete", noteId: nid, payload: { client_updated_at: nowIso } },
-            purgeLease,
-          );
-        })();
-
-        startModalExitAnimation();
-        return;
-      }
-    }
-    freshlyCreatedNoteRef.current = null;
-
-    // Flush any pending drawing debounce before closing.
-    // flushPendingDrawingSave restores pendingDrawingSaveRef on failure,
-    // so a second close attempt can retry.
-    if (activeId && mType === "draw") {
-      flushPendingDrawingSave();
-    }
-
-    // Flush title/text/metadata changes for draw notes on close.
-    // flushPendingDrawingSave only covers drawing data changes (paths/dimensions).
-    // Title, text body, color, tags, images need a separate flush.
-    if (activeId && mType === "draw") {
-      const baseline = committedBaselineRef.current;
-      if (baseline) {
-        const patch = {};
-        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
-        if (baseline.color !== mColor) patch.color = mColor;
-        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
-        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
-        // For text body changes, re-serialize full drawing content
-        const textChanged = baseline.content !== mBody;
-        if (textChanged) {
-          patch.content = JSON.stringify({ ...(mDrawingData || { paths: [], dimensions: null }), text: mBody || "" });
-        }
-        if (Object.keys(patch).length > 0) {
-          autoSaveTextNote(activeId, patch, null, "draw");
-        }
-      }
-    }
-
-    // Retry checklist if the last autosave failed (prevItemsRef wasn't advanced).
-    if (activeId && mType === "checklist" && mItems) {
-      const prevJson = JSON.stringify(prevItemsRef.current || []);
-      const currentJson = JSON.stringify(mItems);
-      if (prevJson !== currentJson) {
-        syncChecklistItems(mItems);
-      }
-    }
-
-    // Flush pending title/metadata changes for checklists on close.
-    // syncChecklistItems only covers the items array; title, color, tags
-    // and images go through autoSaveTextNote with the debounced effect,
-    // so closing within the debounce window could otherwise lose them.
-    if (activeId && mType === "checklist") {
-      const baseline = committedBaselineRef.current;
-      if (baseline) {
-        const patch = {};
-        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
-        if (baseline.color !== mColor) patch.color = mColor;
-        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
-        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
-        if (Object.keys(patch).length > 0) {
-          autoSaveTextNote(activeId, patch, null, "checklist");
-        }
-      }
-    }
-
-    // Flush any pending text changes immediately before closing (local-first).
-    // Use committedBaselineRef (not initialModalStateRef) so that a failed
-    // autosave still produces a diff here and gets retried.
-    // Runs for both view and edit mode: a user may edit, toggle to view
-    // to preview before the 1s debounce fires, then close — the change is
-    // still dirty in mBody/mTitle and must be flushed.
-    // Audio shares this path: its mBody is the {clips, text} JSON, so a
-    // freshly-recorded clip whose autosave hasn't fired yet still gets
-    // flushed here on close.
-    if (activeId && (mType === "text" || mType === "audio")) {
-      const baseline = committedBaselineRef.current;
-      if (baseline) {
-        const patch = {};
-        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
-        if (baseline.content !== mBody) patch.content = mBody;
-        if (baseline.color !== mColor) patch.color = mColor;
-        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
-        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
-        if (Object.keys(patch).length > 0) {
-          autoSaveTextNote(activeId, patch, undefined, mType);
-        }
-      }
-    }
-
-    // No dirty flag management needed here — each flow (text, draw, checklist)
-    // owns its own lease via acquireLocalLease/releaseLocalLease,
-    // released only after successful enqueueAndSync.
-
-    // Start exit animation, then actually unmount after it completes.
-    // Sequential close: if the AI panel is open, it animates out first.
-    startModalExitAnimation();
-  };
-
-  const saveModal = async () => {
-    if (activeId == null) return;
-    // Pressing save on a draft counts as committing it. materialize first so
-    // the create carries the current state and patches below operate on an
-    // existing note.
-    if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
-      materializeDraftIfNeeded();
-    }
-    // Explicit save = user intent to keep this note even if it's empty.
-    // Drop the freshly-created marker so closeModal's auto-trash branch
-    // won't undo the commit.
-    if (freshlyCreatedNoteRef.current === String(activeId)) {
-      freshlyCreatedNoteRef.current = null;
-    }
-    setSavingModal(true);
-
-    const noteId = String(activeId);
-    const nowIso = new Date().toISOString();
-
-    if (mType === "text" || mType === "audio") {
-      // Text + audio notes: use targeted patch with only changed fields.
-      // Use committedBaselineRef so a failed autosave is retried here.
-      // Audio's mBody is the serialised {clips, text} JSON; same diff logic
-      // applies — the JSON string changes when clips are added/removed.
-      const patch = {};
-      const baseline = committedBaselineRef.current;
-      if (baseline) {
-        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
-        if (baseline.content !== mBody) patch.content = mBody;
-        if (baseline.color !== mColor) patch.color = mColor;
-        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
-        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
-      } else {
-        // No initial state — send everything
-        Object.assign(patch, { title: mTitle.trim(), content: mBody, color: mColor, tags: mTagList, images: mImages });
-      }
-
-      if (Object.keys(patch).length > 0) {
-        autoSaveTextNote(activeId, patch, undefined, mType);
-      }
-    } else {
-      // Checklist / Drawing: keep full update (they manage their own local-first flows)
-      const base = {
-        id: activeId,
-        title: mTitle.trim(),
-        tags: mTagList,
-        images: mImages,
-        color: mColor,
-        pinned: !!notes.find((n) => String(n.id) === String(activeId))?.pinned,
-      };
-      const payload =
-        mType === "checklist"
-          ? { ...base, type: "checklist", content: "", items: mItems, client_updated_at: nowIso }
-          : { ...base, type: "draw", content: JSON.stringify({ ...mDrawingData, text: mBody || "" }), items: [], client_updated_at: nowIso };
-
-      const updatedFields = {
-        ...payload,
-        updated_at: nowIso,
-        client_updated_at: nowIso,
-        lastEditedBy: currentUser?.email || currentUser?.name,
-        lastEditedAt: nowIso,
-      };
-
-      const leaseId = acquireLocalLease(noteId);
-      try {
-        const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
-        if (existing) {
-          await idbPutNote({ ...existing, ...updatedFields }, currentUser?.id, sessionId);
-        }
-      } catch (e) {
-        console.error("IndexedDB update failed:", e);
-        // IDB failed — don't advance baselines
-        setSavingModal(false);
-        return;
-      }
-
-      setNotes((prev) =>
-        prev.map((n) =>
-          String(n.id) === noteId ? { ...n, ...updatedFields } : n,
-        ),
-      );
-      const enqueued = await enqueueWithLease(noteId, { type: "update", noteId, payload }, leaseId);
-      if (!enqueued) {
-        // Enqueue failed — don't advance baselines so closeModal retry can detect diff
-        setSavingModal(false);
-        return;
-      }
-
-      // IDB + enqueue both succeeded — advance committed baselines
-      prevItemsRef.current =
-        mType === "checklist" ? (Array.isArray(mItems) ? mItems : []) : [];
-      prevDrawingRef.current =
-        mType === "draw"
-          ? mDrawingData || { paths: [], dimensions: null }
-          : { paths: [], dimensions: null };
-    }
-
-    setSavingModal(false);
-  };
-  const deleteModal = async (mode) => {
-    if (activeId == null) return;
-    // Draft that was never materialised — deleting it is identical to just
-    // closing the modal (nothing has been persisted anywhere).
-    if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
-      closeModal();
-      return;
-    }
-    // The user is explicitly deleting — drop the freshly-created marker so
-    // closeModal's auto-trash branch doesn't enqueue a redundant trash on
-    // top of whatever delete-flow we're about to run.
-    if (freshlyCreatedNoteRef.current === String(activeId)) {
-      freshlyCreatedNoteRef.current = null;
-    }
-    const note = notes.find((n) => String(n.id) === String(activeId));
-    const nid = String(activeId);
-    const isOwner = !note || note.user_id === currentUser?.id;
-    const isCollabNote = (note?.collaborators?.length || 0) > 0;
-
-    if (tagFilter === "TRASHED") {
-      // Local-first: permanent delete — tombstone prevents resurrection by loaders/SSE
-      const leaseId = acquireLocalLease(nid);
-      addDeleteTombstone(nid);
-      try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-      setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-      closeModal();
-      showToast(t("notePermanentlyDeleted"), "success", undefined, "trash-x");
-      await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
-    } else if (isOwner && isCollabNote && mode === "delete_for_all") {
-      // Owner chose to delete the shared note for everyone.
-      // The note lands in the owner's trash (the server sets trashed=1 and
-      // revokes collaborators); collaborators lose access via SSE note_deleted.
-      const leaseId = acquireLocalLease(nid);
-      const nowIso = new Date().toISOString();
-      try {
-        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, trashed: true, collaborators: [], client_updated_at: nowIso }, currentUser?.id, sessionId);
-      } catch (e) { console.error(e); }
-      setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-      closeModal();
-      showToast(t("noteDeletedForAll"), "success", undefined, "trash-x");
-      await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso, mode: "delete_for_all" } }, leaseId);
-    } else if (isOwner && isCollabNote) {
-      // Owner chose "remove for me" on a shared note. Server transfers
-      // ownership to the first collaborator (note stays live for them) and
-      // creates a trashed copy owned by the leaver so they can restore it.
-      // The trashed copy has a new id; the next trash view fetches it from
-      // the server.
-      try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-      setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-      closeModal();
-      showToast(t("noteMovedToTrash"), "success", undefined, "trash");
-      const leaseId = acquireLocalLease(nid);
-      await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: new Date().toISOString(), mode: "remove_self" } }, leaseId);
-    } else if (!isOwner) {
-      // Collaborator "trash" — symmetric with the owner-leaves-shared
-      // case below: they get a personal copy in their corbeille so
-      // the action is recoverable. Without this, the previous spec
-      // ("leave the collaboration cleanly, no recovery") read like a
-      // permanent delete from the user's POV. The trashed copy is
-      // created server-side and the next /notes/trashed fetch picks
-      // it up.
-      try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-      setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-      closeModal();
-      showToast(t("noteMovedToTrash"), "success", undefined, "trash");
-      const leaseId = acquireLocalLease(nid);
-      await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: new Date().toISOString(), mode: "remove_self" } }, leaseId);
-    } else {
-      // Owner of non-collaborative note: local-first move to trash
-      const leaseId = acquireLocalLease(nid);
-      const nowIso = new Date().toISOString();
-      try {
-        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, trashed: true, client_updated_at: nowIso }, currentUser?.id, sessionId);
-      } catch (e) { console.error(e); }
-      setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-      closeModal();
-      showToast(t("noteMovedToTrash"), "success", undefined, "trash");
-      await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
-    }
-  };
-
-  const restoreFromTrash = async (noteId) => {
-    const nid = String(noteId);
-    const leaseId = acquireLocalLease(nid);
-    const nowIso = new Date().toISOString();
-    // Local-first: restore immediately, computing a position that places the note
-    // among active notes at the right chronological spot (by creation timestamp).
-    try {
-      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-      if (existing) {
-        const activeNotes = await idbGetAllNotes(currentUser?.id, sessionId, "active");
-        const sorted = sortByPositionDesc(activeNotes.filter((n) => String(n.id) !== nid));
-        const restoredPosition = computeRestoredPosition(existing, sorted);
-        await idbPutNote({ ...existing, trashed: false, position: restoredPosition, client_updated_at: nowIso }, currentUser?.id, sessionId);
-      }
-    } catch (e) { console.error(e); }
-    setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-    closeModal();
-    showToast(t("noteRestoredFromTrash"), "success", undefined, "restore");
-    await enqueueWithLease(nid, { type: "restore", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
-  };
-  const togglePin = async (id, toPinned) => {
-    // Pinning a draft counts as a real action — materialise it first so the
-    // create lands in the queue before the pin patch follows.
-    if (pendingDraftRef.current && String(id) === String(pendingDraftRef.current.id)) {
-      materializeDraftIfNeeded();
-    }
-    // Pinning is a durable commitment — clear the freshly-created marker so
-    // the empty-on-close auto-trash doesn't undo a pinned empty note.
-    if (freshlyCreatedNoteRef.current === String(id)) {
-      freshlyCreatedNoteRef.current = null;
-    }
-    const nid = String(id);
-    const leaseId = acquireLocalLease(nid);
-    const nowIso = new Date().toISOString();
-
-    // Update React state FIRST (synchronous, before any await) for instant UI.
-    setNotes((prev) => {
-      const updated = prev.map((n) => {
-        if (String(n.id) !== nid) return n;
-        if (toPinned) return { ...n, pinned: true };
-        // When unpinning, just keep the note's existing position — it was
-        // assigned when the note was originally in the "others" section and
-        // is still valid. No need to recompute.
-        return { ...n, pinned: false };
-      });
-      return sortNotesByRecency(updated);
-    });
-
-    // Then persist to IndexedDB and server
-    try {
-      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-      if (existing) await idbPutNote({ ...existing, pinned: !!toPinned, client_updated_at: nowIso }, currentUser?.id, sessionId);
-    } catch (e) { console.error(e); }
-    // Don't use enqueueWithLease here — it releases the lease immediately after
-    // the server responds, but the server also sends an SSE note_updated event
-    // that triggers patchSingleNote after a 300ms debounce. If the lease is
-    // already released by then, patchSingleNote fetches the server note (which
-    // may have a different position) and overwrites the optimistic state, causing
-    // a visual flash in Masonry. Instead, release the lease with a delay that
-    // covers the SSE debounce window.
-    try {
-      await enqueueAndSync({ type: "patch", noteId: nid, payload: { pinned: !!toPinned, client_updated_at: nowIso } });
-    } catch {
-      // On failure, lease stays active — SSE protection maintained
-      return;
-    }
-    // Delay lease release past the SSE debounce (300ms) + patchSingleNote fetch time
-    setTimeout(() => releaseLocalLeaseWithPrune(nid, leaseId), 1000);
-  };
-
-  /** -------- Set / update / clear a note's reminder -------- */
-  // Offline-first like togglePin: optimistic React + IndexedDB update,
-  // then a dedicated "reminder" sync op (POST /notes/:id/reminder). Pass
-  // a null ISO to clear the reminder. Setting one always re-arms it
-  // (clears reminderFiredAt) so a previously-fired reminder fires again.
-  const setNoteReminder = async (id, reminderAtIso) => {
-    // Reminding a draft counts as a real action — materialise it first so
-    // the create lands in the queue before the reminder write follows.
-    if (pendingDraftRef.current && String(id) === String(pendingDraftRef.current.id)) {
-      materializeDraftIfNeeded();
-    }
-    // A reminder is a durable commitment — clear the freshly-created marker
-    // so the empty-on-close auto-trash doesn't discard a reminded note.
-    if (freshlyCreatedNoteRef.current === String(id)) {
-      freshlyCreatedNoteRef.current = null;
-    }
-    const nid = String(id);
-    const leaseId = acquireLocalLease(nid);
-    const nowIso = new Date().toISOString();
-    const reminderAt = reminderAtIso || null;
-    console.log(`[reminders] setNoteReminder note=${nid} ->`, reminderAt || "(cleared)");
-
-    // Optimistic state — the chip + the modal bell update instantly.
-    setNotes((prev) =>
-      prev.map((n) =>
-        String(n.id) === nid ? { ...n, reminderAt, reminderFiredAt: null } : n,
-      ),
-    );
-
-    try {
-      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-      if (existing) {
-        await idbPutNote(
-          { ...existing, reminderAt, reminderFiredAt: null, client_updated_at: nowIso },
-          currentUser?.id,
-          sessionId,
-        );
-      }
-    } catch (e) {
-      console.error(e);
-    }
-
-    try {
-      await enqueueAndSync({
-        type: "reminder",
-        noteId: nid,
-        payload: { reminderAt, client_updated_at: nowIso },
-      });
-    } catch {
-      // On failure the lease stays active so SSE patches can't clobber the
-      // optimistic state; the queued op retries when connectivity returns.
-      return;
-    }
-    setTimeout(() => releaseLocalLeaseWithPrune(nid, leaseId), 1000);
-
-    try {
-      if (reminderAt) {
-        showToast(t("reminderSetToast"), "success", undefined, "reminder");
-      } else {
-        showToast(t("reminderRemovedToast"), "info", undefined, "reminder");
-      }
-    } catch {
-      /* toast is best-effort feedback */
-    }
-  };
-
   useAndroidReminderBridge({ notes, token });
 
-  /** -------- Reset note order -------- */
-  const resetNoteOrder = async (overridePositions = true) => {
-    // Reorder is per-user on the server (note_user_positions), so shared
-    // notes are fine to include — each participant keeps their own order.
-    const sorted = sortNotesForOrderReset(notes);
-
-    // Acquire a lease per note BEFORE any local write — protects positions
-    // from being overwritten by loaders / SSE until server confirms reorder.
-    const noteLeases = sorted.map((n) => {
-      const nid = String(n.id);
-      return { noteId: nid, leaseId: acquireLocalLease(nid) };
-    });
-
-    // Assign new position values so the order persists across reloads
-    if (overridePositions) {
-      const now = Date.now();
-      sorted.forEach((n, i) => {
-        n.position = now - i;
-      });
-    }
-
-    setNotes(sorted);
-
-    // Local-first: update IndexedDB positions
-    for (const n of sorted) {
-      try {
-        const existing = await idbGetNote(String(n.id), currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, position: n.position }, currentUser?.id, sessionId);
-      } catch { /* IDB best-effort */ }
-    }
-
-    const pinnedIds = sorted.filter((n) => n.pinned).map((n) => String(n.id));
-    const otherIds = sorted.filter((n) => !n.pinned).map((n) => String(n.id));
-    // Hold leases until onSyncComplete confirms server-side
-    const reorderToken = leases.holdReorderLeases(noteLeases);
-    try {
-      await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds, otherIds, _reorderToken: reorderToken, client_reordered_at: new Date().toISOString() } });
-    } catch {
-      // enqueue failed — leases stay active
-    }
-    showToast?.(t("noteOrderReset"));
-  };
-
-  /** -------- Drag & Drop reorder (cards) -------- */
-  const swapWithin = (arr, itemId, targetId) => {
-    const a = arr.slice();
-    const from = a.indexOf(itemId);
-    const to = a.indexOf(targetId);
-    if (from === -1 || to === -1) return arr;
-    a[from] = targetId;
-    a[to] = itemId;
-    return a;
-  };
-  const onDragStart = (id, ev) => {
-    dragId.current = String(id);
-    const isPinned = !!notes.find((n) => String(n.id) === String(id))?.pinned;
-    dragGroup.current = isPinned ? "pinned" : "others";
-    ev.currentTarget.classList.add("dragging");
-  };
-  const onDragOver = (overId, group, ev) => {
-    ev.preventDefault();
-    if (!dragId.current) return;
-    if (dragGroup.current !== group) return;
-    ev.currentTarget.classList.add("drag-over");
-  };
-  const onDragLeave = (ev) => {
-    ev.currentTarget.classList.remove("drag-over");
-  };
-  const onDrop = async (overId, group, ev) => {
-    ev.preventDefault();
-    ev.currentTarget.classList.remove("drag-over");
-    const dragged = dragId.current;
-    dragId.current = null;
-    if (!dragged || String(dragged) === String(overId)) return;
-    if (dragGroup.current !== group) return;
-
-    // Reorder is stored per-user server-side, so shared notes can be moved
-    // freely without affecting other participants' ordering.
-    const pinnedIds = notes.filter((n) => n.pinned).map((n) => String(n.id));
-    const otherIds = notes.filter((n) => !n.pinned).map((n) => String(n.id));
-    let newPinned = pinnedIds,
-      newOthers = otherIds;
-    if (group === "pinned")
-      newPinned = swapWithin(pinnedIds, String(dragged), String(overId));
-    else
-      newOthers = swapWithin(otherIds, String(dragged), String(overId));
-
-    // Assign position values so order survives reload (higher = earlier)
-    const now = Date.now();
-    const orderedIds = [...newPinned, ...newOthers];
-    const positionMap = new Map();
-    orderedIds.forEach((id, i) => positionMap.set(id, now - i));
-
-    // Acquire a lease per affected note BEFORE any local write
-    const noteLeases = orderedIds.map((id) => ({
-      noteId: id,
-      leaseId: acquireLocalLease(id),
-    }));
-
-    // Optimistic update with positions baked in
-    const byId = new Map(notes.map((n) => [String(n.id), n]));
-    const reordered = orderedIds.map((id) => {
-      const n = byId.get(id);
-      return n ? { ...n, position: positionMap.get(id) } : n;
-    });
-    setNotes(reordered);
-
-    // Persist new positions to IndexedDB (local-first)
-    for (const id of orderedIds) {
-      const pos = positionMap.get(id);
-      try {
-        const existing = await idbGetNote(id, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, position: pos }, currentUser?.id, sessionId);
-      } catch { /* IDB best-effort */ }
-    }
-
-
-    // Enqueue reorder — leases are held until onSyncComplete confirms server-side.
-    // Tag payload with token so onSyncComplete can find and release the leases.
-    const reorderToken = leases.holdReorderLeases(noteLeases);
-    try {
-      await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds: newPinned, otherIds: newOthers, _reorderToken: reorderToken, client_reordered_at: new Date().toISOString() } });
-    } catch {
-      // enqueue failed — leases stay active (SSE protection maintained)
-    }
-    dragGroup.current = null;
-  };
-  const onDragEnd = (ev) => {
-    ev.currentTarget.classList.remove("dragging");
-  };
+  const { resetNoteOrder, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd } = useNoteReorder({
+    notes,
+    setNotes,
+    currentUser,
+    sessionId,
+    acquireLocalLease,
+    holdReorderLeases: leases.holdReorderLeases,
+    enqueueAndSync,
+    showToast,
+  });
 
   // Stable identities for the note-card callbacks. App.jsx recreates these
   // handlers on every render; handing the raw versions to NoteCard defeats
@@ -2131,9 +726,7 @@ export default function App() {
   // pinned to React render tasks (fn "q") and click handlers (fn "fE").
   // useStableCallback keeps a stable identity while always invoking the
   // latest closure, so the memo holds and only the modal subtree re-renders.
-  // eslint-disable-next-line react-hooks/immutability -- false positive: openModal only touches pendingDraftRef, a ref from useDraftNote, when called
   const sOpenModal = useStableCallback(openModal);
-  // eslint-disable-next-line react-hooks/immutability -- false positive: togglePin only touches freshlyCreatedNoteRef, a ref from useDraftNote, when called
   const sTogglePin = useStableCallback(togglePin);
   const sOnDragStart = useStableCallback(onDragStart);
   const sOnDragOver = useStableCallback(onDragOver);
@@ -2146,345 +739,13 @@ export default function App() {
 
   // Checklist item drag handlers (for modal reordering)
 
-  // Local-first helper: persist checklist changes to IndexedDB + sync queue
-  const syncChecklistItems = async (newItems) => {
-    if (!activeId) return;
-    // A checklist edit is the first real action on a pending draft — materialise
-    // the note first so the create payload already contains newItems and we
-    // don't enqueue a patch for a note the server has never seen. mItems in
-    // closure is still the previous value here (setMItems hasn't committed
-    // yet), so hand newItems in explicitly.
-    if (materializeDraftIfNeeded({ items: newItems })) return;
-    const noteId = String(activeId);
-    const nowIso = new Date().toISOString();
-
-    // Acquire lease BEFORE any async work — prevents SSE patchSingleNote() from
-    // overwriting local checklist state during the IDB write + enqueue window.
-    const leaseId = acquireLocalLease(noteId);
-
-    // Update notes state
-    setNotes((prev) =>
-      prev.map((n) =>
-        String(n.id) === noteId
-          ? { ...n, items: newItems, updated_at: nowIso, client_updated_at: nowIso }
-          : n,
-      ),
-    );
-    // Persist to IndexedDB
-    try {
-      const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
-      if (existing) {
-        await idbPutNote({ ...existing, items: newItems, updated_at: nowIso, client_updated_at: nowIso }, currentUser?.id, sessionId);
-      }
-    } catch (e) {
-      console.error("IndexedDB checklist update failed:", e);
-      // IDB failed — don't advance baseline, keep lease, signal failure
-      return;
-    }
-    // Enqueue for server sync — after this, hasPendingChanges() protects the note
-    try {
-      await enqueueAndSync({
-        type: "patch",
-        noteId,
-        payload: { items: newItems, type: "checklist", content: "", client_updated_at: nowIso },
-      });
-    } catch (e) {
-      console.error("Checklist enqueue failed:", e);
-      // Don't release lease on failure — keep SSE guard active.
-      // Don't advance prevItemsRef — closeModal retry can still detect the diff.
-      return;
-    }
-    // IDB + enqueue both succeeded — advance committed baseline
-    prevItemsRef.current = newItems;
-    // Queue item exists — release this lease + prune older zombies for this note
-    releaseLocalLeaseWithPrune(noteId, leaseId);
-  };
-
-  /**
-   * Convert a note between "text" and "checklist" in place.
-   * Preserves content: text lines become items (one per line, checkbox
-   * syntax honoured), items become markdown-like lines.
-   *
-   * Server-side `type` is immutable under PATCH — we persist via a full
-   * PUT update, mirroring the checklist branch of `saveModal`.
-   */
-  const performConvertNoteType = async () => {
-    if (!activeId) return;
-    if (mType !== "text" && mType !== "checklist") return;
-    if (tagFilter === "TRASHED") return;
-
-    const isDraft = !!pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id);
-    const targetType = mType === "text" ? "checklist" : "text";
-    const toastKey = targetType === "checklist" ? "convertedToChecklist" : "convertedToText";
-
-    // Text → checklist: flatten rich JSON (or legacy Markdown) to plain lines
-    // so textToChecklistItems can parse bullets / tasks / headings.
-    // Checklist → text: wrap the generated Markdown in our rich envelope so
-    // the resulting text note opens directly in rich mode (no second-edit
-    // upgrade needed).
-    const textForConversion =
-      mType === "text" && isRichContent(mBody)
-        ? contentToPlain(mBody)
-        : mBody || "";
-    const newItems = targetType === "checklist" ? textToChecklistItems(textForConversion) : [];
-    const newBody = targetType === "text"
-      ? serializeRichContent(legacyMarkdownToRichDoc(checklistItemsToText(mItems)))
-      : "";
-
-    // Local state first — keep the UI responsive even if the sync call lags.
-    skipNextItemsAutosave.current = true;
-    setMBody(newBody);
-    setMItems(newItems);
-    setMType(targetType);
-    prevItemsRef.current = newItems;
-    if (initialModalStateRef.current) {
-      initialModalStateRef.current = { ...initialModalStateRef.current, content: newBody };
-    }
-    if (committedBaselineRef.current) {
-      committedBaselineRef.current = { ...committedBaselineRef.current, content: newBody };
-    }
-
-    // Draft note: fold the conversion into the pending create payload.
-    if (isDraft) {
-      // eslint-disable-next-line react-hooks/immutability -- pendingDraftRef is a ref from useDraftNote, updated in the conversion handler
-      pendingDraftRef.current = { ...pendingDraftRef.current, type: targetType };
-      materializeDraftIfNeeded({ items: newItems, body: newBody });
-      showToast(t(toastKey), "success");
-      return;
-    }
-
-    // Persisted note: full update via PUT so `type` is actually written server-side.
-    const noteId = String(activeId);
-    const nowIso = new Date().toISOString();
-    const existingNote = notes.find((n) => String(n.id) === noteId);
-    const payload = {
-      id: activeId,
-      title: mTitle.trim(),
-      tags: mTagList,
-      images: mImages,
-      color: mColor,
-      pinned: !!existingNote?.pinned,
-      type: targetType,
-      content: newBody,
-      items: newItems,
-      client_updated_at: nowIso,
-    };
-    const updatedFields = {
-      ...payload,
-      updated_at: nowIso,
-      lastEditedBy: currentUser?.email || currentUser?.name,
-      lastEditedAt: nowIso,
-    };
-
-    const leaseId = acquireLocalLease(noteId);
-    try {
-      const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
-      if (existing) {
-        await idbPutNote({ ...existing, ...updatedFields }, currentUser?.id, sessionId);
-      }
-    } catch (e) {
-      console.error("IndexedDB convert failed:", e);
-      return;
-    }
-    setNotes((prev) =>
-      prev.map((n) => (String(n.id) === noteId ? { ...n, ...updatedFields } : n)),
-    );
-    const enqueued = await enqueueWithLease(
-      noteId,
-      { type: "update", noteId, payload },
-      leaseId,
-    );
-    if (enqueued) showToast(t(toastKey), "success");
-  };
-
-  // Public wrapper: gate the conversion behind a confirmation dialog so
-  // a misclick on the kebab entry doesn't silently rewrite the note.
-  const convertNoteType = () => {
-    if (!activeId) return;
-    if (mType !== "text" && mType !== "checklist") return;
-    if (tagFilter === "TRASHED") return;
-    const targetType = mType === "text" ? "checklist" : "text";
-    setGenericConfirmConfig({
-      title: t(targetType === "checklist" ? "convertToChecklist" : "convertToText"),
-      message: t(targetType === "checklist" ? "convertToChecklistConfirm" : "convertToTextConfirm"),
-      confirmText: t("convertConfirmAction"),
-      onConfirm: () => performConvertNoteType(),
-    });
-    setGenericConfirmOpen(true);
-  };
-
-  /** -------- Duplicate the currently-open note --------
-   *  Builds a fresh note from the modal's in-memory state (so unsaved
-   *  edits are also captured), persists it via the standard create
-   *  pipeline (IDB + setNotes + enqueue "create"), and closes the
-   *  modal so the new card appears at the top of the grid. */
-  const duplicateActiveNote = async () => {
-    if (!activeId) return;
-    if (tagFilter === "TRASHED") return;
-    // If the modal still hosts an unmaterialised draft, materialise it
-    // first so we don't end up with a duplicate of something that the
-    // close flow would later drop as a never-persisted draft.
-    if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
-      materializeDraftIfNeeded();
-    }
-    const newId = uid();
-    const nowIso = new Date().toISOString();
-    const baseTitle = (mTitle || "").trim();
-    const newTitle = baseTitle
-      ? `${baseTitle} ${t("duplicateSuffix")}`
-      : t("duplicateSuffix");
-    const items = Array.isArray(mItems)
-      ? mItems.map((it) => ({ ...it, id: uid() }))
-      : [];
-    const isDraw = mType === "draw";
-    const content = isDraw
-      ? JSON.stringify({
-          paths: mDrawingData?.paths || [],
-          dimensions: mDrawingData?.dimensions || null,
-          text: mBody || "",
-        })
-      : (mBody || "");
-    const newNote = {
-      id: newId,
-      type: mType,
-      title: newTitle,
-      content,
-      items,
-      tags: Array.isArray(mTagList) ? [...mTagList] : [],
-      images: Array.isArray(mImages) ? mImages.map((im) => ({ ...im, id: uid() })) : [],
-      color: mColor || "default",
-      pinned: false,
-      position: Date.now(),
-      timestamp: nowIso,
-      updated_at: nowIso,
-      client_updated_at: nowIso,
-    };
-    const localNote = {
-      ...newNote,
-      user_id: currentUser?.id,
-      archived: false,
-      trashed: false,
-    };
-    const leaseId = acquireLocalLease(newId);
-    try {
-      await idbPutNote(localNote, currentUser?.id, sessionId);
-    } catch (e) {
-      console.error("Duplicate note IDB put failed:", e);
-    }
-    setNotes((prev) =>
-      sortNotesByRecency([localNote, ...(Array.isArray(prev) ? prev : [])]),
-    );
-    enqueueWithLease(newId, { type: "create", noteId: newId, payload: newNote }, leaseId);
-    // The icon (logo badge) is per-user and lives outside the note payload
-    // (its own table + endpoint — see applyNoteIcon), so it isn't carried by
-    // the "create" enqueue above and must be copied over explicitly.
-    if (activeNoteObj?.icon) {
-      applyNoteIcon(newId, activeNoteObj.icon);
-    }
-    showToast(t("noteDuplicated"), "success", undefined, "copy");
-    closeModal();
-  };
-
-  // Checklist drag-and-drop is handled by useChecklistDrag inside NoteModal
-
-  /** -------- Tags list (unique + counts) -------- */
-  // Keep allNotesForTags in sync with notes when in normal view,
-  // so tags remain visible when navigating to archive/trash
-  useEffect(() => {
-    if (notesAreRegular.current) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors the regular list each time it changes, whatever loaded it
-      setAllNotesForTags(notes);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- notesAreRegular is a ref
-  }, [notes]);
-
-  const tagsWithCounts = useMemo(() => {
-    const map = new Map();
-    for (const n of allNotesForTags) {
-      for (const t of n.tags || []) {
-        const key = String(t).trim();
-        if (!key) continue;
-        map.set(key, (map.get(key) || 0) + 1);
-      }
-    }
-    return Array.from(map.entries())
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => a.tag.toLowerCase().localeCompare(b.tag.toLowerCase()));
-  }, [allNotesForTags]);
-
-  /** -------- Derived lists (search + tag filter) -------- */
-  // Deferred so fast typing in the search box stays responsive: the input
-  // updates immediately (search) while the expensive grid re-filter/re-render
-  // runs as a non-urgent update. No visual change — results settle a frame
-  // later only under heavy load.
-  const deferredSearch = useDeferredValue(search);
-  const filtered = useMemo(() => {
-    const q = deferredSearch.toLowerCase();
-    const tag =
-      tagFilter === ALL_IMAGES
-        ? null
-        : tagFilter === "ARCHIVED"
-          ? null
-          : tagFilter === "TRASHED"
-            ? null
-            : tagFilter === REMINDERS
-              ? null
-              : tagFilter?.toLowerCase() || null;
-
-    return notes.filter((n) => {
-      if (tagFilter === ALL_IMAGES) {
-        if (!(n.images && n.images.length)) return false;
-      } else if (tagFilter === "ARCHIVED") {
-        // In archived view, show all notes (they're already filtered by the backend)
-        // Just apply search filter
-      } else if (tagFilter === "TRASHED") {
-        // In trashed view, show all notes (they're already filtered by the backend)
-        // Just apply search filter
-      } else if (tagFilter === REMINDERS) {
-        // Reminders view: a client-side lens over the regular notes list —
-        // keep only notes that carry a reminder. They remain visible in the
-        // normal view too (this filter doesn't load a separate data set).
-        if (!n.reminderAt) return false;
-      } else if (activeTagFilters.length > 0) {
-        // Multi-tag filter : la note doit contenir AU MOINS UN des tags sélectionnés
-        const noteTags = (n.tags || []).map((t) => String(t).toLowerCase());
-        if (!activeTagFilters.some((f) => noteTags.includes(f.toLowerCase()))) {
-          return false;
-        }
-      } else if (
-        tag &&
-        !(n.tags || []).some((t) => String(t).toLowerCase() === tag)
-      ) {
-        return false;
-      }
-      if (!q) return true;
-      const t = (n.title || "").toLowerCase();
-      const c = (n.content || "").toLowerCase();
-      const tagsStr = (n.tags || []).join(" ").toLowerCase();
-      const items = (n.items || [])
-        .map((i) => i.text)
-        .join(" ")
-        .toLowerCase();
-      const images = (n.images || [])
-        .map((im) => im.name)
-        .join(" ")
-        .toLowerCase();
-      return (
-        t.includes(q) ||
-        c.includes(q) ||
-        tagsStr.includes(q) ||
-        items.includes(q) ||
-        images.includes(q)
-      );
-    });
-  }, [notes, deferredSearch, tagFilter, activeTagFilters]);
-  const pinned = useMemo(() => filtered.filter((n) => n.pinned), [filtered]);
-  const others = useMemo(() => filtered.filter((n) => !n.pinned), [filtered]);
-  const filteredEmptyWithSearch =
-    filtered.length === 0 &&
-    notes.length > 0 &&
-    !!(deferredSearch || (tagFilter && tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED") || activeTagFilters.length > 0);
-  const allEmpty = notes.length === 0;
+  const { tagsWithCounts, pinned, others, filteredEmptyWithSearch, allEmpty } = useNoteFilters({
+    notes,
+    notesAreRegular,
+    search,
+    tagFilter,
+    activeTagFilters,
+  });
 
   /** -------- Modal JSX -------- */
   // In SBS mode the left pane's X / scrim click no longer tears down the
@@ -2547,7 +808,6 @@ export default function App() {
       scrimClickStartRef={scrimClickStartRef}
       savedModalScrollRatioRef={savedModalScrollRatioRef}
       activeNoteObj={activeNoteObj}
-      // eslint-disable-next-line react-hooks/immutability -- false positive: the handler only touches freshlyCreatedNoteRef, a ref from useDraftNote, when called
       onSetReminder={setNoteReminder}
       editedStamp={editedStamp}
       modalHasChanges={modalHasChanges}
@@ -2597,12 +857,9 @@ export default function App() {
       tagFilter={tagFilter}
       onScrimClose={sbsActive ? closeBothSBS : undefined}
       closeModal={primaryCloseModal}
-      // eslint-disable-next-line react-hooks/immutability -- false positive: the handler only touches freshlyCreatedNoteRef, a ref from useDraftNote, when called
       saveModal={saveModal}
-      // eslint-disable-next-line react-hooks/immutability -- false positive: the handler only touches freshlyCreatedNoteRef, a ref from useDraftNote, when called
       deleteModal={deleteModal}
       restoreFromTrash={restoreFromTrash}
-      // eslint-disable-next-line react-hooks/immutability -- false positive: the handler only touches freshlyCreatedNoteRef, a ref from useDraftNote, when called
       handleArchiveNote={handleArchiveNote}
       handleDownloadNote={handleDownloadNote}
       togglePin={togglePin}
@@ -3047,7 +1304,6 @@ export default function App() {
         notificationBellDesktop={
           <NotificationBell
             dark={dark}
-            // eslint-disable-next-line react-hooks/immutability -- false positive: the handler only touches pendingDraftRef, a ref from useDraftNote, when called
             onAction={handleNotificationAction}
             onClearAll={clearAllNotificationsSynced}
             onOpenChange={setNotifCenterOpen}
