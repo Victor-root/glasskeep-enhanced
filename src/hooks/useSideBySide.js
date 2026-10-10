@@ -136,12 +136,6 @@ export default function useSideBySide({
       setSbsClosingSide(null);
     }, SBS_ANIM_MS);
   }, [sbsClosingSide, cancelAndClearSbsAi, setSbsSuppressOpenReplay]);
-  // Kept for backward-compat in case the secondary ever runs its own
-  // exit animation outside SBS: currently a no-op in SBS path.
-  const onSbsRightClosed = useCallback(() => {
-    setSbsSecondaryId(null);
-    setSbsClosingSide(null);
-  }, []);
 
   // SBS AI callbacks for the secondary (right) pane. The secondary owns
   // its own AI state, so it must signal the shell when its AI opens or
@@ -230,7 +224,6 @@ export default function useSideBySide({
     onOpenSideBySide,
     requestCloseLeftPaneSBS,
     onSbsRightClosing,
-    onSbsRightClosed,
     onSecondaryAiOpen,
     onSecondaryAiClose,
     closeBothSBS,
