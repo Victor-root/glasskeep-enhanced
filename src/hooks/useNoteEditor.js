@@ -76,8 +76,9 @@ export default function useNoteEditor({
   // Initial draw mode for the modal (null = default "view", "draw" = open in edit mode)
   const [initialDrawMode, setInitialDrawMode] = useState(null);
 
-  // The lease helpers are recreated on every App render: in the effect
-  // dependencies, they re-run the autosave effects on each of them.
+  // With autosaveRerunsOnAppRender, a lease helper (recreated on every App
+  // render) joins the autosave effects' dependencies, so they re-run on
+  // each App render.
   const appRenderKey = autosaveRerunsOnAppRender ? acquireLocalLease : null;
 
   // Baseline of the open note, to detect whether the user actually edited it.

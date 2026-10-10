@@ -31,10 +31,11 @@ App shell:
 - `useLaunchShortcuts`, `useNoteDeepLinks`, `useAndroidReminderBridge`: entry points from outside the app
 
 Notes:
-- `useNoteEditor`: persistence of the open note (drafts via `useDraftNote`, autosave of every note type, live sync into the editor)
-- `useNoteActions`: open, close, save, delete, restore, archive, pin, reminder, convert, duplicate, download
+- `useNoteEditor`: persistence of the open note (loading, drafts via `useDraftNote`, autosave of every note type, flush on close, live sync into the editor)
+- `useNoteActions`: close, save, delete, restore, archive, pin, reminder, convert, duplicate, download
+- `usePrimaryNoteModal`: the primary modal's open, animated close and forced close
 - `useNoteFilters`, `useNoteReorder`, `useMultiSelect`, `useBulkActions`, `useLogoLibrary`, `useAiSearch`, `useNoteAiChat`
-- `useSideBySide`: two notes side by side; the right pane is `components/modal/SecondaryNoteInstance`
+- `useSideBySide`: two notes side by side; the right pane is `components/modal/SecondaryNoteInstance`, which runs `useNoteEditor` and `useNoteActions` on its own modal state
 
 ## Data flow (local-first)
 
