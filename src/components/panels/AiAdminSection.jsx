@@ -11,9 +11,7 @@ import { t } from "../../i18n";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import { useStableCallback } from "../../hooks/useStableCallback.js";
 import TI from "../../icons/editor/index.jsx";
-
-const FIELD_INPUT_CLASSES =
-  "w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--gk-chrome-accent)] placeholder-gray-500 dark:placeholder-gray-400 text-sm";
+import { FIELD_INPUT_CLASSES } from "../settings/fieldClasses.js";
 
 function PrivacyWarning() {
   return (
