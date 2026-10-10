@@ -3,7 +3,7 @@
 //
 // This is purely visual: it toggles a single class on <html>
 // (gk-strike-checked) that CSS keys off to draw a line-through on the text of
-// checked task items (see .gk-strike-checked rules in globalCSS.js). It does
+// checked task items (see .gk-strike-checked rules in styles/global/notes.js). It does
 // NOT add a Strike mark to the note content and never touches the stored doc —
 // the checked state itself lives in the Tiptap JSON, this only changes how a
 // checked item looks. Stored locally because it's a reading preference, not
