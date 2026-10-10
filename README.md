@@ -367,7 +367,7 @@ Users can sign in through an **OpenID Connect provider**: Authentik, Keycloak, A
    * add the language code to `SUPPORTED_LANGUAGES`: `export const SUPPORTED_LANGUAGES = ["fr", "en", "it"];`
    * add the native display name to `LANGUAGE_NATIVE_LABELS`: `it: "Italiano"`
    * extend the dict selector: `const dict = locale === "fr" ? fr : locale === "it" ? it : en;`
-3. In `server/index.js`, add the new code to the validation allowlist in `PATCH /api/user/profile` (the line that checks `lang !== "fr" && lang !== "en"`)
+3. In `server/routes/profileRoutes.js`, add the new code to the validation allowlist in `PATCH /api/user/profile` (the line that checks `lang !== "fr" && lang !== "en"`)
 4. Rebuild the app: `npm run build`
 
 The language selector in the settings panel will automatically show the new option. Missing keys fall back to English automatically.

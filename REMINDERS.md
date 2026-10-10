@@ -66,7 +66,7 @@ stamps `reminder_fired_at`; only the writer that flipped it from `NULL`
 dispatches — so a reminder can never fire twice, and one that fell due
 while the server was down is caught on the next sweep after boot.
 
-Dispatch (in `server/index.js`) reuses the **existing notification
+Dispatch (in `server/services/reminderDispatch.js`) reuses the **existing notification
 pipeline**: it persists a `reminder` notification row (title *"Reminder"*,
 body = the note's title or a content preview), pushes it over SSE, and
 sends a Web Push to each of the recipient's devices.
@@ -319,7 +319,7 @@ path** on demand, since the server can't reach a closed WebView app.
 
 - `server/services/reminderScheduler.js` — the due-sweep loop.
 - `server/services/pushNotifications.js` — VAPID (auto-generated) + subscription storage + send.
-- `GET /api/reminders/upcoming` (`server/index.js`) — feed for the Android background sync.
+- `GET /api/reminders/upcoming` (`server/routes/reminderRoutes.js`): feed for the Android background sync.
 - `public/push-sw.js` — service-worker push / click handlers.
 - `src/components/notes/ReminderPicker.jsx` — the date/time picker.
 - `src/components/notes/NoteReminderChip.jsx` — the card pill.
