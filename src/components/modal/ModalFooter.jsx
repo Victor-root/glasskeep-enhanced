@@ -174,9 +174,11 @@ export default function ModalFooter({
 
         {/* ── Add image / logo (hidden in view mode for draw notes, hidden in
               draw canvas). Audio notes only get the logo: they have no
-              content-image flow. ── */}
+              content-image flow, and their logo-only button is a separate
+              control (its own key). ── */}
         {(mType === "checklist" || mType === "text" || (mType === "draw" && drawMode !== "draw" && !viewMode) || mType === "audio") && (
           <FooterImageButton
+            key={mType === "audio" ? "logo" : "image"}
             logoOnly={mType === "audio"}
             dark={dark}
             isDesktop={isDesktop}

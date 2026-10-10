@@ -1,6 +1,6 @@
 import React from "react";
 import { t } from "../../i18n";
-import ConfirmDialogFrame, { ConfirmChoices } from "./ConfirmDialogFrame.jsx";
+import ConfirmDialogFrame from "./ConfirmDialogFrame.jsx";
 
 /**
  * Explicit choice when the owner removes a collaborator from a shared note.
@@ -23,14 +23,12 @@ export default function ConfirmRemoveCollaboratorDialog({
       title={t("removeCollaboratorQuestion", { name: collaboratorName || "" })}
       message={t("removeCollaboratorConfirm")}
       onClose={onClose}
-    >
-      <ConfirmChoices
-        mildLabel={t("removeAndKeepCopy")}
-        onMild={() => onConfirm("keep_copy")}
-        destructiveLabel={t("removeAndDeleteForThem")}
-        onDestructive={() => onConfirm("remove_access")}
-        onCancel={onClose}
-      />
-    </ConfirmDialogFrame>
+      stacked
+      actions={[
+        { kind: "outline", label: t("removeAndKeepCopy"), onClick: () => onConfirm("keep_copy") },
+        { kind: "danger", label: t("removeAndDeleteForThem"), onClick: () => onConfirm("remove_access") },
+        { kind: "ghost", label: t("cancel"), onClick: onClose },
+      ]}
+    />
   );
 }

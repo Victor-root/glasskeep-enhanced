@@ -1,12 +1,19 @@
 import React from "react";
-import { t } from "../../i18n";
+
+const ACTION_CLASSES = {
+  outline: "px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10",
+  danger: "px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700",
+  ghost: "px-4 py-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-sm text-gray-600 dark:text-gray-300",
+};
 
 /**
  * Centred confirmation card over a dimmed backdrop, shared by the note
- * modal's confirmation dialogs: a title, a message and the action buttons
- * passed as children. `zClassName` sets its stacking level.
+ * modal's confirmation dialogs: a title, a message and the action buttons,
+ * in a row on the right or stacked (`stacked`, for a choice between
+ * outcomes). Each action is { kind: "outline" | "danger" | "ghost", label,
+ * onClick }. `zClassName` sets its stacking level.
  */
-export default function ConfirmDialogFrame({ zClassName, title, message, onClose, children }) {
+export default function ConfirmDialogFrame({ zClassName, title, message, onClose, stacked = false, actions }) {
   return (
     <div className={`fixed inset-0 ${zClassName} flex items-center justify-center`}>
       <div
@@ -19,28 +26,17 @@ export default function ConfirmDialogFrame({ zClassName, title, message, onClose
       >
         <h3 className="text-lg font-semibold mb-2">{title}</h3>
         <p className="text-sm text-gray-600 dark:text-gray-300">{message}</p>
-        {children}
+        <div className={stacked ? "mt-5 flex flex-col gap-2" : "mt-5 flex justify-end gap-3"}>
+          {actions.map((action, i) => (
+            <button
+              // Index keys: switching variant patches the buttons in place.
+              key={i}
+              className={ACTION_CLASSES[action.kind]}
+              onClick={action.onClick}
+            >{action.label}</button>
+          ))}
+        </div>
       </div>
-    </div>
-  );
-}
-
-// Stacked choice between a mild and a destructive outcome, then Cancel.
-export function ConfirmChoices({ mildLabel, onMild, destructiveLabel, onDestructive, onCancel }) {
-  return (
-    <div className="mt-5 flex flex-col gap-2">
-      <button
-        className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
-        onClick={onMild}
-      >{mildLabel}</button>
-      <button
-        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-        onClick={onDestructive}
-      >{destructiveLabel}</button>
-      <button
-        className="px-4 py-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-sm text-gray-600 dark:text-gray-300"
-        onClick={onCancel}
-      >{t("cancel")}</button>
     </div>
   );
 }
