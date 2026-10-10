@@ -26,6 +26,10 @@ export default function useLocalLeases() {
   const pendingReorderLeasesRef = useRef(new Map());
   const reorderTokenSeqRef = useRef(0);
   const localDeleteTombstoneRef = useRef(new Set());
+  // Map<noteId, number>: leases ever acquired per note, i.e. local edits
+  // started. Never decreases, so a change tells that an edit started in
+  // between, even one already finished.
+  const editVersionRef = useRef(new Map());
 
   const acquireLocalLease = (noteId) => {
     const seq = ++leaseSeqRef.current;
@@ -33,8 +37,11 @@ export default function useLocalLeases() {
     const map = localLeaseRef.current;
     if (!map.has(noteId)) map.set(noteId, new Map());
     map.get(noteId).set(leaseId, { seq });
+    const key = String(noteId);
+    editVersionRef.current.set(key, (editVersionRef.current.get(key) || 0) + 1);
     return leaseId;
   };
+  const editVersion = (noteId) => editVersionRef.current.get(String(noteId)) || 0;
   const releaseLocalLease = (noteId, leaseId) => {
     const map = localLeaseRef.current;
     const leases = map.get(noteId);
@@ -95,9 +102,26 @@ export default function useLocalLeases() {
     return hasPendingChanges(noteId, userId);
   };
 
+  // Applying a server copy of a note takes several awaits (IndexedDB, the
+  // network). Snapshot before them, check right before writing: false when
+  // a local edit started meanwhile, so the server copy, older than that
+  // edit, must not overwrite it.
+  const snapshotEdits = (noteId) => {
+    const version = editVersion(noteId);
+    return () => editVersion(noteId) === version && !isNoteLocallyProtected(noteId);
+  };
+  // Same for every note at once (a whole list being reloaded): the check
+  // takes the note id.
+  const snapshotAllEdits = () => {
+    const versions = new Map(editVersionRef.current);
+    return (noteId) =>
+      editVersion(noteId) === (versions.get(String(noteId)) || 0) && !isNoteLocallyProtected(noteId);
+  };
+
   // Sign-out: nothing may survive into the next session.
   const clearAll = () => {
     localLeaseRef.current.clear();
+    editVersionRef.current.clear();
     localDeleteTombstoneRef.current.clear();
     pendingReorderLeasesRef.current.clear();
   };
@@ -114,6 +138,8 @@ export default function useLocalLeases() {
     removeDeleteTombstone,
     isDeleteTombstoned,
     isProtectedFromServerOverwrite,
+    snapshotEdits,
+    snapshotAllEdits,
     clearAll,
   };
 }

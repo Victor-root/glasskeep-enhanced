@@ -97,6 +97,7 @@ export default function useNotesLoader({
         await syncEngineRef.current.healthCheck();
       }
       if (syncEngineRef.current?.serverReachable === false) throw new Error("Server offline (skip)");
+      const noLocalEdit = leases.snapshotAllEdits();
       const data = await api(view.endpoint, { token });
       if (viewChanged()) return;
       const serverNotes = Array.isArray(data) ? data : [];
@@ -154,7 +155,25 @@ export default function useNotesLoader({
       // A local version with a pending change may carry other view flags.
       const final = [...merged, ...localOnly].filter(view.keep);
       if (viewChanged()) return;
-      setNotes(sortNotesByRecency(final));
+      // A note edited locally while the list loaded keeps its current
+      // state: its current version, still created, or still removed from
+      // this list (trashed, archived).
+      setNotes((prev) => {
+        const isEdited = (n) => !noLocalEdit(String(n.id));
+        if (!final.some(isEdited) && !prev.some(isEdited)) return sortNotesByRecency(final);
+        const current = new Map(prev.filter(isEdited).map((n) => [String(n.id), n]));
+        const list = [];
+        for (const n of final) {
+          const id = String(n.id);
+          if (!isEdited(n)) list.push(n);
+          else if (current.has(id)) list.push(current.get(id));
+        }
+        const listed = new Set(list.map((n) => String(n.id)));
+        for (const [id, n] of current) {
+          if (!listed.has(id)) list.push(n);
+        }
+        return sortNotesByRecency(list);
+      });
       return true; // server data fetched
     } catch (error) {
       console.error(view.errorLabel, error);

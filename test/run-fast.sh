@@ -25,6 +25,7 @@ run "politique de confiance des intermédiaires" "$HERE/federation/t7-trust-poli
 run "règles pures (adresses IA, TLS des scripts, style, chiffrement, connexion, passkeys)" \
     "$HERE/unit/t18-pure-rules.mjs"
 run "un 401 sans jeton ne déconnecte pas" "$HERE/unit/t19-unauthenticated-401.mjs"
+run "une copie du serveur n'écrase pas une modification locale" "$HERE/unit/t20-local-edit-race.mjs"
 
 if [ $fail -eq 0 ]; then
   echo "Tout passe."

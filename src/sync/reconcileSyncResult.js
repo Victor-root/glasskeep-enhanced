@@ -1,5 +1,6 @@
 // Converges the local cache with the server's answer to a synced queue
-// item. Only acts when the server returned useful canonical data.
+// item. Only acts when the server returned useful canonical data, and
+// never over a local edit started while the answer was being applied.
 import {
   hasPendingChanges,
   putNote as idbPutNote,
@@ -28,9 +29,11 @@ export async function reconcileSyncResult(item, result, ctx) {
   if (result && result.stale && result.note) {
     const canonical = result.note;
     const nid = String(canonical.id || item.noteId);
+    const noLocalEdit = leases.snapshotEdits(nid);
     const pending = await hasPendingChanges(nid, uid);
-    if (!pending && !leases.isNoteLocallyProtected(nid)) {
+    if (!pending && noLocalEdit()) {
       await idbPutNote(canonical, uid, sid);
+      if (!noLocalEdit()) return;
       const belongsInView = noteBelongsInView(canonical, ctx.viewFilter());
       setNotes((prev) => {
         const idx = prev.findIndex((n) => String(n.id) === nid);
@@ -66,9 +69,11 @@ export async function reconcileSyncResult(item, result, ctx) {
 
   if (item.type === "create" && serverNote && serverNote.id) {
     const nid = String(serverNote.id);
+    const noLocalEdit = leases.snapshotEdits(nid);
     const pending = await hasPendingChanges(nid, uid);
-    if (!pending) {
+    if (!pending && noLocalEdit()) {
       await idbPutNote(serverNote, uid, sid);
+      if (!noLocalEdit()) return;
       const belongsInView = noteBelongsInView(serverNote, ctx.viewFilter());
       setNotes((prev) => {
         const idx = prev.findIndex((n) => String(n.id) === nid);
@@ -89,10 +94,12 @@ export async function reconcileSyncResult(item, result, ctx) {
     // update / patch / archive / trash / restore: the note may also have
     // changed view (archived from the active view, restored from trash).
     const nid = String(item.noteId);
+    const noLocalEdit = leases.snapshotEdits(nid);
     const pending = await hasPendingChanges(nid, uid);
-    if (!pending && !leases.isNoteLocallyProtected(nid)) {
+    if (!pending && noLocalEdit()) {
       const canonical = { ...serverNote, id: nid };
       await idbPutNote(canonical, uid, sid);
+      if (!noLocalEdit()) return;
       const belongsInView = noteBelongsInView(canonical, ctx.viewFilter());
       setNotes((prev) => {
         const idx = prev.findIndex((n) => String(n.id) === nid);
