@@ -1,28 +1,17 @@
 package com.glasskeep.app
 
-import android.Manifest
-import android.animation.ValueAnimator
-import android.app.Activity
-import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.view.Gravity
-import android.view.View
-import android.view.animation.DecelerateInterpolator
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.ServiceWorkerClient
 import android.webkit.ServiceWorkerController
-import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -30,25 +19,28 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.browser.customtabs.CustomTabsIntent
-import androidx.core.content.ContextCompat
-import androidx.core.graphics.ColorUtils
-import androidx.core.view.WindowInsetsControllerCompat
-import androidx.core.view.updateLayoutParams
 import com.glasskeep.app.net.CleartextPolicy
+import com.glasskeep.app.reminders.RemindersBridge
+import com.glasskeep.app.ui.ChangeServerDialog
+import com.glasskeep.app.ui.isDarkMode
+import com.glasskeep.app.ui.isTelevision
+import com.glasskeep.app.update.UpdatePrompts
+import com.glasskeep.app.webview.FileChooser
+import com.glasskeep.app.webview.MediaCapturePermissions
+import com.glasskeep.app.webview.SystemBars
+import com.glasskeep.app.webview.ToastBridge
+import com.glasskeep.app.webview.WebDownloads
 
 class WebViewActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var swipeRefresh: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-    private lateinit var statusBarBackground: View
-    private lateinit var navigationBarBackground: View
-    private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
+    private lateinit var systemBars: SystemBars
     private lateinit var webAuthnBridge: WebAuthnBridge
     // Debug builds only, see NetDebug.
     private var netDebug: NetDebug? = null
@@ -71,142 +63,28 @@ class WebViewActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { }
 
-    // Held while we wait for the POST_NOTIFICATIONS runtime grant on
-    // Android 13+. Once the user replies, we re-attempt the notif post
-    // for this release (or drop it on the floor if denied).
-    private var pendingUpdateRelease: com.glasskeep.app.update.ReleaseInfo? = null
-    private val updateNotificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        val release = pendingUpdateRelease ?: return@registerForActivityResult
-        pendingUpdateRelease = null
-        if (granted) com.glasskeep.app.update.UpdateNotifier.show(this, release)
-    }
+    // These register their result launchers as they are created, so they
+    // are created with the activity. Keep their order: after a process
+    // restart, results find their launcher by registration order.
+    private val updatePrompts = UpdatePrompts(this) { webView }
+    private val remindersBridge = RemindersBridge(this)
+    private val fileChooser = FileChooser(this)
+    private val mediaCapturePermissions = MediaCapturePermissions(this)
 
-    // POST_NOTIFICATIONS grant for reminder alarms. Requested once (per
-    // session) the first time the web app schedules a reminder; the grant
-    // persists, so later reminder notifications just work.
-    private var reminderPermissionAsked = false
-    private val reminderNotificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* grant persists; nothing to retry here */ }
-
-    private val fileChooserLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val data = if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.let { intent ->
-                // Single URI (file manager)
-                intent.data?.let { arrayOf(it) }
-                    // clipData (Android 13+ photo picker)
-                    ?: intent.clipData?.let { clip ->
-                        Array(clip.itemCount) { i -> clip.getItemAt(i).uri }
-                    }
-                    ?: WebChromeClient.FileChooserParams.parseResult(result.resultCode, intent)
-            }
-        } else null
-        fileUploadCallback?.onReceiveValue(data)
-        fileUploadCallback = null
-    }
-
-    private val cameraPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* handled */ }
-
-    // Holds the WebView's PermissionRequest while we ask Android for the matching
-    // runtime permission (RECORD_AUDIO / CAMERA). Resolved in the launchers below.
-    private var pendingWebPermissionRequest: PermissionRequest? = null
-    private var pendingWebPermissionResources: Array<String>? = null
-
-    private val recordAudioPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> resolvePendingWebPermission(Manifest.permission.RECORD_AUDIO, granted) }
-
-    private val webCameraPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> resolvePendingWebPermission(Manifest.permission.CAMERA, granted) }
-
-    private fun resolvePendingWebPermission(perm: String, granted: Boolean) {
-        val req = pendingWebPermissionRequest ?: return
-        val requested = pendingWebPermissionResources ?: req.resources
-        if (!granted) {
-            // User denied — drop the whole request. WebRTC code on the page
-            // will receive a NotAllowedError and can show its own message.
-            req.deny()
-            pendingWebPermissionRequest = null
-            pendingWebPermissionResources = null
-            return
-        }
-        // Granted: re-check all requested resources. If anything else still
-        // needs a runtime grant, chain into that launcher; otherwise resolve.
-        val needsAudio = requested.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE) &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) !=
-                PackageManager.PERMISSION_GRANTED
-        val needsVideo = requested.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE) &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) !=
-                PackageManager.PERMISSION_GRANTED
-        when {
-            needsAudio && perm != Manifest.permission.RECORD_AUDIO -> {
-                recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            }
-            needsVideo && perm != Manifest.permission.CAMERA -> {
-                webCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-            }
-            else -> {
-                req.grant(requested)
-                pendingWebPermissionRequest = null
-                pendingWebPermissionResources = null
-            }
-        }
-    }
-
-    /**
-     * Native Android Toast bridge. The in-app notification system on
-     * mobile delegates to this so the small dark pill at the bottom
-     * is the real system widget (Toast.makeText) instead of a CSS
-     * imitation rendered by the WebView.
-     *
-     * `show(message, durationLong)` honours Android's two canonical
-     * lengths — SHORT (~2 s) or LONG (~3.5 s). The JS side picks
-     * LONG when the notification is persistent or carries a >3 s
-     * duration so a verbose share message stays on screen long
-     * enough to read.
-     *
-     * Toasts are passive by design (no actions, no close button),
-     * so any action button on the original notification stays
-     * accessible only through the in-app notification centre.
-     */
-    inner class ToastBridge {
-        @JavascriptInterface
-        fun show(message: String) {
-            show(message, false)
-        }
-
-        @JavascriptInterface
-        fun show(message: String, durationLong: Boolean) {
-            runOnUiThread {
-                val length = if (durationLong) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
-                Toast.makeText(this@WebViewActivity, message, length).show()
-            }
-        }
-    }
+    private val downloads = WebDownloads(this)
 
     /** Called from JavaScript for theme-color sync and server change */
     inner class ThemeBridge {
         @JavascriptInterface
         fun onThemeColor(hexColor: String) {
-            runOnUiThread { applySystemBarColor(hexColor) }
+            runOnUiThread { systemBars.setThemeColor(hexColor) }
         }
 
         /** Navigation bar colour of its own (an open note's footer), or ""
          *  to follow the theme colour again. */
         @JavascriptInterface
         fun onNavBarColor(hexColor: String) {
-            runOnUiThread {
-                navBarColor = if (hexColor.isBlank()) null
-                else try { Color.parseColor(hexColor) } catch (_: Exception) { return@runOnUiThread }
-                applySystemBars()
-            }
+            runOnUiThread { systemBars.setNavBarColor(hexColor) }
         }
 
         /** Off while the page draws its own scrollbar, under its header,
@@ -220,20 +98,14 @@ class WebViewActivity : AppCompatActivity() {
          *  dimming overlay the page lays over itself (0 lifts it). */
         @JavascriptInterface
         fun setBarsScrim(alpha: Float) {
-            runOnUiThread { animateBarsScrim(alpha.coerceIn(0f, 1f)) }
+            runOnUiThread { systemBars.animateScrim(alpha.coerceIn(0f, 1f)) }
         }
 
-        /** Settings → "Edge-to-edge in portrait". Stored natively so the
-         *  bars are already right at the next cold start, before the page
-         *  loads. */
+        /** Settings → "Edge-to-edge in portrait". */
         @JavascriptInterface
         fun setEdgeToEdgePortrait(enabled: Boolean) {
             runOnUiThread {
-                val prefs = getSharedPreferences("glasskeep", MODE_PRIVATE)
-                if (prefs.getBoolean(KEY_EDGE_TO_EDGE_PORTRAIT, false) == enabled) return@runOnUiThread
-                prefs.edit().putBoolean(KEY_EDGE_TO_EDGE_PORTRAIT, enabled).apply()
-                applySystemBars()
-                injectSafeAreaInsets()
+                if (systemBars.setEdgeToEdgePortrait(enabled)) injectSafeAreaInsets()
             }
         }
 
@@ -244,38 +116,12 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun changeServer() {
-            runOnUiThread { showChangeServerDialog() }
+            runOnUiThread { ChangeServerDialog.show(this@WebViewActivity) }
         }
 
-        /** Manual "check for updates" hook for the in-app Settings
-         *  panel. Bypasses the 12h throttle. Surfaces the outcome
-         *  through a Toast + the in-app card (via JS callback) — no
-         *  system notification, because the user is already looking
-         *  at the result in the panel; the heads-up banner would be
-         *  redundant clutter. The cold-start auto-check still posts
-         *  the notification since the user isn't necessarily in the
-         *  Settings panel then. */
         @JavascriptInterface
         fun checkForUpdate() {
-            runOnUiThread {
-                Toast.makeText(
-                    this@WebViewActivity,
-                    R.string.update_checking,
-                    Toast.LENGTH_SHORT,
-                ).show()
-                com.glasskeep.app.update.UpdateManager.forceCheck(this@WebViewActivity) { release ->
-                    if (release != null) {
-                        notifyJsUpdateAvailable(release)
-                    } else {
-                        Toast.makeText(
-                            this@WebViewActivity,
-                            R.string.update_up_to_date,
-                            Toast.LENGTH_LONG,
-                        ).show()
-                        notifyJsUpToDate()
-                    }
-                }
-            }
+            updatePrompts.checkForUpdate()
         }
 
         /** Returns the currently-installed APK version as a plain
@@ -295,65 +141,17 @@ class WebViewActivity : AppCompatActivity() {
         fun isFdroidInstall(): Boolean =
             com.glasskeep.app.update.UpdateManager.isFdroidInstall(this@WebViewActivity)
 
-        /** Open F-Droid on this app's page. The HTTPS URL is claimed
-         *  by every F-Droid client variant (vanilla, Basic, Privileged
-         *  Extension), so we don't need to second-guess which variant
-         *  the user has — the system intent resolver picks it. Only
-         *  called from the Settings panel when isFdroidInstall() is
-         *  already true, so we're guaranteed at least one F-Droid
-         *  client is present. */
         @JavascriptInterface
         fun openFdroidPage() {
-            val url = "https://f-droid.org/packages/$packageName/"
-            runOnUiThread {
-                try {
-                    startActivity(
-                        Intent(Intent.ACTION_VIEW).apply {
-                            data = Uri.parse(url)
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                    )
-                } catch (e: Exception) {}
-            }
+            updatePrompts.openFdroidPage()
         }
 
-        /** Returns the latest detected release as JSON (or null if no
-         *  pending update). Called from the Settings panel on open so
-         *  the card survives an Activity recreation. The helper auto-
-         *  drops stale prefs when the stored release is no longer
-         *  strictly newer than the running APK. */
         @JavascriptInterface
-        fun getAvailableUpdate(): String? {
-            val release = com.glasskeep.app.update.UpdateManager
-                .getStoredRelease(this@WebViewActivity) ?: return null
-            return jsonReleaseStr(release.versionName, release.assetName, release.downloadUrl)
-        }
+        fun getAvailableUpdate(): String? = updatePrompts.getAvailableUpdate()
 
-        /** Settings card's "Télécharger" action. Triggers the same
-         *  download + install pipeline as a notification tap. */
         @JavascriptInterface
         fun installAvailableUpdate() {
-            val release = com.glasskeep.app.update.UpdateManager
-                .getStoredRelease(this@WebViewActivity) ?: return
-            runOnUiThread {
-                Toast.makeText(
-                    this@WebViewActivity,
-                    R.string.update_downloading,
-                    Toast.LENGTH_SHORT,
-                ).show()
-                com.glasskeep.app.update.UpdateManager.downloadAndInstall(
-                    this@WebViewActivity,
-                    release,
-                ) { ok ->
-                    if (!ok) {
-                        Toast.makeText(
-                            this@WebViewActivity,
-                            R.string.update_download_failed,
-                            Toast.LENGTH_LONG,
-                        ).show()
-                    }
-                }
-            }
+            updatePrompts.installAvailableUpdate()
         }
 
         /** Settings card's "Plus tard" action. */
@@ -366,7 +164,7 @@ class WebViewActivity : AppCompatActivity() {
          *  The web layer reads window.__isAndroidTV on boot to swap the
          *  edit-heavy phone UI for a comfy, focus-driven viewer. */
         @JavascriptInterface
-        fun isAndroidTV(): Boolean = isTelevision()
+        fun isAndroidTV(): Boolean = isTelevision(this@WebViewActivity)
 
         /** Opens the single sign-on provider. Only an authorization URL
          *  that returns to this server's callback is accepted. */
@@ -390,100 +188,16 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun saveBlobFile(base64Data: String, filename: String, mimeType: String) {
-            try {
-                val bytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
-                val contentValues = android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, filename)
-                    put(android.provider.MediaStore.Downloads.MIME_TYPE, mimeType)
-                    put(android.provider.MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                    put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
-                }
-                val uri = contentResolver.insert(
-                    android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues
-                )
-                if (uri == null) {
-                    runOnUiThread {
-                        Toast.makeText(this@WebViewActivity, getString(R.string.download_error), Toast.LENGTH_SHORT).show()
-                    }
-                    return
-                }
-                contentResolver.openOutputStream(uri)?.use { out -> out.write(bytes) }
-                val updateValues = android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
-                }
-                contentResolver.update(uri, updateValues, null, null)
-                runOnUiThread {
-                    Toast.makeText(this@WebViewActivity, getString(R.string.download_complete, filename), Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("GlassKeep", "saveBlobFile failed", e)
-                runOnUiThread {
-                    Toast.makeText(this@WebViewActivity, getString(R.string.download_error), Toast.LENGTH_SHORT).show()
-                }
-            }
+            downloads.saveBlobFile(base64Data, filename, mimeType)
         }
     }
 
-    // Latest system-bar / display-cutout insets in CSS pixels (dp). Captured by the
-    // OnApplyWindowInsetsListener on the WebView and replayed via `injectSafeAreaInsets`
-    // on every page load, so the React app has correct values BEFORE the first paint.
-    //
-    // We do this because the Android 15 WebView on stock Pixel images returns 0 for
-    // env(safe-area-inset-bottom) (the FAB ended up half-hidden behind the gesture/
-    // 3-button bar). The Activity already knows the real insets — we just hand them
-    // to the page as CSS custom properties so styles can read `var(--safe-bottom)`
-    // with `env(safe-area-inset-bottom)` as the fallback for non-WebView contexts.
-    private var safeAreaTopDp = 0.0
-    private var safeAreaBottomDp = 0.0
-    private var safeAreaLeftDp = 0.0
-    private var safeAreaRightDp = 0.0
-
-    // Soft-keyboard height, same idea. The window draws edge-to-edge, so the IME
-    // never resizes the WebView and the page's own visualViewport stays at full
-    // height: without this hand-off the app has no way to know a keyboard is
-    // covering its lower half. Reported on API 30+ only (see the listener).
-    private var keyboardInsetDp = 0.0
-
-    // Theme colour last sent by the page (see ThemeBridge.onThemeColor). Null
-    // until the page reports one; the window theme keeps the bars transparent
-    // until then.
-    private var themeBarColor: Int? = null
-    // Set while the page wants the navigation bar apart from the theme
-    // colour (ThemeBridge.onNavBarColor).
-    private var navBarColor: Int? = null
-    // Share of black over the painted bars (ThemeBridge.setBarsScrim).
-    private var barsScrim = 0f
-    private var barsScrimAnimator: ValueAnimator? = null
-
-    /** Portrait edge-to-edge: the user option is on and the phone is upright.
-     *  The bars then stay transparent and the page draws behind them. */
-    private fun isEdgeToEdgeActive(): Boolean =
-        getSharedPreferences("glasskeep", MODE_PRIVATE)
-            .getBoolean(KEY_EDGE_TO_EDGE_PORTRAIT, false) &&
-            resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-
-    /** The system-bar state the page lays itself out against: the insets, the
-     *  keyboard height, and data-gk-edge-to-edge on <html> while the bars are
-     *  transparent. */
+    /** Hands the page its system-bar state (see SystemBars.injectInsets). */
     private fun injectSafeAreaInsets() {
-        // Skip injection if the WebView hasn't loaded any page yet — evaluating JS
+        // Skip injection if the WebView hasn't loaded any page yet: evaluating JS
         // before there's a document just queues a useless call.
         if (!this::webView.isInitialized) return
-        val js = """
-            (function(){
-              var d = document.documentElement;
-              if (!d) return;
-              var s = d.style;
-              s.setProperty('--android-inset-top',    '${safeAreaTopDp}px');
-              s.setProperty('--android-inset-bottom', '${safeAreaBottomDp}px');
-              s.setProperty('--android-inset-left',   '${safeAreaLeftDp}px');
-              s.setProperty('--android-inset-right',  '${safeAreaRightDp}px');
-              s.setProperty('--android-keyboard-inset', '${keyboardInsetDp}px');
-              d.toggleAttribute('data-gk-edge-to-edge', ${isEdgeToEdgeActive()});
-              window.dispatchEvent(new Event('gk-android-insets'));
-            })();
-        """.trimIndent()
-        webView.evaluateJavascript(js, null)
+        systemBars.injectInsets(webView)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -494,7 +208,7 @@ class WebViewActivity : AppCompatActivity() {
         // and easy to dismiss. Tapping the notification triggers the
         // silent download + system installer.
         com.glasskeep.app.update.UpdateManager.checkInBackground(this) { release ->
-            postUpdateNotification(release)
+            updatePrompts.postUpdateNotification(release)
         }
 
         // Draw edge-to-edge: let the app handle system bar insets via CSS
@@ -508,10 +222,13 @@ class WebViewActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_webview)
 
-        statusBarBackground = findViewById(R.id.status_bar_background)
-        navigationBarBackground = findViewById(R.id.navigation_bar_background)
+        systemBars = SystemBars(
+            this,
+            findViewById(R.id.status_bar_background),
+            findViewById(R.id.navigation_bar_background),
+        )
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
-            placeBarBackgrounds(insets)
+            systemBars.placeBackgrounds(insets)
             insets
         }
 
@@ -596,31 +313,7 @@ class WebViewActivity : AppCompatActivity() {
         // propagating to the WebView so other apps inside the layout still
         // see them.
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(webView) { _, insets ->
-            // We use ONLY the systemBars insets (status bar + nav bar +
-            // caption bar) — NOT the union with displayCutout. Devices
-            // with a centre-top punch-hole (Pixel 8 and friends) report a
-            // cutout.top a few dp larger than the visible status bar
-            // because the cutout's bounding box extends slightly below the
-            // bar to leave room for the camera optics. Including it pushes
-            // the header 1-5 px below the actual status bar bottom edge,
-            // leaving a thin gap where the page background shows through.
-            // The WebView's own env() computation goes through systemBars
-            // for the same reason — we just want to match it pixel-for-
-            // pixel when we override the value.
-            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            // API 30+ only: there the window keeps its full height and the page
-            // has to pull its own bottom edge up. Older releases resize the
-            // window for real under adjustResize, so 100dvh already shrinks and
-            // forwarding the inset would subtract the keyboard twice.
-            val ime = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
-                insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom
-            else 0
-            val density = resources.displayMetrics.density
-            safeAreaTopDp    = bars.top    / density.toDouble()
-            safeAreaBottomDp = bars.bottom / density.toDouble()
-            safeAreaLeftDp   = bars.left   / density.toDouble()
-            safeAreaRightDp  = bars.right  / density.toDouble()
-            keyboardInsetDp  = ime / density.toDouble()
+            systemBars.recordInsets(insets)
             injectSafeAreaInsets()
             insets
         }
@@ -633,7 +326,7 @@ class WebViewActivity : AppCompatActivity() {
             // Toast.makeText widget instead of a CSS pill. Pure-PWA
             // sessions don't see the bridge and fall back to the JS
             // implementation in NotificationMobileToast.
-            addJavascriptInterface(ToastBridge(), "AndroidToast")
+            addJavascriptInterface(ToastBridge(this@WebViewActivity), "AndroidToast")
             // Exposes window.AndroidPasskey to the WebView. The polyfill
             // injected on every page load (see onPageStarted below) wraps
             // it into the Promise-friendly window.GlassKeepAndroidPasskey
@@ -643,7 +336,7 @@ class WebViewActivity : AppCompatActivity() {
             // alarms for note reminders (Web Push isn't available in a
             // WebView). The web app calls schedule/cancel when a reminder
             // changes and syncAll on load. See ReminderScheduler.
-            addJavascriptInterface(RemindersBridge(), "AndroidReminders")
+            addJavascriptInterface(remindersBridge, "AndroidReminders")
             if (BuildConfig.DEBUG) {
                 val origin = Uri.parse(url).let { "${it.scheme}://${it.encodedAuthority}" }
                 netDebug = NetDebug(this@WebViewActivity, origin).also {
@@ -753,7 +446,7 @@ class WebViewActivity : AppCompatActivity() {
                     // first render already picks the TV layout — otherwise
                     // we'd flash the phone UI for a few hundred ms while
                     // the bundle parses, then re-render.
-                    val isTv = isTelevision()
+                    val isTv = isTelevision(this@WebViewActivity)
                     view.evaluateJavascript(
                         "window.__isAndroidTV=$isTv;", null
                     )
@@ -772,7 +465,7 @@ class WebViewActivity : AppCompatActivity() {
                     // mode even with the system in dark, because by the
                     // time onPageFinished's window.__setDarkMode(true) ran,
                     // React had already painted the light theme.
-                    val isDarkBoot = isDarkMode()
+                    val isDarkBoot = isDarkMode(resources.configuration)
                     view.evaluateJavascript(
                         "window.__isAndroidDarkMode=$isDarkBoot;", null
                     )
@@ -814,10 +507,10 @@ class WebViewActivity : AppCompatActivity() {
                     // Re-assert the TV flag in case the page navigated
                     // (login → notes) and reset the global.
                     view.evaluateJavascript(
-                        "window.__isAndroidTV=${isTelevision()};", null
+                        "window.__isAndroidTV=${isTelevision(this@WebViewActivity)};", null
                     )
                     // Push current system dark mode state to web app on load
-                    val isDark = isDarkMode()
+                    val isDark = isDarkMode(resources.configuration)
                     view.evaluateJavascript(
                         "if(window.__setDarkMode)window.__setDarkMode($isDark)", null
                     )
@@ -847,114 +540,20 @@ class WebViewActivity : AppCompatActivity() {
                     webView: WebView,
                     callback: ValueCallback<Array<Uri>>,
                     params: FileChooserParams
-                ): Boolean {
-                    fileUploadCallback?.onReceiveValue(null)
-                    fileUploadCallback = callback
+                ): Boolean = fileChooser.show(callback, params)
 
-                    if (ContextCompat.checkSelfPermission(
-                            this@WebViewActivity, Manifest.permission.CAMERA
-                        ) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-
-                    fileChooserLauncher.launch(params.createIntent())
-                    return true
-                }
-
-                // WebView denies all getUserMedia requests by default — without
-                // this override, the audio-notes recorder (and any future
-                // mic/camera feature) silently fails on Android. We grant the
-                // request once the matching runtime permission is held.
                 override fun onPermissionRequest(request: PermissionRequest) {
-                    runOnUiThread {
-                        val supported = request.resources.filter {
-                            it == PermissionRequest.RESOURCE_AUDIO_CAPTURE ||
-                                it == PermissionRequest.RESOURCE_VIDEO_CAPTURE
-                        }.toTypedArray()
-                        if (supported.isEmpty()) {
-                            request.deny()
-                            return@runOnUiThread
-                        }
-                        // Drop any in-flight request — only the latest matters.
-                        pendingWebPermissionRequest?.deny()
-                        pendingWebPermissionRequest = request
-                        pendingWebPermissionResources = supported
-
-                        val needsAudio = supported.contains(
-                            PermissionRequest.RESOURCE_AUDIO_CAPTURE
-                        ) && ContextCompat.checkSelfPermission(
-                            this@WebViewActivity, Manifest.permission.RECORD_AUDIO
-                        ) != PackageManager.PERMISSION_GRANTED
-                        val needsVideo = supported.contains(
-                            PermissionRequest.RESOURCE_VIDEO_CAPTURE
-                        ) && ContextCompat.checkSelfPermission(
-                            this@WebViewActivity, Manifest.permission.CAMERA
-                        ) != PackageManager.PERMISSION_GRANTED
-
-                        when {
-                            needsAudio -> recordAudioPermissionLauncher.launch(
-                                Manifest.permission.RECORD_AUDIO
-                            )
-                            needsVideo -> webCameraPermissionLauncher.launch(
-                                Manifest.permission.CAMERA
-                            )
-                            else -> {
-                                request.grant(supported)
-                                pendingWebPermissionRequest = null
-                                pendingWebPermissionResources = null
-                            }
-                        }
-                    }
+                    mediaCapturePermissions.onPermissionRequest(request)
                 }
 
                 override fun onPermissionRequestCanceled(request: PermissionRequest) {
-                    runOnUiThread {
-                        if (pendingWebPermissionRequest == request) {
-                            pendingWebPermissionRequest = null
-                            pendingWebPermissionResources = null
-                        }
-                    }
+                    mediaCapturePermissions.onPermissionRequestCanceled(request)
                 }
             }
 
             // Downloads
             setDownloadListener { downloadUrl, userAgent, contentDisposition, mimeType, _ ->
-                if (downloadUrl.startsWith("blob:")) {
-                    // blob: URLs can't be downloaded by DownloadManager —
-                    // fetch in JS, convert to base64, pass to native bridge
-                    val filename = URLUtil.guessFileName(downloadUrl, contentDisposition, mimeType)
-                    webView.evaluateJavascript("""
-                        (async function(){
-                          try {
-                            var r = await fetch('$downloadUrl');
-                            var b = await r.blob();
-                            var reader = new FileReader();
-                            reader.onloadend = function(){
-                              var base64 = reader.result.split(',')[1] || '';
-                              window.AndroidTheme.saveBlobFile(base64, '$filename', b.type || '$mimeType');
-                            };
-                            reader.readAsDataURL(b);
-                          } catch(e){ console.error('blob download failed', e); }
-                        })()
-                    """.trimIndent(), null)
-                } else {
-                    try {
-                        val req = DownloadManager.Request(Uri.parse(downloadUrl)).apply {
-                            setMimeType(mimeType)
-                            addRequestHeader("Cookie", CookieManager.getInstance().getCookie(downloadUrl))
-                            addRequestHeader("User-Agent", userAgent)
-                            val filename = URLUtil.guessFileName(downloadUrl, contentDisposition, mimeType)
-                            setTitle(filename)
-                            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                            setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
-                        }
-                        getSystemService(DownloadManager::class.java).enqueue(req)
-                        Toast.makeText(this@WebViewActivity, getString(R.string.download_started), Toast.LENGTH_SHORT).show()
-                    } catch (_: Exception) {
-                        Toast.makeText(this@WebViewActivity, getString(R.string.download_error), Toast.LENGTH_SHORT).show()
-                    }
-                }
+                downloads.onDownloadStart(webView, downloadUrl, userAgent, contentDisposition, mimeType)
             }
 
             loadUrl(ssoReturnUrl(intent) ?: url)
@@ -970,13 +569,12 @@ class WebViewActivity : AppCompatActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        val isDark = (newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-                Configuration.UI_MODE_NIGHT_YES
+        val isDark = isDarkMode(newConfig)
         webView.evaluateJavascript(
             "if(window.__setDarkMode)window.__setDarkMode($isDark)", null
         )
         // Portrait edge-to-edge follows the orientation.
-        applySystemBars()
+        systemBars.paint()
         injectSafeAreaInsets()
     }
 
@@ -1052,85 +650,12 @@ class WebViewActivity : AppCompatActivity() {
         }
     }
 
-    private fun applySystemBarColor(hexColor: String) {
-        themeBarColor = try { Color.parseColor(hexColor) } catch (_: Exception) { return }
-        applySystemBars()
-    }
-
-    /** Lays the bar backgrounds over the system bars: the status bar along
-     *  the top, the navigation bar along whichever edge it sits on (a side
-     *  one in landscape with button navigation). */
-    private fun placeBarBackgrounds(insets: androidx.core.view.WindowInsetsCompat) {
-        val status = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-        statusBarBackground.updateLayoutParams<FrameLayout.LayoutParams> { height = status.top }
-        val nav = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
-        navigationBarBackground.updateLayoutParams<FrameLayout.LayoutParams> {
-            when {
-                nav.right > 0 -> {
-                    width = nav.right
-                    height = FrameLayout.LayoutParams.MATCH_PARENT
-                    gravity = Gravity.RIGHT
-                }
-                nav.left > 0 -> {
-                    width = nav.left
-                    height = FrameLayout.LayoutParams.MATCH_PARENT
-                    gravity = Gravity.LEFT
-                }
-                else -> {
-                    width = FrameLayout.LayoutParams.MATCH_PARENT
-                    height = nav.bottom
-                    gravity = Gravity.BOTTOM
-                }
-            }
-        }
-    }
-
-    /** Paints the bars in the page's colours (the navigation bar's own one
-     *  when set, else the theme colour), or leaves them transparent in
-     *  portrait edge-to-edge. The icons follow those colours either way: they
-     *  are what sits behind them whenever the page is at rest. */
-    private fun applySystemBars() {
-        val theme = themeBarColor ?: return
-        val color = ColorUtils.blendARGB(theme, Color.BLACK, barsScrim)
-        val navColor = ColorUtils.blendARGB(navBarColor ?: theme, Color.BLACK, barsScrim)
-        val edgeToEdge = isEdgeToEdgeActive()
-        statusBarBackground.setBackgroundColor(if (edgeToEdge) Color.TRANSPARENT else color)
-        navigationBarBackground.setBackgroundColor(if (edgeToEdge) Color.TRANSPARENT else navColor)
-        // The system bars themselves stay transparent over those backgrounds.
-        // With 3-button navigation the system would otherwise lay its own
-        // translucent white scrim over the navigation bar.
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            window.isNavigationBarContrastEnforced = false
-        }
-
-        val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.isAppearanceLightStatusBars = isLight(color)
-        controller.isAppearanceLightNavigationBars = isLight(navColor)
-    }
-
-    /** Same timing as the page overlay's fade (MobileCreateFab). */
-    private fun animateBarsScrim(target: Float) {
-        barsScrimAnimator?.cancel()
-        barsScrimAnimator = ValueAnimator.ofFloat(barsScrim, target).apply {
-            duration = BARS_SCRIM_MS
-            interpolator = DecelerateInterpolator()
-            addUpdateListener {
-                barsScrim = it.animatedValue as Float
-                applySystemBars()
-            }
-            start()
-        }
-    }
-
-    private fun isLight(color: Int): Boolean =
-        (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255 > 0.5
-
     private val handler = Handler(Looper.getMainLooper())
     private var backHeld = false
     private var dialogShown = false
     private val longBackRunnable = Runnable {
         dialogShown = true
-        showChangeServerDialog()
+        ChangeServerDialog.show(this@WebViewActivity)
     }
 
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
@@ -1168,224 +693,6 @@ class WebViewActivity : AppCompatActivity() {
         return super.onKeyUp(keyCode, event)
     }
 
-    private fun isDarkMode(): Boolean {
-        return (resources.configuration.uiMode and
-                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
-    }
-
-    /** True when we're running on Android TV / leanback (Nvidia Shield,
-     *  Chromecast w/ Google TV, Mi Box, etc). Used to switch the webapp
-     *  into the read-friendly TV viewer on boot. */
-    private fun isTelevision(): Boolean {
-        val uiMode = resources.configuration.uiMode and
-                android.content.res.Configuration.UI_MODE_TYPE_MASK
-        if (uiMode == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION) return true
-        return packageManager.hasSystemFeature("android.software.leanback")
-    }
-
-    private fun showChangeServerDialog() {
-        val dark = isDarkMode()
-        val dialog = android.app.Dialog(this)
-        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-
-        val dp = resources.displayMetrics.density
-        val pad = (24 * dp).toInt()
-        val padSmall = (16 * dp).toInt()
-        val indigo = Color.parseColor("#6366f1")
-        val violet = Color.parseColor("#7c3aed")
-
-        val cardColor = if (dark) Color.parseColor("#282828") else Color.WHITE
-        val titleColor = if (dark) Color.parseColor("#e5e7eb") else Color.parseColor("#1f2937")
-        val msgColor = if (dark) Color.parseColor("#9ca3af") else Color.parseColor("#6b7280")
-        val iconCircleColor = if (dark) Color.parseColor("#2d2644") else Color.parseColor("#f0e8ff")
-        val cancelBgColor = if (dark) Color.parseColor("#363636") else Color.parseColor("#f3f4f6")
-        val cancelTextColor = if (dark) Color.parseColor("#9ca3af") else Color.parseColor("#6b7280")
-
-        // Card container
-        val card = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(pad, pad, pad, pad)
-            val bg = android.graphics.drawable.GradientDrawable().apply {
-                setColor(cardColor)
-                cornerRadius = 20 * dp
-            }
-            background = bg
-            elevation = 16 * dp
-        }
-
-        // Icon circle
-        val iconBg = android.widget.FrameLayout(this).apply {
-            val size = (48 * dp).toInt()
-            layoutParams = android.widget.LinearLayout.LayoutParams(size, size).apply {
-                gravity = android.view.Gravity.CENTER_HORIZONTAL
-                bottomMargin = padSmall
-            }
-            val circle = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(iconCircleColor)
-            }
-            background = circle
-        }
-        val iconView = android.widget.ImageView(this).apply {
-            setImageResource(R.drawable.ic_swap_server)
-            val iconPad = (12 * dp).toInt()
-            setPadding(iconPad, iconPad, iconPad, iconPad)
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-            )
-        }
-        iconBg.addView(iconView)
-        card.addView(iconBg)
-
-        // Title
-        val title = android.widget.TextView(this).apply {
-            text = getString(R.string.dialog_change_server)
-            textSize = 18f
-            setTextColor(titleColor)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            gravity = android.view.Gravity.CENTER
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (8 * dp).toInt() }
-        }
-        card.addView(title)
-
-        // Message
-        val msg = android.widget.TextView(this).apply {
-            text = getString(R.string.dialog_change_message)
-            textSize = 14f
-            setTextColor(msgColor)
-            gravity = android.view.Gravity.CENTER
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = pad }
-        }
-        card.addView(msg)
-
-        // Buttons row
-        val row = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.HORIZONTAL
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-
-        // Cancel button
-        val btnCancel = android.widget.TextView(this).apply {
-            text = getString(R.string.dialog_no)
-            textSize = 15f
-            setTextColor(cancelTextColor)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, (12 * dp).toInt(), 0, (12 * dp).toInt())
-            val bg = android.graphics.drawable.GradientDrawable().apply {
-                setColor(cancelBgColor)
-                cornerRadius = 12 * dp
-            }
-            background = bg
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
-            ).apply { marginEnd = (6 * dp).toInt() }
-            setOnClickListener { dialog.dismiss() }
-        }
-        row.addView(btnCancel)
-
-        // Confirm button with gradient
-        val btnConfirm = android.widget.TextView(this).apply {
-            text = getString(R.string.dialog_yes)
-            textSize = 15f
-            setTextColor(Color.WHITE)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, (12 * dp).toInt(), 0, (12 * dp).toInt())
-            val bg = android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(indigo, violet)
-            ).apply { cornerRadius = 12 * dp }
-            background = bg
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
-            ).apply { marginStart = (6 * dp).toInt() }
-            setOnClickListener {
-                dialog.dismiss()
-                getSharedPreferences("glasskeep", MODE_PRIVATE)
-                    .edit()
-                    .remove("server_url")
-                    .remove(MainActivity.KEY_URL_VETTED)
-                    .apply()
-                val intent = Intent(this@WebViewActivity, MainActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                startActivity(intent)
-                finish()
-            }
-        }
-        row.addView(btnConfirm)
-
-        card.addView(row)
-
-        dialog.setContentView(card)
-        dialog.window?.setLayout(
-            (resources.displayMetrics.widthPixels * 0.85).toInt(),
-            android.view.WindowManager.LayoutParams.WRAP_CONTENT
-        )
-        dialog.show()
-    }
-
-    /**
-     * Fired on the main thread when UpdateManager's background check
-     * confirms a newer APK is published. Posts the update-available
-     * notification, requesting the POST_NOTIFICATIONS runtime grant
-     * first on Android 13+ if needed. If the user denies, the update
-     * path stays dormant until they enable notifications themselves.
-     */
-    /** Push the latest detected release to the SPA so the Settings
-     *  panel can render its themed "Version X.Y.Z available" card.
-     *  Posted on the WebView's UI thread; harmless if the page hasn't
-     *  registered the callback (e.g. the user is still on the
-     *  pre-WebView setup flow) — evaluateJavascript no-ops in that
-     *  case. */
-    private fun notifyJsUpdateAvailable(release: com.glasskeep.app.update.ReleaseInfo) {
-        val payload = jsonReleaseStr(release.versionName, release.assetName, release.downloadUrl)
-        val js = "if (typeof window.__glasskeepUpdateAvailable === 'function') { try { window.__glasskeepUpdateAvailable($payload); } catch (e) {} }"
-        webView.post { webView.evaluateJavascript(js, null) }
-    }
-
-    private fun notifyJsUpToDate() {
-        val js = "if (typeof window.__glasskeepUpdateUpToDate === 'function') { try { window.__glasskeepUpdateUpToDate(); } catch (e) {} }"
-        webView.post { webView.evaluateJavascript(js, null) }
-    }
-
-    /** Tiny manual JSON serialiser — avoids dragging org.json in just
-     *  to package three strings, while still escaping the few chars
-     *  that would otherwise break out of the JSON literal. */
-    private fun jsonReleaseStr(version: String, asset: String, url: String): String {
-        fun esc(s: String): String = s
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-        return "{\"version\":\"${esc(version)}\",\"assetName\":\"${esc(asset)}\",\"downloadUrl\":\"${esc(url)}\"}"
-    }
-
-    private fun postUpdateNotification(release: com.glasskeep.app.update.ReleaseInfo) {
-        if (isFinishing || isDestroyed) return
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-        ) {
-            pendingUpdateRelease = release
-            updateNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            return
-        }
-        com.glasskeep.app.update.UpdateNotifier.show(this, release)
-    }
-
     // Track foreground state so ReminderAlarmReceiver can skip the system
     // notification while the app is open (the in-app/SSE notification
     // already shows it) — avoids a visible duplicate.
@@ -1403,25 +710,8 @@ class WebViewActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         netDebug?.stop()
-        barsScrimAnimator?.cancel()
+        if (this::systemBars.isInitialized) systemBars.release()
         super.onDestroy()
-    }
-
-    // Ensure the POST_NOTIFICATIONS grant (Android 13+) so a fired reminder
-    // can actually post its notification. Asked at most once per session.
-    private fun ensureReminderNotificationPermission() {
-        if (isFinishing || isDestroyed || reminderPermissionAsked) return
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-        ) {
-            reminderPermissionAsked = true
-            try {
-                reminderNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } catch (e: Exception) {
-                // launcher unavailable (activity tearing down) — ignore
-            }
-        }
     }
 
     /**
@@ -1444,86 +734,6 @@ class WebViewActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * window.AndroidReminders — local reminder scheduling for the WebView
-     * (Web Push is unavailable here). Methods run on a binder thread;
-     * AlarmManager + SharedPreferences are thread-safe, but any UI work
-     * (permission prompt) is marshalled back to the main thread.
-     */
-    inner class RemindersBridge {
-        @JavascriptInterface
-        fun isSupported(): Boolean = true
-
-        @JavascriptInterface
-        fun schedule(noteId: String?, triggerAtMillis: String?, title: String?, body: String?) {
-            val id = noteId ?: return
-            val at = triggerAtMillis?.toLongOrNull() ?: return
-            com.glasskeep.app.reminders.ReminderScheduler.schedule(
-                applicationContext, id, at, title ?: "", body ?: "",
-            )
-            runOnUiThread { ensureReminderNotificationPermission() }
-        }
-
-        @JavascriptInterface
-        fun cancel(noteId: String?) {
-            val id = noteId ?: return
-            com.glasskeep.app.reminders.ReminderScheduler.cancel(applicationContext, id)
-        }
-
-        @JavascriptInterface
-        fun syncAll(json: String?) {
-            val raw = json ?: return
-            val items = ArrayList<com.glasskeep.app.reminders.ReminderScheduler.ReminderItem>()
-            try {
-                val arr = org.json.JSONArray(raw)
-                for (i in 0 until arr.length()) {
-                    val o = arr.getJSONObject(i)
-                    val id = o.optString("noteId")
-                    val at = o.optLong("t")
-                    if (id.isBlank() || at <= 0L) continue
-                    items.add(
-                        com.glasskeep.app.reminders.ReminderScheduler.ReminderItem(
-                            id, at, o.optString("title"), o.optString("body"),
-                        )
-                    )
-                }
-            } catch (e: Exception) {
-                return
-            }
-            com.glasskeep.app.reminders.ReminderScheduler.syncAll(applicationContext, items)
-            if (items.isNotEmpty()) runOnUiThread { ensureReminderNotificationPermission() }
-        }
-
-        /**
-         * Hand the current auth token to native so the background sync
-         * (ReminderSyncWorker) can poll the server while the app is closed.
-         * Empty string on sign-out. Stored in SharedPreferences; the worker
-         * reads it alongside server_url.
-         */
-        @JavascriptInterface
-        fun setAuth(token: String?) {
-            com.glasskeep.app.reminders.ReminderSyncWorker.setAuthToken(applicationContext, token ?: "")
-        }
-
-        /**
-         * Post a reminder's system notification immediately. Called from the
-         * web app's SSE handler when a reminder arrives while the app is
-         * BACKGROUNDED (not foreground) — the in-app card would be invisible,
-         * so we surface a real system notification instead, driven by the live
-         * SSE connection (no push service / no Google needed). Foreground stays
-         * in-app only. Uses the same note id as the local-alarm path, so the
-         * two collapse into one if both ever fire.
-         */
-        @JavascriptInterface
-        fun notifyNow(noteId: String?, title: String?, body: String?) {
-            val id = noteId ?: return
-            if (id.isBlank()) return
-            com.glasskeep.app.reminders.ReminderNotifier.show(
-                applicationContext, id, title ?: "", body ?: "",
-            )
-        }
-    }
-
     companion object {
         // Read by ReminderAlarmReceiver (possibly from another thread).
         @Volatile
@@ -1536,9 +746,5 @@ class WebViewActivity : AppCompatActivity() {
         // Single sign-on outcome as a query string, from SsoReturnActivity.
         const val EXTRA_SSO_OUTCOME = "ssoOutcome"
         private const val SSO_CALLBACK_PATH = "/api/auth/oidc/callback"
-
-        private const val KEY_EDGE_TO_EDGE_PORTRAIT = "edge_to_edge_portrait"
-        // Matches the FAB overlay's fade (MobileCreateFab).
-        private const val BARS_SCRIM_MS = 200L
     }
 }

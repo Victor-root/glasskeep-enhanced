@@ -1,7 +1,6 @@
 package com.glasskeep.app
 
 import android.content.Intent
-import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -20,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import com.glasskeep.app.net.CleartextPolicy
 import com.glasskeep.app.ui.OnboardingPager
 import com.glasskeep.app.ui.TvBgBottom
+import com.glasskeep.app.ui.isDarkMode
 import com.glasskeep.app.ui.isTelevision
 import com.glasskeep.app.ui.theme.GlassKeepTheme
 
@@ -68,10 +68,7 @@ class MainActivity : ComponentActivity() {
         // The window draws behind transparent system bars, which show the
         // screen's background colour; the content keeps clear of them, of
         // the display cutout and of the keyboard (adjustResize).
-        drawBehindSystemBars(
-            (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-                Configuration.UI_MODE_NIGHT_YES
-        )
+        drawBehindSystemBars(isDarkMode(resources.configuration))
         setContent {
             val dark = isSystemInDarkTheme()
             // The theme can change without the activity restarting (uiMode

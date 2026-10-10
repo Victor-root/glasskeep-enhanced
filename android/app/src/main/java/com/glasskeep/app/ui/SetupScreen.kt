@@ -1,31 +1,15 @@
 package com.glasskeep.app.ui
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,234 +26,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import android.content.res.Configuration
 import com.glasskeep.app.R
 import com.glasskeep.app.net.CleartextPolicy
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
-
-// Shared palette: setup + welcome screens both pull from these so the
-// onboarding flow stays visually consistent. `internal` keeps the
-// surface scoped to this module (no public API leak).
-
-// Light theme
-internal val LightBgGradient = Brush.linearGradient(
-    colors = listOf(Color(0xFFf0e8ff), Color(0xFFe8f4fd), Color(0xFFfde8f0)),
-    start = Offset(0f, 0f),
-    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-)
-internal val LightCardBg = Color(0xFFFFFFFF)
-private val LightFloatingCardBg = Color.White.copy(alpha = 0.35f)
-internal val LightTitleColor = Color(0xFF1f2937)
-internal val LightSubtextColor = Color(0xFF6b7280)
-internal val LightBorderColor = Color(0xFFd1d5db).copy(alpha = 0.3f)
-private val LightLineColor = Color(0xFF9ca3af).copy(alpha = 0.15f)
-
-// Dark theme
-internal val DarkBgColor = Color(0xFF1a1a1a)
-internal val DarkCardBg = Color(0xFF282828)
-private val DarkFloatingCardBg = Color(0xFF1e1e28).copy(alpha = 0.65f)
-internal val DarkTitleColor = Color(0xFFe5e7eb)
-internal val DarkSubtextColor = Color(0xFF9ca3af)
-internal val DarkBorderColor = Color(0xFF4b5563).copy(alpha = 0.3f)
-private val DarkLineColor = Color(0xFF9ca3af).copy(alpha = 0.10f)
-
-internal val ButtonGradient = Brush.horizontalGradient(
-    colors = listOf(Color(0xFF6366f1), Color(0xFF7c3aed))
-)
-internal val Indigo = Color(0xFF6366f1)
-
-/** The gradient button of the onboarding screens. Focus from a remote or
- *  a keyboard rings it in white and enlarges it, so a D-pad shows where
- *  it is. */
-@Composable
-internal fun GradientButton(
-    onClick: () -> Unit,
-    shape: Shape,
-    contentPadding: PaddingValues,
-    modifier: Modifier = Modifier,
-    content: @Composable BoxScope.() -> Unit,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val focused by interactionSource.collectIsFocusedAsState()
-    Box(
-        modifier = modifier
-            .scale(if (focused) 1.04f else 1f)
-            .clip(shape)
-            .background(ButtonGradient)
-            .then(if (focused) Modifier.border(3.dp, Color.White, shape) else Modifier)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = LocalIndication.current,
-                role = Role.Button,
-                onClick = onClick,
-            )
-            .padding(contentPadding),
-        contentAlignment = Alignment.Center,
-        content = content,
-    )
-}
+import com.glasskeep.app.net.ServerCheck
+import com.glasskeep.app.net.checkGlassKeepServer
 
 // Amber, not red: an unencrypted address on your own network is allowed,
 // it is just worth knowing about. Legible on both the light card and the
 // dark TV backdrop.
 private val CleartextNoticeColor = Color(0xFFd97706)
-
-// Floating card accent colors
-private val FloatingCardColors = listOf(
-    Color(0xFF6366f1), Color(0xFFa855f7), Color(0xFF10b981),
-    Color(0xFFf59e0b), Color(0xFFf97316), Color(0xFF0ea5e9),
-    Color(0xFF84cc16), Color(0xFFec4899), Color(0xFF14b8a6),
-    Color(0xFFf43f5e),
-)
-
-private data class FloatingCard(
-    val xFraction: Float,
-    val yFraction: Float,
-    val rotation: Float,
-    val colorIndex: Int,
-    val durationMs: Int,
-    val delayMs: Int,
-    val widthDp: Dp
-)
-
-private val floatingCards = listOf(
-    FloatingCard(0.05f, 0.08f, -12f, 0, 7000, 0, 110.dp),
-    FloatingCard(0.70f, 0.05f, 8f, 1, 8000, 500, 100.dp),
-    FloatingCard(0.85f, 0.22f, -6f, 2, 9000, 1200, 95.dp),
-    FloatingCard(0.02f, 0.35f, 10f, 3, 10000, 800, 105.dp),
-    FloatingCard(0.75f, 0.42f, -15f, 4, 8500, 2000, 90.dp),
-    FloatingCard(0.10f, 0.62f, 5f, 5, 9500, 1500, 100.dp),
-    FloatingCard(0.80f, 0.65f, -8f, 6, 7500, 3000, 95.dp),
-    FloatingCard(0.00f, 0.82f, 13f, 7, 10500, 600, 110.dp),
-    FloatingCard(0.65f, 0.85f, -10f, 8, 11000, 2500, 85.dp),
-    FloatingCard(0.35f, 0.92f, 7f, 9, 8000, 1800, 100.dp),
-)
-
-@Composable
-internal fun FloatingCardsBackground(dark: Boolean) {
-    val transition = rememberInfiniteTransition(label = "float")
-    val cardBg = if (dark) DarkFloatingCardBg else LightFloatingCardBg
-    val lineColor = if (dark) DarkLineColor else LightLineColor
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        floatingCards.forEach { card ->
-            val animOffset by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = -18f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(
-                        durationMillis = card.durationMs,
-                        delayMillis = card.delayMs,
-                        easing = LinearEasing
-                    ),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "card_${card.colorIndex}"
-            )
-
-            val accentColor = FloatingCardColors[card.colorIndex]
-
-            Box(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier
-                        .offset(x = (card.xFraction * 300).dp, y = (card.yFraction * 700).dp)
-                        .offset(y = animOffset.dp)
-                        .rotate(card.rotation)
-                        .width(card.widthDp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(cardBg)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(3.dp)
-                            .background(accentColor.copy(alpha = 0.7f))
-                    )
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(0.7f)
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(accentColor.copy(alpha = 0.2f))
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(0.9f)
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(lineColor)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(0.6f)
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(lineColor)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(0.75f)
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(lineColor)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** True on Android TV / leanback devices — matches the logic
- *  WebViewActivity.kt uses to flip the WebView into TV mode. We rely
- *  on it to swap the setup screen's theme to a dark-violet 10-foot
- *  layout (same vibe as the in-app TvLogin) without touching the
- *  phone / tablet experience. */
-@Composable
-internal fun isTelevision(): Boolean {
-    val ctx = LocalContext.current
-    val uiMode = ctx.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
-    if (uiMode == Configuration.UI_MODE_TYPE_TELEVISION) return true
-    return ctx.packageManager.hasSystemFeature("android.software.leanback")
-}
-
-// TV theme — mirrors the in-app TvLogin React component (dark radial
-// gradient backdrop, violet→pink brand title, glass card, gradient
-// submit button). Used only when isTelevision() returns true.
-private val TvBgTop = Color(0xFF1a1530)
-private val TvBgMid = Color(0xFF0b0d12)
-internal val TvBgBottom = Color(0xFF06070b)
-private val TvCardBg = Color(0xFF0F1119).copy(alpha = 0.85f)
-private val TvCardBorder = Color(0xFFffffff).copy(alpha = 0.08f)
-private val TvTitleStart = Color(0xFFc4b5fd) // violet-300
-private val TvTitleEnd = Color(0xFFf9a8d4)   // pink-300
-private val TvSubtextColor = Color(0xFF9ca3af)
-private val TvBodyColor = Color(0xFFf9fafb)
-private val TvAccent = Color(0xFFa78bfa) // violet-400 — focus / accent
 
 @Composable
 fun SetupScreen(initialUrl: String = "", onConnect: (String) -> Unit) {
@@ -292,6 +65,10 @@ fun SetupScreen(initialUrl: String = "", onConnect: (String) -> Unit) {
     // it is allowed: on your own network it is a deliberate choice, and
     // the person making it should know they are making it.
     val cleartextNotice = url.trim().startsWith("http://", ignoreCase = true)
+    val onUrlChange: (String) -> Unit = {
+        url = it
+        error = null
+    }
 
     val doConnect: () -> Unit = {
         val trimmed = url.trim().trimEnd('/')
@@ -341,7 +118,7 @@ fun SetupScreen(initialUrl: String = "", onConnect: (String) -> Unit) {
     if (isTv) {
         TvSetupScreen(
             url = url,
-            onUrlChange = { url = it; error = null },
+            onUrlChange = onUrlChange,
             error = error,
             cleartextNotice = cleartextNotice,
             loading = loading,
@@ -375,14 +152,7 @@ fun SetupScreen(initialUrl: String = "", onConnect: (String) -> Unit) {
                 .padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.glasskeep_logo),
-                contentDescription = "GlassKeep",
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .shadow(8.dp, RoundedCornerShape(18.dp))
-            )
+            GlassKeepLogo(size = 80.dp, cornerRadius = 18.dp, elevation = 8.dp)
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -408,233 +178,103 @@ fun SetupScreen(initialUrl: String = "", onConnect: (String) -> Unit) {
                     .background(cardBg)
                     .padding(24.dp)
             ) {
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = {
-                        url = it
-                        error = null
-                    },
-                    label = { Text(stringResource(R.string.setup_label)) },
-                    placeholder = { Text(stringResource(R.string.setup_placeholder)) },
-                    singleLine = true,
-                    isError = error != null,
-                    supportingText = {
-                        if (error != null) {
-                            Text(error!!, color = Color(0xFFdc2626))
-                        } else if (cleartextNotice) {
-                            Text(
-                                stringResource(R.string.setup_cleartext_notice),
-                                color = CleartextNoticeColor,
-                                fontSize = 12.sp
-                            )
-                        } else {
-                            Text(
-                                stringResource(R.string.setup_hint),
-                                color = subtextColor,
-                                fontSize = 12.sp
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Uri,
-                        imeAction = ImeAction.Go
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onGo = { doConnect() }
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = textColor,
-                        unfocusedTextColor = textColor,
-                        focusedBorderColor = Indigo,
-                        unfocusedBorderColor = borderColor,
-                        focusedLabelColor = Indigo,
-                        unfocusedLabelColor = subtextColor,
-                        focusedPlaceholderColor = subtextColor,
-                        unfocusedPlaceholderColor = subtextColor,
-                        cursorColor = Indigo
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                ServerUrlField(
+                    url = url,
+                    onUrlChange = onUrlChange,
+                    error = error,
+                    cleartextNotice = cleartextNotice,
+                    onGo = doConnect,
+                    textColor = textColor,
+                    accentColor = Indigo,
+                    borderColor = borderColor,
+                    subtextColor = subtextColor,
+                    errorColor = Color(0xFFdc2626),
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                GradientButton(
-                    onClick = doConnect,
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(0.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                ) {
-                    Text(
-                        stringResource(if (loading) R.string.connecting else R.string.setup_connect),
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        fontSize = 16.sp
-                    )
-                }
+                ConnectButton(loading = loading, onClick = doConnect, height = 48.dp)
             }
         }
     }
 }
 
-// TV variant of the setup screen. Same fields and the same doConnect
-// behaviour, but rendered with the dark-violet glass theme that
-// matches the in-app TvLogin React component. No floating cards
-// decoration here — keeps the layout calm at 10-foot distance.
+/** The server address field of both setup layouts, in their colours. Its
+ *  note under the field is the error, else the notice of an unencrypted
+ *  address, else the hint. */
 @Composable
-private fun TvSetupScreen(
+internal fun ServerUrlField(
     url: String,
     onUrlChange: (String) -> Unit,
     error: String?,
     cleartextNotice: Boolean,
-    loading: Boolean,
-    onConnect: () -> Unit,
+    onGo: () -> Unit,
+    textColor: Color,
+    accentColor: Color,
+    borderColor: Color,
+    subtextColor: Color,
+    errorColor: Color,
 ) {
-    val brandBrush = Brush.horizontalGradient(listOf(TvTitleStart, TvTitleEnd))
-    val bgBrush = Brush.radialGradient(
-        colors = listOf(TvBgTop, TvBgMid, TvBgBottom),
-        center = Offset(0.2f, 0f),
-        radius = 1800f
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(bgBrush),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(0.55f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.glasskeep_logo),
-                contentDescription = "GlassKeep",
-                modifier = Modifier
-                    .size(84.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .shadow(12.dp, RoundedCornerShape(20.dp))
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // TextStyle.brush (Compose 1.4+) fills the glyphs with the
-            // gradient — same effect the web brand uses.
-            Text(
-                text = "GlassKeep TV",
-                style = TextStyle(
-                    brush = brandBrush,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold
+    OutlinedTextField(
+        value = url,
+        onValueChange = onUrlChange,
+        label = { Text(stringResource(R.string.setup_label)) },
+        placeholder = { Text(stringResource(R.string.setup_placeholder)) },
+        singleLine = true,
+        isError = error != null,
+        supportingText = {
+            if (error != null) {
+                Text(error, color = errorColor)
+            } else if (cleartextNotice) {
+                Text(
+                    stringResource(R.string.setup_cleartext_notice),
+                    color = CleartextNoticeColor,
+                    fontSize = 12.sp
                 )
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = stringResource(R.string.setup_subtitle),
-                fontSize = 13.sp,
-                color = TvSubtextColor
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(TvCardBg)
-                    .padding(24.dp)
-            ) {
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = onUrlChange,
-                    label = { Text(stringResource(R.string.setup_label)) },
-                    placeholder = { Text(stringResource(R.string.setup_placeholder)) },
-                    singleLine = true,
-                    isError = error != null,
-                    supportingText = {
-                        if (error != null) {
-                            Text(error, color = Color(0xFFfca5a5))
-                        } else if (cleartextNotice) {
-                            Text(
-                                stringResource(R.string.setup_cleartext_notice),
-                                color = CleartextNoticeColor,
-                                fontSize = 12.sp
-                            )
-                        } else {
-                            Text(
-                                stringResource(R.string.setup_hint),
-                                color = TvSubtextColor,
-                                fontSize = 12.sp
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Uri,
-                        imeAction = ImeAction.Go
-                    ),
-                    keyboardActions = KeyboardActions(onGo = { onConnect() }),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TvBodyColor,
-                        unfocusedTextColor = TvBodyColor,
-                        focusedBorderColor = TvAccent,
-                        unfocusedBorderColor = TvCardBorder,
-                        focusedLabelColor = TvAccent,
-                        unfocusedLabelColor = TvSubtextColor,
-                        focusedPlaceholderColor = TvSubtextColor,
-                        unfocusedPlaceholderColor = TvSubtextColor,
-                        cursorColor = TvAccent
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+            } else {
+                Text(
+                    stringResource(R.string.setup_hint),
+                    color = subtextColor,
+                    fontSize = 12.sp
                 )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                GradientButton(
-                    onClick = onConnect,
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(0.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                ) {
-                    Text(
-                        stringResource(if (loading) R.string.connecting else R.string.setup_connect),
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        fontSize = 16.sp
-                    )
-                }
             }
-        }
-    }
+        },
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Uri,
+            imeAction = ImeAction.Go
+        ),
+        keyboardActions = KeyboardActions(onGo = { onGo() }),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = textColor,
+            unfocusedTextColor = textColor,
+            focusedBorderColor = accentColor,
+            unfocusedBorderColor = borderColor,
+            focusedLabelColor = accentColor,
+            unfocusedLabelColor = subtextColor,
+            focusedPlaceholderColor = subtextColor,
+            unfocusedPlaceholderColor = subtextColor,
+            cursorColor = accentColor
+        ),
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
-private enum class ServerCheck { OK, NOT_GLASSKEEP, UNREACHABLE }
-
-private fun checkGlassKeepServer(baseUrl: String): ServerCheck =
-    try {
-        val conn = URL("$baseUrl/api/health").openConnection() as HttpURLConnection
-        conn.connectTimeout = 5000
-        conn.readTimeout = 5000
-        conn.requestMethod = "GET"
-        conn.instanceFollowRedirects = true
-        val code = conn.responseCode
-        if (code != 200) {
-            conn.disconnect()
-            ServerCheck.UNREACHABLE
-        } else {
-            val body = conn.inputStream.bufferedReader().use { it.readText() }
-            conn.disconnect()
-            val json = JSONObject(body)
-            if (json.optString("service") == "glasskeep") ServerCheck.OK
-            else ServerCheck.NOT_GLASSKEEP
-        }
-    } catch (_: Throwable) {
-        ServerCheck.UNREACHABLE
+/** The full-width Connect button of both setup layouts. */
+@Composable
+internal fun ConnectButton(loading: Boolean, onClick: () -> Unit, height: Dp) {
+    GradientButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(0.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(height),
+    ) {
+        Text(
+            stringResource(if (loading) R.string.connecting else R.string.setup_connect),
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
+            fontSize = 16.sp
+        )
     }
+}

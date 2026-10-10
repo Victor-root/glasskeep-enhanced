@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -28,6 +29,21 @@ object ReminderScheduler {
         val title: String,
         val body: String,
     )
+
+    /** The reminders as the web app and the server both list them,
+     *  [{noteId, t, title, body}]. Entries without a note or a time are
+     *  skipped; a malformed entry throws. */
+    fun parseItems(arr: JSONArray): List<ReminderItem> {
+        val items = ArrayList<ReminderItem>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            val id = o.optString("noteId")
+            val at = o.optLong("t")
+            if (id.isBlank() || at <= 0L) continue
+            items.add(ReminderItem(id, at, o.optString("title"), o.optString("body")))
+        }
+        return items
+    }
 
     private fun alarmManager(ctx: Context): AlarmManager =
         ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
