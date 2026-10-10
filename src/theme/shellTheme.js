@@ -1,7 +1,7 @@
 // Workspace ("shell") colour theme — header + sidebar chrome only.
 //
 // The actual colours live in CSS as --gk-chrome-* / --gk-statusbar token
-// overrides under `html.gk-theme-<id>` (see src/styles/globalCSS.js).
+// overrides under `html.gk-theme-<id>` (see src/styles/global/base.js).
 // GlassKeep is the DEFAULT and intentionally has NO class: it falls back to
 // the untouched :root / html.dark token blocks, so the validated default
 // renders byte-identical regardless of this module.
