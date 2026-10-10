@@ -3,7 +3,6 @@ import React, {
   useMemo,
   useRef,
   useState,
-  useLayoutEffect,
   useCallback,
   useDeferredValue,
 } from "react";
@@ -72,6 +71,8 @@ import useAiSearch from "./hooks/useAiSearch.js";
 import useMultiSelect from "./hooks/useMultiSelect.js";
 import useBulkActions from "./hooks/useBulkActions.js";
 import useLogoLibrary from "./hooks/useLogoLibrary.js";
+import useOverlayBackStack from "./hooks/useOverlayBackStack.js";
+import useSideBySide from "./hooks/useSideBySide.js";
 import useLocalLeases from "./sync/useLocalLeases.js";
 import useNoteSync from "./sync/useNoteSync.js";
 import useNotesLoader from "./sync/useNotesLoader.js";
@@ -849,127 +850,6 @@ export default function App() {
     showToast,
   });
 
-  // Side-by-side: open two selected notes simultaneously. The PRIMARY (left)
-  // pane is the existing App-hosted modal driven by useModalState/openModal:
-  // it keeps every feature wired through App. The SECONDARY (right) pane is
-  // a self-contained SecondaryNoteInstance that owns its own modal state,
-  // autosave, AI chat, and collaboration handlers. Both panes are real,
-  // independently editable note modals; closing one animates it out and the
-  // survivor recenters.
-  const [sbsSecondaryId, setSbsSecondaryId] = useState(null);
-  const [sbsClosingSide, setSbsClosingSide] = useState(null); // "left" | "right" | null
-  const [sbsBothClosing, setSbsBothClosing] = useState(false);
-  // Cuts CSS transitions on the primary modal during the final left-close
-  // handoff frame. Without it, the primary keeps its closing transform
-  // (translateX(-50%-36px) opacity:0) and would visibly transition back to
-  // centre when the SBS rules drop, a left→right kick. Only transition is
-  // suppressed; animation: noteModalIn must remain so it doesn't restart
-  // when the class is removed.
-  const [sbsHandoffNoTransition, setSbsHandoffNoTransition] = useState(false);
-  // After right-pane close cleanup, mobile survivor's animation rule drops and
-  // the base .note-modal-anim { animation: noteModalIn } would re-fire on the
-  // primary, producing a tiny close/reopen flash. Suppress for two frames.
-  const [sbsSuppressOpenReplay, setSbsSuppressOpenReplay] = useState(false);
-
-  // Android back button: push a history entry each time an overlay opens,
-  // pop entries when overlays close. Uses history.go(-n) for batch cleanup
-  // instead of looping history.back() which can navigate out of the SPA.
-  const overlayDepthRef = useRef(0);
-  const popInProgressRef = useRef(false);
-
-  const overlayOpenCount = [
-    imgViewOpen, confirmDeleteOpen, genericConfirmOpen,
-    collaborationModalOpen, showModalColorPop, showModalFmt,
-    modalKebabOpen, imageMenuOpen, logoPickerOpen, reminderPopOpen, modalTagFocused, notifCenterOpen, syncDropdownOpen, mobileSearchOpen,
-    headerMenuOpen, multiMode,
-    typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
-    noteAiOpen, changelogOpen, qrScannerOpen, sbsSecondaryId,
-  ].filter(Boolean).length;
-  const prevOverlayCountRef = useRef(0);
-
-  useEffect(() => {
-    const prev = prevOverlayCountRef.current;
-    prevOverlayCountRef.current = overlayOpenCount;
-    // Skip if this render was caused by our own popstate handler
-    if (popInProgressRef.current) { popInProgressRef.current = false; return; }
-    if (overlayOpenCount > prev) {
-      const delta = overlayOpenCount - prev;
-      for (let i = 0; i < delta; i++) window.history.pushState({ overlay: true }, "");
-      overlayDepthRef.current += delta;
-    } else if (overlayOpenCount < prev) {
-      // Overlays closed via UI — clean up history entries in one go
-      const delta = Math.min(prev - overlayOpenCount, overlayDepthRef.current);
-      if (delta > 0) {
-        overlayDepthRef.current -= delta;
-        popInProgressRef.current = true;
-        window.history.go(-delta);
-      }
-    }
-  }, [overlayOpenCount]);
-
-  // Disable pull-to-refresh when any overlay is open. Two delivery paths:
-  //   1. Native Android — the JS bridge disables the SwipeRefreshLayout.
-  //   2. Chrome PWA — html/body get overscroll-behavior:none via the
-  //      data-gk-overlay-locked attribute (defined in globalCSS.js). An
-  //      attribute rather than a class, like data-gk-scrolling: rules matching
-  //      <html>'s class list (the workspace themes) would otherwise be
-  //      re-evaluated as every overlay opens, stalling its opening animation.
-  // notifCenterOpen is part of overlayOpenCount now that closeNotifBellRef
-  // gives App.jsx a way to close the panel from the popstate handler.
-  useEffect(() => {
-    const locked = overlayOpenCount > 0;
-    document.documentElement.toggleAttribute("data-gk-overlay-locked", locked);
-    try { window.AndroidTheme?.setRefreshEnabled(!locked); } catch { /* Android bridge best-effort */ }
-  }, [overlayOpenCount]);
-
-  useEffect(() => {
-    const onPopState = () => {
-      // Skip popstate events triggered by our own history.go() cleanup
-      if (popInProgressRef.current) { popInProgressRef.current = false; return; }
-      if (overlayDepthRef.current <= 0) return;
-      overlayDepthRef.current--;
-      // Tell the count effect to skip (back button already popped the entry)
-      popInProgressRef.current = true;
-      // Close topmost overlay (highest z-index first)
-      if (qrScannerOpen) { closeQrScanner(); return; }
-      if (imgViewOpen) { setImgViewOpen(false); return; }
-      if (changelogOpen) { setChangelogOpen(false); return; }
-      if (confirmDeleteOpen) { setConfirmDeleteOpen(false); return; }
-      if (genericConfirmOpen) { setGenericConfirmOpen(false); return; }
-      if (collaborationModalOpen) { setCollaborationModalOpen(false); return; }
-      if (showModalColorPop) { setShowModalColorPop(false); return; }
-      if (showModalFmt) { setShowModalFmt(false); return; }
-      if (modalKebabOpen) { setModalKebabOpen(false); return; }
-      if (logoPickerOpen) { setLogoPickerOpen(false); return; }
-      if (imageMenuOpen) { setImageMenuOpen(false); return; }
-      if (reminderPopOpen) { setReminderPopOpen(false); return; }
-      if (modalTagFocused) { setModalTagFocused(false); return; }
-      // noteAiOpen lives INSIDE the NoteModal (open), so we close the
-      // AI panel before the note itself — otherwise back inside the
-      // AI panel would dismiss the entire note in one go.
-      if (noteAiOpen) { setNoteAiOpen(false); return; }
-      if (open) { closeModalRef.current?.(); return; }
-      if (fabOpen) { setFabOpen(false); return; }
-      if (notifCenterOpen) { closeNotifBellRef.current?.(); return; }
-      if (syncDropdownOpen) { setSyncDropdownOpen(false); return; }
-      if (mobileSearchOpen) { setSearch(""); setMobileSearchOpen(false); return; }
-      if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
-      if (multiMode) { setMultiMode(false); return; }
-      if (typographyModalOpen) { setTypographyModalOpen(false); return; }
-      if (settingsPanelOpen) { setSettingsPanelOpen(false); return; }
-      if (adminPanelOpen) { setAdminPanelOpen(false); return; }
-      if (sidebarOpen) { setSidebarOpen(false); return; }
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
-      showModalColorPop, showModalFmt, modalKebabOpen, imageMenuOpen, logoPickerOpen, reminderPopOpen, modalTagFocused,
-      notifCenterOpen, syncDropdownOpen, mobileSearchOpen,
-      headerMenuOpen, multiMode, typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
-      noteAiOpen, changelogOpen, qrScannerOpen,
-      closeQrScanner, setImgViewOpen, setConfirmDeleteOpen, setCollaborationModalOpen, setShowModalColorPop, setShowModalFmt,
-      setModalKebabOpen, setLogoPickerOpen, setImageMenuOpen, setModalTagFocused, setAdminPanelOpen, setNoteAiOpen, setMultiMode]);
-
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
     const results = [];
@@ -1105,6 +985,11 @@ export default function App() {
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Set once the side-by-side right pane has closed: the surviving primary
+  // modal's opening animation must not replay (a tiny close/reopen flash
+  // on mobile). Cleared whenever a note opens or the modal closes.
+  const [sbsSuppressOpenReplay, setSbsSuppressOpenReplay] = useState(false);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the service worker listener is re-attached each render so it always calls the latest openModal
   const openModal = (id) => {
@@ -1349,157 +1234,59 @@ export default function App() {
     return () => { delete window.__glasskeepOpenNote; };
   }, [notes]);
 
-  // SBS AI coordination — when one note opens its AI panel in SBS mode,
-  // the AI panel takes over the OPPOSITE pane's slot and the opposite
-  // note is hidden (kept mounted). Cleared on close/hide and on SBS exit.
-  const [sbsAiActiveSide, setSbsAiActiveSide] = useState(null); // null | "left" | "right"
-  // Timer that delays clearing sbsAiActiveSide so the AI close animation
-  // (620ms in NoteModal) can complete before the opposite pane reappears
-  // and the wrapper loses its absolute positioning. Cancelled immediately
-  // when the whole SBS session closes (no need to wait).
-  const sbsAiClearTimerRef = useRef(null);
-  const scheduleSbsAiClear = useCallback(() => {
-    if (sbsAiClearTimerRef.current) clearTimeout(sbsAiClearTimerRef.current);
-    sbsAiClearTimerRef.current = setTimeout(() => {
-      setSbsAiActiveSide(null);
-      sbsAiClearTimerRef.current = null;
-    }, 640); // 620ms (NoteModal aiClosing) + 20ms buffer
-  }, []);
-  // Cancel any pending delayed clear and wipe immediately (used when SBS
-  // closes so there's no zombie state left after teardown).
-  const cancelAndClearSbsAi = useCallback(() => {
-    if (sbsAiClearTimerRef.current) {
-      clearTimeout(sbsAiClearTimerRef.current);
-      sbsAiClearTimerRef.current = null;
-    }
-    setSbsAiActiveSide(null);
-  }, []);
-  useEffect(() => () => {
-    if (sbsAiClearTimerRef.current) clearTimeout(sbsAiClearTimerRef.current);
-  }, []);
+  const {
+    sbsActive, sbsSecondaryId, sbsClosingSide, sbsBothClosing,
+    sbsHandoffNoTransition,
+    sbsAiActiveSide, setSbsAiActiveSide, scheduleSbsAiClear,
+    onOpenSideBySide, requestCloseLeftPaneSBS, onSbsRightClosing, onSbsRightClosed,
+    onSecondaryAiOpen, onSecondaryAiClose, closeBothSBS,
+  } = useSideBySide({
+    openModal,
+    setSbsSuppressOpenReplay,
+    setMultiMode,
+    setSelectedIds,
+    setSidebarOpen,
+    mType,
+    flushPendingDrawingSave,
+    setOpen,
+    setActiveId,
+    setViewMode,
+    setConfirmDeleteOpen,
+    setShowModalFmt,
+    setIsModalClosing,
+  });
 
-  const onOpenSideBySide = (ids) => {
-    if (!Array.isArray(ids) || ids.length !== 2) return;
-    setMultiMode(false);
-    setSelectedIds([]);
-    setSidebarOpen(false);
-    // Add sbs-active to <body> synchronously before the React render so
-    // both panes paint with the SBS positioning CSS already in effect.
-    // Their noteModalIn keyframes compose with --note-anim-x via the SBS
-    // CSS rules, so they animate scale+slide IN PLACE at their SBS
-    // anchor positions (same animation as opening a single note).
-    document.body.classList.add("sbs-active");
-    // Open the left pane via the existing primary pipeline (full features
-    // unchanged). Open the right pane via the SecondaryNoteInstance below.
-    openModal(String(ids[0]));
-    setSbsSecondaryId(String(ids[1]));
-    setSbsClosingSide(null);
-  };
-
-  // SBS animation duration — 40ms longer than the CSS --sbs-anim (360ms) so
-  // React cleanup fires after transitions have fully settled.
-  const SBS_ANIM_MS = 400;
-
-  // Intercepts the LEFT pane's close button while in SBS mode. The trick
-  // is to NEVER tear down the primary modal here — instead we play a
-  // pure-CSS close animation on the left half, glide the right pane to
-  // centre, then in the SAME render swap the primary's active note from
-  // A → B and unmount the secondary. Because primary's `open` state
-  // never flips, there's no close-then-reopen flicker. The survivor
-  // smoothly takes over the centre slot with full single-note features.
-  const requestCloseLeftPaneSBS = useCallback(() => {
-    if (!sbsSecondaryId || sbsClosingSide) return;
-    const remaining = sbsSecondaryId;
-    cancelAndClearSbsAi();
-    setSbsClosingSide("left");
-    setTimeout(() => {
-      // Handoff: snap the primary back to centre WITHOUT transition. The
-      // SBS rules drop in the same React commit as openModal/setSbsSecondaryId,
-      // and without this snap the residual `transition: transform var(--sbs-anim)`
-      // would animate the primary from translateX(-50%-36px) back to translateX(0)
-      // — a left→right kick at the very end. Re-enable transitions after two
-      // frames so the next render has settled.
-      setSbsHandoffNoTransition(true);
-      openModal(String(remaining));
-      setSbsSecondaryId(null);
-      setSbsClosingSide(null);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setSbsHandoffNoTransition(false);
-        });
-      });
-    }, SBS_ANIM_MS);
-  }, [sbsSecondaryId, sbsClosingSide, cancelAndClearSbsAi]); // eslint-disable-line react-hooks/exhaustive-deps -- openModal is recreated on every render
-
-  // Closing the RIGHT pane: the secondary instance only signals start
-  // (via onRequestClosing) and then sits still while the shell drives
-  // both sides' transitions in lockstep. After the recenter animation
-  // finishes the shell unmounts the secondary and drops sbs-active so
-  // the primary settles into normal single-modal layout at centre.
-  const onSbsRightClosing = useCallback(() => {
-    if (sbsClosingSide) return;
-    cancelAndClearSbsAi();
-    setSbsClosingSide("right");
-    setTimeout(() => {
-      // Sticky flag: stays true while the survivor remains mounted, so the
-      // base .note-modal-anim { animation: noteModalIn } can never replay.
-      // Cleared by openModal / onOpenSideBySide / closeModal — never on a timer.
-      setSbsSuppressOpenReplay(true);
-      setSbsSecondaryId(null);
-      setSbsClosingSide(null);
-    }, SBS_ANIM_MS);
-  }, [sbsClosingSide, cancelAndClearSbsAi]);
-  // Kept for backward-compat in case the secondary ever runs its own
-  // exit animation outside SBS — currently a no-op in SBS path.
-  const onSbsRightClosed = useCallback(() => {
-    setSbsSecondaryId(null);
-    setSbsClosingSide(null);
-  }, []);
-
-  // SBS AI callbacks for the secondary (right) pane. The secondary owns
-  // its own AI state, so it must signal the shell when its AI opens or
-  // closes/hides. The shell uses these to drive sbsAiActiveSide and the
-  // body class that hides the opposite pane.
-  const onSecondaryAiOpen = useCallback(() => {
-    setSbsAiActiveSide("right");
-  }, []);
-  const onSecondaryAiClose = useCallback(() => {
-    // Like closeNoteAi/hideNoteAi for the primary: keep sbsAiActiveSide="right"
-    // alive for the AI close animation duration so the left pane stays hidden
-    // and the wrapper keeps its absolute position at the left half.
-    scheduleSbsAiClear();
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- false positive: scheduleSbsAiClear is a memoized callback never mutated
-  }, [scheduleSbsAiClear]);
-
-  // Backdrop click while in SBS mode: close BOTH notes together.
-  // Strict separation of roles:
-  //   - splitClosing → closes ONE pane, survivor recenters (NOT used here)
-  //   - sbsClosingSide → drives the survivor's recenter (NOT used here)
-  //   - isModalClosing + noteModalOut → closes the WHOLE modal (used here)
-  // body.sbs-active stays on so --note-anim-x is still set on each pane;
-  // noteModalOut composes with it and plays from each pane's own anchor
-  // position (left from -50%-12px, right from +50%+12px). The secondary
-  // is forced into closing via the forceClosing prop, which OR-s into its
-  // NoteModal's isModalClosing.
-  const MODAL_FADE_DURATION_SBS = 200; // noteModalOut 180ms + 20ms buffer
-  const closeBothSBS = useCallback(() => {
-    if (sbsBothClosing) return;
-    if (mType === "draw") flushPendingDrawingSave();
-    setSbsBothClosing(true);
-    setIsModalClosing(true);
-    setTimeout(() => {
-      setSbsAiActiveSide(null);
-      setSbsSecondaryId(null);
-      setSbsClosingSide(null);
-      setSbsBothClosing(false);
-      setOpen(false);
-      setActiveId(null);
-      setViewMode(true);
-      setConfirmDeleteOpen(false);
-      setShowModalFmt(false);
-      setIsModalClosing(false);
-    }, MODAL_FADE_DURATION_SBS);
-  }, [sbsBothClosing, mType, flushPendingDrawingSave, setActiveId, setConfirmDeleteOpen, setIsModalClosing, setOpen, setShowModalFmt, setViewMode]);
+  // Overlays in closing priority for the back button, topmost first.
+  useOverlayBackStack([
+    { open: qrScannerOpen, close: closeQrScanner },
+    { open: imgViewOpen, close: () => setImgViewOpen(false) },
+    { open: changelogOpen, close: () => setChangelogOpen(false) },
+    { open: confirmDeleteOpen, close: () => setConfirmDeleteOpen(false) },
+    { open: genericConfirmOpen, close: () => setGenericConfirmOpen(false) },
+    { open: collaborationModalOpen, close: () => setCollaborationModalOpen(false) },
+    { open: showModalColorPop, close: () => setShowModalColorPop(false) },
+    { open: showModalFmt, close: () => setShowModalFmt(false) },
+    { open: modalKebabOpen, close: () => setModalKebabOpen(false) },
+    { open: logoPickerOpen, close: () => setLogoPickerOpen(false) },
+    { open: imageMenuOpen, close: () => setImageMenuOpen(false) },
+    { open: reminderPopOpen, close: () => setReminderPopOpen(false) },
+    { open: modalTagFocused, close: () => setModalTagFocused(false) },
+    // The AI panel lives inside the note modal: back closes it first.
+    { open: noteAiOpen, close: () => setNoteAiOpen(false) },
+    { open, close: () => closeModalRef.current?.() },
+    { open: fabOpen, close: () => setFabOpen(false) },
+    { open: notifCenterOpen, close: () => closeNotifBellRef.current?.() },
+    { open: syncDropdownOpen, close: () => setSyncDropdownOpen(false) },
+    { open: mobileSearchOpen, close: () => { setSearch(""); setMobileSearchOpen(false); } },
+    { open: headerMenuOpen, close: () => setHeaderMenuOpen(false) },
+    { open: multiMode, close: () => setMultiMode(false) },
+    { open: typographyModalOpen, close: () => setTypographyModalOpen(false) },
+    { open: settingsPanelOpen, close: () => setSettingsPanelOpen(false) },
+    { open: adminPanelOpen, close: () => setAdminPanelOpen(false) },
+    { open: sidebarOpen, close: () => setSidebarOpen(false) },
+    // Closed through the panes' own close buttons.
+    { open: !!sbsSecondaryId },
+  ]);
 
   // Check if the note has been modified from initial state
   const hasNoteBeenModified = useCallback(() => {
@@ -2909,40 +2696,6 @@ export default function App() {
   const allEmpty = notes.length === 0;
 
   /** -------- Modal JSX -------- */
-  // Side-by-side mode is active whenever a secondary note id is set.
-  // Both panes render under a shared scrim overlay (the .sbs-active body
-  // class drives split-mode CSS so the two scrims align as flex siblings
-  // and each note panel keeps its native modal dimensions).
-  const sbsActive = !!sbsSecondaryId;
-
-  // Body-level classes that drive split-mode CSS:
-  //   .sbs-active            — both panes are mounted
-  //   .sbs-closing-left      — left is fading out, right glides to centre
-  //   .sbs-closing-right     — right is fading out, left glides to centre
-  // Use useLayoutEffect (not useEffect) so the class change is applied
-  // BEFORE the next paint, in the same commit cycle as data-split-* prop
-  // updates on the primary scrim. This prevents an intermediate paint
-  // where body still has sbs-active/sbs-closing-left while the primary's
-  // data-split-mode has already become undefined — the surviving right
-  // pane's anchor-x rule would briefly flip from the recenter (0) back
-  // to its default (calc(50%+gap/2)), kicking it rightward for one frame
-  // before the rule drops entirely.
-  useLayoutEffect(() => {
-    const body = document.body;
-    body.classList.toggle("sbs-active", sbsActive);
-    body.classList.toggle("sbs-closing-left", sbsActive && sbsClosingSide === "left");
-    body.classList.toggle("sbs-closing-right", sbsActive && sbsClosingSide === "right");
-    body.classList.toggle("sbs-ai-left", sbsActive && sbsAiActiveSide === "left");
-    body.classList.toggle("sbs-ai-right", sbsActive && sbsAiActiveSide === "right");
-    return () => {
-      body.classList.remove("sbs-active");
-      body.classList.remove("sbs-closing-left");
-      body.classList.remove("sbs-closing-right");
-      body.classList.remove("sbs-ai-left");
-      body.classList.remove("sbs-ai-right");
-    };
-  }, [sbsActive, sbsClosingSide, sbsAiActiveSide]);
-
   // In SBS mode the left pane's X / scrim click no longer tears down the
   // primary modal — it just animates the left half out and hands B to
   // the centre slot. Outside SBS, fall back to the regular closeModal.
