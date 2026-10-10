@@ -6,9 +6,9 @@
  * LiteLLM, OpenAI, …). The server holds the API key and the base URL.
  */
 
-import { api, getAuth, API_BASE } from "./utils/api.js";
-import { contentToPlain } from "./utils/richText.js";
-import { t, locale } from "./i18n";
+import { api, getAuth, API_BASE } from "../utils/api.js";
+import { contentToPlain } from "../utils/richText.js";
+import { t, locale } from "../i18n";
 
 function detectLang() {
   return locale;

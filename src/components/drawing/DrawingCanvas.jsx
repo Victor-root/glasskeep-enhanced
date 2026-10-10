@@ -1,9 +1,9 @@
-import { t } from "./i18n";
+import { t } from "../../i18n";
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import useDrawingHistory from './hooks/useDrawingHistory';
-import DrawingToolbar from './components/drawing/DrawingToolbar';
-import { drawSmoothPath, renderPaths } from './utils/drawingRender';
+import useDrawingHistory from '../../hooks/useDrawingHistory';
+import DrawingToolbar from './DrawingToolbar';
+import { drawSmoothPath, renderPaths } from '../../utils/drawingRender';
 
 /* ─── Hit-test: is a point within radius of any point on a path? ─── */
 function isPointNearPath(px, py, path, radius) {

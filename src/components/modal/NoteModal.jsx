@@ -39,7 +39,7 @@ const NoteViewContent = memo(function NoteViewContent({ html, noteViewRef }) {
     />
   );
 }, (prev, next) => prev.html === next.html);
-import DrawingCanvas from "../../DrawingCanvas";
+import DrawingCanvas from "../drawing/DrawingCanvas";
 import ModalHeader from "./ModalHeader.jsx";
 import ModalFooter from "./ModalFooter.jsx";
 import Sheet from "../common/Sheet.jsx";

@@ -4,6 +4,7 @@ import {
   putNote as idbPutNote,
 } from "../sync/localDb.js";
 import useDraftNote from "./useDraftNote.js";
+import { parseDrawingContent } from "../utils/drawingContent.js";
 
 /**
  * Local-first persistence of the note open in the primary modal:
@@ -65,7 +66,7 @@ export default function useNoteEditor({
   // Committed baseline: only advances when autoSaveTextNote actually succeeds
   // (IDB write + enqueue). closeModal uses this to detect unsaved diffs, so a
   // failed autosave still gets retried on close. initialModalStateRef may advance
-  // eagerly to prevent effect re-triggers — this ref is the safety net.
+  // eagerly to prevent effect re-triggers: this ref is the safety net.
   const committedBaselineRef = useRef(null);
 
   // Deferred creation of the notes opened from the creation buttons (see
@@ -111,7 +112,7 @@ export default function useNoteEditor({
     }
   }, [notes, open, activeId, mType, setMItems]);
 
-  // Flush any pending drawing debounce — shared persist logic used by both
+  // Flush any pending drawing debounce: shared persist logic used by both
   // the debounce timeout and the flush-on-close path.
   // Async: dirty flag stays active until queue write completes, closing the
   // micro-window where SSE patchSingleNote could slip through.
@@ -141,7 +142,7 @@ export default function useNoteEditor({
       ),
     );
 
-    // Persist to IDB first — hasPendingChanges() reads from this store
+    // Persist to IDB first: hasPendingChanges() reads from this store
     try {
       const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
       if (existing) {
@@ -149,12 +150,12 @@ export default function useNoteEditor({
       }
     } catch (e) {
       console.error("IndexedDB drawing flush failed:", e);
-      // IDB failed — restore pending ref so closeModal can retry
+      // IDB failed: restore pending ref so closeModal can retry
       pendingDrawingSaveRef.current = pending;
       return;
     }
 
-    // Write queue item — after this, hasPendingChanges() returns true for noteId
+    // Write queue item: after this, hasPendingChanges() returns true for noteId
     try {
       await enqueueAndSync({
         type: "patch",
@@ -163,15 +164,15 @@ export default function useNoteEditor({
       });
     } catch (e) {
       console.error("Drawing enqueue failed:", e);
-      // Enqueue failed — restore pending ref so closeModal can retry.
-      // Don't release lease on failure — keep SSE guard active.
+      // Enqueue failed: restore pending ref so closeModal can retry.
+      // Don't release lease on failure: keep SSE guard active.
       pendingDrawingSaveRef.current = pending;
       return;
     }
 
-    // IDB + enqueue both succeeded — advance committed baseline
+    // IDB + enqueue both succeeded: advance committed baseline
     prevDrawingRef.current = drawingData;
-    // Queue item exists — release this lease + prune older zombies for this note
+    // Queue item exists: release this lease + prune older zombies for this note
     releaseLocalLeaseWithPrune(noteId, leaseId);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the lease helpers only touch refs
   }, [currentUser?.id, sessionId, enqueueAndSync]);
@@ -195,13 +196,13 @@ export default function useNoteEditor({
     );
     if (prevJson === currentJson) return;
 
-    // A real draw stroke reached us — materialise the draft before we save
+    // A real draw stroke reached us: materialise the draft before we save
     // against it. The create payload will carry the new drawing, and the
     // effect returns because baselines are realigned to the current state.
     if (materializeDraftIfNeeded({ drawing: mDrawingData })) return;
     // If materialise was rejected because the draft is still empty (no
     // strokes, no caption, no metadata), keep the draft pending and skip
-    // the autosave — there's nothing to patch, and acquiring a lease /
+    // the autosave: there's nothing to patch, and acquiring a lease /
     // scheduling a flush for a non-existent server row destabilises
     // subsequent modal opens (the user reported a flaky "modal opens
     // then closes immediately" after closing an empty drawing draft).
@@ -221,14 +222,14 @@ export default function useNoteEditor({
       releaseLocalLease(prev.noteId, prev.leaseId);
     }
 
-    // Acquire a fresh lease BEFORE debounce fires — prevents SSE patchSingleNote()
+    // Acquire a fresh lease BEFORE debounce fires: prevents SSE patchSingleNote()
     // from overwriting local drawing state during the 500ms debounce window.
     const leaseId = acquireLocalLease(dirtyNoteId);
 
     // Store pending payload + lease so flush can pick it up if modal closes mid-debounce
     pendingDrawingSaveRef.current = { noteId: dirtyNoteId, drawingData: mDrawingData, leaseId };
 
-    // Debounce local-first save by 500ms — timeout calls flush which consumes
+    // Debounce local-first save by 500ms: timeout calls flush which consumes
     // and clears pendingDrawingSaveRef, so no double-execute is possible.
     const timeoutId = setTimeout(() => {
       drawingDebounceTimerRef.current = null;
@@ -257,13 +258,7 @@ export default function useNoteEditor({
     if (!n || n.type !== "draw") return;
 
     try {
-      const serverDrawingData = JSON.parse(n.content || "[]");
-      // Handle backward compatibility: if it's an array, convert to new format
-      const normalizedData = Array.isArray(serverDrawingData)
-        ? { paths: serverDrawingData, dimensions: null }
-        : serverDrawingData;
-      // Separate text body from drawing data
-      const { text: _text, ...serverCleanData } = normalizedData;
+      const { drawing: serverCleanData } = parseDrawingContent(n.content);
       const prevJson = JSON.stringify(prevDrawingRef.current || []);
       const serverJson = JSON.stringify(serverCleanData);
       if (serverJson !== prevJson) {
@@ -298,7 +293,7 @@ export default function useNoteEditor({
 
 
   // Local-first auto-save for text notes: persist to IndexedDB + enqueue patch
-  // Works for ALL text notes (not just collaborative) — mirrors drawing/checklist pattern
+  // Works for ALL text notes (not just collaborative): mirrors drawing/checklist pattern
   // If existingLeaseId is provided, this function owns that lease and releases it on
   // success. Otherwise acquires its own (used when called directly from closeModal).
   // Returns true if IDB + enqueue both succeeded, false otherwise.
@@ -325,7 +320,7 @@ export default function useNoteEditor({
       }
     } catch (e) {
       console.error("IndexedDB text auto-save failed:", e);
-      // IDB failed — don't enqueue, keep lease, signal failure
+      // IDB failed: don't enqueue, keep lease, signal failure
       return false;
     }
 
@@ -338,7 +333,7 @@ export default function useNoteEditor({
       });
     } catch (e) {
       console.error("Text enqueue failed:", e);
-      // Don't release lease on failure — keep SSE guard active
+      // Don't release lease on failure: keep SSE guard active
       return false;
     }
     // hasPendingChanges() now returns true → SSE protection via queue takes over
@@ -347,7 +342,7 @@ export default function useNoteEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the lease helpers only touch refs
   }, [enqueueAndSync, currentUser?.id, sessionId]);
 
-  // Local-first auto-save for metadata (color, tags, images) — immediate, no debounce
+  // Local-first auto-save for metadata (color, tags, images): immediate, no debounce
   // Works for text, checklist, AND draw notes (metadata fields are independent of content).
   useEffect(() => {
     if (!open || !activeId) return;
@@ -360,7 +355,7 @@ export default function useNoteEditor({
 
     if (!colorChanged && !tagsChanged && !imagesChanged) return;
 
-    // A real metadata change reached us — materialise the draft before saving.
+    // A real metadata change reached us: materialise the draft before saving.
     // The create payload carries the new metadata so the subsequent patch is
     // redundant and the effect exits.
     if (materializeDraftIfNeeded()) return;
@@ -393,7 +388,7 @@ export default function useNoteEditor({
   // NOTE: runs in BOTH view and edit mode. Toggling to view mode after a pending
   // edit used to cancel the debounce and leak the change (only a manual save or
   // closing from edit-mode would catch it). Read/write mode is a pure display
-  // concern — the underlying mBody/mTitle state is equally dirty either way.
+  // concern: the underlying mBody/mTitle state is equally dirty either way.
   useEffect(() => {
     if (!open || !activeId) return;
     if (mType !== "text" && mType !== "checklist" && mType !== "audio") return;
@@ -409,7 +404,7 @@ export default function useNoteEditor({
     const contentChanged = bodyAppliesToType && initial.content !== mBody;
     if (!titleChanged && !contentChanged) return;
 
-    // Real keystroke reached us — materialise the draft. The create carries
+    // Real keystroke reached us: materialise the draft. The create carries
     // the typed content and baselines are aligned, so the effect exits.
     if (materializeDraftIfNeeded()) return;
 
@@ -426,7 +421,7 @@ export default function useNoteEditor({
       if (titleChanged) contentPatch.title = mTitle.trim();
       if (contentChanged) contentPatch.content = mBody;
 
-      // Transfer lease ownership to autoSaveTextNote — it will release after enqueue.
+      // Transfer lease ownership to autoSaveTextNote: it will release after enqueue.
       // Advance initialModalStateRef eagerly (prevent re-trigger), but only advance
       // committedBaselineRef after confirmed IDB + enqueue success.
       const committedFields = { ...(titleChanged ? { title: mTitle.trim() } : {}), ...(contentChanged ? { content: mBody } : {}) };
@@ -536,7 +531,7 @@ export default function useNoteEditor({
 
     // If server changed and user hasn't edited locally, update initial state to server state
     // This prevents overwriting server changes when user closes without editing.
-    // Skip if the note has an active local lease — a local save (auto-save metadata,
+    // Skip if the note has an active local lease: a local save (auto-save metadata,
     // auto-save text, drawing save) is in flight and the `notes` state hasn't caught up
     // yet with the optimistic setNotes. Without this guard, the stale `notes` value
     // would briefly reset modal state, causing a visible flicker (e.g. deleted image
@@ -558,7 +553,7 @@ export default function useNoteEditor({
   // Local-first helper: persist checklist changes to IndexedDB + sync queue
   const syncChecklistItems = async (newItems) => {
     if (!activeId) return;
-    // A checklist edit is the first real action on a pending draft — materialise
+    // A checklist edit is the first real action on a pending draft: materialise
     // the note first so the create payload already contains newItems and we
     // don't enqueue a patch for a note the server has never seen. mItems in
     // closure is still the previous value here (setMItems hasn't committed
@@ -567,7 +562,7 @@ export default function useNoteEditor({
     const noteId = String(activeId);
     const nowIso = new Date().toISOString();
 
-    // Acquire lease BEFORE any async work — prevents SSE patchSingleNote() from
+    // Acquire lease BEFORE any async work: prevents SSE patchSingleNote() from
     // overwriting local checklist state during the IDB write + enqueue window.
     const leaseId = acquireLocalLease(noteId);
 
@@ -587,10 +582,10 @@ export default function useNoteEditor({
       }
     } catch (e) {
       console.error("IndexedDB checklist update failed:", e);
-      // IDB failed — don't advance baseline, keep lease, signal failure
+      // IDB failed: don't advance baseline, keep lease, signal failure
       return;
     }
-    // Enqueue for server sync — after this, hasPendingChanges() protects the note
+    // Enqueue for server sync: after this, hasPendingChanges() protects the note
     try {
       await enqueueAndSync({
         type: "patch",
@@ -599,13 +594,13 @@ export default function useNoteEditor({
       });
     } catch (e) {
       console.error("Checklist enqueue failed:", e);
-      // Don't release lease on failure — keep SSE guard active.
-      // Don't advance prevItemsRef — closeModal retry can still detect the diff.
+      // Don't release lease on failure: keep SSE guard active.
+      // Don't advance prevItemsRef: closeModal retry can still detect the diff.
       return;
     }
-    // IDB + enqueue both succeeded — advance committed baseline
+    // IDB + enqueue both succeeded: advance committed baseline
     prevItemsRef.current = newItems;
-    // Queue item exists — release this lease + prune older zombies for this note
+    // Queue item exists: release this lease + prune older zombies for this note
     releaseLocalLeaseWithPrune(noteId, leaseId);
   };
 

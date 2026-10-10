@@ -50,7 +50,7 @@ export default function useServerEvents({
     };
 
     const debouncedPatch = (noteId) => {
-      // During reload cooldown, buffer instead of dropping — the full reload
+      // During reload cooldown, buffer instead of dropping: the full reload
       // may have started BEFORE these notes existed on the server (e.g. another
       // device synced while the reload was in flight).
       if (Date.now() < reloadCooldownUntil) {
@@ -76,13 +76,13 @@ export default function useServerEvents({
           console.log("SSE connected");
           netLog("sse: open");
           // SSE onopen through a reverse proxy does NOT prove the backend is
-          // alive — the proxy accepts the TCP connection even when the backend
+          // alive: the proxy accepts the TCP connection even when the backend
           // is down. Only a real SSE data message (onmessage) is proof.
           // Trigger a health check instead to verify properly.
           if (syncEngineRef.current && !syncEngineRef.current.isRateLimited) {
             syncEngineRef.current.healthCheck();
           }
-          // On reconnection (not first connect), reload the view — but only
+          // On reconnection (not first connect), reload the view: but only
           // AFTER the sync queue has finished processing. If we reload while
           // processQueue is running, the server may return stale data (patches
           // not yet applied) and overwrite correct local state.
@@ -91,14 +91,14 @@ export default function useServerEvents({
             const waitForQueue = async () => {
               const engine = syncEngineRef.current;
               if (engine && engine._processing) {
-                // Queue still running — check again in 500ms
+                // Queue still running: check again in 500ms
                 setTimeout(waitForQueue, 500);
                 return;
               }
               // Skip reload if:
-              // 1. Server not confirmed reachable — loadNotes() would skip the
+              // 1. Server not confirmed reachable: loadNotes() would skip the
               //    server fetch and we'd go green with stale IDB data.
-              // 2. A pull is already in progress (recovery useEffect owns it) —
+              // 2. A pull is already in progress (recovery useEffect owns it):
               //    avoid duplicate reloads racing each other.
               // In both cases, the recovery useEffect handles the reload.
               if (engine && (engine.serverReachable !== true || engine.isPulling)) {
@@ -139,7 +139,7 @@ export default function useServerEvents({
         // after connect and `ping` every 25s (server/index.js). Named events do
         // NOT trigger es.onmessage (that only fires for unnamed "message"
         // events), so we listen for them explicitly. Each is written by the
-        // Node backend itself — a reverse proxy can't fabricate one — so
+        // Node backend itself: a reverse proxy can't fabricate one: so
         // receiving it proves the backend, not just the proxy, is reachable.
         // This is what breaks the "stuck offline after resuming from
         // background" deadlock: on resume the /health fetch can keep timing out
@@ -159,7 +159,7 @@ export default function useServerEvents({
           try {
             // A real SSE data message = proof the GlassKeep backend is alive.
             // This is the ONLY place we call notifyServerReachable from SSE
-            // (onopen doesn't count — the proxy can accept connections even
+            // (onopen doesn't count: the proxy can accept connections even
             // when the backend is down).
             if (syncEngineRef.current) {
               syncEngineRef.current.notifyServerReachable();
@@ -174,7 +174,7 @@ export default function useServerEvents({
           const engine = syncEngineRef.current;
           if (engine) {
             engine.notifySseDisconnected();
-            // SSE died — trigger a health check to detect server outage fast.
+            // SSE died: trigger a health check to detect server outage fast.
             // healthCheck() has built-in throttling (3s min gap) so rapid SSE
             // errors won't flood the server.
             if (!engine.isRateLimited) {
@@ -228,7 +228,7 @@ export default function useServerEvents({
     const startPolling = () => {
       pollInterval = setInterval(() => {
         if (!es || es.readyState === EventSource.CLOSED) {
-          // SSE is dead — do a full reload as last resort
+          // SSE is dead: do a full reload as last resort
           reloadCurrentViewRef.current?.();
         }
         // When SSE is connected, polling does nothing
@@ -238,7 +238,7 @@ export default function useServerEvents({
     const pollTimeout = setTimeout(startPolling, 15000);
 
     // Visibility change: reconnect SSE if dead, kick sync engine recovery.
-    // CRITICAL: use the engine's healthCheck() — NOT a separate api("/health") —
+    // CRITICAL: use the engine's healthCheck(): NOT a separate api("/health"):
     // so that _serverReachable gets updated. Without this, processQueue()
     // early-exits when _serverReachable===false (stuck "offline" on mobile
     // after the health-check timer chain breaks during tab suspension).
@@ -248,7 +248,7 @@ export default function useServerEvents({
 
       const engine = syncEngineRef.current;
 
-      // Run engine health check — this updates _serverReachable and
+      // Run engine health check: this updates _serverReachable and
       // auto-triggers processQueue on recovery. Also restarts the
       // health timer chain if it was broken by tab suspension.
       if (engine) {
@@ -269,7 +269,7 @@ export default function useServerEvents({
           await new Promise((r) => setTimeout(r, 1500 + i * 1500));
           ok = await engine.healthCheck(true);
         }
-        // Restart the health timer chain unconditionally — mobile browsers
+        // Restart the health timer chain unconditionally: mobile browsers
         // may have GC'd the previous setTimeout during background suspension.
         engine.restartHealthTimer();
 
@@ -278,7 +278,7 @@ export default function useServerEvents({
           connectSSE();
         }
       } else if (es && es.readyState === EventSource.CLOSED) {
-        // No engine but SSE dead — try to reconnect SSE anyway
+        // No engine but SSE dead: try to reconnect SSE anyway
         try {
           await api("/health", { token });
           connectSSE();
@@ -293,13 +293,13 @@ export default function useServerEvents({
     // Handle online/offline events
     const handleOnline = async () => {
       netLog("browser online event");
-      // Browser detected network recovery — run health check first,
+      // Browser detected network recovery: run health check first,
       // then process queue and reconnect SSE only after confirming
       // the server is reachable. Avoids racing SSE reconnect against
       // the health check that sets _serverReachable = true.
       const engine = syncEngineRef.current;
       if (engine) {
-        // force=true: same reason as in visibilitychange — the 1.5s retry
+        // force=true: same reason as in visibilitychange: the 1.5s retry
         // gap would otherwise trip the 3s throttle inside healthCheck().
         let ok = await engine.healthCheck(true);
         // On mobile, stale TCP sockets survive the offline→online transition.
@@ -325,7 +325,7 @@ export default function useServerEvents({
 
     const handleOffline = () => {
       netLog("browser offline event");
-      // Immediately tell the sync engine — don't wait for the next health check.
+      // Immediately tell the sync engine: don't wait for the next health check.
       // The browser "offline" event is instant proof the network is down.
       const engine = syncEngineRef.current;
       if (engine) {
@@ -356,7 +356,7 @@ export default function useServerEvents({
     const prev = prevSyncStateRef.current;
     prevSyncStateRef.current = syncStatus.syncState;
     if (prev === "offline" && syncStatus.syncState !== "offline" && syncStatus.syncState !== "checking") {
-      // Server just recovered — reconnect SSE immediately
+      // Server just recovered: reconnect SSE immediately
       reconnectSseRef.current?.();
       // Reload the view to pick up changes from other devices, but WAIT for
       // the local queue to drain first. Otherwise we fetch stale server data
@@ -366,7 +366,7 @@ export default function useServerEvents({
       //
       // After the initial reload, wait a settling period (3s) then reload
       // again. This gives OTHER devices time to push their pending changes
-      // (e.g. PC reordered notes while offline — it needs a few seconds to
+      // (e.g. PC reordered notes while offline: it needs a few seconds to
       // push the reorder after it also detects recovery).
       const waitThenReload = async () => {
         const engine = syncEngineRef.current;
@@ -374,13 +374,13 @@ export default function useServerEvents({
           setTimeout(waitThenReload, 500);
           return;
         }
-        // Signal that we're now pulling remote changes — keeps status "syncing"
+        // Signal that we're now pulling remote changes: keeps status "syncing"
         if (engine) await engine.beginPull();
         try {
           // First reload: get whatever the server has right now
           let ok = await reloadCurrentViewRef.current?.();
           if (!ok) {
-            // Server fetch failed — retry a few times
+            // Server fetch failed: retry a few times
             for (let i = 1; i <= 4 && !ok; i++) {
               await new Promise((r) => setTimeout(r, 2000 * i));
               ok = await reloadCurrentViewRef.current?.();

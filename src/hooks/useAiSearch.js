@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { t } from "../i18n";
-import { askAI } from "../ai";
+import { askAI } from "../ai/aiClient.js";
 import { api } from "../utils/api.js";
 
 /**
@@ -35,7 +35,7 @@ export default function useAiSearch({ token, notes }) {
     api("/user/ai/settings", { token })
       .then((data) => {
         if (!cancelled && data && typeof data.enabled === "boolean") {
-          // Effective AI availability — even if the user has it enabled,
+          // Effective AI availability: even if the user has it enabled,
           // the admin's master switch overrides everything. Custom mode
           // is not a workaround anymore (server enforces this too).
           const adminGate = data.adminAiEnabled !== false;

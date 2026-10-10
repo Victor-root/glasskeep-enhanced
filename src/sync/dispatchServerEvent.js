@@ -33,7 +33,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
     // this just makes the redirect immediate.
     window.dispatchEvent(new CustomEvent("instance-locked"));
   } else if (msg && msg.type === "instance_unlocked") {
-    // An admin unlocked the instance elsewhere — leave the unlock
+    // An admin unlocked the instance elsewhere: leave the unlock
     // screen at once (mirror of instance_locked above).
     window.dispatchEvent(new CustomEvent("instance-unlocked"));
   } else if (msg && msg.type === "note_updated" && msg.noteId) {
@@ -51,8 +51,8 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
     } catch { /* bus is best-effort */ }
   } else if (msg && msg.type === "note_access_changed" && msg.noteId) {
     // The owner changed THIS user's read/write permission on a
-    // shared note. Apply it immediately — even when the note is open
-    // and locally protected (which suppresses the generic patch) —
+    // shared note. Apply it immediately: even when the note is open
+    // and locally protected (which suppresses the generic patch):
     // by updating ONLY the `access` field, so the editor locks /
     // unlocks live without a reload and without touching content.
     const nid = String(msg.noteId);
@@ -71,7 +71,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
   } else if (msg && msg.type === "logo_deleted" && msg.id) {
     ctx.setLogoLibrary((prev) => prev.filter((l) => l.id !== msg.id));
   } else if (msg && msg.type === "notes_reordered") {
-    // Another session reordered notes — reload the full list once
+    // Another session reordered notes: reload the full list once
     // instead of fetching each note individually (avoids rate limits).
     ctx.reloadCurrentView();
   } else if (msg && msg.type === "notes_imported") {
@@ -80,7 +80,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
     // per imported note, which would be hundreds of requests.
     ctx.reloadCurrentView();
   } else if (msg && msg.type === "note_deleted" && msg.noteId) {
-    // Another session permanently deleted this note — remove locally
+    // Another session permanently deleted this note: remove locally
     const nid = String(msg.noteId);
     if (!ctx.leases.isDeleteTombstoned(nid)) {
       ctx.setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
@@ -90,7 +90,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
     }
   } else if (msg && msg.type === "note_shared") {
     // A live share notification. The bell calls markDelivered
-    // when the panel is opened — we don't ack here because the
+    // when the panel is opened: we don't ack here because the
     // server's notification_delivered broadcast would race with
     // the just-rendered card and clear it on the same tick.
     ctx.showShareToast({
@@ -122,7 +122,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
     // history entry and unread badge. metadata carries the
     // server-side id so the cross-device dismiss broadcast
     // (`notification_delivered`) can find this card in
-    // state — without it, dismissByServerIds would have
+    // state: without it, dismissByServerIds would have
     // nothing to match against.
     ctx.notify({
       type: "test",
@@ -171,7 +171,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
       },
     });
     // Android APK: if the app isn't in the foreground, the in-app
-    // card is invisible — so post a real SYSTEM notification
+    // card is invisible: so post a real SYSTEM notification
     // natively (this SSE event already reached us, so no push
     // service is needed). Foreground stays in-app only. Same note
     // id as the local-alarm path → they collapse, no duplicate.
@@ -192,7 +192,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
     // from this device.
     ctx.clearServerBackedNotifications();
   } else if (msg && msg.type === "notification_delivered" && Array.isArray(msg.ids)) {
-    // Cross-device dismissal — another tab/device (or this
+    // Cross-device dismissal: another tab/device (or this
     // one) just acknowledged these server notification ids.
     // We route through the reducer dispatcher because
     // notificationsRef hasn't necessarily caught up with a
@@ -202,7 +202,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
     // ADD action ran one microtask ago.
     ctx.dismissByServerIds(msg.ids);
   } else if (msg && msg.type === "notification_removed" && Array.isArray(msg.ids)) {
-    // Cross-device per-item removal — another tab/device
+    // Cross-device per-item removal: another tab/device
     // permanently deleted these notifications. Drop matching
     // rows from local state so the history panel stays
     // identical everywhere.
@@ -261,7 +261,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
     // to skip its outbound write, then apply state updates
     // through the same validators the initial load uses.
     if (msg.originClientId && msg.originClientId === getClientId()) {
-      // Our own write — server confirmed it, nothing else to do.
+      // Our own write: server confirmed it, nothing else to do.
     } else {
       ctx.applyRemoteUserSettings(msg.settings);
     }
@@ -291,7 +291,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
     }
   } else if (msg && msg.type === "user_ai_settings_updated" && msg.settings) {
     // Live sync of the personal AI settings (/api/user/ai/settings)
-    // — enable/mode/provider — to every other session of this
+    // enable/mode/provider: to every other session of this
     // user. Setting state directly here never re-triggers a
     // PATCH, so no echo-skip is needed beyond ignoring our own
     // write (the sender already applied it locally on success).
@@ -314,7 +314,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
     }
   } else if (msg && msg.type === "user_deleted_notification") {
     // Audit notification for OTHER admins: someone got
-    // deleted. The acting admin doesn't receive this — they
+    // deleted. The acting admin doesn't receive this: they
     // saw the success toast in the panel.
     if (ctx.isAdmin()) {
       ctx.showUserDeletedToast({
@@ -327,7 +327,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
       ctx.loadAllUsers?.();
     }
   } else if (msg && msg.type === "note_access_revoked" && msg.noteId) {
-    // Collaboration access revoked — note owner removed us.
+    // Collaboration access revoked: note owner removed us.
     const nid = String(msg.noteId);
     if (msg.copyNoteId) {
       // Grant-copy path: fetch the copy first, then swap the
@@ -336,8 +336,8 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
       (async () => {
         let copy = null;
         // A transient blip on this ONE fetch used to silently drop
-        // the note from view with nothing to replace it — the copy
-        // genuinely exists server-side, only this request failed —
+        // the note from view with nothing to replace it: the copy
+        // genuinely exists server-side, only this request failed:
         // until the next full reload quietly fixed it. Retry a
         // couple of times before falling back to a full resync.
         for (let attempt = 0; attempt < 3 && !copy; attempt++) {
@@ -352,7 +352,7 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
           }
         }
         if (!copy) {
-          // Still nothing — don't silently lose the note from view.
+          // Still nothing: don't silently lose the note from view.
           // Re-sync from the authoritative server list instead,
           // exactly what a manual refresh already does today.
           ctx.reloadCurrentView();

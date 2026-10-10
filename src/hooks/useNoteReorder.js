@@ -25,10 +25,10 @@ export default function useNoteReorder({
   /** -------- Reset note order -------- */
   const resetNoteOrder = async (overridePositions = true) => {
     // Reorder is per-user on the server (note_user_positions), so shared
-    // notes are fine to include — each participant keeps their own order.
+    // notes are fine to include: each participant keeps their own order.
     const sorted = sortNotesForOrderReset(notes);
 
-    // Acquire a lease per note BEFORE any local write — protects positions
+    // Acquire a lease per note BEFORE any local write: protects positions
     // from being overwritten by loaders / SSE until server confirms reorder.
     const noteLeases = sorted.map((n) => {
       const nid = String(n.id);
@@ -60,7 +60,7 @@ export default function useNoteReorder({
     try {
       await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds, otherIds, _reorderToken: reorderToken, client_reordered_at: new Date().toISOString() } });
     } catch {
-      // enqueue failed — leases stay active
+      // enqueue failed: leases stay active
     }
     showToast?.(t("noteOrderReset"));
   };
@@ -139,13 +139,13 @@ export default function useNoteReorder({
     }
 
 
-    // Enqueue reorder — leases are held until onSyncComplete confirms server-side.
+    // Enqueue reorder: leases are held until onSyncComplete confirms server-side.
     // Tag payload with token so onSyncComplete can find and release the leases.
     const reorderToken = holdReorderLeases(noteLeases);
     try {
       await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds: newPinned, otherIds: newOthers, _reorderToken: reorderToken, client_reordered_at: new Date().toISOString() } });
     } catch {
-      // enqueue failed — leases stay active (SSE protection maintained)
+      // enqueue failed: leases stay active (SSE protection maintained)
     }
     dragGroup.current = null;
   };

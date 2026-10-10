@@ -45,7 +45,7 @@ export default function useSession({ navigate }) {
   // on boot and whenever the tab regains focus. The user object is
   // otherwise only set at login and cached in localStorage, so a profile
   // change made on ANOTHER device (e.g. a new avatar) never showed up here
-  // — not even after Ctrl+F5, which doesn't clear localStorage. Best
+  // not even after Ctrl+F5, which doesn't clear localStorage. Best
   // effort: a failure (locked instance, offline) just keeps the cache.
   useEffect(() => {
     if (!token) return undefined;
@@ -61,7 +61,7 @@ export default function useSession({ navigate }) {
           const cur = getAuth();
           if (cur) setAuth({ ...cur, user: { ...cur.user, ...me } });
         } catch { /* localStorage unavailable */ }
-      } catch { /* offline / locked — keep the cached profile */ }
+      } catch { /* offline / locked: keep the cached profile */ }
 
       // Proactively renew the JWT while it's still valid but aging, so an
       // actively-used session never hits the expiry cliff. We decode the
@@ -70,14 +70,14 @@ export default function useSession({ navigate }) {
       //
       // NB: JWT payloads are base64URL. A plain atob() throws on '-'/'_'
       // (present in ~all tokens), which previously threw here and silently
-      // disabled renewal entirely — so tokens still died at their max age.
+      // disabled renewal entirely: so tokens still died at their max age.
       try {
         let shouldRenew = true;
         try {
           const payloadB64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
           const claims = JSON.parse(atob(payloadB64));
           if (claims?.iat && Date.now() - claims.iat * 1000 < 24 * 3600 * 1000) {
-            shouldRenew = false; // still fresh — nothing to do yet
+            shouldRenew = false; // still fresh: nothing to do yet
           }
         } catch { /* couldn't read the age → renew anyway */ }
         if (shouldRenew) {
@@ -90,7 +90,7 @@ export default function useSession({ navigate }) {
             } catch { /* localStorage unavailable */ }
           }
         }
-      } catch { /* renewal best-effort — existing token still valid */ }
+      } catch { /* renewal best-effort: existing token still valid */ }
     };
     refreshProfile();
     window.addEventListener("focus", refreshProfile);
