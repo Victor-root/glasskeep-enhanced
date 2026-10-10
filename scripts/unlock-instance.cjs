@@ -18,7 +18,6 @@
 // machine itself. See scripts/lib/secureRequest.cjs for the rule and
 // for the --ca / --insecure escape hatches.
 
-const fs = require("fs");
 const readline = require("readline");
 const {
   parseTlsArgs,
@@ -26,6 +25,11 @@ const {
   requestJson,
   TLS_USAGE,
 } = require("./lib/secureRequest.cjs");
+const {
+  envFilePath,
+  parseEnvFile,
+  isLocalHttpsEnabled,
+} = require("./lib/instanceEnv.cjs");
 
 function parseArgs(argv) {
   const out = {
@@ -68,37 +72,14 @@ function printUsage() {
   ].join("\n"));
 }
 
-// Minimal .env parser: KEY=VALUE per line, no quoting tricks. Good
-// enough for a Glass Keep install where install.sh emits the file.
-function parseEnvFile(p) {
-  const out = {};
-  if (!fs.existsSync(p)) return out;
-  const txt = fs.readFileSync(p, "utf8");
-  for (const raw of txt.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq <= 0) continue;
-    out[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
-  }
-  return out;
-}
-
 function loadConfig(args) {
-  const envFile = process.env.GLASSKEEP_ENV || "/opt/glass-keep/.env";
+  const envFile = envFilePath();
   const env = parseEnvFile(envFile);
   const port = args.port
     || Number(env.API_PORT || env.PORT)
     || 8080;
   const host = args.host || "127.0.0.1";
-  // Mirrors the server's own HTTPS check, and describes THIS machine
-  // only: usesHttps decides what that is worth for the target actually
-  // being addressed.
-  const localHttpsEnabled = Boolean(
-    env.HTTPS_ENABLED !== "false"
-    && env.SSL_CERT && env.SSL_KEY
-    && fs.existsSync(env.SSL_CERT) && fs.existsSync(env.SSL_KEY),
-  );
+  const localHttpsEnabled = isLocalHttpsEnabled(env);
   return { host, port, httpsEnabled: usesHttps({ host, localHttpsEnabled }), envFile };
 }
 
