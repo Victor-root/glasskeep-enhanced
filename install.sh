@@ -1044,6 +1044,131 @@ NODESCRIPT
     GLASSKEEP_ADMIN_LOGIN="$admin_login"
 }
 
+# ── Install steps shared by install / update / restore ────────────────────────
+# Builds the front-end with a V8 heap sized for this host.
+build_app() {
+    local label="$1"
+    info "${DIM}${MSG_HINT_LONG}${RESET}"
+    local build_heap_mb
+    build_heap_mb=$(compute_build_heap_mb)
+    step "$label" \
+        bash -c "cd '${INSTALL_DIR}' && NODE_OPTIONS='--max-old-space-size=${build_heap_mb}' npm run build"
+}
+
+# Fresh checkout of the latest release into INSTALL_DIR, with its
+# prerequisites and dependencies, built.
+install_latest_release() {
+    step "$MSG_STEP_APT"     apt-get update -qq
+    step "$MSG_STEP_PREREQ"  apt-get install -y git curl gnupg ca-certificates
+
+    install_nodejs
+
+    if [[ -d "$INSTALL_DIR" ]]; then
+        # shellcheck disable=SC2059
+        warn "$(printf "$MSG_WARN_DIR_EXISTS" "$INSTALL_DIR")"
+        rm -rf "$INSTALL_DIR"
+    fi
+
+    local latest_tag
+    latest_tag="$(latest_release_tag)"
+
+    # shellcheck disable=SC2059
+    step "$(printf "$MSG_STEP_CLONE" "$latest_tag" "$INSTALL_DIR")" \
+        git clone --depth=1 --no-single-branch --branch "$latest_tag" "$REPO_URL" "$INSTALL_DIR"
+
+    info "${DIM}${MSG_HINT_LONG}${RESET}"
+    step "$MSG_STEP_NPM" \
+        bash -c "cd '${INSTALL_DIR}' && npm install --silent"
+
+    build_app "$MSG_STEP_BUILD"
+}
+
+# Writes .env for a new install: a fresh JWT secret, the port, the
+# accounts promoted to admin by email and the HTTPS choice.
+# Args: <port> <admin_emails>
+write_env_file() {
+    local port="$1" admin_emails="$2"
+    local jwt_secret
+    jwt_secret=$(openssl rand -hex 32 2>/dev/null || cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 64)
+
+    local ssl_dir="/opt/glass-keep/ssl"
+    [[ "$SSL_MODE" == "selfsigned" ]] && generate_selfsigned_cert
+
+    cat > "$ENV_FILE" <<EOF
+NODE_ENV=production
+API_PORT=${port}
+JWT_SECRET=${jwt_secret}
+DB_FILE=${DATA_DIR}/notes.db
+ADMIN_EMAILS=${admin_emails}
+ALLOW_REGISTRATION=false
+HTTPS_ENABLED=$([[ "$SSL_MODE" == "proxy" ]] && echo "false" || echo "true")
+TRUST_PROXY=$([[ "$SSL_MODE" == "proxy" ]] && echo "true" || echo "false")
+# Optional: pull self-updates from a different branch (default: main).
+# Useful for tracking a pre-release branch or a custom fork. Restart the
+# service after changing this. Leave commented for the standard behavior.
+# UPDATE_BRANCH=main
+# Optional: cap Node's V8 heap during the in-app update's vite build.
+# Default is auto-detected from RAM + swap (50 %, between 512 MB and
+# 1 GB). Raise it if your build is unusually large; lower it if your
+# host has very little memory AND no swap.
+# UPDATE_BUILD_HEAP_MB=1024
+EOF
+    case "$SSL_MODE" in
+        selfsigned) printf 'SSL_CERT=%s/cert.pem\nSSL_KEY=%s/key.pem\n' "$ssl_dir" "$ssl_dir" >> "$ENV_FILE" ;;
+        custom)     printf 'SSL_CERT=%s\nSSL_KEY=%s\n' "$CUSTOM_CERT_PATH" "$CUSTOM_KEY_PATH"  >> "$ENV_FILE" ;;
+    esac
+    chmod 600 "$ENV_FILE"
+    # shellcheck disable=SC2059
+    success "$(printf "$MSG_ENV_CREATED" "$ENV_FILE")"
+}
+
+write_service_unit() {
+    cat > "$SERVICE_FILE" <<EOF
+[Unit]
+Description=GlassKeep — Note Manager
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=${INSTALL_DIR}
+EnvironmentFile=${ENV_FILE}
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+# One-shot unit driven by the admin panel's "Update now" button.
+# Runs as its own unit so stopping glass-keep.service does NOT kill
+# the updater half-way through. Type=oneshot keeps systemctl waiting
+# until the script returns; the main app calls it with --no-block so
+# the HTTP request returns immediately while the updater works.
+write_updater_unit() {
+    cat > "$UPDATER_SERVICE_FILE" <<EOF
+[Unit]
+Description=GlassKeep — Self-Update (one-shot)
+
+[Service]
+Type=oneshot
+WorkingDirectory=${INSTALL_DIR}
+EnvironmentFile=-${ENV_FILE}
+Environment=INSTALL_DIR=${INSTALL_DIR}
+Environment=DATA_DIR=${DATA_DIR}
+Environment=SERVICE_NAME=${SERVICE_NAME}
+ExecStart=/usr/bin/env bash ${INSTALL_DIR}/scripts/self-update.sh
+StandardOutput=journal
+StandardError=journal
+EOF
+
+    # The updater script must be executable for systemd to run it.
+    chmod +x "${INSTALL_DIR}/scripts/self-update.sh" 2>/dev/null || true
+}
+
 # ── Actions ───────────────────────────────────────────────────────────────────
 action_install() {
     section "$MSG_HDR_INSTALL"
@@ -1127,33 +1252,7 @@ action_install() {
         "${TEAL}${MSG_INFO_PORT}${RESET}${BOLD}${port}${RESET}" \
         "${TEAL}${MSG_INFO_SERVICE}${RESET}${BOLD}${SERVICE_NAME}${RESET}"
 
-    step "$MSG_STEP_APT"     apt-get update -qq
-    step "$MSG_STEP_PREREQ"  apt-get install -y git curl gnupg ca-certificates
-
-    install_nodejs
-
-    if [[ -d "$INSTALL_DIR" ]]; then
-        # shellcheck disable=SC2059
-        warn "$(printf "$MSG_WARN_DIR_EXISTS" "$INSTALL_DIR")"
-        rm -rf "$INSTALL_DIR"
-    fi
-
-    local latest_tag
-    latest_tag="$(latest_release_tag)"
-
-    # shellcheck disable=SC2059
-    step "$(printf "$MSG_STEP_CLONE" "$latest_tag" "$INSTALL_DIR")" \
-        git clone --depth=1 --no-single-branch --branch "$latest_tag" "$REPO_URL" "$INSTALL_DIR"
-
-    info "${DIM}${MSG_HINT_LONG}${RESET}"
-    step "$MSG_STEP_NPM" \
-        bash -c "cd '${INSTALL_DIR}' && npm install --silent"
-
-    info "${DIM}${MSG_HINT_LONG}${RESET}"
-    local build_heap_mb
-    build_heap_mb=$(compute_build_heap_mb)
-    step "$MSG_STEP_BUILD" \
-        bash -c "cd '${INSTALL_DIR}' && NODE_OPTIONS='--max-old-space-size=${build_heap_mb}' npm run build"
+    install_latest_release
 
     mkdir -p "$DATA_DIR"
 
@@ -1168,81 +1267,11 @@ action_install() {
     # Wipe the passphrase from this shell as soon as we're done with it.
     ENC_PASSPHRASE=""
 
-    local jwt_secret
-    jwt_secret=$(openssl rand -hex 32 2>/dev/null || cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 64)
+    write_env_file "$port" "$GLASSKEEP_ADMIN_LOGIN"
 
-    local ssl_dir="/opt/glass-keep/ssl"
-    [[ "$SSL_MODE" == "selfsigned" ]] && generate_selfsigned_cert
+    write_service_unit
 
-    cat > "$ENV_FILE" <<EOF
-NODE_ENV=production
-API_PORT=${port}
-JWT_SECRET=${jwt_secret}
-DB_FILE=${DATA_DIR}/notes.db
-ADMIN_EMAILS=${GLASSKEEP_ADMIN_LOGIN}
-ALLOW_REGISTRATION=false
-HTTPS_ENABLED=$([[ "$SSL_MODE" == "proxy" ]] && echo "false" || echo "true")
-TRUST_PROXY=$([[ "$SSL_MODE" == "proxy" ]] && echo "true" || echo "false")
-# Optional: pull self-updates from a different branch (default: main).
-# Useful for tracking a pre-release branch or a custom fork. Restart the
-# service after changing this. Leave commented for the standard behavior.
-# UPDATE_BRANCH=main
-# Optional: cap Node's V8 heap during the in-app update's vite build.
-# Default is auto-detected from RAM + swap (50 %, between 512 MB and
-# 1 GB). Raise it if your build is unusually large; lower it if your
-# host has very little memory AND no swap.
-# UPDATE_BUILD_HEAP_MB=1024
-EOF
-    case "$SSL_MODE" in
-        selfsigned) printf 'SSL_CERT=%s/cert.pem\nSSL_KEY=%s/key.pem\n' "$ssl_dir" "$ssl_dir" >> "$ENV_FILE" ;;
-        custom)     printf 'SSL_CERT=%s\nSSL_KEY=%s\n' "$CUSTOM_CERT_PATH" "$CUSTOM_KEY_PATH"  >> "$ENV_FILE" ;;
-    esac
-    chmod 600 "$ENV_FILE"
-    # shellcheck disable=SC2059
-    success "$(printf "$MSG_ENV_CREATED" "$ENV_FILE")"
-
-    cat > "$SERVICE_FILE" <<EOF
-[Unit]
-Description=GlassKeep — Note Manager
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=${INSTALL_DIR}
-EnvironmentFile=${ENV_FILE}
-ExecStart=/usr/bin/node server/index.js
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    # One-shot unit driven by the admin panel's "Update now" button.
-    # Runs as its own unit so stopping glass-keep.service does NOT kill
-    # the updater half-way through. Type=oneshot keeps systemctl waiting
-    # until the script returns; the main app calls it with --no-block so
-    # the HTTP request returns immediately while the updater works.
-    cat > "$UPDATER_SERVICE_FILE" <<EOF
-[Unit]
-Description=GlassKeep — Self-Update (one-shot)
-
-[Service]
-Type=oneshot
-WorkingDirectory=${INSTALL_DIR}
-EnvironmentFile=-${ENV_FILE}
-Environment=INSTALL_DIR=${INSTALL_DIR}
-Environment=DATA_DIR=${DATA_DIR}
-Environment=SERVICE_NAME=${SERVICE_NAME}
-ExecStart=/usr/bin/env bash ${INSTALL_DIR}/scripts/self-update.sh
-StandardOutput=journal
-StandardError=journal
-EOF
-
-    # The updater script must be executable for systemd to run it.
-    chmod +x "${INSTALL_DIR}/scripts/self-update.sh" 2>/dev/null || true
+    write_updater_unit
 
     step "$MSG_STEP_DAEMON" systemctl daemon-reload
     # shellcheck disable=SC2059
@@ -1321,11 +1350,7 @@ action_update() {
     step "$MSG_STEP_NPM_UPDATE" \
         bash -c "cd '${INSTALL_DIR}' && npm ci --silent"
 
-    info "${DIM}${MSG_HINT_LONG}${RESET}"
-    local build_heap_mb
-    build_heap_mb=$(compute_build_heap_mb)
-    step "$MSG_STEP_REBUILD" \
-        bash -c "cd '${INSTALL_DIR}' && NODE_OPTIONS='--max-old-space-size=${build_heap_mb}' npm run build"
+    build_app "$MSG_STEP_REBUILD"
 
     # Apply HTTPS setting based on user's choice
     apply_ssl_to_env
@@ -1334,22 +1359,7 @@ action_update() {
     # the "Update now" button in the admin panel. Re-writing the file
     # on every script-run keeps it in sync with the install paths and
     # bootstraps it for installs that pre-date this feature.
-    cat > "$UPDATER_SERVICE_FILE" <<EOF
-[Unit]
-Description=GlassKeep — Self-Update (one-shot)
-
-[Service]
-Type=oneshot
-WorkingDirectory=${INSTALL_DIR}
-EnvironmentFile=-${ENV_FILE}
-Environment=INSTALL_DIR=${INSTALL_DIR}
-Environment=DATA_DIR=${DATA_DIR}
-Environment=SERVICE_NAME=${SERVICE_NAME}
-ExecStart=/usr/bin/env bash ${INSTALL_DIR}/scripts/self-update.sh
-StandardOutput=journal
-StandardError=journal
-EOF
-    chmod +x "${INSTALL_DIR}/scripts/self-update.sh" 2>/dev/null || true
+    write_updater_unit
     systemctl daemon-reload
 
     # shellcheck disable=SC2059
@@ -1430,108 +1440,18 @@ action_restore() {
         "${TEAL}${MSG_INFO_PORT}${RESET}${BOLD}${port}${RESET}" \
         "${TEAL}${MSG_INFO_SERVICE}${RESET}${BOLD}${SERVICE_NAME}${RESET}"
 
-    step "$MSG_STEP_APT"     apt-get update -qq
-    step "$MSG_STEP_PREREQ"  apt-get install -y git curl gnupg ca-certificates
-
-    install_nodejs
-
-    if [[ -d "$INSTALL_DIR" ]]; then
-        # shellcheck disable=SC2059
-        warn "$(printf "$MSG_WARN_DIR_EXISTS" "$INSTALL_DIR")"
-        rm -rf "$INSTALL_DIR"
-    fi
-
-    local latest_tag
-    latest_tag="$(latest_release_tag)"
-
-    # shellcheck disable=SC2059
-    step "$(printf "$MSG_STEP_CLONE" "$latest_tag" "$INSTALL_DIR")" \
-        git clone --depth=1 --no-single-branch --branch "$latest_tag" "$REPO_URL" "$INSTALL_DIR"
-
-    info "${DIM}${MSG_HINT_LONG}${RESET}"
-    step "$MSG_STEP_NPM" \
-        bash -c "cd '${INSTALL_DIR}' && npm install --silent"
-
-    info "${DIM}${MSG_HINT_LONG}${RESET}"
-    local build_heap_mb
-    build_heap_mb=$(compute_build_heap_mb)
-    step "$MSG_STEP_BUILD" \
-        bash -c "cd '${INSTALL_DIR}' && NODE_OPTIONS='--max-old-space-size=${build_heap_mb}' npm run build"
+    install_latest_release
 
     # NB: no setup_admin, no activate_encryption — the restored notes.db
     # already carries users, settings and (if any) the encryption vault.
 
-    local jwt_secret
-    jwt_secret=$(openssl rand -hex 32 2>/dev/null || cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 64)
-
-    local ssl_dir="/opt/glass-keep/ssl"
-    [[ "$SSL_MODE" == "selfsigned" ]] && generate_selfsigned_cert
-
     # ADMIN_EMAILS left empty: the restored DB already flags the admin
     # account (is_admin=1), so no email-based promotion is needed.
-    cat > "$ENV_FILE" <<EOF
-NODE_ENV=production
-API_PORT=${port}
-JWT_SECRET=${jwt_secret}
-DB_FILE=${DATA_DIR}/notes.db
-ADMIN_EMAILS=
-ALLOW_REGISTRATION=false
-HTTPS_ENABLED=$([[ "$SSL_MODE" == "proxy" ]] && echo "false" || echo "true")
-TRUST_PROXY=$([[ "$SSL_MODE" == "proxy" ]] && echo "true" || echo "false")
-# Optional: pull self-updates from a different branch (default: main).
-# Useful for tracking a pre-release branch or a custom fork. Restart the
-# service after changing this. Leave commented for the standard behavior.
-# UPDATE_BRANCH=main
-# Optional: cap Node's V8 heap during the in-app update's vite build.
-# Default is auto-detected from RAM + swap (50 %, between 512 MB and
-# 1 GB). Raise it if your build is unusually large; lower it if your
-# host has very little memory AND no swap.
-# UPDATE_BUILD_HEAP_MB=1024
-EOF
-    case "$SSL_MODE" in
-        selfsigned) printf 'SSL_CERT=%s/cert.pem\nSSL_KEY=%s/key.pem\n' "$ssl_dir" "$ssl_dir" >> "$ENV_FILE" ;;
-        custom)     printf 'SSL_CERT=%s\nSSL_KEY=%s\n' "$CUSTOM_CERT_PATH" "$CUSTOM_KEY_PATH"  >> "$ENV_FILE" ;;
-    esac
-    chmod 600 "$ENV_FILE"
-    # shellcheck disable=SC2059
-    success "$(printf "$MSG_ENV_CREATED" "$ENV_FILE")"
+    write_env_file "$port" ""
 
-    cat > "$SERVICE_FILE" <<EOF
-[Unit]
-Description=GlassKeep — Note Manager
-After=network.target
+    write_service_unit
 
-[Service]
-Type=simple
-WorkingDirectory=${INSTALL_DIR}
-EnvironmentFile=${ENV_FILE}
-ExecStart=/usr/bin/node server/index.js
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    cat > "$UPDATER_SERVICE_FILE" <<EOF
-[Unit]
-Description=GlassKeep — Self-Update (one-shot)
-
-[Service]
-Type=oneshot
-WorkingDirectory=${INSTALL_DIR}
-EnvironmentFile=-${ENV_FILE}
-Environment=INSTALL_DIR=${INSTALL_DIR}
-Environment=DATA_DIR=${DATA_DIR}
-Environment=SERVICE_NAME=${SERVICE_NAME}
-ExecStart=/usr/bin/env bash ${INSTALL_DIR}/scripts/self-update.sh
-StandardOutput=journal
-StandardError=journal
-EOF
-
-    chmod +x "${INSTALL_DIR}/scripts/self-update.sh" 2>/dev/null || true
+    write_updater_unit
 
     step "$MSG_STEP_DAEMON" systemctl daemon-reload
     # shellcheck disable=SC2059
