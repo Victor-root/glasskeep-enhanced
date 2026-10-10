@@ -21,7 +21,6 @@ import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRi
 import { normalizeTypographyPresets } from "./utils/typographyPresets.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES, REMINDERS } from "./utils/constants.js";
-import { hasAndroidReminders, syncAndroidReminders, setAndroidReminderAuth } from "./utils/androidReminders.js";
 import TooltipPortal from "./components/common/TooltipPortal.jsx";
 import AuthShell from "./components/auth/AuthShell.jsx";
 import LoginView from "./components/auth/LoginView.jsx";
@@ -32,7 +31,6 @@ import TagSidebar from "./components/panels/TagSidebar.jsx";
 import SettingsPanel from "./components/panels/SettingsPanel.jsx";
 import AdminPanel from "./components/panels/AdminPanel.jsx";
 import FederationInviteWatcher from "./components/admin/federation/FederationInviteWatcher.jsx";
-import { acceptFederationLink, refuseFederationLink, federationErrorMessage } from "./components/admin/federation/federationActions.js";
 import SelfUpdateProgress from "./components/admin/SelfUpdateProgress.jsx";
 import ChangelogModal, { consumeChangelogShowFlag, onOpenChangelogRequest } from "./components/admin/ChangelogModal.jsx";
 import AdminView from "./components/notes/AdminView.jsx";
@@ -73,6 +71,10 @@ import useBulkActions from "./hooks/useBulkActions.js";
 import useLogoLibrary from "./hooks/useLogoLibrary.js";
 import useOverlayBackStack from "./hooks/useOverlayBackStack.js";
 import useSideBySide from "./hooks/useSideBySide.js";
+import useLaunchShortcuts from "./hooks/useLaunchShortcuts.js";
+import useNoteDeepLinks from "./hooks/useNoteDeepLinks.js";
+import useAndroidReminderBridge from "./hooks/useAndroidReminderBridge.js";
+import { runNotificationAction } from "./utils/notificationActions.js";
 import useLocalLeases from "./sync/useLocalLeases.js";
 import useNoteSync from "./sync/useNoteSync.js";
 import useNotesLoader from "./sync/useNotesLoader.js";
@@ -278,30 +280,6 @@ export default function App() {
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const openQrScanner = useCallback(() => setQrScannerOpen(true), []);
   const closeQrScanner = useCallback(() => setQrScannerOpen(false), []);
-
-  // App-shortcut entry point. The Android launcher's "Scan PC login"
-  // shortcut routes through MainActivity → WebViewActivity with
-  // ?qr=open in the URL. We consume the param (cleaning the URL so a
-  // refresh doesn't loop us back), and only actually pop the scanner
-  // when the user already has a session — otherwise the request would
-  // race with the auth bootstrap and the modal would mount on top of
-  // the login screen with no usable token. token from useState lives
-  // on this same first render, so this useEffect sees the hydrated
-  // value (no race condition with auth restore).
-  useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("qr") !== "open") return;
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("qr");
-        window.history.replaceState(null, "", url.pathname + url.search + url.hash);
-      } catch { /* non-fatal */ }
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot consume of the ?qr=open launch parameter on mount
-      if (token) setQrScannerOpen(true);
-    } catch { /* ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // ChangelogModal open state is lifted here (instead of inside the
   // component) so it can be registered with the central Android
@@ -958,40 +936,19 @@ export default function App() {
     getInitialTags: getInitialTagsForNewNote,
   });
 
-  // Android launcher shortcut entry: /?new=<type> comes from
-  // MainActivity (long-press → "Note texte" / "Liste" / "Dessin" /
-  // "Note audio"). Consume the param exactly once, clean it from the
-  // URL so a refresh doesn't loop the action, and dispatch to the
-  // matching handleDirect* helper — but only when the user already
-  // has a session, otherwise the modal would mount on top of the
-  // login screen with no way to save.
-  useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const newType = params.get("new");
-      if (!newType) return;
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("new");
-        window.history.replaceState(null, "", url.pathname + url.search + url.hash);
-      } catch { /* non-fatal */ }
-      if (!token) return;
-      const handlers = {
-        text: handleDirectText,
-        checklist: handleDirectChecklist,
-        audio: handleDirectAudio,
-      };
-      handlers[newType]?.();
-    } catch { /* ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useLaunchShortcuts({
+    token,
+    openQrScanner,
+    handleDirectText,
+    handleDirectChecklist,
+    handleDirectAudio,
+  });
 
   // Set once the side-by-side right pane has closed: the surviving primary
   // modal's opening animation must not replay (a tiny close/reopen flash
   // on mobile). Cleared whenever a note opens or the modal closes.
   const [sbsSuppressOpenReplay, setSbsSuppressOpenReplay] = useState(false);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- the service worker listener is re-attached each render so it always calls the latest openModal
   const openModal = (id) => {
     const n = notes.find((x) => String(x.id) === String(id));
     if (!n) return;
@@ -1084,155 +1041,20 @@ export default function App() {
     noteAi.restoreSavedNoteAi(id);
   };
 
-  // Handler for notification action buttons (the "Ouvrir" affordance
-  // on a shared-note toast, etc.). For an action carrying a noteId
-  // the linked note opens in the modal and the notification is
-  // dismissed. Defined as a plain function rather than useCallback so
-  // it always closes over the freshest openModal / notes references.
-  const handleNotificationAction = (notif, chosenAction) => {
-    if (!notif) return;
-    // Single-action notifications pass `notif.action`; multi-action
-    // ones pass the chosen action explicitly so this dispatcher knows
-    // which button was clicked.
-    const a = chosenAction || notif.action;
-    if (!a) return;
-    if (a.kind === "approve_pending_user" && a.pendingUserId != null) {
-      if (typeof approvePendingUser !== "function") return;
-      approvePendingUser(a.pendingUserId)
-        .then(() => {
-          // Mirror AdminPanel's post-action confirmation so the two
-          // entry points (panel button + notification action) give
-          // the same feedback.
-          showToast(t("registrationApproved"), "success", undefined, "user-check");
-          // Server already broadcasts notification_removed to every
-          // admin so the history entries vanish; explicit remove here
-          // covers the local toast in the same session.
-          removeNotification(notif.id);
-        })
-        .catch((e) => {
-          if (e && /404/.test(String(e.message))) {
-            showToast(t("pendingUserAlreadyHandled"), "warning");
-            removeNotification(notif.id);
-          }
-        });
-      return;
-    }
-    if (a.kind === "reject_pending_user" && a.pendingUserId != null) {
-      if (typeof rejectPendingUser !== "function") return;
-      rejectPendingUser(a.pendingUserId)
-        .then(() => {
-          showToast(t("registrationRejected"), "info", undefined, "user-x");
-          removeNotification(notif.id);
-        })
-        .catch((e) => {
-          if (e && /404/.test(String(e.message))) {
-            showToast(t("pendingUserAlreadyHandled"), "warning");
-            removeNotification(notif.id);
-          }
-        });
-      return;
-    }
-    // Accept / decline a cross-server pairing request straight from the
-    // notification toast. The API call lives in federationActions; this
-    // only routes the click and gives the same feedback as the panel.
-    if (a.kind === "federation_accept" && a.linkId) {
-      acceptFederationLink({ token, linkId: a.linkId })
-        .then(() => {
-          showToast(t("fedAcceptedToast"), "success", undefined, "user-check");
-          removeNotification(notif.id);
-        })
-        .catch((e) => showToast(federationErrorMessage(e), "error"));
-      return;
-    }
-    if (a.kind === "federation_refuse" && a.linkId) {
-      refuseFederationLink({ token, linkId: a.linkId })
-        .then(() => {
-          showToast(t("fedRefusedToast"), "info", undefined, "user-x");
-          removeNotification(notif.id);
-        })
-        .catch((e) => showToast(federationErrorMessage(e), "error"));
-      return;
-    }
-    if (a.kind === "start_self_update" && a.latestVersion) {
-      // Same one-click path as the admin panel's "Mettre à jour
-      // maintenant" button: surface the generic confirm dialog, then
-      // hand off to selfUpdate.startUpdate which opens the existing
-      // update-progress modal. Dismiss the notification either way so
-      // the card doesn't linger behind the confirm.
-      const latestVersion = a.latestVersion;
-      const fire = () => {
-        try {
-          selfUpdate?.startUpdate({ latestVersion });
-        } catch {
-          /* startUpdate surfaces its own errors via the modal */
-        }
-      };
-      showGenericConfirm({
-        title: t("selfUpdateConfirmTitle").replace("{version}", latestVersion),
-        message: t("selfUpdateConfirmMessage").replace(
-          "{version}",
-          latestVersion,
-        ),
-        confirmText: t("selfUpdateConfirmButton"),
-        cancelText: t("cancel"),
-        variant: "success",
-        onConfirm: fire,
-      });
-      dismissNotification(notif.id);
-      return;
-    }
-    if (a.noteId) {
-      try { openModal(String(a.noteId)); } catch { /* opening the note is best-effort */ }
-      dismissNotification(notif.id);
-    }
-  };
+  // Re-created each render so it always uses the latest openModal.
+  const handleNotificationAction = (notif, chosenAction) => runNotificationAction(notif, chosenAction, {
+    token,
+    approvePendingUser,
+    rejectPendingUser,
+    selfUpdate,
+    openModal,
+    showToast,
+    showGenericConfirm,
+    removeNotification,
+    dismissNotification,
+  });
 
-  // Tapping a Web Push reminder focuses the app (handled by push-sw.js)
-  // and posts { type: "gk-open-note", noteId } to this client; route it to
-  // the note modal. Focusing is guaranteed by the SW regardless of this.
-  // eslint-disable-next-line react-hooks/immutability -- false positive: openModal only touches pendingDraftRef, a ref from useDraftNote, when called
-  useEffect(() => {
-    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
-    const onMessage = (event) => {
-      const data = event.data;
-      if (data && data.type === "gk-open-note" && data.noteId) {
-        try { openModal(String(data.noteId)); } catch { /* opening the note is best-effort */ }
-      }
-    };
-    navigator.serviceWorker.addEventListener("message", onMessage);
-    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
-  }, [openModal]);
-
-  // Native (Android APK) reminder deep-link: a notification tap calls
-  // window.__glasskeepOpenNote(noteId) (see WebViewActivity.maybeDispatchOpenNote)
-  // to pop that note's modal — the native sibling of the SSE / Web-Push
-  // "Open" actions above (the WebView has no Web Push). On a cold start the
-  // notes list may not be hydrated when the tap arrives, so we stash the id
-  // and open it the moment the note shows up.
-  const openModalRef = useRef(openModal);
-  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by the native deep-link handler, outside render
-  openModalRef.current = openModal;
-  const pendingOpenNoteIdRef = useRef(null);
-  useEffect(() => {
-    const tryOpen = (id) => {
-      const sid = String(id);
-      if (notes.some((n) => String(n.id) === sid)) {
-        try { openModalRef.current?.(sid); } catch { /* opening the note is best-effort */ }
-        return true;
-      }
-      return false;
-    };
-    window.__glasskeepOpenNote = (id) => {
-      if (id == null || id === "") return;
-      if (!tryOpen(id)) pendingOpenNoteIdRef.current = String(id);
-    };
-    // A deep-link that arrived before notes hydrated — retry now that this
-    // effect re-ran on a notes change.
-    if (pendingOpenNoteIdRef.current && tryOpen(pendingOpenNoteIdRef.current)) {
-      pendingOpenNoteIdRef.current = null;
-    }
-    return () => { delete window.__glasskeepOpenNote; };
-  }, [notes]);
+  useNoteDeepLinks({ notes, openModal });
 
   const {
     sbsActive, sbsSecondaryId, sbsClosingSide, sbsBothClosing,
@@ -2169,39 +1991,7 @@ export default function App() {
     }
   };
 
-  // Android WebView only: mirror upcoming reminders to the native local
-  // alarm scheduler (Web Push isn't available in a WebView, so the APK
-  // fires reminders via AlarmManager instead). No-op in the PWA / browser,
-  // where Web Push handles it. Reconciles the whole set on every change
-  // (create / edit / delete, cross-device sync, app launch); the signature
-  // guard skips redundant bridge calls.
-  const androidReminderSyncRef = useRef("");
-  useEffect(() => {
-    if (!hasAndroidReminders()) return;
-    const now = Date.now();
-    const title = t("reminderNotificationTitle");
-    const items = (notes || [])
-      .filter((n) => n.reminderAt && new Date(n.reminderAt).getTime() > now)
-      .map((n) => ({
-        noteId: String(n.id),
-        t: new Date(n.reminderAt).getTime(),
-        title,
-        body: (n.title || "").trim() || t("untitledNote"),
-      }));
-    const sig = JSON.stringify(items);
-    if (sig === androidReminderSyncRef.current) return;
-    androidReminderSyncRef.current = sig;
-    syncAndroidReminders(items);
-  }, [notes]);
-
-  // Android WebView only: hand the session token to the native layer so its
-  // background reminder sync (WorkManager) can poll the server while the APK
-  // is closed — letting a reminder created on another device still fire on
-  // the phone, with no push service (no Google). No-op in the PWA / browser.
-  // Re-runs on login / logout / token refresh.
-  useEffect(() => {
-    setAndroidReminderAuth(token || "");
-  }, [token]);
+  useAndroidReminderBridge({ notes, token });
 
   /** -------- Reset note order -------- */
   const resetNoteOrder = async (overridePositions = true) => {
@@ -2341,6 +2131,7 @@ export default function App() {
   // pinned to React render tasks (fn "q") and click handlers (fn "fE").
   // useStableCallback keeps a stable identity while always invoking the
   // latest closure, so the memo holds and only the modal subtree re-renders.
+  // eslint-disable-next-line react-hooks/immutability -- false positive: openModal only touches pendingDraftRef, a ref from useDraftNote, when called
   const sOpenModal = useStableCallback(openModal);
   // eslint-disable-next-line react-hooks/immutability -- false positive: togglePin only touches freshlyCreatedNoteRef, a ref from useDraftNote, when called
   const sTogglePin = useStableCallback(togglePin);
