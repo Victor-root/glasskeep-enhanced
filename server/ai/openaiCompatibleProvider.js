@@ -101,6 +101,60 @@ async function requestInit(cfg, { body, signal, headers, deadlineMs = REQUEST_TI
   };
 }
 
+// The /chat/completions request both paths send, once the configuration
+// and the messages have been checked.
+function chatRequest(cfg, { messages, temperature, maxTokens }, stream) {
+  validateConfig(cfg);
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw new AIProviderError("Messages array is required.", { status: 400 });
+  }
+
+  return {
+    url: joinUrl(cfg.baseUrl, "/chat/completions"),
+    body: {
+      model: cfg.model,
+      messages,
+      temperature:
+        typeof temperature === "number" ? temperature : cfg.temperature ?? 0.3,
+      max_tokens:
+        typeof maxTokens === "number" ? maxTokens : cfg.maxTokens ?? 800,
+      stream,
+    },
+  };
+}
+
+// The error for a request that never got an answer (DNS, connection
+// refused, TLS, abort, a destination the guard refused, ...). Keep the
+// message generic, never leak the API key, but name a refused destination
+// so the user can act.
+function unreachableError(err, dbg) {
+  if (err?.cause?.code === "GK_PRIVATE_ADDRESS" || err?.code === "GK_PRIVATE_ADDRESS") {
+    dbg("fetch refused: private destination");
+    return new AIProviderError(guard.REASON.PRIVATE, { status: 400 });
+  }
+  const reason = err?.name === "AbortError" ? "request aborted" : "network error";
+  dbg(`fetch failed: ${err?.message || reason}`);
+  return new AIProviderError(`Failed to reach AI provider (${reason}).`, {
+    status: 502,
+  });
+}
+
+// The error for a non-2xx answer, named after what the provider said.
+function upstreamError(status, payload, dbg) {
+  const providerMessage =
+    (payload && (payload.error?.message || payload.message)) ||
+    describeProviderStatus(status);
+  dbg(`fetch !ok: ${providerMessage}`);
+  return new AIProviderError(`AI provider error: ${providerMessage}`, {
+    status: 502,
+    providerStatus: status,
+    providerBody: payload,
+  });
+}
+
+const noDebug = () => {};
+
 function buildHeaders(cfg) {
   const headers = {
     "Content-Type": "application/json",
@@ -114,22 +168,7 @@ function buildHeaders(cfg) {
 // the assistant text content. Throws AIProviderError on misconfig or
 // upstream failure — never logs the API key or full prompts.
 async function chatCompletion(cfg, { messages, temperature, maxTokens, signal } = {}) {
-  validateConfig(cfg);
-
-  if (!Array.isArray(messages) || messages.length === 0) {
-    throw new AIProviderError("Messages array is required.", { status: 400 });
-  }
-
-  const url = joinUrl(cfg.baseUrl, "/chat/completions");
-  const body = {
-    model: cfg.model,
-    messages,
-    temperature:
-      typeof temperature === "number" ? temperature : cfg.temperature ?? 0.3,
-    max_tokens:
-      typeof maxTokens === "number" ? maxTokens : cfg.maxTokens ?? 800,
-    stream: false,
-  };
+  const { url, body } = chatRequest(cfg, { messages, temperature, maxTokens }, false);
 
   let res;
   // The deadline covers the body as well as the connection, so it is only
@@ -140,16 +179,7 @@ async function chatCompletion(cfg, { messages, temperature, maxTokens, signal } 
     try {
       res = await fetch(url, init);
     } catch (err) {
-      // Network-level failure (DNS, connection refused, TLS, abort, a
-      // destination the guard refused, …). Keep the message generic, never
-      // leak the API key, but name a refused destination so the user can act.
-      if (err?.cause?.code === "GK_PRIVATE_ADDRESS" || err?.code === "GK_PRIVATE_ADDRESS") {
-        throw new AIProviderError(guard.REASON.PRIVATE, { status: 400 });
-      }
-      const reason = err?.name === "AbortError" ? "request aborted" : "network error";
-      throw new AIProviderError(`Failed to reach AI provider (${reason}).`, {
-        status: 502,
-      });
+      throw unreachableError(err, noDebug);
     }
     try {
       payload = await res.json();
@@ -160,16 +190,7 @@ async function chatCompletion(cfg, { messages, temperature, maxTokens, signal } 
     done();
   }
 
-  if (!res.ok) {
-    const providerMessage =
-      (payload && (payload.error?.message || payload.message)) ||
-      describeProviderStatus(res.status);
-    throw new AIProviderError(`AI provider error: ${providerMessage}`, {
-      status: 502,
-      providerStatus: res.status,
-      providerBody: payload,
-    });
-  }
+  if (!res.ok) throw upstreamError(res.status, payload, noDebug);
 
   const choice = Array.isArray(payload?.choices) ? payload.choices[0] : null;
   const content = choice?.message?.content ?? choice?.text ?? "";
@@ -192,23 +213,8 @@ async function* chatCompletionStream(
   cfg,
   { messages, temperature, maxTokens, signal, onDebug } = {},
 ) {
-  validateConfig(cfg);
-  const dbg = typeof onDebug === "function" ? onDebug : () => {};
-
-  if (!Array.isArray(messages) || messages.length === 0) {
-    throw new AIProviderError("Messages array is required.", { status: 400 });
-  }
-
-  const url = joinUrl(cfg.baseUrl, "/chat/completions");
-  const body = {
-    model: cfg.model,
-    messages,
-    temperature:
-      typeof temperature === "number" ? temperature : cfg.temperature ?? 0.3,
-    max_tokens:
-      typeof maxTokens === "number" ? maxTokens : cfg.maxTokens ?? 800,
-    stream: true,
-  };
+  const { url, body } = chatRequest(cfg, { messages, temperature, maxTokens }, true);
+  const dbg = typeof onDebug === "function" ? onDebug : noDebug;
 
   dbg(`fetch start url=${url} model=${cfg.model}`);
   let res;
@@ -218,30 +224,14 @@ async function* chatCompletionStream(
   try {
     res = await fetch(url, init);
   } catch (err) {
-    if (err?.cause?.code === "GK_PRIVATE_ADDRESS" || err?.code === "GK_PRIVATE_ADDRESS") {
-      dbg("fetch refused: private destination");
-      throw new AIProviderError(guard.REASON.PRIVATE, { status: 400 });
-    }
-    const reason = err?.name === "AbortError" ? "request aborted" : "network error";
-    dbg(`fetch failed: ${err?.message || reason}`);
-    throw new AIProviderError(`Failed to reach AI provider (${reason}).`, {
-      status: 502,
-    });
+    throw unreachableError(err, dbg);
   }
   dbg(`fetch resolved status=${res.status} content-type=${res.headers.get("content-type") || "?"}`);
 
   if (!res.ok) {
     let payload = null;
     try { payload = await res.json(); } catch { /* body is not JSON: fall back to the status text */ }
-    const providerMessage =
-      (payload && (payload.error?.message || payload.message)) ||
-      describeProviderStatus(res.status);
-    dbg(`fetch !ok: ${providerMessage}`);
-    throw new AIProviderError(`AI provider error: ${providerMessage}`, {
-      status: 502,
-      providerStatus: res.status,
-      providerBody: payload,
-    });
+    throw upstreamError(res.status, payload, dbg);
   }
 
   const reader = res.body.getReader();
