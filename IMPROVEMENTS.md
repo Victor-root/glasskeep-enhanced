@@ -140,8 +140,8 @@ The responsive work was then extended all the way to the living room. The **same
 #### Android wrapper changes (`android/`)
 - `AndroidManifest.xml` — leanback `<uses-feature>` flags, `LEANBACK_LAUNCHER` intent filter, banner reference
 - `tv_banner.xml` / `drawable-xxxhdpi/tv_banner.png` — the rectangular Android TV banner shown in the leanback launcher
-- `WebViewActivity.kt` — `isTelevision()` helper, KEYCODE_BACK → `history.back()`, KEYCODE_MENU → `tv-menu-key` DOM event
-- `SetupScreen.kt` — a dedicated `TvSetupScreen` Compose variant with leanback-safe spacing and gradient brand text via `TextStyle.brush`, picked at runtime by an `isTelevision()` Compose helper
+- `ui/UiMode.kt`: `isTelevision()` helper; `WebViewActivity.kt`: KEYCODE_BACK → `history.back()`, KEYCODE_MENU → `tv-menu-key` DOM event
+- `ui/TvSetupScreen.kt`: a dedicated `TvSetupScreen` Compose variant with leanback-safe spacing and gradient brand text via `TextStyle.brush`, picked at runtime in `SetupScreen.kt` by the `isTelevision()` Compose helper
 
 ### Why it matters
 The TV layout reuses the same React engine, the same auth flow, the same notes endpoint and the same Android wrapper — so a user who installs GlassKeep on their TV stick gets the same notes, the same accounts and the same sync behaviour as on their phone, just rendered for the couch. There is no separate "GlassKeep TV" app to maintain.
