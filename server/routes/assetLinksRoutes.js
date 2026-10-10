@@ -70,10 +70,13 @@ function parseExtraFingerprints(envValue) {
     .filter(Boolean);
 }
 
-function buildAssetLinksPayload() {
+// Every signing certificate allowed to use this domain's passkeys,
+// normalised. Read from the environment on each call, so a changed
+// ANDROID_EXTRA_FINGERPRINTS applies without a restart.
+function authorisedFingerprints() {
   const extra = parseExtraFingerprints(process.env.ANDROID_EXTRA_FINGERPRINTS);
 
-  // Dedupe while preserving order — defaults first, custom rebuilds
+  // Dedupe while preserving order: defaults first, custom rebuilds
   // appended in the order the operator listed them.
   const seen = new Set();
   const fingerprints = [];
@@ -83,6 +86,11 @@ function buildAssetLinksPayload() {
     seen.add(n);
     fingerprints.push(n);
   }
+  return fingerprints;
+}
+
+function buildAssetLinksPayload() {
+  const fingerprints = authorisedFingerprints();
 
   // The "get_login_creds" relation is what Android Credential Manager
   // checks for when associating passkey credentials with an APK. We
@@ -137,6 +145,7 @@ module.exports = {
     FDROID_RELEASE_FINGERPRINT,
     normaliseFingerprint,
     parseExtraFingerprints,
+    authorisedFingerprints,
     buildAssetLinksPayload,
   },
 };
