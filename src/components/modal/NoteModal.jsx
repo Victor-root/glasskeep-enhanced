@@ -1,45 +1,5 @@
-import React, { memo } from "react";
+import React from "react";
 import { t } from "../../i18n";
-import { domSelectionToCleanPlainText } from "../../utils/richTextClipboard.js";
-
-// Outbound-only clipboard hook for the read-only viewer. Mirrors what
-// editorProps.clipboardTextSerializer does for the Tiptap editor:
-// override the text/plain payload with a clean line-per-block version,
-// keep the text/html payload faithful to the rendered DOM. No change
-// to what's actually rendered on screen.
-const handleNoteViewCopy = (event) => {
-  let cleanText;
-  try {
-    cleanText = domSelectionToCleanPlainText();
-  } catch {
-    return;
-  }
-  if (cleanText == null) return;
-  try {
-    const selection = window.getSelection();
-    const range = selection?.getRangeAt(0);
-    const fragment = range?.cloneContents();
-    const container = document.createElement("div");
-    if (fragment) container.appendChild(fragment);
-    event.clipboardData.setData("text/plain", cleanText);
-    event.clipboardData.setData("text/html", container.innerHTML);
-    event.preventDefault();
-  } catch {
-    // Any failure → leave the default browser copy behaviour alone.
-  }
-};
-
-const NoteViewContent = memo(function NoteViewContent({ html, noteViewRef }) {
-  return (
-    <div
-      ref={noteViewRef}
-      className="note-content note-content--dense"
-      onCopy={handleNoteViewCopy}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
-}, (prev, next) => prev.html === next.html);
-import DrawingCanvas from "../drawing/DrawingCanvas";
 import ModalHeader from "./ModalHeader.jsx";
 import ModalFooter from "./ModalFooter.jsx";
 import Sheet from "../common/Sheet.jsx";
@@ -50,17 +10,12 @@ import CollaborationModal from "./CollaborationModal.jsx";
 import FullscreenImageViewer from "./FullscreenImageViewer.jsx";
 import OfflineCollabBanner from "./OfflineCollabBanner.jsx";
 import FederationReadOnlyBanner from "./FederationReadOnlyBanner.jsx";
-import ChecklistEditor from "../checklist/ChecklistEditor.jsx";
+import NoteModalBody from "./NoteModalBody.jsx";
+import NoteEditedStamp from "./NoteEditedStamp.jsx";
 import useModalHistory from "../../hooks/useModalHistory.js";
 import { getContentImages } from "../../utils/noteIcon.js";
-import { renderSafeMarkdown, linkifyContactsHTML } from "../../utils/markdown.jsx";
-import RichTextEditor from "../richtext/RichTextEditor.jsx";
-import { contentToHTML, serializeRichContent, isRichContent } from "../../utils/richText.js";
 import { modalBgFor, scrollColorsFor, solid, bgFor, toHex, audioAccentColor, compositeOver } from "../../utils/colors.js";
 import { setThemeColor, currentStatusBarColor, setNavBarColor } from "../../utils/helpers.js";
-import AudioNoteEditor from "../audio/AudioNoteEditor.jsx";
-import StorageGauge from "../audio/StorageGauge.jsx";
-import { parseAudioContent, totalClipsBytes } from "../../utils/audioNote.js";
 
 export default function NoteModal({
   // visibility / animation
@@ -269,25 +224,6 @@ export default function NoteModal({
       setDrawTransition('leaving');
     }
   }, [isDrawEdit]);
-  // Rendered HTML for view mode. Rich-format notes render through Tiptap's
-  // generateHTML (also sanitized); legacy Markdown notes keep the old marked
-  // pipeline so they look identical until the user edits and upgrades them.
-  const viewHtml = React.useMemo(() => {
-    if (isRichContent(mBody)) return linkifyContactsHTML(contentToHTML(mBody));
-    return linkifyContactsHTML(renderSafeMarkdown(mBody));
-  }, [mBody]);
-
-  // Serialize a Tiptap doc from the editor back into the string shape that
-  // mBody / autosave / sync expect. Centralised here so the two editor mount
-  // points (text note / draw-note body) stay in lockstep.
-  const handleRichDocChange = React.useCallback(
-    (doc) => {
-      const serialized = serializeRichContent(doc);
-      setMBody(serialized);
-    },
-    [setMBody],
-  );
-
   const { undo, redo, canUndo, canRedo } = useModalHistory({
     mTitle, mBody, mItems,
     setMTitle, setMBody, setMItems,
@@ -523,6 +459,23 @@ export default function NoteModal({
 
   if (!open && !isModalClosing) return null;
 
+  // Shared by the sidebar panel (desktop) and the full-screen overlay.
+  const noteAiPanelProps = {
+    dark,
+    mColor,
+    open: noteAiPanelVisible,
+    messages: noteAiMessages || [],
+    loading: !!noteAiLoading,
+    error: noteAiError,
+    saved: !!noteAiSaved,
+    canSave: !!noteAiCanSave,
+    onSend: onSendNoteAiMessage,
+    onStop: onStopNoteAi,
+    onClose: onCloseNoteAi,
+    onSave: onSaveNoteAi,
+    onReset: onResetNoteAi,
+  };
+
   return (
     <>
       <div
@@ -671,167 +624,52 @@ export default function NoteModal({
             <FederationReadOnlyBanner info={fedInfo} />
 
             {/* Content area */}
-            <div
+            <NoteModalBody
               key={isDrawEdit ? 'draw' : viewMode ? 'view' : 'edit'}
-              className={`${isDrawEdit ? "flex-1 min-h-0 flex flex-col" : isDrawView ? "px-6 pt-3 pb-6 max-sm:px-4 max-sm:pt-1 max-sm:pb-4" : isAudio ? "flex-1 min-h-0 flex flex-col px-4 pt-2 pb-4 sm:px-5 sm:pt-3 sm:pb-5" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"} ${!isDrawEdit ? "modal-content-fade" : ""}`}
+              mType={mType}
+              isDrawEdit={isDrawEdit}
+              isDrawView={isDrawView}
+              isAudio={isAudio}
+              viewMode={viewMode}
+              noteReadOnly={noteReadOnly}
+              readModeEnabled={readModeEnabled}
+              dark={dark}
+              activeId={activeId}
+              noteId={activeNoteObj?.id}
               onClick={onModalBodyClick}
-            >
-
-              {/* Text, Checklist, Drawing, or Audio */}
-              {mType === "audio" ? (
-                <AudioNoteEditor
-                  body={mBody}
-                  setBody={setMBody}
-                  title={mTitle}
-                  readOnly={noteReadOnly}
-                />
-              ) : mType === "text" ? (
-                viewMode ? (
-                  <NoteViewContent html={viewHtml} noteViewRef={noteViewRef} />
-                ) : (
-                  <div className="relative min-h-[160px]">
-                    <RichTextEditor
-                      key={activeId || "new"}
-                      editable={!noteReadOnly}
-                      value={mBody}
-                      onDocChange={handleRichDocChange}
-                      placeholder={t("writeYourNoteEllipsis")}
-                      dark={dark}
-                      autoFocus={!activeId && !mTitle}
-                      minHeightClass="min-h-[160px]"
-                      toolbarContainer={toolbarMount}
-                      toolbarMode={editorToolbarMode}
-                      pasteMode={pasteMode}
-                      readModeEnabled={readModeEnabled}
-                      onReady={(ed) => { richEditorRef.current = ed; }}
-                      onShiftTabExit={focusModalTitle}
-                    />
-                  </div>
-                )
-              ) : mType === "checklist" ? (
-                <div data-checklist-list>
-                  <ChecklistEditor
-                    entries={mItems}
-                    setEntries={setMItems}
-                    syncEntries={syncChecklistItems}
-                    insertPosition={checklistInsertPosition}
-                    removeSectionBehavior={checklistRemoveSectionBehavior}
-                    noteId={activeNoteObj?.id}
-                    readOnly={noteReadOnly}
-                  />
-                </div>
-              ) : drawMode === 'draw' ? (
-                /* Draw mode: fullscreen interactive canvas */
-                <DrawingCanvas
-                  data={mDrawingData}
-                  onChange={setMDrawingData}
-                  width={1200}
-                  height={800}
-                  readOnly={noteReadOnly}
-                  darkMode={dark}
-                  hideModeToggle
-                  externalMode={drawMode}
-                  onModeChange={setDrawMode}
-                  fillContainer
-                  toolbarPortalTarget={drawToolbarEl}
-                />
-              ) : viewMode ? (
-                /* View mode: rendered text + read-only drawing preview */
-                <>
-                  {mBody && (
-                    <NoteViewContent html={viewHtml} />
-                  )}
-                  <div className="mt-4">
-                    <DrawingCanvas
-                      data={mDrawingData}
-                      width={1200}
-                      height={800}
-                      readOnly
-                      darkMode={dark}
-                      hideModeToggle
-                    />
-                  </div>
-                </>
-              ) : (
-                /* Edit mode: rich text body + drawing preview */
-                <>
-                  <RichTextEditor
-                    key={`draw-${activeId || "new"}`}
-                    editable={!noteReadOnly}
-                    value={mBody}
-                    onDocChange={handleRichDocChange}
-                    placeholder={t("writeYourNoteEllipsis")}
-                    dark={dark}
-                    minHeightClass="min-h-[80px]"
-                    toolbarContainer={toolbarMount}
-                    toolbarMode={editorToolbarMode}
-                    pasteMode={pasteMode}
-                    readModeEnabled={readModeEnabled}
-                    onReady={(ed) => { richEditorRef.current = ed; }}
-                    onShiftTabExit={focusModalTitle}
-                  />
-                  <DrawingCanvas
-                    data={mDrawingData}
-                    width={1200}
-                    height={800}
-                    readOnly
-                    darkMode={dark}
-                    hideModeToggle
-                  />
-                </>
-              )}
-
-              {/* Audio bottom bar: storage gauge on the left (mirror of the
-                  "Edited:" stamp on the right). Always rendered so the
-                  user can read the per-note limit even before they start
-                  recording. The popover auto-flips upward since this row
-                  sits at the bottom of the modal. */}
-              {isAudio && !(mType === 'draw' && drawMode === 'draw') && (
-                <div className="mt-6 text-xs text-gray-600 dark:text-gray-300 flex items-center justify-between gap-3">
-                  <StorageGauge usedBytes={totalClipsBytes(parseAudioContent(mBody).clips)} />
-                  {editedStamp && (
-                    <div className="flex items-center gap-1.5">
-                      <span>{t("editedPrefix")} {editedStamp}</span>
-                      {activeId && (
-                        <span
-                          className="opacity-30 hover:opacity-100 cursor-default transition-opacity"
-                          data-tooltip={`Note ID : ${activeId}`}
-                        >ⓘ</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Inline Edited stamp: scrollable non-audio notes. Audio
-                  uses its own bottom row above so the gauge can sit
-                  opposite the stamp. */}
-              {editedStamp && modalScrollable && !isAudio && !(mType === 'draw' && drawMode === 'draw') && (
-                <div className="mt-6 text-xs text-gray-600 dark:text-gray-300 text-right flex items-center justify-end gap-1.5">
-                  <span>{t("editedPrefix")} {editedStamp}</span>
-                  {activeId && (
-                    <span
-                      className="opacity-30 hover:opacity-100 cursor-default transition-opacity"
-                      data-tooltip={`Note ID : ${activeId}`}
-                    >ⓘ</span>
-                  )}
-                </div>
-              )}
-            </div>
+              mTitle={mTitle}
+              mBody={mBody}
+              setMBody={setMBody}
+              noteViewRef={noteViewRef}
+              richEditorRef={richEditorRef}
+              focusModalTitle={focusModalTitle}
+              toolbarMount={toolbarMount}
+              editorToolbarMode={editorToolbarMode}
+              pasteMode={pasteMode}
+              mItems={mItems}
+              setMItems={setMItems}
+              syncChecklistItems={syncChecklistItems}
+              checklistInsertPosition={checklistInsertPosition}
+              checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
+              drawMode={drawMode}
+              setDrawMode={setDrawMode}
+              mDrawingData={mDrawingData}
+              setMDrawingData={setMDrawingData}
+              drawToolbarEl={drawToolbarEl}
+              editedStamp={editedStamp}
+              modalScrollable={modalScrollable}
+            />
 
             {/* Absolute Edited stamp: only when NOT scrollable (hidden in
-                draw edit mode and for audio notes — those use the inline
-                stamp above so it doesn't overlap body content). */}
-            {editedStamp && !modalScrollable && !isAudio && !(mType === 'draw' && drawMode === 'draw') && (
-              <div className="absolute bottom-3 right-4 text-xs text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
-                <span className="pointer-events-none">{t("editedPrefix")} {editedStamp}</span>
-                {activeId && (
-                  <span
-                    className="opacity-30 hover:opacity-100 cursor-default transition-opacity"
-                    data-tooltip={`Note ID : ${activeId}`}
-                  >ⓘ</span>
-                )}
-              </div>
+                draw edit mode and for audio notes: those use the inline
+                stamp of NoteModalBody so it doesn't overlap body content). */}
+            {editedStamp && !modalScrollable && !isAudio && !isDrawEdit && (
+              <NoteEditedStamp
+                editedStamp={editedStamp}
+                activeId={activeId}
+                className="absolute bottom-3 right-4 text-xs text-gray-600 dark:text-gray-300 flex items-center gap-1.5"
+                labelClassName="pointer-events-none"
+              />
             )}
           </div>
 
@@ -1006,21 +844,7 @@ export default function NoteModal({
             }}
           >
             {(noteAiPanelVisible || isAiClosing) && (
-              <NoteAiChatPanel
-                dark={dark}
-                mColor={mColor}
-                open={noteAiPanelVisible}
-                messages={noteAiMessages || []}
-                loading={!!noteAiLoading}
-                error={noteAiError}
-                saved={!!noteAiSaved}
-                canSave={!!noteAiCanSave}
-                onSend={onSendNoteAiMessage}
-                onStop={onStopNoteAi}
-                onClose={onCloseNoteAi}
-                onSave={onSaveNoteAi}
-                onReset={onResetNoteAi}
-              />
+              <NoteAiChatPanel {...noteAiPanelProps} />
             )}
           </div>
         )}
@@ -1042,23 +866,7 @@ export default function NoteModal({
             paddingRight: 'var(--safe-right)',
           }}
         >
-          <NoteAiChatPanel
-            dark={dark}
-            mColor={mColor}
-            isMobile
-            open={noteAiPanelVisible}
-            messages={noteAiMessages || []}
-            loading={!!noteAiLoading}
-            error={noteAiError}
-            saved={!!noteAiSaved}
-            canSave={!!noteAiCanSave}
-            onSend={onSendNoteAiMessage}
-            onStop={onStopNoteAi}
-            onHide={onHideNoteAi}
-            onClose={onCloseNoteAi}
-            onSave={onSaveNoteAi}
-            onReset={onResetNoteAi}
-          />
+          <NoteAiChatPanel {...noteAiPanelProps} isMobile onHide={onHideNoteAi} />
         </div>
       )}
 
