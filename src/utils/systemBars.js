@@ -19,15 +19,15 @@ export function currentStatusBarColor() {
       .trim();
     if (v) return v;
   } catch {
-    /* getComputedStyle unavailable — fall through */
+    /* getComputedStyle unavailable: fall through */
   }
   return document.documentElement.classList.contains("dark")
     ? STATUS_BAR_DARK
     : STATUS_BAR_LIGHT;
 }
 
-/** Whatever theme-color is live right now — a modal's own override or the
- *  shell default, whichever last called setThemeColor — read straight from
+/** Whatever theme-color is live right now (a modal's own override or the
+ *  shell default, whichever last called setThemeColor), read straight from
  *  the meta tag rather than recomputed, so a caller can restore exactly
  *  what was there before it took over (e.g. a modal opened on top of an
  *  already-colored NoteModal). Null if the tag isn't mounted yet. */

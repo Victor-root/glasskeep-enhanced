@@ -7,8 +7,8 @@
 // unlock screen.
 //
 // Usage:
-//   sudo -u glass-keep node scripts/unlock-instance.js
-//   node scripts/unlock-instance.js --recovery
+//   sudo -u glass-keep node scripts/unlock-instance.cjs
+//   node scripts/unlock-instance.cjs --recovery
 //
 // The script reads /opt/glass-keep/.env (or the file pointed at by
 // GLASSKEEP_ENV) to discover the listening port and HTTPS settings.

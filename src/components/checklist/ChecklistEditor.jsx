@@ -3,7 +3,7 @@ import { t } from "../../i18n";
 import ChecklistItemRow from "./ChecklistItemRow.jsx";
 import ChecklistSection from "./ChecklistSection.jsx";
 import ChecklistDoneArea from "./ChecklistDoneArea.jsx";
-import { useDark } from "./useDark.js";
+import { useDark } from "../../hooks/useDark.js";
 import useChecklistDrag from "../../hooks/useChecklistDrag.js";
 import {
   DEFAULT_SECTION_ID,

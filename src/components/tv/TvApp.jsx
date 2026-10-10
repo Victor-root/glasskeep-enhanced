@@ -13,8 +13,8 @@ import { setTvModeOverride } from "../../utils/tvMode.js";
 // graph is far too noisy for a 10-foot viewer (composer, drag, multi-
 // select, sync queue UI, …) and we don't need any of it here.
 //
-// Sync engine, IndexedDB queue and SSE live in App.jsx — when the user
-// flips out of TV mode they reconnect normally. The TV viewer is a
+// Sync engine, IndexedDB queue and SSE are run by App.jsx's hooks (sync/):
+// when the user flips out of TV mode they reconnect normally. The TV viewer is a
 // strict consumer that re-fetches /api/notes on mount and on focus.
 
 function applyTvAttrs(enable) {

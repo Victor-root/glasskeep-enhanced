@@ -102,7 +102,7 @@ function loadTestScriptConfig(args, missingSecretHint = null) {
     if (missingSecretHint) console.error(missingSecretHint);
     process.exit(1);
   }
-  // DB discovery mirrors server/index.js: DB_FILE, then SQLITE_FILE,
+  // DB discovery mirrors server/config.js: DB_FILE, then SQLITE_FILE,
   // then the default next to the server source.
   const serverDir = path.resolve(__dirname, "..", "..", "server");
   const dbFile =

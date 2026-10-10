@@ -6,9 +6,10 @@ import { useCallback, useLayoutEffect, useRef } from "react";
 // its handlers on every render — without the stale-closure risk of
 // useCallback dependency lists. (The "useEvent" pattern.)
 //
-// Why this matters here: App.jsx defines the note-card callbacks
-// (openModal, togglePin, drag/select/checklist handlers) inline, so each
-// render hands NoteCard brand-new function references and defeats its
+// Why this matters here: the note-card callbacks App.jsx gets from its
+// hooks (openModal, togglePin, drag/select/checklist handlers) are
+// recreated on every render, so each render would hand NoteCard
+// brand-new function references and defeat its
 // React.memo — the entire notes grid then re-renders on every modal open
 // and every keystroke in the editor. Wrapping the handlers makes their
 // identity stable so the memo actually holds.

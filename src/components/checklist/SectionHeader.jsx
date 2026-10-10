@@ -3,7 +3,7 @@ import { t } from "../../i18n";
 import { useSwallowClosingClick } from "../../hooks/useSwallowClosingClick.js";
 import useBlurOnKeyboardClose from "../../hooks/useBlurOnKeyboardClose.js";
 import useTimedConfirm from "../../hooks/useTimedConfirm.js";
-import { useDark } from "./useDark.js";
+import { useDark } from "../../hooks/useDark.js";
 import SectionColorPicker from "./SectionColorPicker.jsx";
 import GripDots from "./GripDots.jsx";
 

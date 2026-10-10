@@ -27,7 +27,7 @@ export default function FooterImageButton({
   modalFileRef,
   addImagesToState,
   setMImages,
-  // note icon: flows through setNoteIconFromFile (handled in App)
+  // note icon: saved through setNoteIconFromFile (hooks/useNoteIconActions.js)
   modalIconFileRef,
   setNoteIconFromFile,
   removeNoteIcon,

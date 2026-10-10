@@ -56,8 +56,8 @@ export default function ModalFooter({
   modalFileRef,
   addImagesToState,
   setMImages,
-  // note icon (logo badge) — flows through addImagesToState too, then
-  // gets stamped with role:"icon" via setNoteIconFromFile (handled in App).
+  // note icon (logo badge): per user, saved through setNoteIconFromFile
+  // (hooks/useNoteIconActions.js).
   modalIconFileRef,
   setNoteIconFromFile,
   removeNoteIcon,

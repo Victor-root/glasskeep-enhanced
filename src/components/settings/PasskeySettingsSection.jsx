@@ -75,11 +75,11 @@ export default function PasskeySettingsSection({
   const [confirmPrompt, setConfirmPrompt] = useState(null);
 
   // Hold showToast in a ref so it doesn't appear in any callback's
-  // dependency list. The parent App.jsx defines showToast as an inline
-  // arrow on every render, so a naive [showToast] dep would invalidate
-  // every callback on every render — a previous version of this file
-  // did exactly that and the user-facing symptom was a tight render
-  // loop where /api/passkeys was hammered after login. The ref keeps
+  // dependency list. When the parent recreated showToast on every render,
+  // a naive [showToast] dep invalidated every callback on every render;
+  // a previous version of this file did exactly that and the user-facing
+  // symptom was a tight render loop where /api/passkeys was hammered after
+  // login. The ref keeps
   // the callbacks stable while still letting handlers reach the live
   // toast emitter.
   const showToastRef = useRef(showToast);

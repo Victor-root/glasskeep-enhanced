@@ -76,7 +76,7 @@ export async function makeSquarePngIcon(dataUrl, size = 512, bg = "#ffffff", pad
 /** Derive the two tiny placeholders for a login-background image (a data
  *  URL): its mean colour (#rrggbb) and a BlurHash string (~30 chars). The
  *  login page paints the colour, then the decoded BlurHash, then fades in
- *  the real image — so there's never a flash of the default backdrop, even
+ *  the real image, so there's never a flash of the default backdrop, even
  *  on a cold load. Both outputs are a few bytes, so unlike the image itself
  *  they can be inlined in the page / cached cheaply. Returns
  *  { color, hash }, or null if the image can't be read. */
@@ -105,7 +105,7 @@ export async function deriveBackgroundPlaceholders(dataUrl) {
     const hex = (v) => Math.round(v / n).toString(16).padStart(2, "0");
     const color = `#${hex(r)}${hex(g)}${hex(b)}`;
 
-    // 4×3 components — the sweet spot (enough to recognise the image, still
+    // 4×3 components: the sweet spot (enough to recognise the image, still
     // a ~30-char string), the same the BlurHash authors recommend.
     const hash = blurhashEncode(data, w, h, 4, 3);
     return { color, hash };

@@ -146,7 +146,7 @@ export default function useDraftNote(ctx) {
       images: newNote.images,
       color: newNote.color,
     };
-    // eslint-disable-next-line react-hooks/immutability -- ctx carries App's refs; writing .current from this event-time helper is intended
+    // eslint-disable-next-line react-hooks/immutability -- ctx carries the note pane's refs; writing .current from this event-time helper is intended
     ctx.initialModalStateRef.current = newBaseline;
     ctx.committedBaselineRef.current = { ...newBaseline };
     if (isDraw) {
@@ -184,7 +184,7 @@ export default function useDraftNote(ctx) {
     ctx.setMType(type);
     ctx.setMTitle("");
     ctx.setMDrawingData({ paths: [], dimensions: null });
-    // eslint-disable-next-line react-hooks/immutability -- ctx carries App's refs; writing .current from this event-time helper is intended
+    // eslint-disable-next-line react-hooks/immutability -- ctx carries the note pane's refs; writing .current from this event-time helper is intended
     ctx.prevDrawingRef.current = { paths: [], dimensions: null };
     ctx.setMBody(initialBody);
     ctx.skipNextDrawingAutosaveRef.current = true;
