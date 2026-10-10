@@ -41,6 +41,15 @@ function validateLwwTimestamp(ts) {
   return parsed;
 }
 
+/**
+ * The client_updated_at of a note write, required and validated.
+ * Returns { ms, iso }, or { error } to answer with a 400.
+ */
+function readClientUpdatedAt(body) {
+  if (!body?.client_updated_at) return { error: "client_updated_at is required" };
+  return validateLwwTimestamp(body.client_updated_at);
+}
+
 // La date d'affichage d'une note, à ne pas confondre avec l'horodatage de
 // départage entre appareils juste au-dessus. Elle peut légitimement être
 // ancienne (une note importée d'ailleurs), donc rien ne borne le passé,
@@ -73,6 +82,7 @@ module.exports = {
   nowISO,
   parseIsoTimestamp,
   validateLwwTimestamp,
+  readClientUpdatedAt,
   normalizeDisplayTimestamp,
   isNewerOrEqual,
 };

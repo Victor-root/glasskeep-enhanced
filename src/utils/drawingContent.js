@@ -11,3 +11,14 @@ export function parseDrawingContent(content) {
   const { text: _text, ...drawing } = normalized;
   return { drawing, text };
 }
+
+// Whether a drawing note's content (JSON text, or already parsed) holds at
+// least one stroke. Unreadable content holds none.
+export function drawingHasStrokes(content) {
+  try {
+    const parsed = typeof content === "string" ? JSON.parse(content) : content;
+    if (Array.isArray(parsed)) return parsed.some((p) => p?.points?.length);
+    if (Array.isArray(parsed?.paths)) return parsed.paths.some((p) => p?.points?.length);
+    return false;
+  } catch { return false; }
+}

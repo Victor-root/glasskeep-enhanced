@@ -2,6 +2,7 @@ import React from "react";
 import { t } from "../../i18n";
 import { linkifyContacts } from "../../utils/markdown.jsx";
 import { INDENT_STEP_PX } from "../../utils/checklist.js";
+import useBlurOnKeyboardClose from "../../hooks/useBlurOnKeyboardClose.js";
 
 export default function ChecklistRow({
   item,
@@ -63,29 +64,8 @@ export default function ChecklistRow({
     }
   }, [editing]);
 
-  // Exit edit mode when the soft keyboard is dismissed (mobile back / swipe down).
-  // Skipped on iOS Safari: it emits unstable visualViewport.resize bounces while
-  // the keyboard is opening (URL bar / predictive bar animations), which would
-  // be misread as a keyboard close and immediately blur the textarea — making
-  // checklist editing unusable on iPhone. iOS already blurs naturally on Done.
-  React.useEffect(() => {
-    if (!editing || !window.visualViewport) return;
-    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-    const isIOS =
-      /iPad|iPhone|iPod/.test(ua) ||
-      (typeof navigator !== "undefined" &&
-        navigator.platform === "MacIntel" &&
-        navigator.maxTouchPoints > 1);
-    if (isIOS) return;
-    let prevH = window.visualViewport.height;
-    const onResize = () => {
-      const h = window.visualViewport.height;
-      if (h - prevH > 150) textareaRef.current?.blur();
-      prevH = h;
-    };
-    window.visualViewport.addEventListener("resize", onResize);
-    return () => window.visualViewport.removeEventListener("resize", onResize);
-  }, [editing]);
+  // Exit edit mode when the soft keyboard is dismissed.
+  useBlurOnKeyboardClose(editing, textareaRef);
 
   // External focus trigger: parent bumps focusToken to request this row.
   React.useEffect(() => {

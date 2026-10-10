@@ -47,6 +47,17 @@ function uid() {
   return `n_${Date.now().toString(36)}_${(_nextId++).toString(36)}`;
 }
 
+// The numeric server notification ids among `ids`; anything else is ignored.
+function serverIdSet(ids) {
+  const set = new Set();
+  if (!Array.isArray(ids)) return set;
+  for (const raw of ids) {
+    const n = Number(raw);
+    if (Number.isFinite(n)) set.add(n);
+  }
+  return set;
+}
+
 // Every variant defaults to whatever the consumer last set via
 // `setDefaultDuration(ms|null)` — App wires this to a user pref.
 // Callers can still override per-call with `duration`; `persistent:
@@ -214,12 +225,7 @@ export function NotificationProvider({ children }) {
   // Cross-device per-item remove handler. Triggered by the SSE
   // `notification_removed` event when another device DELETE'd a row.
   const removeByServerIds = useCallback((ids) => {
-    if (!Array.isArray(ids) || ids.length === 0) return;
-    const set = new Set();
-    for (const raw of ids) {
-      const n = Number(raw);
-      if (Number.isFinite(n)) set.add(n);
-    }
+    const set = serverIdSet(ids);
     if (set.size === 0) return;
     dispatch({ type: "REMOVE_BY_SERVER_IDS", ids: set });
   }, []);
@@ -231,12 +237,7 @@ export function NotificationProvider({ children }) {
   // until React commits the useEffect that mirrors state, but the
   // reducer always operates on the latest array.
   const dismissByServerIds = useCallback((ids) => {
-    if (!Array.isArray(ids) || ids.length === 0) return;
-    const set = new Set();
-    for (const raw of ids) {
-      const n = Number(raw);
-      if (Number.isFinite(n)) set.add(n);
-    }
+    const set = serverIdSet(ids);
     if (set.size === 0) return;
     dispatch({ type: "DISMISS_BY_SERVER_IDS", ids: set });
   }, []);

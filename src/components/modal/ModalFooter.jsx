@@ -30,9 +30,7 @@ export default function ModalFooter({
   onTogglePin,
   reserveNavBar = false,
   rootRef,
-  windowWidth,
-  isLandscapeMobile,
-  isWebView,
+  isDesktop,
   // tags
   mTagList,
   setMTagList,
@@ -130,7 +128,6 @@ export default function ModalFooter({
   noteAiAvailable,
   onOpenNoteAi,
 }) {
-  const isDesktop = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
   const isTrashed = tagFilter === "TRASHED";
 
   const btnClass = isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn";

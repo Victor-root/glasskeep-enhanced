@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { t } from "../i18n";
-import { formatEditedStamp, normalizeImageFilename, downloadDataUrl } from "../utils/helpers.js";
+import { normalizeImageFilename, downloadDataUrl } from "../utils/files.js";
+import { formatEditedStamp } from "../utils/dates.js";
 import { attachPlainTextCodeCopy } from "../utils/plainTextCodeCopy.js";
 import { attachReadModeInlineCopy } from "../components/richtext/extensions/inlineCodeCopy.js";
 import { attachStickyCopyButton } from "../utils/codeCopySticky.js";

@@ -8,6 +8,7 @@ import { getContentImages } from "../../utils/noteIcon.js";
 import { parseAudioContent, formatDuration } from "../../utils/audioNote.js";
 import { Mic } from "lucide-react";
 import DrawingPreview from "../common/DrawingPreview.jsx";
+import { drawingHasStrokes } from "../../utils/drawingContent.js";
 import { isColorDark } from "./tvNoteColors.js";
 
 function buildBodyHtml(note) {
@@ -58,15 +59,10 @@ export default function TvNoteDetail({ note /* , onClose */ }) {
     if (!note || note.type !== "checklist") return null;
     return getSections(note.items);
   }, [note]);
-  const hasStrokes = useMemo(() => {
-    if (!note || note.type !== "draw") return false;
-    try {
-      const parsed = typeof note.content === "string" ? JSON.parse(note.content) : note.content;
-      if (Array.isArray(parsed)) return parsed.some((p) => p?.points?.length);
-      if (Array.isArray(parsed?.paths)) return parsed.paths.some((p) => p?.points?.length);
-      return false;
-    } catch { return false; }
-  }, [note]);
+  const hasStrokes = useMemo(
+    () => !!note && note.type === "draw" && drawingHasStrokes(note.content),
+    [note],
+  );
 
   // Keyboard scroll while the detail viewer is open. Runs in capture
   // phase with stopImmediatePropagation so useSpatialFocus never sees

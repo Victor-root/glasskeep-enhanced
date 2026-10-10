@@ -10,7 +10,7 @@ import {
   convertAudioToWav,
   dataUrlToBlob,
 } from "../../utils/audioConvert.js";
-import { sanitizeFilename, triggerBlobDownload } from "../../utils/helpers.js";
+import { sanitizeFilename, triggerBlobDownload } from "../../utils/files.js";
 
 // Download button of the audio player (hero layout) and its format menu:
 // the original recording, or an MP3 / WAV conversion when the browser can

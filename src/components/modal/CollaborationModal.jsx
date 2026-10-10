@@ -5,7 +5,7 @@ import CurrentCollaboratorsList from "./CurrentCollaboratorsList.jsx";
 import CollaboratorPicker from "./CollaboratorPicker.jsx";
 import AccessToggle from "./AccessToggle.jsx";
 import { t } from "../../i18n";
-import { setThemeColor, currentThemeColor } from "../../utils/helpers.js";
+import { setThemeColor, currentThemeColor } from "../../utils/systemBars.js";
 
 /**
  * Collaboration modal — manage who a note is shared with.

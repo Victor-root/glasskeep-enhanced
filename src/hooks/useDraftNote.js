@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { uid } from "../utils/helpers.js";
+import { uid } from "../utils/ids.js";
 import { serializeAudioContent } from "../utils/audioNote.js";
 import { contentToPlain } from "../utils/richText.js";
 import { sortNotesByRecency } from "../utils/noteList.js";

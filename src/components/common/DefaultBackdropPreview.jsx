@@ -1,15 +1,17 @@
 import React from "react";
+import DecoCard from "./DecoCard.jsx";
 
 // A few representative floating cards — a subset of the real login/app
 // backdrop. Positioned across a virtual canvas that gets scaled down so
 // several small cards fit inside a preview box.
+const PREVIEW_LINES = ["85%", "60%"];
 const PREVIEW_CARDS = [
-  { rot: "-12deg", dur: "7s", delay: "0s", top: "6%", left: "5%", c: "99,102,241" },
-  { rot: "6deg", dur: "9s", delay: "-2s", top: "10%", left: "62%", c: "168,85,247" },
-  { rot: "8deg", dur: "8s", delay: "-4s", top: "55%", left: "8%", c: "16,185,129" },
-  { rot: "-8deg", dur: "10s", delay: "-1s", top: "52%", left: "66%", c: "245,158,11" },
-  { rot: "10deg", dur: "8.5s", delay: "-3s", top: "30%", left: "34%", c: "236,72,153" },
-  { rot: "-6deg", dur: "9.5s", delay: "-6s", top: "74%", left: "40%", c: "14,165,233" },
+  { rot: "-12deg", dur: "7s", delay: "0s", pos: { top: "6%", left: "5%" }, color: "99,102,241", lines: PREVIEW_LINES },
+  { rot: "6deg", dur: "9s", delay: "-2s", pos: { top: "10%", left: "62%" }, color: "168,85,247", lines: PREVIEW_LINES },
+  { rot: "8deg", dur: "8s", delay: "-4s", pos: { top: "55%", left: "8%" }, color: "16,185,129", lines: PREVIEW_LINES },
+  { rot: "-8deg", dur: "10s", delay: "-1s", pos: { top: "52%", left: "66%" }, color: "245,158,11", lines: PREVIEW_LINES },
+  { rot: "10deg", dur: "8.5s", delay: "-3s", pos: { top: "30%", left: "34%" }, color: "236,72,153", lines: PREVIEW_LINES },
+  { rot: "-6deg", dur: "9.5s", delay: "-6s", pos: { top: "74%", left: "40%" }, color: "14,165,233", lines: PREVIEW_LINES },
 ];
 
 // Mirror of the default backdrop (body gradient in light / solid dark)
@@ -35,17 +37,7 @@ export default function DefaultBackdropPreview({ dark }) {
           transformOrigin: "top left",
         }}
       >
-        {PREVIEW_CARDS.map((k, i) => (
-          <div
-            key={i}
-            className="login-deco-card"
-            style={{ "--rot": k.rot, "--dur": k.dur, "--delay": k.delay, top: k.top, left: k.left, borderTop: `3px solid rgba(${k.c},0.7)` }}
-          >
-            <div className="deco-title" style={{ background: `rgba(${k.c},0.5)` }} />
-            <div className="deco-line" style={{ width: "85%" }} />
-            <div className="deco-line" style={{ width: "60%" }} />
-          </div>
-        ))}
+        {PREVIEW_CARDS.map((card, i) => <DecoCard key={i} {...card} />)}
       </div>
     </div>
   );

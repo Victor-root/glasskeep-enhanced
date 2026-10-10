@@ -1,6 +1,8 @@
 // Google Keep import (Google Takeout): expands the Takeout .zip and turns
 // each Keep .json into a GlassKeep note, with its attached images embedded.
-import { uid, fileToCompressedDataURL, ensureJSZip } from "./helpers.js";
+import { uid } from "./ids.js";
+import { ensureJSZip } from "./files.js";
+import { fileToCompressedDataURL } from "./images.js";
 import { plainTextToRichDoc, serializeRichContent } from "./richText.js";
 
 // Google Keep persists colours as a fixed enum; GlassKeep uses its own

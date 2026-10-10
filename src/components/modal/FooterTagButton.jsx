@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import Sheet from "../common/Sheet.jsx";
 import NoteTagPicker from "./NoteTagPicker.jsx";
 import { t } from "../../i18n";
+import { anchoredArrowLeft, anchoredArrowStyle } from "../../utils/anchoredPanel.js";
 
 // Tag button of the modal footer, with its count badge and the tag picker:
 // a dropdown under the button on desktop, a bottom sheet on phones.
@@ -95,10 +96,8 @@ export default function FooterTagButton({
         const dropWidth = 260;
         const dropLeft = Math.min(rect.left, window.innerWidth - dropWidth - 8);
 
-        const arrowLeft = rect.left + rect.width / 2 - dropLeft - 6;
+        const arrowLeft = anchoredArrowLeft(rect, dropLeft);
         const arrowDir = dropUp ? "down" : "up";
-        const nearLeft = arrowLeft < 20;
-        const nearRight = arrowLeft > dropWidth - 32;
 
         return createPortal(
           <div
@@ -111,11 +110,7 @@ export default function FooterTagButton({
                 : { top: rect.bottom + 6, left: dropLeft }),
               width: dropWidth,
               zIndex: 99999,
-              '--arrow-left': `${arrowLeft}px`,
-              ...(nearLeft && arrowDir === "up" && { borderTopLeftRadius: '4px' }),
-              ...(nearLeft && arrowDir === "down" && { borderBottomLeftRadius: '4px' }),
-              ...(nearRight && arrowDir === "up" && { borderTopRightRadius: '4px' }),
-              ...(nearRight && arrowDir === "down" && { borderBottomRightRadius: '4px' }),
+              ...anchoredArrowStyle(arrowLeft, arrowDir, dropWidth - 32),
             }}
             className="gk-tag-popover rounded-2xl shadow-2xl bg-white dark:bg-gray-900 border border-indigo-100/80 dark:border-indigo-800/50 ring-1 ring-black/5 dark:ring-white/5"
           >

@@ -3,10 +3,13 @@ import {
   getAllNotes as idbGetAllNotes,
   getNote as idbGetNote,
   putNote as idbPutNote,
+  patchNote as idbPatchNote,
   deleteNote as idbDeleteNote,
 } from "../sync/localDb.js";
 import { mdForDownload } from "../utils/markdown.jsx";
-import { uid, sanitizeFilename, downloadText, triggerBlobDownload, fileToCompressedDataURL } from "../utils/helpers.js";
+import { uid } from "../utils/ids.js";
+import { sanitizeFilename, downloadText, triggerBlobDownload } from "../utils/files.js";
+import { fileToCompressedDataURL } from "../utils/images.js";
 import { sortNotesByRecency, computeRestoredPosition, sortByPositionDesc } from "../utils/noteList.js";
 import { textToChecklistItems, checklistItemsToText } from "../utils/noteConversion.js";
 import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "../utils/richText.js";
@@ -119,8 +122,7 @@ export default function useNoteActions({
 
     // Local-first: apply archive state immediately
     try {
-      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-      if (existing) await idbPutNote({ ...existing, archived: !!archived, client_updated_at: nowIso }, currentUser?.id, sessionId);
+      await idbPatchNote(nid, { archived: !!archived, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
 
     // Update UI: remove note from current view (it moved to another view)
@@ -343,10 +345,7 @@ export default function useNoteActions({
 
       const leaseId = acquireLocalLease(noteId);
       try {
-        const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
-        if (existing) {
-          await idbPutNote({ ...existing, ...updatedFields }, currentUser?.id, sessionId);
-        }
+        await idbPatchNote(noteId, updatedFields, currentUser?.id, sessionId);
       } catch (e) {
         console.error("IndexedDB update failed:", e);
         // IDB failed: don't advance baselines
@@ -412,8 +411,7 @@ export default function useNoteActions({
       const leaseId = acquireLocalLease(nid);
       const nowIso = new Date().toISOString();
       try {
-        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, trashed: true, collaborators: [], client_updated_at: nowIso }, currentUser?.id, sessionId);
+        await idbPatchNote(nid, { trashed: true, collaborators: [], client_updated_at: nowIso }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
@@ -450,8 +448,7 @@ export default function useNoteActions({
       const leaseId = acquireLocalLease(nid);
       const nowIso = new Date().toISOString();
       try {
-        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, trashed: true, client_updated_at: nowIso }, currentUser?.id, sessionId);
+        await idbPatchNote(nid, { trashed: true, client_updated_at: nowIso }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
@@ -513,8 +510,7 @@ export default function useNoteActions({
 
     // Then persist to IndexedDB and server
     try {
-      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-      if (existing) await idbPutNote({ ...existing, pinned: !!toPinned, client_updated_at: nowIso }, currentUser?.id, sessionId);
+      await idbPatchNote(nid, { pinned: !!toPinned, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
     // Don't use enqueueWithLease here: it releases the lease immediately after
     // the server responds, but the server also sends an SSE note_updated event
@@ -563,14 +559,7 @@ export default function useNoteActions({
     );
 
     try {
-      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-      if (existing) {
-        await idbPutNote(
-          { ...existing, reminderAt, reminderFiredAt: null, client_updated_at: nowIso },
-          currentUser?.id,
-          sessionId,
-        );
-      }
+      await idbPatchNote(nid, { reminderAt, reminderFiredAt: null, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) {
       console.error(e);
     }
@@ -676,10 +665,7 @@ export default function useNoteActions({
 
     const leaseId = acquireLocalLease(noteId);
     try {
-      const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
-      if (existing) {
-        await idbPutNote({ ...existing, ...updatedFields }, currentUser?.id, sessionId);
-      }
+      await idbPatchNote(noteId, updatedFields, currentUser?.id, sessionId);
     } catch (e) {
       console.error("IndexedDB convert failed:", e);
       return;

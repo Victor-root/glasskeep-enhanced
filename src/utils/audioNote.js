@@ -1,4 +1,4 @@
-import { uid } from "./helpers.js";
+import { uid } from "./ids.js";
 import { t } from "../i18n";
 
 // Audio note content helpers.

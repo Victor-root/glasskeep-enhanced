@@ -1,5 +1,6 @@
 import { api } from "../utils/api.js";
-import { uid, sanitizeFilename, downloadText } from "../utils/helpers.js";
+import { uid } from "../utils/ids.js";
+import { sanitizeFilename, downloadText, saveBlobViaLink } from "../utils/files.js";
 import { t } from "../i18n";
 import { localizeServerError } from "../utils/serverErrors.js";
 import {
@@ -74,14 +75,7 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
     const blob = new Blob([jsonText], {
       type: "application/json;charset=utf-8",
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    saveBlobViaLink(filename, blob);
   };
 
   const exportAll = async () => {

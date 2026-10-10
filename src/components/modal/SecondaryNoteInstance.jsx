@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useEffect, useRef } from "react";
 import NoteModal from "./NoteModal.jsx";
 import useModalState from "../../hooks/useModalState.js";
 import useCollaboration from "../../hooks/useCollaboration.js";
 import useNoteAiChat from "../../hooks/useNoteAiChat.js";
 import useNoteEditor from "../../hooks/useNoteEditor.js";
 import useNoteActions from "../../hooks/useNoteActions.js";
-import { uid, fileToCompressedDataURL } from "../../utils/helpers.js";
+import useNoteIconActions from "../../hooks/useNoteIconActions.js";
 
 /**
  * SecondaryNoteInstance: self-contained per-note modal controller used as
@@ -187,20 +187,7 @@ export default function SecondaryNoteInstance({
   closeModalRef.current = closeModal;
 
   // ─── Note icon (PER-USER, never synced) ────────────────────────────────
-  // Bound to this pane's note; applyNoteIcon (useLogoLibrary) persists it.
-  const setNoteIconFromFile = useCallback(async (file) => {
-    if (!file) return;
-    try {
-      const src = await fileToCompressedDataURL(file);
-      await applyNoteIcon(activeId, { id: uid(), src, name: file.name });
-      addLogoToLibrary?.({ src, name: file.name });
-    } catch (e) { console.error("[SBS] icon load failed", e); }
-  }, [activeId, applyNoteIcon, addLogoToLibrary]);
-
-  const removeNoteIconCb = useCallback(() => { applyNoteIcon(activeId, null); }, [activeId, applyNoteIcon]);
-  const pickNoteIconCb = useCallback((logo) => {
-    if (logo?.src) applyNoteIcon(activeId, { id: uid(), src: logo.src, name: logo.name });
-  }, [activeId, applyNoteIcon]);
+  const { setNoteIconFromFile, removeNoteIcon, pickNoteIcon } = useNoteIconActions({ noteId: activeId, applyNoteIcon, addLogoToLibrary });
 
   if (!noteId) return null;
 
@@ -304,9 +291,9 @@ export default function SecondaryNoteInstance({
       togglePin={togglePin}
       addImagesToState={addImagesToState}
       setNoteIconFromFile={setNoteIconFromFile}
-      removeNoteIcon={removeNoteIconCb}
+      removeNoteIcon={removeNoteIcon}
       noteIcon={activeNoteObj?.icon || null}
-      onPickIcon={pickNoteIconCb}
+      onPickIcon={pickNoteIcon}
       logoLibrary={logoLibrary}
       deleteLogoFromLibrary={deleteLogoFromLibrary}
       isCollaborativeNote={isCollaborativeNote}

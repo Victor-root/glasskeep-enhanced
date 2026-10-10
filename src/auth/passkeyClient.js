@@ -19,6 +19,9 @@ import {
   platformAuthenticatorIsAvailable,
 } from "@simplewebauthn/browser";
 import { t } from "../i18n";
+import { API_BASE, AUTH_KEY } from "../utils/api.js";
+import { base64UrlToBytes } from "../utils/base64url.js";
+import { authHeaders, postJSON as postAuthJSON, getJSON as getAuthJSON } from "./jsonRequest.js";
 
 // ── Android native passkey bridge ─────────────────────────────────────
 //
@@ -60,59 +63,17 @@ async function performAuthentication(optionsJSON, { withPrf = false } = {}) {
   return await startAuthentication({ optionsJSON: prepared });
 }
 
-const API = "/api";
-
-function authHeaders(token) {
-  const h = { "Content-Type": "application/json" };
-  if (token) h.Authorization = `Bearer ${token}`;
-  return h;
-}
-
 // Mirror api.js's behaviour on 401: clear the cached auth and fire the
 // auth-expired event so the centralised cleanup (useAuthActions) runs once. Without
 // this, a stale token sitting in localStorage would keep producing 401s
 // every time the settings panel re-fetched the passkey list.
 function _handleAuthExpired() {
-  try { localStorage.removeItem("glass-keep-auth"); } catch { /* storage unavailable: nothing cached to clear */ }
+  try { localStorage.removeItem(AUTH_KEY); } catch { /* storage unavailable: nothing cached to clear */ }
   try { window.dispatchEvent(new CustomEvent("auth-expired")); } catch { /* CustomEvent unsupported: skip the notification */ }
 }
 
-async function postJSON(path, body, token) {
-  const res = await fetch(`${API}${path}`, {
-    method: "POST",
-    headers: authHeaders(token),
-    body: JSON.stringify(body || {}),
-  });
-  let data = null;
-  try { data = await res.json(); } catch { /* non-JSON body: data stays null */ }
-  if (res.status === 401 && token) _handleAuthExpired();
-  if (!res.ok) {
-    const e = new Error((data && data.error) || `HTTP ${res.status}`);
-    e.status = res.status;
-    throw e;
-  }
-  return data || {};
-}
-
-async function getJSON(path, token) {
-  const res = await fetch(`${API}${path}`, { headers: authHeaders(token) });
-  let data = null;
-  try { data = await res.json(); } catch { /* non-JSON body: data stays null */ }
-  if (res.status === 401 && token) _handleAuthExpired();
-  if (!res.ok) {
-    const e = new Error((data && data.error) || `HTTP ${res.status}`);
-    e.status = res.status;
-    throw e;
-  }
-  return data || {};
-}
-
-// Decode a base64url string to Uint8Array (browser-side only).
-function base64UrlToUint8Array(s) {
-  const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = b64.length % 4 ? "=".repeat(4 - b64.length % 4) : "";
-  return Uint8Array.from(atob(b64 + pad), (c) => c.charCodeAt(0));
-}
+const postJSON = (path, body, token) => postAuthJSON(path, body, token, _handleAuthExpired);
+const getJSON = (path, token) => getAuthJSON(path, token, _handleAuthExpired);
 
 // @simplewebauthn/browser's startAuthentication just does
 // `{ ...optionsJSON, challenge: decode(…) }` — it never converts
@@ -128,8 +89,8 @@ function preparePrfOptions(optionsJSON) {
   if (!eval_) return optionsJSON;
   const patched = { ...optionsJSON, extensions: { ...optionsJSON.extensions, prf: { ...optionsJSON.extensions.prf, eval: { ...eval_ } } } };
   const e = patched.extensions.prf.eval;
-  if (typeof e.first === "string")  e.first  = base64UrlToUint8Array(e.first);
-  if (typeof e.second === "string") e.second = base64UrlToUint8Array(e.second);
+  if (typeof e.first === "string")  e.first  = base64UrlToBytes(e.first);
+  if (typeof e.second === "string") e.second = base64UrlToBytes(e.second);
   return patched;
 }
 
@@ -219,7 +180,7 @@ export async function listPasskeys(token) {
 }
 
 export async function renamePasskey(token, credentialId, name) {
-  const res = await fetch(`${API}/passkeys/${encodeURIComponent(credentialId)}`, {
+  const res = await fetch(`${API_BASE}/passkeys/${encodeURIComponent(credentialId)}`, {
     method: "PATCH",
     headers: authHeaders(token),
     body: JSON.stringify({ name }),
@@ -231,7 +192,7 @@ export async function renamePasskey(token, credentialId, name) {
 }
 
 export async function deletePasskey(token, credentialId) {
-  const res = await fetch(`${API}/passkeys/${encodeURIComponent(credentialId)}`, {
+  const res = await fetch(`${API_BASE}/passkeys/${encodeURIComponent(credentialId)}`, {
     method: "DELETE",
     headers: authHeaders(token),
   });

@@ -1,6 +1,8 @@
-import React, { useRef, useState, useEffect, useLayoutEffect } from "react";
+import React, { useRef } from "react";
 import { createPortal } from "react-dom";
 import { t } from "../../i18n";
+import useAnchoredPanel from "../../hooks/useAnchoredPanel.js";
+import { anchoredArrowStyle } from "../../utils/anchoredPanel.js";
 
 /**
  * Logo picker popover.
@@ -26,42 +28,9 @@ export default function LogoPickerPopover({
   onDeleteLogo,
 }) {
   const panelRef = useRef(null);
-  const [pos, setPos] = useState({ top: 0, left: 0, dropUp: false, arrowLeft: 0 });
-
   const PANEL_W = 256;
 
-  useLayoutEffect(() => {
-    if (!open) return;
-    const place = () => {
-      const a = anchorRef?.current;
-      if (!a) return;
-      const r = a.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - r.bottom;
-      const dropUp = spaceBelow < 280;
-      let left = Math.min(r.left, window.innerWidth - PANEL_W - 8);
-      left = Math.max(8, left);
-      const arrowLeft = r.left + r.width / 2 - left - 6;
-      setPos({ top: dropUp ? r.top - 8 : r.bottom + 8, left, dropUp, arrowLeft });
-    };
-    place();
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
-  }, [open, anchorRef]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e) => {
-      if (panelRef.current?.contains(e.target)) return;
-      if (anchorRef?.current?.contains(e.target)) return;
-      onClose?.();
-    };
-    document.addEventListener("mousedown", onDown, true);
-    return () => document.removeEventListener("mousedown", onDown, true);
-  }, [open, onClose, anchorRef]);
+  const pos = useAnchoredPanel({ open, anchorRef, panelRef, onClose, width: PANEL_W, minSpaceBelow: 280, followScroll: true });
 
   if (!open) return null;
 
@@ -76,8 +45,6 @@ export default function LogoPickerPopover({
   };
 
   const arrowDir = pos.dropUp ? "down" : "up";
-  const nearLeft = (pos.arrowLeft || 0) < 20;
-  const nearRight = (pos.arrowLeft || 0) > PANEL_W - 32;
 
   return createPortal(
     <div
@@ -85,11 +52,7 @@ export default function LogoPickerPopover({
       data-arrow={arrowDir}
       style={{
         ...panelStyle,
-        '--arrow-left': `${pos.arrowLeft || 0}px`,
-        ...(nearLeft && arrowDir === "up" && { borderTopLeftRadius: '4px' }),
-        ...(nearLeft && arrowDir === "down" && { borderBottomLeftRadius: '4px' }),
-        ...(nearRight && arrowDir === "up" && { borderTopRightRadius: '4px' }),
-        ...(nearRight && arrowDir === "down" && { borderBottomRightRadius: '4px' }),
+        ...anchoredArrowStyle(pos.arrowLeft, arrowDir, PANEL_W - 32),
       }}
       className={`rounded-2xl shadow-2xl border ring-1 ring-black/5 dark:ring-white/5 p-3 ${
         dark ? "bg-gray-900 border-gray-700/50" : "bg-white border-gray-100/80"

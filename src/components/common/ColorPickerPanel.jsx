@@ -1,41 +1,13 @@
-import React, { useRef, useState, useEffect, useLayoutEffect } from "react";
+import React, { useRef } from "react";
 import { createPortal } from "react-dom";
 import { trColorName, solid, bgFor } from "../../utils/colors.js";
+import useAnchoredPanel from "../../hooks/useAnchoredPanel.js";
+import { anchoredArrowStyle } from "../../utils/anchoredPanel.js";
 
 /** ---------- Color Picker Panel ---------- */
 export default function ColorPickerPanel({ anchorRef, open, onClose, colors, selectedColor, darkMode, onSelect }) {
   const panelRef = useRef(null);
-  const [pos, setPos] = useState({ top: 0, left: 0, dropUp: false });
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    const place = () => {
-      const a = anchorRef?.current;
-      if (!a) return;
-      const r = a.getBoundingClientRect();
-      const panelW = 256;
-      const spaceBelow = window.innerHeight - r.bottom;
-      const dropUp = spaceBelow < 240;
-      let left = Math.min(r.left, window.innerWidth - panelW - 8);
-      left = Math.max(8, left);
-      const arrowLeft = r.left + r.width / 2 - left - 6;
-      setPos({ top: dropUp ? r.top - 8 : r.bottom + 8, left, dropUp, arrowLeft });
-    };
-    place();
-    window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-  }, [open, anchorRef]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e) => {
-      if (panelRef.current?.contains(e.target)) return;
-      if (anchorRef?.current?.contains(e.target)) return;
-      onClose?.();
-    };
-    document.addEventListener("mousedown", onDown, true);
-    return () => document.removeEventListener("mousedown", onDown, true);
-  }, [open, onClose, anchorRef]);
+  const pos = useAnchoredPanel({ open, anchorRef, panelRef, onClose, width: 256, minSpaceBelow: 240 });
 
   if (!open) return null;
   const panelStyle = {
@@ -49,8 +21,6 @@ export default function ColorPickerPanel({ anchorRef, open, onClose, colors, sel
   };
 
   const arrowDir = pos.dropUp ? "down" : "up";
-  const nearLeft = (pos.arrowLeft || 0) < 20;
-  const nearRight = (pos.arrowLeft || 0) > 220;
 
   return createPortal(
     <div
@@ -58,11 +28,7 @@ export default function ColorPickerPanel({ anchorRef, open, onClose, colors, sel
       data-arrow={arrowDir}
       style={{
         ...panelStyle,
-        '--arrow-left': `${pos.arrowLeft || 0}px`,
-        ...(nearLeft && arrowDir === "up" && { borderTopLeftRadius: '4px' }),
-        ...(nearLeft && arrowDir === "down" && { borderBottomLeftRadius: '4px' }),
-        ...(nearRight && arrowDir === "up" && { borderTopRightRadius: '4px' }),
-        ...(nearRight && arrowDir === "down" && { borderBottomRightRadius: '4px' }),
+        ...anchoredArrowStyle(pos.arrowLeft, arrowDir, 220),
       }}
       className={`rounded-2xl shadow-2xl backdrop-blur-xl border ring-1 ring-black/5 dark:ring-white/5 p-3 ${
         darkMode

@@ -10,7 +10,7 @@
 // single class on <html>. No colours are hardcoded here except the small
 // swatch triplets used purely to draw the picker chips.
 
-import { setThemeColor, currentStatusBarColor } from "../utils/helpers.js";
+import { setThemeColor, currentStatusBarColor } from "../utils/systemBars.js";
 
 export const DEFAULT_SHELL_THEME = "glasskeep";
 

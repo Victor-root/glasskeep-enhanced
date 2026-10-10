@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { t } from "../../i18n";
 import AuthShell from "./AuthShell.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
+import { AUTH_INPUT_CLASSES, WIDE_SUBMIT_CLASSES } from "../common/fieldClasses.js";
 
 export default function RegisterView({ dark, onToggleDark, onRegister, goLogin, floatingCardsEnabled, loginSlogan }) {
   const [name, setName] = useState("");
@@ -65,7 +66,7 @@ export default function RegisterView({ dark, onToggleDark, onRegister, goLogin, 
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
           type="text"
-          className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+          className={AUTH_INPUT_CLASSES}
           placeholder={t("name")}
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -73,7 +74,7 @@ export default function RegisterView({ dark, onToggleDark, onRegister, goLogin, 
         <input
           type="text"
           autoComplete="username"
-          className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+          className={AUTH_INPUT_CLASSES}
           placeholder={t("username")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -81,7 +82,7 @@ export default function RegisterView({ dark, onToggleDark, onRegister, goLogin, 
         />
         <input
           type="password"
-          className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+          className={AUTH_INPUT_CLASSES}
           placeholder={t("passwordMin6")}
           value={pw}
           onChange={(e) => setPw(e.target.value)}
@@ -89,7 +90,7 @@ export default function RegisterView({ dark, onToggleDark, onRegister, goLogin, 
         />
         <input
           type="password"
-          className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+          className={AUTH_INPUT_CLASSES}
           placeholder={t("confirmPassword")}
           value={pw2}
           onChange={(e) => setPw2(e.target.value)}
@@ -98,7 +99,7 @@ export default function RegisterView({ dark, onToggleDark, onRegister, goLogin, 
         {err && <p className="text-red-600 text-sm">{err}</p>}
         <button
           type="submit"
-          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+          className={WIDE_SUBMIT_CLASSES}
         >{t("createAccount")}</button>
       </form>
       <div className="mt-4 text-sm text-center">

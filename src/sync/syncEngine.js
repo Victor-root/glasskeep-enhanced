@@ -10,10 +10,10 @@ import {
   purgeQueueForNote,
 } from "./localDb.js";
 import { t } from "../i18n";
+import { API_BASE } from "../utils/api.js";
 import { netLog, netProbe } from "../utils/netDebug.js";
 
-const API_BASE = "/api";
-const MAX_RETRIES = 5;
+export const MAX_RETRIES = 5;
 const BASE_RETRY_DELAY = 2000; // 2s, 4s, 8s, 16s, 32s
 const QUEUE_ITEM_DELAY = 200;  // ms between queue items to avoid rate limiting
 

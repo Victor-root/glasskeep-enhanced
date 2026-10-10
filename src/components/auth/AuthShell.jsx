@@ -4,6 +4,22 @@ import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
 import { useBranding, DEFAULT_APP_NAME } from "../../branding/BrandingContext.jsx";
 import { applyShellThemeClass, applyStoredShellTheme, DEFAULT_SHELL_THEME } from "../../theme/shellTheme.js";
+import DecoCard from "../common/DecoCard.jsx";
+
+// Decorative floating note cards behind the sign-in card.
+const AUTH_CARDS = [
+  { rot: "-12deg", dur: "7s", delay: "0s", pos: { top: "8%", left: "6%" }, color: "99,102,241", lines: ["90%", "75%", "60%"] },
+  { rot: "5deg", dur: "9s", delay: "-2s", pos: { top: "42%", left: "3%" }, color: "168,85,247", lines: ["85%", "55%"] },
+  { rot: "8deg", dur: "8s", delay: "-4s", pos: { bottom: "10%", left: "9%" }, color: "16,185,129", lines: ["80%", "65%", "45%"] },
+  { rot: "6deg", dur: "10s", delay: "-1s", pos: { top: "6%", right: "7%" }, color: "245,158,11", lines: ["88%", "70%"] },
+  { rot: "-8deg", dur: "7.5s", delay: "-3s", pos: { top: "38%", right: "4%" }, color: "236,72,153", lines: ["90%", "60%", "78%"] },
+  { rot: "-15deg", dur: "11s", delay: "-5s", pos: { bottom: "8%", right: "8%" }, color: "20,184,166", lines: ["75%", "50%"] },
+  // Extra cards, visible only on md+ screens to fill the gap
+  { rot: "10deg", dur: "8.5s", delay: "-1.5s", pos: { top: "18%", left: "22%" }, color: "249,115,22", lines: ["82%", "64%", "50%"], wideOnly: true },
+  { rot: "-6deg", dur: "9.5s", delay: "-6s", pos: { bottom: "20%", left: "20%" }, color: "14,165,233", lines: ["88%", "58%"], wideOnly: true },
+  { rot: "-9deg", dur: "10.5s", delay: "-2.5s", pos: { top: "14%", right: "20%" }, color: "132,204,22", lines: ["76%", "92%", "55%"], wideOnly: true },
+  { rot: "7deg", dur: "8s", delay: "-7s", pos: { bottom: "18%", right: "18%" }, color: "244,63,94", lines: ["80%", "62%"], wideOnly: true },
+];
 
 // Clear the boot-time placeholder (colour + BlurHash painted on the body
 // background by the inline script in index.html) once React owns the
@@ -139,64 +155,8 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
           />
         </div>
       )}
-      {/* Decorative floating note cards */}
       {showDecoCards && <div aria-hidden="true">
-        <div className="login-deco-card" style={{"--rot":"-12deg","--dur":"7s","--delay":"0s",top:"8%",left:"6%",borderTop:"3px solid rgba(99,102,241,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(99,102,241,0.5)"}}/>
-          <div className="deco-line" style={{width:"90%"}}/>
-          <div className="deco-line" style={{width:"75%"}}/>
-          <div className="deco-line" style={{width:"60%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"5deg","--dur":"9s","--delay":"-2s",top:"42%",left:"3%",borderTop:"3px solid rgba(168,85,247,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(168,85,247,0.5)"}}/>
-          <div className="deco-line" style={{width:"85%"}}/>
-          <div className="deco-line" style={{width:"55%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"8deg","--dur":"8s","--delay":"-4s",bottom:"10%",left:"9%",borderTop:"3px solid rgba(16,185,129,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(16,185,129,0.5)"}}/>
-          <div className="deco-line" style={{width:"80%"}}/>
-          <div className="deco-line" style={{width:"65%"}}/>
-          <div className="deco-line" style={{width:"45%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"6deg","--dur":"10s","--delay":"-1s",top:"6%",right:"7%",borderTop:"3px solid rgba(245,158,11,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(245,158,11,0.5)"}}/>
-          <div className="deco-line" style={{width:"88%"}}/>
-          <div className="deco-line" style={{width:"70%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"-8deg","--dur":"7.5s","--delay":"-3s",top:"38%",right:"4%",borderTop:"3px solid rgba(236,72,153,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(236,72,153,0.5)"}}/>
-          <div className="deco-line" style={{width:"90%"}}/>
-          <div className="deco-line" style={{width:"60%"}}/>
-          <div className="deco-line" style={{width:"78%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"-15deg","--dur":"11s","--delay":"-5s",bottom:"8%",right:"8%",borderTop:"3px solid rgba(20,184,166,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(20,184,166,0.5)"}}/>
-          <div className="deco-line" style={{width:"75%"}}/>
-          <div className="deco-line" style={{width:"50%"}}/>
-        </div>
-        {/* Extra cards — visible only on md+ screens to fill the gap */}
-        <div className="login-deco-card hidden md:block" style={{"--rot":"10deg","--dur":"8.5s","--delay":"-1.5s",top:"18%",left:"22%",borderTop:"3px solid rgba(249,115,22,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(249,115,22,0.5)"}}/>
-          <div className="deco-line" style={{width:"82%"}}/>
-          <div className="deco-line" style={{width:"64%"}}/>
-          <div className="deco-line" style={{width:"50%"}}/>
-        </div>
-        <div className="login-deco-card hidden md:block" style={{"--rot":"-6deg","--dur":"9.5s","--delay":"-6s",bottom:"20%",left:"20%",borderTop:"3px solid rgba(14,165,233,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(14,165,233,0.5)"}}/>
-          <div className="deco-line" style={{width:"88%"}}/>
-          <div className="deco-line" style={{width:"58%"}}/>
-        </div>
-        <div className="login-deco-card hidden md:block" style={{"--rot":"-9deg","--dur":"10.5s","--delay":"-2.5s",top:"14%",right:"20%",borderTop:"3px solid rgba(132,204,22,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(132,204,22,0.5)"}}/>
-          <div className="deco-line" style={{width:"76%"}}/>
-          <div className="deco-line" style={{width:"92%"}}/>
-          <div className="deco-line" style={{width:"55%"}}/>
-        </div>
-        <div className="login-deco-card hidden md:block" style={{"--rot":"7deg","--dur":"8s","--delay":"-7s",bottom:"18%",right:"18%",borderTop:"3px solid rgba(244,63,94,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(244,63,94,0.5)"}}/>
-          <div className="deco-line" style={{width:"80%"}}/>
-          <div className="deco-line" style={{width:"62%"}}/>
-        </div>
+        {AUTH_CARDS.map((card, i) => <DecoCard key={i} {...card} />)}
       </div>}
       {/* Centered card area, takes the remaining vertical space so the
           footer below stays in normal flow and never overlaps the card

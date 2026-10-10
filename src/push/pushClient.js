@@ -12,6 +12,7 @@
 
 import { api } from "../utils/api.js";
 import { locale } from "../i18n";
+import { base64UrlToBytes } from "../utils/base64url.js";
 
 // True when the browser has the APIs Web Push needs. Note: on iOS this is
 // only true inside an installed (home-screen) PWA, never in a Safari tab.
@@ -29,16 +30,6 @@ export function isPushSupported() {
 export function getPushPermission() {
   if (!isPushSupported()) return "unsupported";
   return Notification.permission;
-}
-
-// VAPID public keys are base64url; PushManager wants a Uint8Array.
-function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(base64);
-  const output = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) output[i] = raw.charCodeAt(i);
-  return output;
 }
 
 async function getRegistration() {
@@ -89,7 +80,7 @@ export async function enablePush(token) {
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key),
+        applicationServerKey: base64UrlToBytes(key),
       });
     }
 

@@ -3,11 +3,14 @@ import {
   getAllNotes as idbGetAllNotes,
   getNote as idbGetNote,
   putNote as idbPutNote,
+  patchNote as idbPatchNote,
   deleteNote as idbDeleteNote,
 } from "../sync/localDb.js";
 import { mdForDownload } from "../utils/markdown.jsx";
 import { localizeServerError } from "../utils/serverErrors.js";
-import { uid, sanitizeFilename, triggerBlobDownload, ensureJSZip, fileToCompressedDataURL } from "../utils/helpers.js";
+import { uid } from "../utils/ids.js";
+import { sanitizeFilename, triggerBlobDownload, ensureJSZip } from "../utils/files.js";
+import { fileToCompressedDataURL } from "../utils/images.js";
 import { computeRestoredPosition, sortByPositionDesc } from "../utils/noteList.js";
 
 /**
@@ -73,8 +76,7 @@ export default function useBulkActions({
               try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
             } else {
               try {
-                const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-                if (existing) await idbPutNote({ ...existing, trashed: true, client_updated_at: nowIso }, currentUser?.id, sessionId);
+                await idbPatchNote(nid, { trashed: true, client_updated_at: nowIso }, currentUser?.id, sessionId);
               } catch (e) { console.error(e); }
             }
             await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
@@ -124,8 +126,7 @@ export default function useBulkActions({
       const nid = String(id);
       const leaseId = acquireLocalLease(nid);
       try {
-        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, pinned: !!pinnedVal, client_updated_at: nowIso }, currentUser?.id, sessionId);
+        await idbPatchNote(nid, { pinned: !!pinnedVal, client_updated_at: nowIso }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
       await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { pinned: !!pinnedVal, client_updated_at: nowIso } }, leaseId);
     }
@@ -171,8 +172,7 @@ export default function useBulkActions({
       const nid = String(id);
       const leaseId = acquireLocalLease(nid);
       try {
-        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, archived: !!archivedValue, client_updated_at: nowIso }, currentUser?.id, sessionId);
+        await idbPatchNote(nid, { archived: !!archivedValue, client_updated_at: nowIso }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
       await enqueueWithLease(nid, { type: "archive", noteId: nid, payload: { archived: !!archivedValue, client_updated_at: nowIso } }, leaseId);
     }
@@ -207,8 +207,7 @@ export default function useBulkActions({
       const nid = String(id);
       const leaseId = acquireLocalLease(nid);
       try {
-        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, color: colorName, client_updated_at: nowIso }, currentUser?.id, sessionId);
+        await idbPatchNote(nid, { color: colorName, client_updated_at: nowIso }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
       await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { color: colorName, client_updated_at: nowIso } }, leaseId);
     }

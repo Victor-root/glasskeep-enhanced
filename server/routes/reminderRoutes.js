@@ -5,7 +5,7 @@
 // itself lives in services/reminderDispatch.js.
 
 const { t: serverT } = require("../i18n");
-const { nowISO, validateLwwTimestamp, isNewerOrEqual } = require("../utils/timestamps");
+const { nowISO, readClientUpdatedAt, isNewerOrEqual } = require("../utils/timestamps");
 const { notePreviewText } = require("../utils/notePreview");
 
 function attachReminderRoutes(app, deps) {
@@ -45,10 +45,7 @@ function attachReminderRoutes(app, deps) {
   app.post("/api/notes/:id/reminder", auth, (req, res) => {
     const id = req.params.id;
     const { reminderAt } = req.body || {};
-    if (!req.body?.client_updated_at) {
-      return res.status(400).json({ error: "client_updated_at is required" });
-    }
-    const tsResult = validateLwwTimestamp(req.body.client_updated_at);
+    const tsResult = readClientUpdatedAt(req.body);
     if (tsResult.error) {
       return res.status(400).json({ error: tsResult.error });
     }

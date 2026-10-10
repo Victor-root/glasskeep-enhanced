@@ -1,10 +1,6 @@
 import React from "react";
 import { t } from "../../i18n";
-
-function formatDate(iso) {
-  if (!iso) return null;
-  try { return new Date(iso).toLocaleString(); } catch { return iso; }
-}
+import { formatDateTime } from "../../utils/dates.js";
 
 function Badge({ color, children }) {
   const klass = {
@@ -56,7 +52,7 @@ export default function PasskeyListItem({
         </div>
         <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
           {p.lastUsedAt
-            ? t("passkeyLastUsed").replace("%s", formatDate(p.lastUsedAt))
+            ? t("passkeyLastUsed").replace("%s", formatDateTime(p.lastUsedAt))
             : t("passkeyNeverUsed")}
         </div>
         {!p.prfSupported && isAdmin && encryptionEnabled && (

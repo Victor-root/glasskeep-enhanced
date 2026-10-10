@@ -126,9 +126,8 @@ function createSessions({ db, getUserById }) {
     };
   }
 
-  function auth(req, res, next) {
-    const h = req.headers.authorization || "";
-    const token = h.startsWith("Bearer ") ? h.slice(7) : null;
+  // Lets the request through with `token`'s session, or answers 401.
+  function authWithToken(req, res, next, token) {
     if (!token) return res.status(401).json({ error: "Missing token" });
     try {
       acceptToken(req, token);
@@ -139,20 +138,18 @@ function createSessions({ db, getUserById }) {
     }
   }
 
+  function auth(req, res, next) {
+    const h = req.headers.authorization || "";
+    const token = h.startsWith("Bearer ") ? h.slice(7) : null;
+    return authWithToken(req, res, next, token);
+  }
+
   // Auth that also supports token in query string for EventSource
   function authFromQueryOrHeader(req, res, next) {
     const h = req.headers.authorization || "";
     const headerToken = h.startsWith("Bearer ") ? h.slice(7) : null;
     const queryToken = req.query && typeof req.query.token === "string" ? req.query.token : null;
-    const token = headerToken || queryToken;
-    if (!token) return res.status(401).json({ error: "Missing token" });
-    try {
-      acceptToken(req, token);
-      next();
-    } catch (e) {
-      logAuthFailure(req, token, e);
-      return res.status(401).json({ error: "Invalid token" });
-    }
+    return authWithToken(req, res, next, headerToken || queryToken);
   }
 
   // Next to auth() so the unlock routes, registered before the bulk of

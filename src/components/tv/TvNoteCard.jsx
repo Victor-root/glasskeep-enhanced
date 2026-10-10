@@ -8,6 +8,7 @@ import { Image as ImageLucide, Mic, Pencil, CheckSquare } from "lucide-react";
 import { countItems, countChecked, isItem } from "../../utils/checklist.js";
 import { parseAudioContent } from "../../utils/audioNote.js";
 import DrawingPreview from "../common/DrawingPreview.jsx";
+import { drawingHasStrokes } from "../../utils/drawingContent.js";
 import { isColorDark } from "./tvNoteColors.js";
 
 // Closed note card for TV. Renders into the dark 10-foot palette and
@@ -69,15 +70,10 @@ function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
 
   // Pre-parse the drawing payload once per render so we know whether
   // to show the canvas, just the companion text, or the fallback.
-  const hasStrokes = useMemo(() => {
-    if (!isDraw) return false;
-    try {
-      const parsed = typeof note.content === "string" ? JSON.parse(note.content) : note.content;
-      if (Array.isArray(parsed)) return parsed.some((p) => p?.points?.length);
-      if (Array.isArray(parsed?.paths)) return parsed.paths.some((p) => p?.points?.length);
-      return false;
-    } catch { return false; }
-  }, [isDraw, note.content]);
+  const hasStrokes = useMemo(
+    () => isDraw && drawingHasStrokes(note.content),
+    [isDraw, note.content],
+  );
 
   const handleActivate = (e) => {
     e?.preventDefault?.();

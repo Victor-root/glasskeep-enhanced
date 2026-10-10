@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import { t } from "../../i18n";
 import { TextNoteIcon, ChecklistIcon, BrushIcon, MicIcon } from "../../icons/index.jsx";
-import { setSystemBarsScrim } from "../../utils/helpers.js";
+import { setSystemBarsScrim } from "../../utils/systemBars.js";
 
 // Darkness of the backdrop, matched on the Android status and navigation bars.
 const SCRIM_ALPHA = 0.3;

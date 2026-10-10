@@ -2,7 +2,7 @@ import React from "react";
 import { t } from "../../i18n";
 import { api } from "../../utils/api.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
-import { fileToCompressedDataURL } from "../../utils/helpers.js";
+import { fileToCompressedDataURL } from "../../utils/images.js";
 import UserAvatar from "../common/UserAvatar.jsx";
 
 // Avatar block at the top of the Settings panel: photo upload / removal

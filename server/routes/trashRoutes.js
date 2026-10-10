@@ -4,7 +4,7 @@
 // note), restoring it, listing it, and deleting for good.
 
 const { uid } = require("../utils/ids");
-const { nowISO, validateLwwTimestamp, isNewerOrEqual } = require("../utils/timestamps");
+const { nowISO, readClientUpdatedAt, isNewerOrEqual } = require("../utils/timestamps");
 
 function attachTrashRoutes(app, deps) {
   const {
@@ -35,10 +35,7 @@ function attachTrashRoutes(app, deps) {
   // Trash/Restore notes
   app.post("/api/notes/:id/trash", auth, (req, res) => {
     const id = req.params.id;
-    if (!req.body?.client_updated_at) {
-      return res.status(400).json({ error: "client_updated_at is required" });
-    }
-    const tsResult = validateLwwTimestamp(req.body.client_updated_at);
+    const tsResult = readClientUpdatedAt(req.body);
     if (tsResult.error) {
       return res.status(400).json({ error: tsResult.error });
     }
@@ -315,10 +312,7 @@ function attachTrashRoutes(app, deps) {
 
   app.post("/api/notes/:id/restore", auth, (req, res) => {
     const id = req.params.id;
-    if (!req.body?.client_updated_at) {
-      return res.status(400).json({ error: "client_updated_at is required" });
-    }
-    const tsResult = validateLwwTimestamp(req.body.client_updated_at);
+    const tsResult = readClientUpdatedAt(req.body);
     if (tsResult.error) {
       return res.status(400).json({ error: tsResult.error });
     }
@@ -408,10 +402,7 @@ function attachTrashRoutes(app, deps) {
   app.delete("/api/notes/:id/permanent", auth, (req, res) => {
     const id = req.params.id;
 
-    if (!req.body?.client_updated_at) {
-      return res.status(400).json({ error: "client_updated_at is required" });
-    }
-    const tsResult = validateLwwTimestamp(req.body.client_updated_at);
+    const tsResult = readClientUpdatedAt(req.body);
     if (tsResult.error) {
       return res.status(400).json({ error: tsResult.error });
     }
