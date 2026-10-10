@@ -68,6 +68,22 @@ function createNoteFederation(ctx) {
     return peer.tlsAwareMessage ? peer.tlsAwareMessage(e) : "unreachable";
   }
 
+  // POSTs to the peer of a federated recipient (`shadow`, our local
+  // stand-in for them) the body `makeBody(link, origin)` builds, and
+  // reports whether that peer acknowledged it.
+  async function postToRecipientPeer(shadow, path, makeBody) {
+    const origin = splitOrigin(shadow);
+    if (!origin) return { ok: false, error: "not_federated" };
+    const link = store.getById(origin.linkId);
+    if (!link || link.status !== "active") return { ok: false, error: "peer_not_paired" };
+    try {
+      const resp = await peer.postSigned(link, path, makeBody(link, origin));
+      return { ok: !!(resp.ok && resp.json && resp.json.ok === true) };
+    } catch (e) {
+      return { ok: false, error: unreachable(e) };
+    }
+  }
+
   const {
     handleIncomingRemove,
     handleIncomingUnshareRecipient,
@@ -75,7 +91,7 @@ function createNoteFederation(ctx) {
     sweepOrphanedMappings,
     markShareEnding,
     onRemoteRecipientRemoved,
-  } = createNoteTeardown({ ...shared, findRealUser, splitOrigin, unreachable, onNoteChangedLocally });
+  } = createNoteTeardown({ ...shared, findRealUser, splitOrigin, postToRecipientPeer, onNoteChangedLocally });
 
   // Seed a collaborator's per-user position so a freshly shared note
   // lands at the top of their list (mirrors the local share flow).
@@ -408,19 +424,10 @@ function createNoteFederation(ctx) {
   // The owner toggled a federated recipient between read-only / read-write;
   // push it so their mirror copy flips immediately. `shadow` is our local
   // stand-in for that recipient (federated_origin = `${linkId}|${ref}`).
-  async function setRemotePermission({ note, shadow, canWrite }) {
-    const origin = splitOrigin(shadow);
-    if (!origin) return { ok: false, error: "not_federated" };
-    const link = store.getById(origin.linkId);
-    if (!link || link.status !== "active") return { ok: false, error: "peer_not_paired" };
-    try {
-      const resp = await peer.postSigned(link, "/api/federation/notes/permission", {
-        linkId: link.id, noteId: note.id, targetRef: origin.ref, canWrite: canWrite ? 1 : 0,
-      });
-      return { ok: !!(resp.ok && resp.json && resp.json.ok === true) };
-    } catch (e) {
-      return { ok: false, error: unreachable(e) };
-    }
+  function setRemotePermission({ note, shadow, canWrite }) {
+    return postToRecipientPeer(shadow, "/api/federation/notes/permission", (link, origin) => ({
+      linkId: link.id, noteId: note.id, targetRef: origin.ref, canWrite: canWrite ? 1 : 0,
+    }));
   }
 
   // ── Inbound: the peer changed a recipient's access on a note we mirror ─

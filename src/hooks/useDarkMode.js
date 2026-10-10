@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { setThemeColor, currentStatusBarColor } from "../utils/helpers.js";
+import { setThemeColor, currentStatusBarColor } from "../utils/systemBars.js";
 
 const MANUAL_PREF_KEY = "glass-keep-dark-mode-manual";
 

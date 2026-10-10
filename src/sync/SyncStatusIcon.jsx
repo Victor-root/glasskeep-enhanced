@@ -5,6 +5,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { t } from "../i18n";
 import { useSwallowClosingClick } from "../hooks/useSwallowClosingClick.js";
 import Sheet from "../components/common/Sheet.jsx";
+import { MAX_RETRIES } from "./syncEngine.js";
+import { SHEET_BREAKPOINT_PX } from "../utils/constants.js";
 
 // ─── SVG Icons ───
 
@@ -72,9 +74,6 @@ const LockBadge = ({ className }) => (
     <path d="M8 11V8a4 4 0 1 1 8 0v3" fill="none" strokeWidth="2.5" />
   </svg>
 );
-
-const MAX_RETRIES = 5; // must match syncEngine.js
-const SHEET_BREAKPOINT_PX = 640;
 
 // ─── Status config ───
 

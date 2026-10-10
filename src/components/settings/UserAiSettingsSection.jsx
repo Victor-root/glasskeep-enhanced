@@ -12,7 +12,8 @@ import { t } from "../../i18n";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import { useStableCallback } from "../../hooks/useStableCallback.js";
 import TI from "../../icons/editor/index.jsx";
-import { FIELD_INPUT_CLASSES } from "./fieldClasses.js";
+import AiProviderFields, { AiTestResult } from "./AiProviderFields.jsx";
+import useAiProviderFields from "../../hooks/useAiProviderFields.js";
 
 function PrivacyWarning({ tone = "amber" }) {
   const palette =
@@ -30,8 +31,11 @@ function PrivacyWarning({ tone = "amber" }) {
 export default function UserAiSettingsSection({ token, showToast, onEnabledChange }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState(null);
+  const {
+    testing, testResult, setTestResult, runTest,
+    applyProviderConfig, providerBody, withApiKeyDraft, fields,
+  } = useAiProviderFields(token);
+  const { baseUrl, model } = fields;
 
   const [enabled, setEnabled] = useState(false);
   const [mode, setMode] = useState("server");
@@ -40,14 +44,6 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
   // the user toggle is greyed out and the rest of the form is hidden —
   // no mode is usable (not even custom) while AI is admin-disabled.
   const [adminAiEnabled, setAdminAiEnabled] = useState(true);
-
-  const [baseUrl, setBaseUrl] = useState("");
-  const [model, setModel] = useState("");
-  const [apiKeyDraft, setApiKeyDraft] = useState("");
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [showKey, setShowKey] = useState(false);
-  const [temperature, setTemperature] = useState(0.3);
-  const [maxTokens, setMaxTokens] = useState(800);
 
   // Pinned in a ref to keep the load effect independent from each
   // parent re-render.
@@ -64,29 +60,21 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
     setMode(data.mode === "custom" ? "custom" : "server");
     setServerAiAvailable(!!data.serverAiAvailable);
     setAdminAiEnabled(data.adminAiEnabled !== false);
-    setBaseUrl(data.baseUrl || "");
-    setModel(data.model || "");
-    setHasApiKey(!!data.hasApiKey);
-    setApiKeyDraft("");
-    setTemperature(
-      typeof data.temperature === "number" ? data.temperature : 0.3,
-    );
-    setMaxTokens(
-      typeof data.maxTokens === "number" ? data.maxTokens : 800,
-    );
+    applyProviderConfig(data);
     onEnabledChangeRef.current?.(
       !!data.enabled && data.adminAiEnabled !== false,
     );
   };
-  const applyRemoteConfig = useStableCallback(applyConfig);
+  // For the effects' callbacks, which run after the render they come from.
+  const applyLatestConfig = useStableCallback(applyConfig);
 
   useEffect(() => {
     const onRemote = (e) => {
-      if (e.detail) applyRemoteConfig(e.detail);
+      if (e.detail) applyLatestConfig(e.detail);
     };
     window.addEventListener("user-ai-settings-updated", onRemote);
     return () => window.removeEventListener("user-ai-settings-updated", onRemote);
-  }, [applyRemoteConfig]);
+  }, [applyLatestConfig]);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,7 +84,7 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
       try {
         const data = await api("/user/ai/settings", { token });
         if (cancelled) return;
-        applyConfig(data);
+        applyLatestConfig(data);
       } catch (err) {
         // Background load: this panel mounts (and fetches) even while the
         // Settings panel is closed, so a failed initial fetch must stay
@@ -113,21 +101,14 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, applyLatestConfig]);
 
-  const buildPatch = (overrides = {}) => {
-    const patch = {
-      enabled,
-      mode,
-      baseUrl: baseUrl.trim(),
-      model: model.trim(),
-      temperature: Number(temperature),
-      maxTokens: Math.round(Number(maxTokens) || 0),
-      ...overrides,
-    };
-    if (apiKeyDraft.length > 0) patch.apiKey = apiKeyDraft;
-    return patch;
-  };
+  const buildPatch = (overrides = {}) => withApiKeyDraft({
+    enabled,
+    mode,
+    ...providerBody(),
+    ...overrides,
+  });
 
   const persistPatch = async (patch) => {
     setSaving(true);
@@ -182,51 +163,10 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
     }
   };
 
-  const onTest = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const body = { mode };
-      if (mode === "custom") {
-        body.baseUrl = baseUrl.trim();
-        body.model = model.trim();
-        body.temperature = Number(temperature);
-        body.maxTokens = Math.round(Number(maxTokens) || 0);
-        if (apiKeyDraft.length > 0) body.apiKey = apiKeyDraft;
-      }
-      const data = await api("/user/ai/test", {
-        method: "POST",
-        token,
-        timeoutMs: 60000,
-        body,
-      });
-      setTestResult({
-        ok: true,
-        message: data?.reply
-          ? `${t("aiTestOk")} : ${data.reply}`
-          : t("aiTestOk"),
-      });
-    } catch (err) {
-      const raw = String(err?.message || "");
-      const localized = localizeServerError(raw, "aiTestFailed");
-      // Test button is for diagnostics — keep the raw provider/reason
-      // tail that localizeServerError strips, so the user can act on it.
-      const detail =
-        raw.match(/^AI provider error:\s*(.+)$/)?.[1] ||
-        raw.match(/^Failed to reach AI provider\s*\((.+)\)\.?$/)?.[1] ||
-        null;
-      setTestResult({
-        ok: false,
-        message: detail && !localized.includes(detail) ? `${localized} : ${detail}` : localized,
-      });
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const apiKeyPlaceholder = hasApiKey
-    ? t("aiApiKeyPlaceholderSet")
-    : t("aiApiKeyPlaceholder");
+  const onTest = () => runTest(
+    "/user/ai/test",
+    mode === "custom" ? withApiKeyDraft({ mode, ...providerBody() }) : { mode },
+  );
 
   // When the admin has fully disabled AI, the user can't enable
   // anything — not even a custom provider. The toggle stays off and
@@ -331,149 +271,16 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
             <>
               <PrivacyWarning />
 
-              {/* Base URL */}
-              <div className="space-y-1">
-                <label htmlFor="user-ai-base-url" className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  {t("aiBaseUrlLabel")}
-                </label>
-                <input
-                  id="user-ai-base-url"
-                  type="url"
-                  inputMode="url"
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder={t("aiBaseUrlPlaceholder")}
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  disabled={loading || saving}
-                  className={FIELD_INPUT_CLASSES}
-                />
-                <p className="text-xs text-gray-500">{t("aiBaseUrlHint")}</p>
-              </div>
-
-              {/* Model */}
-              <div className="space-y-1">
-                <label htmlFor="user-ai-model" className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  {t("aiModelLabel")}
-                </label>
-                <input
-                  id="user-ai-model"
-                  type="text"
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder={t("aiModelPlaceholder")}
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  disabled={loading || saving}
-                  className={FIELD_INPUT_CLASSES}
-                />
-                <p className="text-xs text-gray-500">{t("aiModelHint")}</p>
-              </div>
-
-              {/* API Key */}
-              <div className="space-y-1">
-                <label htmlFor="user-ai-api-key" className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  {t("aiApiKeyLabel")}
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    id="user-ai-api-key"
-                    type={showKey ? "text" : "password"}
-                    autoComplete="off"
-                    spellCheck={false}
-                    placeholder={apiKeyPlaceholder}
-                    value={apiKeyDraft}
-                    onChange={(e) => setApiKeyDraft(e.target.value)}
-                    disabled={loading || saving}
-                    className={FIELD_INPUT_CLASSES}
-                  />
-                  {(!hasApiKey || apiKeyDraft.length > 0) && (
-                    <button
-                      type="button"
-                      onClick={() => setShowKey((v) => !v)}
-                      disabled={loading || saving}
-                      className="shrink-0 px-3 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50"
-                      aria-label={showKey ? t("hide") : t("show")}
-                      data-tooltip={showKey ? t("hide") : t("show")}
-                    >
-                      {showKey ? (
-                        <TI.EyeOff className="tabler-icon w-4 h-4" />
-                      ) : (
-                        <TI.Eye className="tabler-icon w-4 h-4" />
-                      )}
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
-                  <span>{t("aiApiKeyHint")}</span>
-                  {hasApiKey && (
-                    <button
-                      type="button"
-                      onClick={onClearKey}
-                      disabled={loading || saving}
-                      className="text-red-600 hover:underline disabled:opacity-50"
-                    >
-                      {t("aiApiKeyClear")}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Temperature + Max tokens */}
-              <div className="space-y-1">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label htmlFor="user-ai-temperature" className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      {t("aiTemperatureLabel")}
-                    </label>
-                    <input
-                      id="user-ai-temperature"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="2"
-                      value={temperature}
-                      onChange={(e) => setTemperature(e.target.value)}
-                      disabled={loading || saving}
-                      className={FIELD_INPUT_CLASSES}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label htmlFor="user-ai-max-tokens" className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      {t("aiMaxTokensLabel")}
-                    </label>
-                    <input
-                      id="user-ai-max-tokens"
-                      type="number"
-                      step="1"
-                      min="1"
-                      max="32768"
-                      value={maxTokens}
-                      onChange={(e) => setMaxTokens(e.target.value)}
-                      disabled={loading || saving}
-                      className={FIELD_INPUT_CLASSES}
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 pt-1">
-                  {t("aiAdvancedFieldsHint")}
-                </p>
-              </div>
+              <AiProviderFields
+                idPrefix="user-ai"
+                fields={fields}
+                disabled={loading || saving}
+                onClearKey={onClearKey}
+              />
             </>
           )}
 
-          {/* Test result */}
-          {testResult && (
-            <div
-              className={`rounded-lg px-3 py-2 text-sm ${
-                testResult.ok
-                  ? "bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200"
-                  : "bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200"
-              }`}
-            >
-              {testResult.message}
-            </div>
-          )}
+          <AiTestResult result={testResult} />
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2">

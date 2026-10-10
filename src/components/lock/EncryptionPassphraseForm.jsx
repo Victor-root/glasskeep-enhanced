@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { api } from "../../utils/api.js";
 import { t } from "../../i18n";
 import { localizeServerError } from "../../utils/serverErrors.js";
+import { PASSPHRASE_INPUT_CLASSES } from "../common/fieldClasses.js";
 
 // Changes the encryption passphrase.
 export default function EncryptionPassphraseForm({ token, showToast }) {
@@ -49,7 +50,7 @@ export default function EncryptionPassphraseForm({ token, showToast }) {
         placeholder={t("encryptionCurrentPassphraseLabel")}
         value={current}
         onChange={(e) => setCurrent(e.target.value)}
-        className="w-full px-3 py-2 rounded-md border border-[var(--border-light)] bg-white/70 dark:bg-gray-800/60"
+        className={PASSPHRASE_INPUT_CLASSES}
         disabled={busy}
       />
       <input
@@ -58,7 +59,7 @@ export default function EncryptionPassphraseForm({ token, showToast }) {
         placeholder={t("encryptionNewPassphraseLabel")}
         value={next}
         onChange={(e) => setNext(e.target.value)}
-        className="w-full px-3 py-2 rounded-md border border-[var(--border-light)] bg-white/70 dark:bg-gray-800/60"
+        className={PASSPHRASE_INPUT_CLASSES}
         disabled={busy}
       />
       <input
@@ -67,7 +68,7 @@ export default function EncryptionPassphraseForm({ token, showToast }) {
         placeholder={t("encryptionPassphraseConfirmLabel")}
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
-        className="w-full px-3 py-2 rounded-md border border-[var(--border-light)] bg-white/70 dark:bg-gray-800/60"
+        className={PASSPHRASE_INPUT_CLASSES}
         disabled={busy}
       />
       {err && <div className="text-sm text-red-600 dark:text-red-400">{err}</div>}

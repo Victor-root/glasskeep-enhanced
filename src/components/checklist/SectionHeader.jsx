@@ -1,6 +1,8 @@
 import React from "react";
 import { t } from "../../i18n";
 import { useSwallowClosingClick } from "../../hooks/useSwallowClosingClick.js";
+import useBlurOnKeyboardClose from "../../hooks/useBlurOnKeyboardClose.js";
+import useTimedConfirm from "../../hooks/useTimedConfirm.js";
 import { useDark } from "./useDark.js";
 import SectionColorPicker from "./SectionColorPicker.jsx";
 import GripDots from "./GripDots.jsx";
@@ -44,10 +46,8 @@ export default function SectionHeader({
   readOnly = false,
 }) {
   const [editing, setEditing] = React.useState(!readOnly && !section.title);
-  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const inputRef = React.useRef(null);
-  const confirmTimerRef = React.useRef(null);
   const enterPressedRef = React.useRef(false);
   const triggerBtnRef = React.useRef(null);
   const swallowClickOf = useSwallowClosingClick();
@@ -56,27 +56,7 @@ export default function SectionHeader({
   const colorKey = section.color ?? "none";
   const colorHex = SECTION_COLORS.find((c) => c.key === colorKey)?.hex ?? null;
 
-  React.useEffect(() => {
-    if (!editing || !window.visualViewport) return;
-    // Skipped on iOS Safari: visualViewport emits unstable bounces while the
-    // keyboard is opening, which would immediately blur the input — same issue
-    // as ChecklistRow. iOS already blurs naturally on Done.
-    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-    const isIOS =
-      /iPad|iPhone|iPod/.test(ua) ||
-      (typeof navigator !== "undefined" &&
-        navigator.platform === "MacIntel" &&
-        navigator.maxTouchPoints > 1);
-    if (isIOS) return;
-    let prevH = window.visualViewport.height;
-    const onResize = () => {
-      const h = window.visualViewport.height;
-      if (h - prevH > 150) inputRef.current?.blur();
-      prevH = h;
-    };
-    window.visualViewport.addEventListener("resize", onResize);
-    return () => window.visualViewport.removeEventListener("resize", onResize);
-  }, [editing]);
+  useBlurOnKeyboardClose(editing, inputRef);
 
   React.useEffect(() => {
     if (editing && inputRef.current) {
@@ -85,13 +65,7 @@ export default function SectionHeader({
     }
   }, [editing]);
 
-  React.useEffect(() => {
-    if (!confirmingDelete) return;
-    confirmTimerRef.current = setTimeout(() => setConfirmingDelete(false), 3000);
-    return () => {
-      if (confirmTimerRef.current) { clearTimeout(confirmTimerRef.current); confirmTimerRef.current = null; }
-    };
-  }, [confirmingDelete]);
+  const [confirmingDelete, setConfirmingDelete] = useTimedConfirm();
 
   const commit = (value) => {
     onRename((value ?? "").trim());

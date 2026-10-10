@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { api } from "../../utils/api.js";
+import { api, AUTH_KEY } from "../../utils/api.js";
 import { t } from "../../i18n";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import EncryptionRecoveryKeyBlock from "./EncryptionRecoveryKeyBlock.jsx";
+import { PASSPHRASE_INPUT_CLASSES } from "../common/fieldClasses.js";
 
 // Turns encryption on: passphrase + confirmation, then the recovery key.
 export default function EncryptionActivationForm({ onActivated, showToast }) {
@@ -45,8 +46,8 @@ export default function EncryptionActivationForm({ onActivated, showToast }) {
       const res = await api("/instance/activate", {
         method: "POST",
         body: { passphrase, confirmPassphrase: confirm },
-        token: window.localStorage.getItem("glass-keep-auth")
-          ? JSON.parse(window.localStorage.getItem("glass-keep-auth"))?.token
+        token: window.localStorage.getItem(AUTH_KEY)
+          ? JSON.parse(window.localStorage.getItem(AUTH_KEY))?.token
           : undefined,
       });
       if (res?.recoveryKey) setRecoveryKey(res.recoveryKey);
@@ -80,7 +81,7 @@ export default function EncryptionActivationForm({ onActivated, showToast }) {
         placeholder={t("encryptionPassphraseLabel")}
         value={passphrase}
         onChange={(e) => setPassphrase(e.target.value)}
-        className="w-full px-3 py-2 rounded-md border border-[var(--border-light)] bg-white/70 dark:bg-gray-800/60"
+        className={PASSPHRASE_INPUT_CLASSES}
         disabled={busy}
       />
       <input
@@ -89,7 +90,7 @@ export default function EncryptionActivationForm({ onActivated, showToast }) {
         placeholder={t("encryptionPassphraseConfirmLabel")}
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
-        className="w-full px-3 py-2 rounded-md border border-[var(--border-light)] bg-white/70 dark:bg-gray-800/60"
+        className={PASSPHRASE_INPUT_CLASSES}
         disabled={busy}
       />
       {err && <div className="text-sm text-red-600 dark:text-red-400">{err}</div>}

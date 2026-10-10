@@ -5,7 +5,7 @@
 // a link that disappears with notes still riding it, and the "keep a
 // copy" outcome that leaves each local participant a standalone note.
 
-function createNoteTeardown({ q, store, peer, deps, log, findRealUser, splitOrigin, unreachable, onNoteChangedLocally }) {
+function createNoteTeardown({ q, store, deps, log, findRealUser, splitOrigin, postToRecipientPeer, onNoteChangedLocally }) {
   // ── Inbound: the peer removed/unshared a note we mirror ─────────────
   // keepCopies: the share ended WITHOUT the content being deleted (the
   // owner left the note, or removed its last recipient while granting a
@@ -149,19 +149,10 @@ function createNoteTeardown({ q, store, peer, deps, log, findRealUser, splitOrig
   // any other recipients on the same peer (and the mirror itself) intact.
   // `shadow` is our local stand-in for the removed recipient
   // (federated_origin = `${linkId}|${remoteRef}`).
-  async function unshareFromRemote({ shadow, noteId, withCopy = false }) {
-    const origin = splitOrigin(shadow);
-    if (!origin) return { ok: false, error: "not_federated" };
-    const link = store.getById(origin.linkId);
-    if (!link || link.status !== "active") return { ok: false, error: "peer_not_paired" };
-    try {
-      const resp = await peer.postSigned(link, "/api/federation/notes/unshare-recipient", {
-        linkId: link.id, noteId, targetRef: origin.ref, withCopy,
-      });
-      return { ok: !!(resp.ok && resp.json && resp.json.ok === true) };
-    } catch (e) {
-      return { ok: false, error: unreachable(e) };
-    }
+  function unshareFromRemote({ shadow, noteId, withCopy = false }) {
+    return postToRecipientPeer(shadow, "/api/federation/notes/unshare-recipient", (link, origin) => ({
+      linkId: link.id, noteId, targetRef: origin.ref, withCopy,
+    }));
   }
 
   // Give a local user their own standalone (non-federated) note carrying

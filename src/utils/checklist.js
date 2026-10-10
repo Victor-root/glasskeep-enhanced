@@ -1,4 +1,4 @@
-import { uid } from "./helpers.js";
+import { uid } from "./ids.js";
 
 /**
  * Checklist data model
@@ -331,6 +331,18 @@ export function updateEntry(entries, id, patch) {
   return entries.map((e) => (e.id === id ? { ...e, ...patch } : e));
 }
 
+// Where a section sits in `arr`: its marker's index (-1 when absent) and
+// the index just past its last entry.
+function sectionSpan(arr, sectionId) {
+  const startIdx = arr.findIndex((e) => isSection(e) && e.id === sectionId);
+  let endIdx = arr.length;
+  if (startIdx === -1) return { startIdx, endIdx };
+  for (let i = startIdx + 1; i < arr.length; i++) {
+    if (isSection(arr[i])) { endIdx = i; break; }
+  }
+  return { startIdx, endIdx };
+}
+
 /**
  * Remove a section marker and every entry that belongs to it (i.e.
  * everything between this marker and the next section marker, or the
@@ -338,12 +350,8 @@ export function updateEntry(entries, id, patch) {
  */
 export function removeSectionWithItems(entries, sectionId) {
   const arr = entries.slice();
-  const startIdx = arr.findIndex((e) => isSection(e) && e.id === sectionId);
+  const { startIdx, endIdx } = sectionSpan(arr, sectionId);
   if (startIdx === -1) return arr;
-  let endIdx = arr.length;
-  for (let i = startIdx + 1; i < arr.length; i++) {
-    if (isSection(arr[i])) { endIdx = i; break; }
-  }
   arr.splice(startIdx, endIdx - startIdx);
   return arr;
 }
@@ -356,12 +364,8 @@ export function removeSectionWithItems(entries, sectionId) {
  */
 export function removeSectionKeepItems(entries, sectionId) {
   const arr = entries.slice();
-  const startIdx = arr.findIndex((e) => isSection(e) && e.id === sectionId);
+  const { startIdx, endIdx } = sectionSpan(arr, sectionId);
   if (startIdx === -1) return arr;
-  let endIdx = arr.length;
-  for (let i = startIdx + 1; i < arr.length; i++) {
-    if (isSection(arr[i])) { endIdx = i; break; }
-  }
   const items = arr.slice(startIdx + 1, endIdx);
   arr.splice(startIdx, endIdx - startIdx);
   // Re-insert at the end of the default section (just before the first

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
 import { Trash, PencilIcon, PlayFilledIcon, PauseFilledIcon } from "../../icons/index.jsx";
 import { formatDuration } from "../../utils/audioNote.js";
+import useTimedConfirm from "../../hooks/useTimedConfirm.js";
 
 // Playlist-style list of clips in an audio note. Each row shows:
 //  - A row index, that becomes a play indicator when this clip is current.
@@ -53,11 +54,6 @@ export default function ClipList({
 function ClipRow({ clip, index, isCurrent, isPlaying, readOnly, onPlay, onRename, onDelete }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(clip.name || "");
-  // Mirror the section-header confirm-on-second-click delete: the trash
-  // button flips to a checkmark on first click, deletes on second click,
-  // and auto-resets after 3 seconds of inaction.
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const confirmTimerRef = useRef(null);
   const inputRef = useRef(null);
 
   // Sync local draft when the parent changes the clip name from elsewhere
@@ -68,18 +64,10 @@ function ClipRow({ clip, index, isCurrent, isPlaying, readOnly, onPlay, onRename
     if (!editing) setDraft(clip.name || "");
   }, [clip.name, editing]);
 
-  // Auto-cancel the pending delete confirm after 3s — same window as the
-  // checklist section header, so the muscle memory is consistent.
-  useEffect(() => {
-    if (!confirmingDelete) return;
-    confirmTimerRef.current = setTimeout(() => setConfirmingDelete(false), 3000);
-    return () => {
-      if (confirmTimerRef.current) {
-        clearTimeout(confirmTimerRef.current);
-        confirmTimerRef.current = null;
-      }
-    };
-  }, [confirmingDelete]);
+  // Mirror the section-header confirm-on-second-click delete: the trash
+  // button flips to a checkmark on first click, deletes on second click,
+  // and auto-resets after 3 seconds of inaction.
+  const [confirmingDelete, setConfirmingDelete] = useTimedConfirm();
 
   const handleDeleteClick = (e) => {
     e.stopPropagation();

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { api } from "../../utils/api.js";
 import { t } from "../../i18n";
 import { localizeServerError } from "../../utils/serverErrors.js";
+import { PASSPHRASE_INPUT_CLASSES } from "../common/fieldClasses.js";
 
 // Turns encryption off, after the passphrase and an explicit acknowledgement.
 export default function EncryptionDeactivationForm({ token, showToast, onDeactivated }) {
@@ -51,7 +52,7 @@ export default function EncryptionDeactivationForm({ token, showToast, onDeactiv
         placeholder={t("encryptionCurrentPassphraseLabel")}
         value={passphrase}
         onChange={(e) => setPassphrase(e.target.value)}
-        className="w-full px-3 py-2 rounded-md border border-[var(--border-light)] bg-white/70 dark:bg-gray-800/60"
+        className={PASSPHRASE_INPUT_CLASSES}
         disabled={busy}
       />
       <label className="flex items-start gap-2 text-sm">

@@ -24,8 +24,7 @@ export default function ModalHeader({
   setMTitle,
   mType,
   viewMode,
-  windowWidth,
-  isLandscapeMobile,
+  isDesktop,
   isWebView,
   // pin
   onTogglePin,
@@ -100,7 +99,6 @@ export default function ModalHeader({
       else titleInputRef.current = node;
     }
   }, [titleInputRef]);
-  const isDesktop = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
   const isPinned = !!notes.find((n) => String(n.id) === String(activeId))?.pinned;
   const showPinBtn = tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED";
   const isDrawEdit = mType === 'draw' && drawMode === 'draw';

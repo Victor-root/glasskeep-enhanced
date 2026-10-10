@@ -95,6 +95,7 @@ export default function NotesHeader({
   SectionIcon,
   openSidebar,
   isLandscapeMobile,
+  isMobile,
   qrQuickEnabled = false,
   onOpenQrScanner,
   // Notification bell slots. Two separate instances are passed because
@@ -214,7 +215,7 @@ export default function NotesHeader({
           // the Activity-injected inset (works around an Android 15
           // WebView bug where env() returns 0 even in edge-to-edge).
           top: "var(--safe-top)",
-          transform: !headerVisible && (windowWidth < 700 || isLandscapeMobile) ? "translateY(calc(-100% - var(--gk-header-bleed)))" : "translateY(0)",
+          transform: !headerVisible && isMobile ? "translateY(calc(-100% - var(--gk-header-bleed)))" : "translateY(0)",
           transition: "transform 0.3s ease",
         }}
       >

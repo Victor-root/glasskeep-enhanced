@@ -31,7 +31,7 @@
 // here, because a note can never contribute a script in the first
 // place: the sanitizer allows no script tag and no event handler.
 // jsDelivr is listed because the ZIP export loads JSZip from there on
-// demand (see src/utils/helpers.js).
+// demand (see src/utils/files.js).
 const CSP = [
   "default-src 'self'",
   "img-src 'self' data: blob:",

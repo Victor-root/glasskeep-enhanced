@@ -15,7 +15,8 @@ import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
 import { RowIcon } from "../common/SettingsAccordion.jsx";
 import OidcProviderForm, { PRIMARY_BTN, SECONDARY_BTN, Warning } from "./OidcProviderForm.jsx";
-import { FIELD_INPUT_CLASSES } from "./fieldClasses.js";
+import { FIELD_INPUT_CLASSES } from "../common/fieldClasses.js";
+import { formatDateTime } from "../../utils/dates.js";
 import {
   deleteMyOidc,
   getMyOidc,
@@ -27,11 +28,6 @@ import {
 } from "../../auth/oidcClient.js";
 
 const DANGER_LINK = "text-sm font-medium text-red-600 hover:underline disabled:opacity-50";
-
-function formatDate(iso) {
-  if (!iso) return null;
-  try { return new Date(iso).toLocaleString(); } catch { return iso; }
-}
 
 // One provider the account can be linked through: its name, whether this
 // account is linked through it, and the way to link. `children` are the
@@ -52,7 +48,7 @@ function ProviderStatus({ name, badge, identity, originWarning, canLink, replace
         </div>
         <div className="text-xs text-gray-500 wrap-anywhere">
           {identity
-            ? [identity.email, t("oidcLinkedOn", { date: formatDate(identity.linkedAt) })].filter(Boolean).join(" · ")
+            ? [identity.email, t("oidcLinkedOn", { date: formatDateTime(identity.linkedAt) })].filter(Boolean).join(" · ")
             : t("oidcNotLinkedYet")}
         </div>
       </div>

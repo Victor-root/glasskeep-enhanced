@@ -15,15 +15,6 @@ function detectLang() {
   return locale;
 }
 
-/**
- * No-op kept for backward compatibility — the server no longer needs
- * any client-driven initialization.
- */
-export async function initAI(onProgress) {
-  if (onProgress) onProgress({ status: "ready" });
-  return Promise.resolve();
-}
-
 // Flatten any note shape (text / checklist / drawing) into a single
 // plain-text body the AI can actually read. Without this the model
 // receives raw Tiptap JSON for text notes and an empty string for
@@ -58,6 +49,16 @@ function noteToPlainText(n) {
   return contentToPlain(n.content || "");
 }
 
+// The note as the AI endpoints receive it.
+function flattenNote(n) {
+  return {
+    id: n.id != null ? String(n.id) : "",
+    title: (n.title || "").toString(),
+    content: noteToPlainText(n),
+    tags: Array.isArray(n.tags) ? n.tags.map(String) : [],
+  };
+}
+
 /**
  * Ask the AI assistant a question with optional note context.
  *
@@ -82,12 +83,7 @@ export async function askAI(question, notes, onProgress) {
   // and parses it back out before returning.
   const flattened = (notes || [])
     .filter((n) => n && !n.archived && !n.trashed)
-    .map((n) => ({
-      id: n.id != null ? String(n.id) : "",
-      title: (n.title || "").toString(),
-      content: noteToPlainText(n),
-      tags: Array.isArray(n.tags) ? n.tags.map(String) : [],
-    }))
+    .map(flattenNote)
     .filter((n) => n.id && (n.title.trim() || n.content.trim()));
 
   const debugMode = localStorage.getItem("glasskeep_ai_debug") === "true";
@@ -151,61 +147,13 @@ export async function askAI(question, notes, onProgress) {
  * on the client (panel state) and is forwarded each turn so the model
  * can keep a coherent conversation without anything being persisted.
  *
- * @param {Object} params
- * @param {Object} params.note     { id, title, content, tags } of the open note
- * @param {Array}  params.messages prior turns: [{ role: 'user'|'assistant', content }]
- * @param {string} params.question the latest user question
- * @returns {Promise<{answer: string, finishReason: string|null}>}
- */
-export async function askNoteAI({ note, messages, question }) {
-  const auth = getAuth();
-  const token = auth?.token;
-  if (!token) {
-    throw new Error(t("aiLoginRequired"));
-  }
-  if (!note) throw new Error(t("aiMissingNoteContext"));
-  if (!question || !String(question).trim()) {
-    throw new Error(t("aiMissingQuestion"));
-  }
-
-  // Flatten the note the same way as global chat — text/checklist/draw
-  // notes need their human-readable body, not the raw Tiptap envelope.
-  const flatNote = {
-    id: note.id != null ? String(note.id) : "",
-    title: (note.title || "").toString(),
-    content: noteToPlainText(note),
-    tags: Array.isArray(note.tags) ? note.tags.map(String) : [],
-  };
-
-  const lang = detectLang();
-
-  const data = await api("/ai/note-chat", {
-    method: "POST",
-    token,
-    timeoutMs: 120000,
-    body: {
-      note: flatNote,
-      messages: Array.isArray(messages) ? messages : [],
-      question: String(question),
-      lang,
-    },
-  });
-
-  return {
-    answer: data?.answer || "",
-    finishReason: data?.finishReason || null,
-  };
-}
-
-/**
- * Streaming variant of askNoteAI. Posts to /api/ai/note-chat with
- * stream:true and reads the SSE response, dispatching each delta to
- * onChunk as it arrives. Resolves with { finishReason } once the
- * stream terminates. Throws on transport / server errors and on the
+ * Posts to /api/ai/note-chat with stream:true and reads the SSE
+ * response, dispatching each delta to onChunk as it arrives. Resolves
+ * with { finishReason } once the stream terminates. Throws on transport / server errors and on the
  * server's own `{error}` SSE frame.
  *
  * @param {Object}   params
- * @param {Object}   params.note      flattened note context (same shape as askNoteAI)
+ * @param {Object}   params.note      the open note (flattened before sending)
  * @param {Array}    params.messages  prior turns
  * @param {string}   params.question  latest user question
  * @param {Function} params.onChunk   called with each text delta as it arrives
@@ -218,12 +166,7 @@ export async function askNoteAIStream({ note, messages, question, onChunk, signa
   if (!note) throw new Error(t("aiMissingNoteContext"));
   if (!question || !String(question).trim()) throw new Error(t("aiMissingQuestion"));
 
-  const flatNote = {
-    id: note.id != null ? String(note.id) : "",
-    title: (note.title || "").toString(),
-    content: noteToPlainText(note),
-    tags: Array.isArray(note.tags) ? note.tags.map(String) : [],
-  };
+  const flatNote = flattenNote(note);
 
   const lang = detectLang();
 

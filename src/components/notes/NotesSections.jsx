@@ -30,6 +30,60 @@ function NotesSections({
   onEmptyTrash,
 }) {
   const maxPreviewItems = windowWidth < 640 ? 4 : 8;
+  const disablePin =
+    "ontouchstart" in window ||
+    navigator.maxTouchPoints > 0 ||
+    activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED";
+
+  // The pinned and other notes render alike: a section label, then the
+  // cards as a list or as the masonry grid.
+  const renderLabel = (labelKey) => (listView ? (
+    <div className="max-w-2xl mx-auto">
+      <h2 className="gk-section-label text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
+        {t(labelKey)}
+      </h2>
+    </div>
+  ) : (
+    <h2 className="gk-section-label text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
+      {t(labelKey)}
+    </h2>
+  ));
+  const renderCards = (notes) => notes.map((n) => (
+    <div key={n.id}>
+      <NoteCard
+        n={n}
+        dark={dark}
+        openModal={openModal}
+        togglePin={togglePin}
+        multiMode={multiMode}
+        selected={selectedIds.includes(String(n.id))}
+        onToggleSelect={onToggleSelect}
+        onCtrlSelect={onCtrlSelect}
+        disablePin={disablePin}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        onDragEnd={onDragEnd}
+        currentUser={currentUser}
+        maxPreviewItems={maxPreviewItems}
+      />
+    </div>
+  ));
+  const renderGroup = (notes) => (listView ? (
+    <div className="max-w-2xl mx-auto space-y-6">
+      {renderCards(notes)}
+    </div>
+  ) : (
+    <Masonry
+      breakpointCols={{default: 7, 1835: 6, 1587: 5, 1339: 4, 1089: 3, 767: 2}}
+      className="masonry-grid"
+      columnClassName="masonry-grid-column"
+    >
+      {renderCards(notes)}
+    </Masonry>
+  ));
+
   return (
       <main className="px-4 sm:px-6 md:px-8 lg:px-12 pb-12">
         {activeTagFilter === "TRASHED" && (pinned.length > 0 || others.length > 0) && !multiMode && (
@@ -44,160 +98,15 @@ function NotesSections({
         )}
         {pinned.length > 0 && (
           <section className="mb-10">
-            {listView ? (
-              <div className="max-w-2xl mx-auto">
-                <h2 className="gk-section-label text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
-                  {t("pinned")}
-                </h2>
-              </div>
-            ) : (
-              <h2 className="gk-section-label text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
-                {t("pinned")}
-              </h2>
-            )}
-            {listView ? (
-              <div className="max-w-2xl mx-auto space-y-6">
-                {pinned.map((n) => (
-                  <div key={n.id}>
-                  <NoteCard
-                    n={n}
-                    dark={dark}
-                    openModal={openModal}
-                    togglePin={togglePin}
-                    multiMode={multiMode}
-                    selected={selectedIds.includes(String(n.id))}
-                    onToggleSelect={onToggleSelect}
-                    onCtrlSelect={onCtrlSelect}
-                    disablePin={
-                      "ontouchstart" in window ||
-                      navigator.maxTouchPoints > 0 ||
-                      activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED"
-                    }
-                    onDragStart={onDragStart}
-                    onDragOver={onDragOver}
-                    onDragLeave={onDragLeave}
-                    onDrop={onDrop}
-                    onDragEnd={onDragEnd}
-                    currentUser={currentUser}
-                    maxPreviewItems={maxPreviewItems}
-                  />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <Masonry
-                breakpointCols={{default: 7, 1835: 6, 1587: 5, 1339: 4, 1089: 3, 767: 2}}
-                className="masonry-grid"
-                columnClassName="masonry-grid-column"
-              >
-                {pinned.map((n) => (
-                  <div key={n.id}>
-                  <NoteCard
-                    n={n}
-                    dark={dark}
-                    openModal={openModal}
-                    togglePin={togglePin}
-                    multiMode={multiMode}
-                    selected={selectedIds.includes(String(n.id))}
-                    onToggleSelect={onToggleSelect}
-                    onCtrlSelect={onCtrlSelect}
-                    disablePin={
-                      "ontouchstart" in window ||
-                      navigator.maxTouchPoints > 0 ||
-                      activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED"
-                    }
-                    onDragStart={onDragStart}
-                    onDragOver={onDragOver}
-                    onDragLeave={onDragLeave}
-                    onDrop={onDrop}
-                    onDragEnd={onDragEnd}
-                    currentUser={currentUser}
-                    maxPreviewItems={maxPreviewItems}
-                  />
-                  </div>
-                ))}
-              </Masonry>
-            )}
+            {renderLabel("pinned")}
+            {renderGroup(pinned)}
           </section>
         )}
 
         {others.length > 0 && (
           <section>
-            {pinned.length > 0 &&
-              (listView ? (
-                <div className="max-w-2xl mx-auto">
-                  <h2 className="gk-section-label text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
-                    {t("others")}
-                  </h2>
-                </div>
-              ) : (
-                <h2 className="gk-section-label text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
-                  {t("others")}
-                </h2>
-              ))}
-            {listView ? (
-              <div className="max-w-2xl mx-auto space-y-6">
-                {others.map((n) => (
-                  <div key={n.id}>
-                  <NoteCard
-                    n={n}
-                    dark={dark}
-                    openModal={openModal}
-                    togglePin={togglePin}
-                    multiMode={multiMode}
-                    selected={selectedIds.includes(String(n.id))}
-                    onToggleSelect={onToggleSelect}
-                    onCtrlSelect={onCtrlSelect}
-                    disablePin={
-                      "ontouchstart" in window ||
-                      navigator.maxTouchPoints > 0 ||
-                      activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED"
-                    }
-                    onDragStart={onDragStart}
-                    onDragOver={onDragOver}
-                    onDragLeave={onDragLeave}
-                    onDrop={onDrop}
-                    onDragEnd={onDragEnd}
-                    currentUser={currentUser}
-                    maxPreviewItems={maxPreviewItems}
-                  />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <Masonry
-                breakpointCols={{default: 7, 1835: 6, 1587: 5, 1339: 4, 1089: 3, 767: 2}}
-                className="masonry-grid"
-                columnClassName="masonry-grid-column"
-              >
-                {others.map((n) => (
-                  <div key={n.id}>
-                  <NoteCard
-                    n={n}
-                    dark={dark}
-                    openModal={openModal}
-                    togglePin={togglePin}
-                    multiMode={multiMode}
-                    selected={selectedIds.includes(String(n.id))}
-                    onToggleSelect={onToggleSelect}
-                    onCtrlSelect={onCtrlSelect}
-                    disablePin={
-                      "ontouchstart" in window ||
-                      navigator.maxTouchPoints > 0 ||
-                      activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED"
-                    }
-                    onDragStart={onDragStart}
-                    onDragOver={onDragOver}
-                    onDragLeave={onDragLeave}
-                    onDrop={onDrop}
-                    onDragEnd={onDragEnd}
-                    currentUser={currentUser}
-                    maxPreviewItems={maxPreviewItems}
-                  />
-                  </div>
-                ))}
-              </Masonry>
-            )}
+            {pinned.length > 0 && renderLabel("others")}
+            {renderGroup(others)}
           </section>
         )}
 

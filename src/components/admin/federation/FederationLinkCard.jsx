@@ -15,18 +15,10 @@ import { t } from "../../../i18n";
 import TI from "../../../icons/editor/index.jsx";
 import { ServerCheckIcon } from "./FederationIcons.jsx";
 import { getFederationStateMeta, fedToneClasses } from "./federationStatus.js";
+import { formatDateTime } from "../../../utils/dates.js";
 
 function hostOf(url) {
   return String(url || "").replace(/^https?:\/\//i, "");
-}
-
-function formatWhen(iso) {
-  if (!iso) return null;
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return null;
-  }
 }
 
 // A clock difference, as a duration a human reads at a glance. The sign is
@@ -173,7 +165,7 @@ export default function FederationLinkCard({
   const blocked = isActive && !link.writable; // offline / locked / incompatible
 
   const title = link.peerLabel || hostOf(link.peerBaseUrl);
-  const lastSeen = formatWhen(link.lastSeenAt);
+  const lastSeen = formatDateTime(link.lastSeenAt);
 
   const confirmDanger = (opts, onConfirm) => {
     if (typeof showGenericConfirm === "function") {

@@ -120,6 +120,13 @@ export async function putNote(note, userId, sessionId) {
   });
 }
 
+// Merges `fields` into the stored copy of a note; a note not stored yet
+// stays absent.
+export async function patchNote(noteId, fields, userId, sessionId) {
+  const existing = await getNote(noteId, userId, sessionId);
+  if (existing) await putNote({ ...existing, ...fields }, userId, sessionId);
+}
+
 export async function putNotes(notes, userId, sessionId) {
   const db = await openDb();
   const t = db.transaction(SESSION_NOTES_STORE, "readwrite");
@@ -144,12 +151,13 @@ export async function deleteNote(noteId, userId, sessionId) {
   });
 }
 
-export async function clearNotesForSession(userId, sessionId) {
+// Deletes every record of `storeName` whose `indexName` key is `key`.
+async function deleteByIndex(storeName, indexName, key) {
   const db = await openDb();
-  const t = db.transaction(SESSION_NOTES_STORE, "readwrite");
-  const store = t.objectStore(SESSION_NOTES_STORE);
-  const idx = store.index("userSession");
-  const req = idx.openCursor(IDBKeyRange.only([userId, sessionId]));
+  const t = db.transaction(storeName, "readwrite");
+  const store = t.objectStore(storeName);
+  const idx = store.index(indexName);
+  const req = idx.openCursor(IDBKeyRange.only(key));
   req.onsuccess = (e) => {
     const cursor = e.target.result;
     if (cursor) {
@@ -161,6 +169,10 @@ export async function clearNotesForSession(userId, sessionId) {
     t.oncomplete = () => resolve();
     t.onerror = () => reject(t.error);
   });
+}
+
+export function clearNotesForSession(userId, sessionId) {
+  return deleteByIndex(SESSION_NOTES_STORE, "userSession", [userId, sessionId]);
 }
 
 // ─── Sync Queue Store ───
@@ -205,7 +217,7 @@ export async function enqueue(action) {
  * This ensures pending mutations from a previous session are still visible
  * after token refresh or re-login.
  */
-export async function getQueueItems(userId) {
+async function getQueueItems(userId) {
   const store = await tx(QUEUE_STORE);
   return new Promise((resolve, reject) => {
     const req = store.index("userId").getAll(userId);
@@ -251,46 +263,8 @@ export async function removeQueueItem(queueId) {
  * Clear ALL queue items for a user (across all sessions).
  * Used at explicit sign-out / user change to prevent cross-user data leaks.
  */
-export async function clearQueueForUser(userId) {
-  const db = await openDb();
-  const t = db.transaction(QUEUE_STORE, "readwrite");
-  const store = t.objectStore(QUEUE_STORE);
-  const idx = store.index("userId");
-  const req = idx.openCursor(IDBKeyRange.only(userId));
-  req.onsuccess = (e) => {
-    const cursor = e.target.result;
-    if (cursor) {
-      cursor.delete();
-      cursor.continue();
-    }
-  };
-  return new Promise((resolve, reject) => {
-    t.oncomplete = () => resolve();
-    t.onerror = () => reject(t.error);
-  });
-}
-
-/**
- * Clear queue items for a specific session only.
- * Kept for targeted cleanup; prefer clearQueueForUser at sign-out.
- */
-export async function clearQueueForSession(userId, sessionId) {
-  const db = await openDb();
-  const t = db.transaction(QUEUE_STORE, "readwrite");
-  const store = t.objectStore(QUEUE_STORE);
-  const idx = store.index("userSession");
-  const req = idx.openCursor(IDBKeyRange.only([userId, sessionId]));
-  req.onsuccess = (e) => {
-    const cursor = e.target.result;
-    if (cursor) {
-      cursor.delete();
-      cursor.continue();
-    }
-  };
-  return new Promise((resolve, reject) => {
-    t.oncomplete = () => resolve();
-    t.onerror = () => reject(t.error);
-  });
+export function clearQueueForUser(userId) {
+  return deleteByIndex(QUEUE_STORE, "userId", userId);
 }
 
 export async function getQueueStats(userId) {

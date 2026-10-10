@@ -12,43 +12,7 @@
 // (QrLoginModal and QrScannerModal) stay focused on rendering rather
 // than fetch plumbing.
 
-const API = "/api";
-
-function authHeaders(token) {
-  const h = { "Content-Type": "application/json" };
-  if (token) h.Authorization = `Bearer ${token}`;
-  return h;
-}
-
-async function postJSON(path, body, token) {
-  const res = await fetch(`${API}${path}`, {
-    method: "POST",
-    headers: authHeaders(token),
-    body: JSON.stringify(body || {}),
-  });
-  let data = null;
-  try { data = await res.json(); } catch { /* ignore */ }
-  if (!res.ok) {
-    const e = new Error((data && data.error) || `HTTP ${res.status}`);
-    e.status = res.status;
-    e.data = data;
-    throw e;
-  }
-  return data || {};
-}
-
-async function getJSON(path, token) {
-  const res = await fetch(`${API}${path}`, { headers: authHeaders(token) });
-  let data = null;
-  try { data = await res.json(); } catch { /* ignore */ }
-  if (!res.ok) {
-    const e = new Error((data && data.error) || `HTTP ${res.status}`);
-    e.status = res.status;
-    e.data = data;
-    throw e;
-  }
-  return data || {};
-}
+import { postJSON, getJSON } from "./jsonRequest.js";
 
 // ── PC side ──────────────────────────────────────────────────────────
 

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, getAuth } from "../utils/api.js";
-import { getNote as idbGetNote, putNote as idbPutNote } from "../sync/localDb.js";
-import { uid, fileToCompressedDataURL } from "../utils/helpers.js";
+import { patchNote as idbPatchNote } from "../sync/localDb.js";
 import { fetchLogoLibrary, createLogo, deleteLogo as apiDeleteLogo } from "../utils/logoLibrary.js";
+import useNoteIconActions from "./useNoteIconActions.js";
 
 /**
  * The user's logo library and the note icons taken from it.
@@ -77,8 +77,7 @@ export default function useLogoLibrary({ token, currentUser, sessionId, setNotes
     const nid = String(noteId);
     setNotes((prev) => prev.map((n) => (String(n.id) === nid ? { ...n, icon: icon || null } : n)));
     try {
-      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-      if (existing) await idbPutNote({ ...existing, icon: icon || null }, currentUser?.id, sessionId);
+      await idbPatchNote(nid, { icon: icon || null }, currentUser?.id, sessionId);
     } catch { /* IDB best-effort */ }
     try {
       if (icon) {
@@ -91,27 +90,9 @@ export default function useLogoLibrary({ token, currentUser, sessionId, setNotes
     }
   }, [token, currentUser, sessionId, setNotes]);
 
-  const setNoteIconFromFile = useCallback(async (file) => {
-    if (!file || !activeId) return;
-    try {
-      const src = await fileToCompressedDataURL(file);
-      const iconEntry = { id: uid(), src, name: file.name };
-      await applyNoteIcon(activeId, iconEntry);
-      addLogoToLibrary({ src, name: file.name });
-    } catch (e) {
-      console.error("Note icon load failed", e);
-    }
-  }, [activeId, applyNoteIcon, addLogoToLibrary]);
-
-  const removeNoteIcon = useCallback(() => {
-    if (activeId) applyNoteIcon(activeId, null);
-  }, [activeId, applyNoteIcon]);
-
-  // Pick an existing logo from the library as the active note's icon.
-  const pickNoteIcon = useCallback((logo) => {
-    if (!activeId || !logo?.src) return;
-    applyNoteIcon(activeId, { id: uid(), src: logo.src, name: logo.name });
-  }, [activeId, applyNoteIcon]);
+  const { setNoteIconFromFile, removeNoteIcon, pickNoteIcon } = useNoteIconActions({
+    noteId: activeId, applyNoteIcon, addLogoToLibrary,
+  });
 
   return {
     logoLibrary,

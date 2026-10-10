@@ -12,7 +12,7 @@
 import React, { useState } from "react";
 import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
-import { FIELD_INPUT_CLASSES } from "./fieldClasses.js";
+import { FIELD_INPUT_CLASSES } from "../common/fieldClasses.js";
 import CopyButton from "../common/CopyButton.jsx";
 import { oidcErrorMessage } from "../../auth/oidcClient.js";
 

@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { t } from "../i18n";
-import { getNote as idbGetNote, putNote as idbPutNote } from "../sync/localDb.js";
+import { patchNote as idbPatchNote } from "../sync/localDb.js";
 import { sortNotesForOrderReset } from "../utils/noteList.js";
 
 /**
@@ -48,8 +48,7 @@ export default function useNoteReorder({
     // Local-first: update IndexedDB positions
     for (const n of sorted) {
       try {
-        const existing = await idbGetNote(String(n.id), currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, position: n.position }, currentUser?.id, sessionId);
+        await idbPatchNote(String(n.id), { position: n.position }, currentUser?.id, sessionId);
       } catch { /* IDB best-effort */ }
     }
 
@@ -133,8 +132,7 @@ export default function useNoteReorder({
     for (const id of orderedIds) {
       const pos = positionMap.get(id);
       try {
-        const existing = await idbGetNote(id, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, position: pos }, currentUser?.id, sessionId);
+        await idbPatchNote(id, { position: pos }, currentUser?.id, sessionId);
       } catch { /* IDB best-effort */ }
     }
 

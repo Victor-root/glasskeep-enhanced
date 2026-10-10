@@ -118,7 +118,7 @@ function NotesUI({
   const [headerVisible, setHeaderVisible] = useState(true);
   const lastScrollYRef = useRef(0);
   useEffect(() => {
-    if (windowWidth >= 700 && !isLandscapeMobile) {
+    if (!isMobile) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- header auto-hide only runs on mobile: force the header back when switching to desktop
       setHeaderVisible(true);
       return;
@@ -137,7 +137,7 @@ function NotesUI({
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-evaluated on width changes only, as before; isLandscapeMobile is read at that time
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-evaluated on width changes only, as before; isLandscapeMobile (in isMobile) is read at that time
   }, [windowWidth]);
   const sectionLabel = (() => {
     // Multiple tags selected: show a compact count badge instead of the
@@ -194,6 +194,7 @@ function NotesUI({
         headerVisible={headerVisible}
         windowWidth={windowWidth}
         isLandscapeMobile={isLandscapeMobile}
+        isMobile={isMobile}
         sidebarPermanent={sidebarPermanent}
         mobileSearchOpen={mobileSearchOpen}
         setMobileSearchOpen={setMobileSearchOpen}
@@ -257,7 +258,7 @@ function NotesUI({
         onDirectAudio={onDirectAudio}
         fabOpen={fabOpen}
         setFabOpen={setFabOpen}
-        isDesktop={windowWidth >= 700 && !isLandscapeMobile}
+        isDesktop={!isMobile}
         multiMode={multiMode}
         aiAssistantEnabled={aiAssistantEnabled}
         aiResponse={aiResponse}

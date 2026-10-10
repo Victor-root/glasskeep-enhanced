@@ -2,6 +2,7 @@ import React from "react";
 import Popover from "../common/Popover.jsx";
 import Sheet, { SheetRow } from "../common/Sheet.jsx";
 import { t } from "../../i18n";
+import { LogoIcon } from "../../icons/index.jsx";
 
 /**
  * Sub-menu opened when the user clicks the "Image" action in the modal
@@ -40,16 +41,7 @@ export default function AddImageMenu({
       key: "logo",
       color: dark ? "#c4b5fd" : "#7c3aed",
       // Tabler · photo-circle-plus (circular outline)
-      icon: (
-        <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M15 8h.01" />
-          <path d="M20.964 12.806a9 9 0 0 0 -8.964 -9.806a9 9 0 0 0 -9 9a9 9 0 0 0 9.397 8.991" />
-          <path d="M4 15l4 -4c.928 -.893 2.072 -.893 3 0l4 4" />
-          <path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0" />
-          <path d="M16 19.33h6" />
-          <path d="M19 16.33v6" />
-        </svg>
-      ),
+      icon: <LogoIcon className="w-4 h-4 shrink-0" />,
       label: hasIcon ? t("replaceLogo") : t("addLogo"),
       run: onAddIcon,
     },

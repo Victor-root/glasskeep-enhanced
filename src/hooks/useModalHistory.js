@@ -39,6 +39,17 @@ function eq(a, b) {
   return a.body === b.body;
 }
 
+// Records snapshot `s` as the new current step: the redo steps past the
+// current one are dropped, then the oldest step beyond MAX_HISTORY.
+function pushSnapshot(historyRef, indexRef, lastSnapRef, s) {
+  const next = historyRef.current.slice(0, indexRef.current + 1);
+  next.push(s);
+  if (next.length > MAX_HISTORY) next.shift();
+  historyRef.current = next;
+  indexRef.current = next.length - 1;
+  lastSnapRef.current = s;
+}
+
 export default function useModalHistory({
   mTitle,
   mBody,
@@ -104,14 +115,7 @@ export default function useModalHistory({
       debounceRef.current = null;
       const s = snap();
       if (!eq(s, lastSnapRef.current)) {
-        const h = historyRef.current;
-        const idx = indexRef.current;
-        const next = h.slice(0, idx + 1);
-        next.push(s);
-        if (next.length > MAX_HISTORY) next.shift();
-        historyRef.current = next;
-        indexRef.current = next.length - 1;
-        lastSnapRef.current = s;
+        pushSnapshot(historyRef, indexRef, lastSnapRef, s);
         bump((n) => n + 1);
       }
     }, DEBOUNCE_MS);
@@ -142,14 +146,7 @@ export default function useModalHistory({
       debounceRef.current = null;
       const s = snap();
       if (!eq(s, lastSnapRef.current)) {
-        const h = historyRef.current;
-        const idx = indexRef.current;
-        const next = h.slice(0, idx + 1);
-        next.push(s);
-        if (next.length > MAX_HISTORY) next.shift();
-        historyRef.current = next;
-        indexRef.current = next.length - 1;
-        lastSnapRef.current = s;
+        pushSnapshot(historyRef, indexRef, lastSnapRef, s);
       }
     }
   }, [snap]);

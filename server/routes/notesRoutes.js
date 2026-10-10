@@ -13,6 +13,7 @@ const {
   nowISO,
   parseIsoTimestamp,
   validateLwwTimestamp,
+  readClientUpdatedAt,
   normalizeDisplayTimestamp,
   isNewerOrEqual,
 } = require("../utils/timestamps");
@@ -180,10 +181,7 @@ function attachNotesRoutes(app, deps) {
     }
 
     const b = req.body || {};
-    if (!b.client_updated_at) {
-      return res.status(400).json({ error: "client_updated_at is required" });
-    }
-    const tsResult = validateLwwTimestamp(b.client_updated_at);
+    const tsResult = readClientUpdatedAt(b);
     if (tsResult.error) {
       return res.status(400).json({ error: tsResult.error });
     }
@@ -299,10 +297,7 @@ function attachNotesRoutes(app, deps) {
       return res.json({ ok: true, readOnly: true, note: serializeNote(existing, req.user.id) });
     }
 
-    if (!req.body.client_updated_at) {
-      return res.status(400).json({ error: "client_updated_at is required" });
-    }
-    const tsResult = validateLwwTimestamp(req.body.client_updated_at);
+    const tsResult = readClientUpdatedAt(req.body);
     if (tsResult.error) {
       return res.status(400).json({ error: tsResult.error });
     }

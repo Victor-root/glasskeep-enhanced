@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  getNote as idbGetNote,
   putNote as idbPutNote,
+  patchNote as idbPatchNote,
 } from "../sync/localDb.js";
 import useDraftNote from "./useDraftNote.js";
 import { parseDrawingContent } from "../utils/drawingContent.js";
@@ -220,10 +220,7 @@ export default function useNoteEditor({
 
     // Persist to IDB first: hasPendingChanges() reads from this store
     try {
-      const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
-      if (existing) {
-        await idbPutNote({ ...existing, content: drawingContent, updated_at: nowIso, client_updated_at: nowIso }, currentUser?.id, sessionId);
-      }
+      await idbPatchNote(noteId, { content: drawingContent, updated_at: nowIso, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) {
       console.error("IndexedDB drawing flush failed:", e);
       // IDB failed: restore pending ref so closeModal can retry
@@ -390,10 +387,7 @@ export default function useNoteEditor({
 
     // Persist to IndexedDB
     try {
-      const existing = await idbGetNote(nId, currentUser?.id, sessionId);
-      if (existing) {
-        await idbPutNote({ ...existing, ...fields, updated_at: nowIso, client_updated_at: nowIso }, currentUser?.id, sessionId);
-      }
+      await idbPatchNote(nId, { ...fields, updated_at: nowIso, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) {
       console.error("IndexedDB text auto-save failed:", e);
       // IDB failed: don't enqueue, keep lease, signal failure
@@ -652,10 +646,7 @@ export default function useNoteEditor({
     );
     // Persist to IndexedDB
     try {
-      const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
-      if (existing) {
-        await idbPutNote({ ...existing, items: newItems, updated_at: nowIso, client_updated_at: nowIso }, currentUser?.id, sessionId);
-      }
+      await idbPatchNote(noteId, { items: newItems, updated_at: nowIso, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) {
       console.error("IndexedDB checklist update failed:", e);
       // IDB failed: don't advance baseline, keep lease, signal failure

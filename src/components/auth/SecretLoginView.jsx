@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { t } from "../../i18n";
 import AuthShell from "./AuthShell.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
+import { WIDE_SUBMIT_CLASSES } from "../common/fieldClasses.js";
 
 export default function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin, floatingCardsEnabled, loginSlogan }) {
   const [key, setKey] = useState("");
@@ -36,7 +37,7 @@ export default function SecretLoginView({ dark, onToggleDark, onLoginWithKey, go
         {err && <p className="text-red-600 text-sm">{err}</p>}
         <button
           type="submit"
-          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+          className={WIDE_SUBMIT_CLASSES}
         >{t("signInWithSecretKey")}</button>
       </form>
       <div className="mt-4 text-sm text-center">

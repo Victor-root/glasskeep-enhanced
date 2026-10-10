@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { DownloadIcon, CloseIcon, ArrowLeft, ArrowRight } from "../../icons/index.jsx";
-import { normalizeImageFilename, downloadDataUrl } from "../../utils/helpers.js";
+import { normalizeImageFilename, downloadDataUrl } from "../../utils/files.js";
 import { t } from "../../i18n";
 import RemoveImageIcon from "./RemoveImageIcon.jsx";
 

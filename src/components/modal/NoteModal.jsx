@@ -15,7 +15,7 @@ import NoteEditedStamp from "./NoteEditedStamp.jsx";
 import useModalHistory from "../../hooks/useModalHistory.js";
 import { getContentImages } from "../../utils/noteIcon.js";
 import { modalBgFor, scrollColorsFor, solid, bgFor, toHex, audioAccentColor, compositeOver } from "../../utils/colors.js";
-import { setThemeColor, currentStatusBarColor, setNavBarColor } from "../../utils/helpers.js";
+import { setThemeColor, currentStatusBarColor, setNavBarColor } from "../../utils/systemBars.js";
 
 export default function NoteModal({
   // visibility / animation
@@ -559,8 +559,7 @@ export default function NoteModal({
               setMTitle={setMTitle}
               mType={mType}
               viewMode={effViewMode}
-              windowWidth={windowWidth}
-              isLandscapeMobile={isLandscapeMobile}
+              isDesktop={isDesktopLayout}
               isWebView={isWebView}
               // pin
               onTogglePin={togglePin}
@@ -698,9 +697,7 @@ export default function NoteModal({
             // shows the footer's colour rather than the note's behind it.
             reserveNavBar={mobileLayout}
             rootRef={footerRef}
-            windowWidth={windowWidth}
-            isLandscapeMobile={isLandscapeMobile}
-            isWebView={isWebView}
+            isDesktop={isDesktopLayout}
             // tags
             mTagList={mTagList}
             setMTagList={setMTagList}

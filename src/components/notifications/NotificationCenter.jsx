@@ -16,8 +16,7 @@ import NotificationCard from "./NotificationCard.jsx";
 import Sheet from "../common/Sheet.jsx";
 import { useSwallowClosingClick } from "../../hooks/useSwallowClosingClick.js";
 import { t } from "../../i18n";
-
-const SHEET_BREAKPOINT_PX = 640;
+import { SHEET_BREAKPOINT_PX } from "../../utils/constants.js";
 
 export default function NotificationCenter({
   open,

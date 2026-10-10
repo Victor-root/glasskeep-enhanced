@@ -38,6 +38,15 @@ import {
 } from "../utils/shareNotificationMessages.js";
 import { useNotifications } from "../components/notifications/NotificationProvider.jsx";
 
+// Records that the notification `id` is being shown; false when it
+// already was. A notification without an id always shows.
+function markShown(shownIds, id) {
+  if (id == null) return true;
+  if (shownIds.has(id)) return false;
+  shownIds.add(id);
+  return true;
+}
+
 export function useShareNotifications({ token, userId }) {
   const { notify, mergeHistory } = useNotifications();
   const shownIdsRef = useRef(new Set());
@@ -89,10 +98,7 @@ export function useShareNotifications({ token, userId }) {
   const showShareToast = useCallback((n) => {
     if (!n) return;
     const id = n.id ?? n.notificationId;
-    if (id != null) {
-      if (shownIdsRef.current.has(id)) return;
-      shownIdsRef.current.add(id);
-    }
+    if (!markShown(shownIdsRef.current, id)) return;
     const sender = String(n.senderName ?? n.sender_name ?? "").trim();
     const rawTitle = String(n.noteTitle ?? n.note_title ?? "").trim();
     const noteTitle = rawTitle || t("untitledNote");
@@ -130,10 +136,7 @@ export function useShareNotifications({ token, userId }) {
   const showUserDeletedToast = useCallback((n) => {
     if (!n) return;
     const id = n.notificationId ?? n.id;
-    if (id != null) {
-      if (shownIdsRef.current.has(id)) return;
-      shownIdsRef.current.add(id);
-    }
+    if (!markShown(shownIdsRef.current, id)) return;
     const deletedName = String(n.deletedName ?? n.note_title ?? "").trim();
     const adminName = String(n.adminName ?? n.sender_name ?? "").trim();
     const fn = notifyRef.current;
@@ -161,10 +164,7 @@ export function useShareNotifications({ token, userId }) {
   const showPendingUserToast = useCallback((n) => {
     if (!n) return;
     const id = n.notificationId ?? n.id;
-    if (id != null) {
-      if (shownIdsRef.current.has(id)) return;
-      shownIdsRef.current.add(id);
-    }
+    if (!markShown(shownIdsRef.current, id)) return;
     const userName = String(n.name ?? n.sender_name ?? "").trim();
     const userEmail = String(n.email ?? n.note_title ?? "").trim();
     const pendingId = n.pendingId ?? n.note_id ?? null;
@@ -201,10 +201,7 @@ export function useShareNotifications({ token, userId }) {
   const showRevokeToast = useCallback((n) => {
     if (!n) return;
     const id = n.id ?? n.notificationId;
-    if (id != null) {
-      if (shownIdsRef.current.has(id)) return;
-      shownIdsRef.current.add(id);
-    }
+    if (!markShown(shownIdsRef.current, id)) return;
     const sender = String(n.senderName ?? n.sender_name ?? "").trim();
     const rawTitle = String(n.noteTitle ?? n.note_title ?? "").trim();
     const noteTitle = rawTitle || t("untitledNote");
