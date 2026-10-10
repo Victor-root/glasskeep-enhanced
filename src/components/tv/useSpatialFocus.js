@@ -148,6 +148,14 @@ function focusFirst() {
   if (first) focusElement(first);
 }
 
+// Asks the hook below (through its "tv-focus" window event) to move the
+// D-pad focus onto `target`. Ignored when target isn't an element.
+export function requestTvFocus(target) {
+  if (target instanceof HTMLElement) {
+    window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target } }));
+  }
+}
+
 export default function useSpatialFocus({ enabled, onBack, onEdgeReached, onZoneChange } = {}) {
   const onBackRef = useRef(onBack);
   const onEdgeReachedRef = useRef(onEdgeReached);

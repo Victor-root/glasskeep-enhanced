@@ -4,9 +4,14 @@ import { t } from "../../i18n";
 import TvNoteCard from "./TvNoteCard.jsx";
 import TvNoteDetail from "./TvNoteDetail.jsx";
 import TvSidebar from "./TvSidebar.jsx";
-import useSpatialFocus from "./useSpatialFocus.js";
-import { getContentImages } from "../../utils/noteIcon.js";
-import { Menu, LayoutGrid, Rows3, Sun, Moon, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
+import TvHeaderClock from "./TvHeaderClock.jsx";
+import TvHeaderUserChip from "./TvHeaderUserChip.jsx";
+import TvPager, { PAGER_PAGE_SIZE } from "./TvPager.jsx";
+import useSpatialFocus, { requestTvFocus } from "./useSpatialFocus.js";
+import useViewportWidth from "./useViewportWidth.js";
+import { partitionNotes, pickColumnCount } from "./tvNotesList.js";
+import { loadPref, savePref } from "./tvPrefs.js";
+import { Menu, LayoutGrid, Rows3, Sun, Moon } from "lucide-react";
 
 // TV-mode "home" screen.
 //
@@ -23,261 +28,6 @@ import { Menu, LayoutGrid, Rows3, Sun, Moon, ChevronLeft, ChevronRight, LogOut }
 const STORAGE_VIEW = "tv-view-mode";
 const STORAGE_SIDEBAR = "tv-sidebar";
 const STORAGE_THEME = "tv-theme";
-
-// Date+time line as its own subtree. The 30s tick used to live on
-// TvNotesViewer, which made the whole tree re-render every half
-// minute — masonry diff + memo bust on every card check. Isolated
-// here it costs literally one text node update per tick.
-function HeaderClock() {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30 * 1000);
-    return () => clearInterval(id);
-  }, []);
-  const dateStr = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
-  const timeStr = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  return <div className="tv-header__subtitle">{dateStr} · {timeStr}</div>;
-}
-
-function useViewportWidth() {
-  const [w, setW] = useState(() => window.innerWidth || 1280);
-  useEffect(() => {
-    // Debounced resize listener. TVs almost never resize once running,
-    // but the launcher / system overlays can fire a few synthetic
-    // resize events at boot; debouncing keeps the masonry recompute
-    // from running multiple times back-to-back.
-    let t = null;
-    const onResize = () => {
-      if (t) clearTimeout(t);
-      t = setTimeout(() => setW(window.innerWidth || 1280), 200);
-    };
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      if (t) clearTimeout(t);
-    };
-  }, []);
-  return w;
-}
-
-function sortNotes(list) {
-  return [...list].sort((a, b) => {
-    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
-    const at = a.updated_at || a.created_at || "";
-    const bt = b.updated_at || b.created_at || "";
-    return bt.localeCompare(at);
-  });
-}
-
-function partitionNotes(notes, filter) {
-  const list = notes.filter((n) => {
-    if (!n) return false;
-    if (n.archived || n.trashed) return false;
-    if (!filter || filter.type === "all") return true;
-    if (filter.type === "images") return getContentImages(n.images).length > 0;
-    if (filter.type === "tag") return Array.isArray(n.tags) && n.tags.includes(filter.value);
-    return true;
-  });
-  return sortNotes(list);
-}
-
-function loadPref(key, fallback) {
-  try {
-    const v = localStorage.getItem(key);
-    return v == null ? fallback : v;
-  } catch { return fallback; }
-}
-function savePref(key, value) {
-  try { localStorage.setItem(key, value); } catch { /* ignore */ }
-}
-
-// Column count from viewport width — independent of sidebar state so
-// toggling the rail doesn't force the masonry to re-bucket every card
-// (the root cause of the 3-4s freeze on older Shields). With ~7 cols
-// at 1080p, each card still gets a comfortable ~220-260px regardless
-// of whether the sidebar is open.
-function pickColumnCount(width) {
-  if (width < 700) return 2;
-  if (width < 950) return 3;
-  if (width < 1200) return 4;
-  if (width < 1500) return 5;
-  if (width < 1800) return 6;
-  return 7;
-}
-
-const PAGER_PAGE_SIZE = 2;
-
-// Two-cards-at-a-time pager.
-// Arrows are PURELY DECORATIVE (no click target, no focus): the user
-// pages by pressing Right at the last card of the current page or Left
-// at the first one. The intercept handler lives in TvNotesViewer
-// because the page state is lifted up (so the header can show the
-// indicator).
-function TvPager({ slice, hasPrev, hasNext, onActivate }) {
-  return (
-    <div className="tv-pager">
-      <div className="tv-pager__arrow tv-pager__arrow--decorative" aria-hidden="true">
-        {hasPrev && <ChevronLeft size={36} />}
-      </div>
-      <div className="tv-pager__page">
-        {slice.map((n) => (
-          <TvNoteCard key={n.id} note={n} variant="carousel" onActivate={onActivate} />
-        ))}
-        {/* Fill any empty slot on the last page so the grid stays 2-column. */}
-        {slice.length < PAGER_PAGE_SIZE && Array.from({ length: PAGER_PAGE_SIZE - slice.length }).map((_, i) => (
-          <div key={`pad-${i}`} aria-hidden="true" />
-        ))}
-      </div>
-      <div className="tv-pager__arrow tv-pager__arrow--decorative" aria-hidden="true">
-        {hasNext && <ChevronRight size={36} />}
-      </div>
-    </div>
-  );
-}
-
-// Clickable header chip + popover. Tapping it opens a small menu
-// (currently just "Sign out"); the menu closes on outside click, Back
-// key, or after the user picks an item.
-function HeaderUserChip({ currentUser, onSignOut }) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef(null);
-  const initial = (currentUser?.name?.[0] || currentUser?.email?.[0] || "?").toUpperCase();
-  const label = currentUser?.name || currentUser?.email || "";
-
-  // Close on click outside.
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDocClick = (e) => {
-      if (!wrapRef.current?.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("touchstart", onDocClick);
-    return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("touchstart", onDocClick);
-    };
-  }, [open]);
-
-  // Close on native Back. The Android wrapper turns KEYCODE_BACK into
-  // window.history.back() — a popstate event, NOT a keydown. We push a
-  // history marker on open and react to popstate to close. The cleanup
-  // branch rewinds the entry if the popover closes by any other means
-  // so we don't leak history entries.
-  useEffect(() => {
-    if (!open) return undefined;
-    const marker = { tvUserMenu: true, ts: Date.now() };
-    window.history.pushState(marker, "");
-    const onPop = () => {
-      setOpen(false);
-      const btn = wrapRef.current?.querySelector(".tv-header__user");
-      if (btn instanceof HTMLElement) {
-        window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target: btn } }));
-      }
-    };
-    window.addEventListener("popstate", onPop);
-    return () => {
-      window.removeEventListener("popstate", onPop);
-      if (window.history.state?.tvUserMenu) window.history.back();
-    };
-  }, [open]);
-
-  // Once open, drop focus onto the first menu item so D-pad works.
-  useEffect(() => {
-    if (!open) return;
-    const id = requestAnimationFrame(() => {
-      const first = wrapRef.current?.querySelector(".tv-header__user-menu-item");
-      if (first instanceof HTMLElement) {
-        window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target: first } }));
-      }
-    });
-    return () => cancelAnimationFrame(id);
-  }, [open]);
-
-  // While the popover is open we run a focus trap in capture phase so
-  // useSpatialFocus never sees the D-pad keys:
-  //   - Up / Down cycle between the chip and the menu item(s) only
-  //   - Left / Right are swallowed (no escape sideways)
-  //   - Back / Esc / GoBack close the popover and return focus to chip
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => {
-      // Back / Esc / GoBack: close + restore focus on chip.
-      if (e.key === "Escape" || e.key === "Backspace" || e.key === "GoBack") {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        setOpen(false);
-        const btn = wrapRef.current?.querySelector(".tv-header__user");
-        if (btn instanceof HTMLElement) {
-          window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target: btn } }));
-        }
-        return;
-      }
-      // Lateral nav: just absorb so focus can't leave the popover.
-      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        return;
-      }
-      // Vertical nav: walk the focusables inside the wrap.
-      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-        const wrap = wrapRef.current;
-        if (!wrap) return;
-        const list = Array.from(wrap.querySelectorAll(".tv-focusable"))
-          .filter((el) => el.offsetParent !== null);
-        if (!list.length) return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        const idx = list.indexOf(document.activeElement);
-        const nextIdx = e.key === "ArrowDown"
-          ? Math.min(list.length - 1, (idx < 0 ? -1 : idx) + 1)
-          : Math.max(0, (idx < 0 ? list.length : idx) - 1);
-        const target = list[nextIdx];
-        if (target instanceof HTMLElement) {
-          window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target } }));
-        }
-      }
-    };
-    document.addEventListener("keydown", onKey, true);
-    return () => document.removeEventListener("keydown", onKey, true);
-  }, [open]);
-
-  return (
-    <div className="tv-header__user-menu-wrap" ref={wrapRef}>
-      <button
-        type="button"
-        className="tv-header__user tv-focusable tv-focusable--flat"
-        aria-label={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span className="tv-header__avatar">
-          {currentUser?.avatar_url
-            ? <img src={currentUser.avatar_url} alt="" />
-            : <span>{initial}</span>}
-        </span>
-        <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {label}
-        </span>
-      </button>
-      {open && (
-        <div className="tv-header__user-menu" role="menu">
-          {typeof onSignOut === "function" && (
-            <button
-              type="button"
-              className="tv-header__user-menu-item tv-focusable tv-focusable--flat"
-              role="menuitem"
-              onClick={() => { setOpen(false); onSignOut(); }}
-            >
-              <span className="tv-header__user-menu-item-icon"><LogOut size={14} /></span>
-              <span>{t("logout") || "Sign out"}</span>
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function TvNotesViewer({
   notes,
@@ -355,9 +105,7 @@ export default function TvNotesViewer({
           setPagerPage((p) => Math.min(pagerTotalPages - 1, p + 1));
           requestAnimationFrame(() => {
             const first = document.querySelector(".tv-pager__page [data-note-id]");
-            if (first instanceof HTMLElement) {
-              window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target: first } }));
-            }
+            requestTvFocus(first);
           });
         }
       } else if (e.key === "ArrowLeft" && idx === 0) {
@@ -368,9 +116,7 @@ export default function TvNotesViewer({
           requestAnimationFrame(() => {
             const els = document.querySelectorAll(".tv-pager__page [data-note-id]");
             const target = els[els.length - 1];
-            if (target instanceof HTMLElement) {
-              window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target } }));
-            }
+            requestTvFocus(target);
           });
         }
       }
@@ -399,9 +145,7 @@ export default function TvNotesViewer({
     if (!id) return undefined;
     const raf = requestAnimationFrame(() => {
       const el = document.querySelector(`[data-note-id="${CSS.escape(id)}"]`);
-      if (el instanceof HTMLElement) {
-        window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target: el } }));
-      }
+      requestTvFocus(el);
     });
     return () => cancelAnimationFrame(raf);
   }, [openNote]);
@@ -484,9 +228,7 @@ export default function TvNotesViewer({
     setSidebarVisible(true);
     requestAnimationFrame(() => {
       const first = document.querySelector(".tv-sidebar .tv-focusable");
-      if (first instanceof HTMLElement) {
-        window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target: first } }));
-      }
+      requestTvFocus(first);
     });
   }, []);
 
@@ -550,7 +292,7 @@ export default function TvNotesViewer({
         />
         <div className="tv-header__title-wrap">
           <div className="tv-header__title">GlassKeep</div>
-          <HeaderClock />
+          <TvHeaderClock />
         </div>
         {viewMode === "carousel" && pagerTotalPages > 1 && (
           <div className="tv-header__pager-indicator" aria-label={t("tvPagerIndicatorLabel")}>
@@ -561,7 +303,7 @@ export default function TvNotesViewer({
         )}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
           <span className="tv-header__count">{filterLabel} · {visible.length}</span>
-          <HeaderUserChip currentUser={currentUser} onSignOut={onSignOut} />
+          <TvHeaderUserChip currentUser={currentUser} onSignOut={onSignOut} />
         </div>
       </header>
 
