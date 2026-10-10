@@ -15,6 +15,7 @@ import { textToChecklistItems, checklistItemsToText } from "../../utils/noteConv
 import { api } from "../../utils/api.js";
 import { mdForDownload } from "../../utils/markdown.jsx";
 import { sortNotesByRecency } from "../../utils/noteList.js";
+import { parseDrawingContent } from "../../utils/drawingContent.js";
 
 /**
  * SecondaryNoteInstance — self-contained per-note modal controller used as
@@ -207,12 +208,8 @@ export default function SecondaryNoteInstance({
     let drawNoteText = "";
     if (n.type === "draw") {
       try {
-        const drawingData = JSON.parse(n.content || "[]");
-        const normalizedData = Array.isArray(drawingData)
-          ? { paths: drawingData, dimensions: null }
-          : drawingData;
-        drawNoteText = normalizedData.text || "";
-        const { text: _discardText, ...cleanDrawingData } = normalizedData;
+        const { drawing: cleanDrawingData, text } = parseDrawingContent(n.content);
+        drawNoteText = text;
         setMDrawingData(cleanDrawingData);
         prevDrawingRef.current = cleanDrawingData;
         setMBody(drawNoteText);
@@ -475,11 +472,7 @@ export default function SecondaryNoteInstance({
     const n = notes.find((x) => String(x.id) === String(activeId));
     if (!n || n.type !== "draw") return;
     try {
-      const serverDrawingData = JSON.parse(n.content || "[]");
-      const normalizedData = Array.isArray(serverDrawingData)
-        ? { paths: serverDrawingData, dimensions: null }
-        : serverDrawingData;
-      const { text: _serverText, ...serverCleanData } = normalizedData;
+      const { drawing: serverCleanData } = parseDrawingContent(n.content);
       const prevJson = JSON.stringify(prevDrawingRef.current || []);
       const serverJson = JSON.stringify(serverCleanData);
       if (serverJson !== prevJson) {

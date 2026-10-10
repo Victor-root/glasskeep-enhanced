@@ -12,6 +12,7 @@ import { textToChecklistItems, checklistItemsToText } from "../utils/noteConvers
 import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "../utils/richText.js";
 import { parseAudioContent, isAudioContentEmpty, extensionForMime } from "../utils/audioNote.js";
 import { dataUrlToBlob } from "../utils/audioConvert.js";
+import { parseDrawingContent } from "../utils/drawingContent.js";
 
 /**
  * What can be done to a note from the app: open it in the primary
@@ -69,7 +70,7 @@ export default function useNoteActions({
   const handleDownloadNote = async (note) => {
     if (note?.type === "audio") {
       const parsed = parseAudioContent(note.content);
-      // Multi-clip notes still download from the kebab as a single file —
+      // Multi-clip notes still download from the kebab as a single file:
       // the first clip. The themed player offers per-clip downloads with
       // an explicit format choice (original / WAV); that's the richer UX.
       const clip = parsed.clips[0];
@@ -93,12 +94,12 @@ export default function useNoteActions({
 
   /** -------- Archive/Unarchive note -------- */
   const handleArchiveNote = async (noteId, archived) => {
-    // Archiving a draft counts as a real action — materialise it first so the
+    // Archiving a draft counts as a real action: materialise it first so the
     // create reaches the queue before the archive patch follows.
     if (pendingDraftRef.current && String(noteId) === String(pendingDraftRef.current.id)) {
       materializeDraftIfNeeded();
     }
-    // Archiving is a durable commitment — clear the freshly-created marker
+    // Archiving is a durable commitment: clear the freshly-created marker
     // so the empty-on-close auto-trash doesn't undo it for an empty note.
     if (freshlyCreatedNoteRef.current === String(noteId)) {
       freshlyCreatedNoteRef.current = null;
@@ -174,9 +175,9 @@ export default function useNoteActions({
         }
       });
     } catch {
-      /* best-effort — never block opening the note */
+      /* best-effort: never block opening the note */
     }
-    // Clear any stale pending-draft state — we're opening a real, persisted
+    // Clear any stale pending-draft state: we're opening a real, persisted
     // note, so the deferred-create path must not fire for it.
     pendingDraftRef.current = null;
     setSidebarOpen(false);
@@ -187,15 +188,8 @@ export default function useNoteActions({
     let drawNoteText = "";
     if (n.type === "draw") {
       try {
-        const drawingData = JSON.parse(n.content || "[]");
-        // Handle backward compatibility: if it's an array, convert to new format
-        const normalizedData = Array.isArray(drawingData)
-          ? { paths: drawingData, dimensions: null }
-          : drawingData;
-        // Extract text body from drawing JSON (stored alongside paths/dimensions)
-        drawNoteText = normalizedData.text || "";
-        // Remove text from the drawing data object to keep mDrawingData clean
-        const { text: _discardText, ...cleanDrawingData } = normalizedData;
+        const { drawing: cleanDrawingData, text } = parseDrawingContent(n.content);
+        drawNoteText = text;
         setMDrawingData(cleanDrawingData);
         prevDrawingRef.current = cleanDrawingData;
         setMBody(drawNoteText);
@@ -230,7 +224,7 @@ export default function useNoteActions({
     initialModalStateRef.current = baselineState;
     committedBaselineRef.current = { ...baselineState };
 
-    // Audio notes have no read/edit distinction — the AudioNoteEditor always
+    // Audio notes have no read/edit distinction: the AudioNoteEditor always
     // shows the player + recorder controls regardless of viewMode. Open in
     // edit mode so the experience is identical to creating a new audio note.
     // Users who disabled the read-mode setting always open in edit mode.
@@ -252,7 +246,7 @@ export default function useNoteActions({
     }
   };
 
-  // Force-close modal without any save/flush — used when a remote session
+  // Force-close modal without any save/flush: used when a remote session
   // permanently deletes the note that is currently open. Must not trigger
   // autoSaveTextNote, flushPendingDrawingSave, or any enqueueAndSync.
   const forceCloseModalForRemoteDelete = (noteId) => {
@@ -276,7 +270,7 @@ export default function useNoteActions({
       modalClosingTimerRef.current = null;
     }
 
-    // Reset all modal state immediately — no animation, no save
+    // Reset all modal state immediately: no animation, no save
     // (history cleanup is handled by the centralized overlay back-button system)
     setOpen(false);
     setActiveId(null);
@@ -289,7 +283,7 @@ export default function useNoteActions({
 
   // Run the modal exit animation. If the AI side panel is open, close
   // it first with its own slide-back animation, then kick off the modal
-  // fade-out — this gives a clean sequential close instead of both
+  // fade-out: this gives a clean sequential close instead of both
   // animations playing at the same time. The same modalClosingTimerRef
   // guards re-entry through both phases.
   const startModalExitAnimation = () => {
@@ -331,7 +325,7 @@ export default function useNoteActions({
 
     // Unmaterialised draft: the user opened a blank note via the creation
     // buttons and never touched it, so nothing was ever persisted. Just run
-    // the exit animation and drop the pending state — no IDB/queue work.
+    // the exit animation and drop the pending state: no IDB/queue work.
     // Defensive: also remove the draft id from `notes` in case some path
     // accidentally added it before closeModal fired (this should be a no-op
     // in the normal flow, but it covers any reproducer where the user
@@ -354,12 +348,12 @@ export default function useNoteActions({
       return;
     }
 
-    // Auto-trash any note the user emptied before closing — fresh or not.
+    // Auto-trash any note the user emptied before closing: fresh or not.
     // Body emptiness is checked through contentToPlain so the Tiptap JSON
     // envelope (which is never an empty STRING even when the doc is empty)
     // collapses to its actual user-visible text before the trim test.
     //
-    // Tags don't count — a fresh note opened from inside a tag filter
+    // Tags don't count: a fresh note opened from inside a tag filter
     // auto-inherits the tag and would otherwise never qualify. Images
     // DO count as content though: a note that only carries pictures
     // (typical of Google Keep imports) is just as valid as a text-only
@@ -370,7 +364,7 @@ export default function useNoteActions({
         : [];
       // A "real" stroke needs at least 2 points. A single tap on the
       // canvas (no drag) still commits a one-point path which the user
-      // perceives as "I didn't draw anything" — without filtering, the
+      // perceives as "I didn't draw anything": without filtering, the
       // auto-trash would skip the note because drawPaths.length is
       // non-zero, and an empty card would stick around in the list.
       // The combination titleEmpty + bodyEmpty + noImages is already
@@ -381,12 +375,12 @@ export default function useNoteActions({
       const meaningfulPaths = drawPaths.filter(
         (p) => Array.isArray(p?.points) && p.points.length >= 2,
       );
-      // For each note type, "body" means what the user actually authored —
+      // For each note type, "body" means what the user actually authored:
       // the rich-text doc for text notes, the items list for checklists,
       // the drawing strokes (+ optional inline text) for draw notes.
       // Draw notes' body is the Tiptap text caption envelope (an empty
       // editor still serialises to {"v":1,"format":"tiptap","doc":{...}})
-      // so we must collapse it through contentToPlain before trimming —
+      // so we must collapse it through contentToPlain before trimming:
       // a raw `!mBody?.trim()` would always be false on an empty draw
       // caption and would block the auto-trash entirely.
       const bodyEmpty = mType === "text"
@@ -404,7 +398,7 @@ export default function useNoteActions({
         // Server contract: a note must be trashed before it can be
         // permanently deleted (DELETE /notes/:id/permanent returns 400
         // otherwise). Locally we still want the note gone immediately
-        // — tombstone + idbDeleteNote handle the UI/storage side. The
+        // tombstone + idbDeleteNote handle the UI/storage side. The
         // queue then plays out in FIFO order: trash THEN permanent
         // delete, so the server walks through the legal transition
         // and the note doesn't end up stuck mid-pipeline.
@@ -496,7 +490,7 @@ export default function useNoteActions({
     // Use committedBaselineRef (not initialModalStateRef) so that a failed
     // autosave still produces a diff here and gets retried.
     // Runs for both view and edit mode: a user may edit, toggle to view
-    // to preview before the 1s debounce fires, then close — the change is
+    // to preview before the 1s debounce fires, then close: the change is
     // still dirty in mBody/mTitle and must be flushed.
     // Audio shares this path: its mBody is the {clips, text} JSON, so a
     // freshly-recorded clip whose autosave hasn't fired yet still gets
@@ -516,7 +510,7 @@ export default function useNoteActions({
       }
     }
 
-    // No dirty flag management needed here — each flow (text, draw, checklist)
+    // No dirty flag management needed here: each flow (text, draw, checklist)
     // owns its own lease via acquireLocalLease/releaseLocalLease,
     // released only after successful enqueueAndSync.
 
@@ -548,7 +542,7 @@ export default function useNoteActions({
       // Text + audio notes: use targeted patch with only changed fields.
       // Use committedBaselineRef so a failed autosave is retried here.
       // Audio's mBody is the serialised {clips, text} JSON; same diff logic
-      // applies — the JSON string changes when clips are added/removed.
+      // applies: the JSON string changes when clips are added/removed.
       const patch = {};
       const baseline = committedBaselineRef.current;
       if (baseline) {
@@ -558,7 +552,7 @@ export default function useNoteActions({
         if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
         if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
       } else {
-        // No initial state — send everything
+        // No initial state: send everything
         Object.assign(patch, { title: mTitle.trim(), content: mBody, color: mColor, tags: mTagList, images: mImages });
       }
 
@@ -596,7 +590,7 @@ export default function useNoteActions({
         }
       } catch (e) {
         console.error("IndexedDB update failed:", e);
-        // IDB failed — don't advance baselines
+        // IDB failed: don't advance baselines
         setSavingModal(false);
         return;
       }
@@ -608,12 +602,12 @@ export default function useNoteActions({
       );
       const enqueued = await enqueueWithLease(noteId, { type: "update", noteId, payload }, leaseId);
       if (!enqueued) {
-        // Enqueue failed — don't advance baselines so closeModal retry can detect diff
+        // Enqueue failed: don't advance baselines so closeModal retry can detect diff
         setSavingModal(false);
         return;
       }
 
-      // IDB + enqueue both succeeded — advance committed baselines
+      // IDB + enqueue both succeeded: advance committed baselines
       prevItemsRef.current =
         mType === "checklist" ? (Array.isArray(mItems) ? mItems : []) : [];
       prevDrawingRef.current =
@@ -626,13 +620,13 @@ export default function useNoteActions({
   };
   const deleteModal = async (mode) => {
     if (activeId == null) return;
-    // Draft that was never materialised — deleting it is identical to just
+    // Draft that was never materialised: deleting it is identical to just
     // closing the modal (nothing has been persisted anywhere).
     if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
       closeModal();
       return;
     }
-    // The user is explicitly deleting — drop the freshly-created marker so
+    // The user is explicitly deleting: drop the freshly-created marker so
     // closeModal's auto-trash branch doesn't enqueue a redundant trash on
     // top of whatever delete-flow we're about to run.
     if (freshlyCreatedNoteRef.current === String(activeId)) {
@@ -644,7 +638,7 @@ export default function useNoteActions({
     const isCollabNote = (note?.collaborators?.length || 0) > 0;
 
     if (tagFilter === "TRASHED") {
-      // Local-first: permanent delete — tombstone prevents resurrection by loaders/SSE
+      // Local-first: permanent delete: tombstone prevents resurrection by loaders/SSE
       const leaseId = acquireLocalLease(nid);
       addDeleteTombstone(nid);
       try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
@@ -679,7 +673,7 @@ export default function useNoteActions({
       const leaseId = acquireLocalLease(nid);
       await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: new Date().toISOString(), mode: "remove_self" } }, leaseId);
     } else if (!isOwner) {
-      // Collaborator "trash" — symmetric with the owner-leaves-shared
+      // Collaborator "trash": symmetric with the owner-leaves-shared
       // case below: they get a personal copy in their corbeille so
       // the action is recoverable. Without this, the previous spec
       // ("leave the collaboration cleanly, no recovery") read like a
@@ -728,12 +722,12 @@ export default function useNoteActions({
     await enqueueWithLease(nid, { type: "restore", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
   };
   const togglePin = async (id, toPinned) => {
-    // Pinning a draft counts as a real action — materialise it first so the
+    // Pinning a draft counts as a real action: materialise it first so the
     // create lands in the queue before the pin patch follows.
     if (pendingDraftRef.current && String(id) === String(pendingDraftRef.current.id)) {
       materializeDraftIfNeeded();
     }
-    // Pinning is a durable commitment — clear the freshly-created marker so
+    // Pinning is a durable commitment: clear the freshly-created marker so
     // the empty-on-close auto-trash doesn't undo a pinned empty note.
     if (freshlyCreatedNoteRef.current === String(id)) {
       freshlyCreatedNoteRef.current = null;
@@ -747,7 +741,7 @@ export default function useNoteActions({
       const updated = prev.map((n) => {
         if (String(n.id) !== nid) return n;
         if (toPinned) return { ...n, pinned: true };
-        // When unpinning, just keep the note's existing position — it was
+        // When unpinning, just keep the note's existing position: it was
         // assigned when the note was originally in the "others" section and
         // is still valid. No need to recompute.
         return { ...n, pinned: false };
@@ -760,7 +754,7 @@ export default function useNoteActions({
       const existing = await idbGetNote(nid, currentUser?.id, sessionId);
       if (existing) await idbPutNote({ ...existing, pinned: !!toPinned, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
-    // Don't use enqueueWithLease here — it releases the lease immediately after
+    // Don't use enqueueWithLease here: it releases the lease immediately after
     // the server responds, but the server also sends an SSE note_updated event
     // that triggers patchSingleNote after a 300ms debounce. If the lease is
     // already released by then, patchSingleNote fetches the server note (which
@@ -770,7 +764,7 @@ export default function useNoteActions({
     try {
       await enqueueAndSync({ type: "patch", noteId: nid, payload: { pinned: !!toPinned, client_updated_at: nowIso } });
     } catch {
-      // On failure, lease stays active — SSE protection maintained
+      // On failure, lease stays active: SSE protection maintained
       return;
     }
     // Delay lease release past the SSE debounce (300ms) + patchSingleNote fetch time
@@ -783,12 +777,12 @@ export default function useNoteActions({
   // a null ISO to clear the reminder. Setting one always re-arms it
   // (clears reminderFiredAt) so a previously-fired reminder fires again.
   const setNoteReminder = async (id, reminderAtIso) => {
-    // Reminding a draft counts as a real action — materialise it first so
+    // Reminding a draft counts as a real action: materialise it first so
     // the create lands in the queue before the reminder write follows.
     if (pendingDraftRef.current && String(id) === String(pendingDraftRef.current.id)) {
       materializeDraftIfNeeded();
     }
-    // A reminder is a durable commitment — clear the freshly-created marker
+    // A reminder is a durable commitment: clear the freshly-created marker
     // so the empty-on-close auto-trash doesn't discard a reminded note.
     if (freshlyCreatedNoteRef.current === String(id)) {
       freshlyCreatedNoteRef.current = null;
@@ -799,7 +793,7 @@ export default function useNoteActions({
     const reminderAt = reminderAtIso || null;
     console.log(`[reminders] setNoteReminder note=${nid} ->`, reminderAt || "(cleared)");
 
-    // Optimistic state — the chip + the modal bell update instantly.
+    // Optimistic state: the chip + the modal bell update instantly.
     setNotes((prev) =>
       prev.map((n) =>
         String(n.id) === nid ? { ...n, reminderAt, reminderFiredAt: null } : n,
@@ -848,7 +842,7 @@ export default function useNoteActions({
    * Preserves content: text lines become items (one per line, checkbox
    * syntax honoured), items become markdown-like lines.
    *
-   * Server-side `type` is immutable under PATCH — we persist via a full
+   * Server-side `type` is immutable under PATCH: we persist via a full
    * PUT update, mirroring the checklist branch of `saveModal`.
    */
   const performConvertNoteType = async () => {
@@ -874,7 +868,7 @@ export default function useNoteActions({
       ? serializeRichContent(legacyMarkdownToRichDoc(checklistItemsToText(mItems)))
       : "";
 
-    // Local state first — keep the UI responsive even if the sync call lags.
+    // Local state first: keep the UI responsive even if the sync call lags.
     skipNextItemsAutosaveRef.current = true;
     setMBody(newBody);
     setMItems(newItems);
@@ -1017,7 +1011,7 @@ export default function useNoteActions({
     );
     enqueueWithLease(newId, { type: "create", noteId: newId, payload: newNote }, leaseId);
     // The icon (logo badge) is per-user and lives outside the note payload
-    // (its own table + endpoint — see applyNoteIcon), so it isn't carried by
+    // (its own table + endpoint: see applyNoteIcon), so it isn't carried by
     // the "create" enqueue above and must be copied over explicitly.
     if (activeNoteObj?.icon) {
       applyNoteIcon(newId, activeNoteObj.icon);

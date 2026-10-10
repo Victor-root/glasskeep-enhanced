@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "../i18n";
-import { askNoteAIStream } from "../ai.js";
+import { askNoteAIStream } from "../ai/aiClient.js";
 import { localizeServerError } from "../utils/serverErrors.js";
 
 const noteAiStorageKey = (id) =>

@@ -44,7 +44,7 @@ export default function useMultiSelect({ setFabOpen }) {
     const scrollEl = getNotesScrollTarget();
     const scrollX = scrollEl ? scrollEl.scrollLeft : window.scrollX;
     const scrollY = scrollEl ? scrollEl.scrollTop : window.scrollY;
-    // Read the padding BEFORE the state change — after the commit it's gone.
+    // Read the padding BEFORE the state change: after the commit it's gone.
     const shim = document.querySelector(".multi-select-content-shim");
     const pad = shim ? parseFloat(getComputedStyle(shim).paddingTop) || 0 : 0;
     setMultiMode(false);

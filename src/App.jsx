@@ -97,7 +97,7 @@ export default function App() {
   const isMobileDevice = Math.min(windowWidth, windowHeight) < 500;
   const isLandscapeMobile = windowWidth > windowHeight && windowHeight < 500;
 
-  // Detect Android WebView (APK) — force mobile layout on tablets
+  // Detect Android WebView (APK): force mobile layout on tablets
   const isWebView = !!window.AndroidTheme;
 
   useKeyboardInset();
@@ -172,12 +172,8 @@ export default function App() {
     qrQuickEnabled, setQrQuickEnabled,
     applyRemoteUserSettings,
   } = useUserPreferences(token);
-  // Which Settings-panel categories are currently expanded. Defaults to
-  // an empty object = all collapsed; persisted in localStorage and synced
-  // to the user's server settings so the layout follows them across
-  // devices.
   // Per-section expansion state for the Settings side sheet. NOT
-  // persisted — every time the user closes and reopens the panel,
+  // persisted: every time the user closes and reopens the panel,
   // categories should be fully collapsed again. The reset happens
   // in a small effect below that watches settingsPanelOpen flipping
   // to false.
@@ -250,7 +246,7 @@ export default function App() {
   });
   const { noteAiOpen, setNoteAiOpen } = noteAi;
 
-  // Reminder picker open state — lifted here (not in ModalFooter) so it joins
+  // Reminder picker open state: lifted here (not in ModalFooter) so it joins
   // the central overlay stack: the Android back button closes it and the
   // mobile full-screen panel pushes/pops a history entry like every other
   // overlay.
@@ -275,7 +271,7 @@ export default function App() {
 
   // ChangelogModal open state is lifted here (instead of inside the
   // component) so it can be registered with the central Android
-  // back-button stack — overlayOpenCount + the popstate handler below.
+  // back-button stack (useOverlayBackStack below).
   // Without lifting, pressing back on Android while the changelog was
   // open backgrounded the entire app.
   const [changelogOpen, setChangelogOpen] = useState(false);
@@ -348,8 +344,9 @@ export default function App() {
   // the new values without a reload.
   const { refreshBranding } = useBranding();
 
-  // Admin panel state (hook)
   const { allowRegistration, loginSlogan, setLoginSlogan, loginProfiles } = usePublicLoginInfo();
+
+  // Admin panel state (hook)
   const {
     adminPanelOpen, setAdminPanelOpen,
     adminSettings,
@@ -363,7 +360,7 @@ export default function App() {
   } = useAdminActions(token, {
     onSettingsUpdated: (settings) => {
       if (typeof settings.loginSlogan === 'string') setLoginSlogan(settings.loginSlogan);
-      // Branding (name/logo/background/blur) may have changed too —
+      // Branding (name/logo/background/blur) may have changed too:
       // re-pull the public branding so the live app reflects it.
       refreshBranding();
     },
@@ -403,8 +400,8 @@ export default function App() {
   // inside NotificationBell (local, to avoid the desktop+mobile bell
   // duplicating the panel). The bell reports its state up via
   // onOpenChange and exposes a close handle via closeNotifBellRef so
-  // App.jsx can include it in overlayOpenCount (PTR lock + Android
-  // back-button history machinery).
+  // App.jsx can include it in the overlay back stack (pull-to-refresh
+  // lock + Android back button).
   const [notifCenterOpen, setNotifCenterOpen] = useState(false);
   const closeNotifBellRef = useRef(null);
 
@@ -722,7 +719,7 @@ export default function App() {
   // Stable identities for the note-card callbacks. App.jsx recreates these
   // handlers on every render; handing the raw versions to NoteCard defeats
   // its React.memo, so the whole notes grid re-renders on every modal open
-  // and every keystroke in the editor — the main-thread cost the LoAF trace
+  // and every keystroke in the editor: the main-thread cost the LoAF trace
   // pinned to React render tasks (fn "q") and click handlers (fn "fE").
   // useStableCallback keeps a stable identity while always invoking the
   // latest closure, so the memo holds and only the modal subtree re-renders.
@@ -737,8 +734,6 @@ export default function App() {
   const sOnCtrlSelect = useStableCallback(onCtrlSelect);
   const sOnEmptyTrash = useStableCallback(onEmptyTrash);
 
-  // Checklist item drag handlers (for modal reordering)
-
   const { tagsWithCounts, pinned, others, filteredEmptyWithSearch, allEmpty } = useNoteFilters({
     notes,
     notesAreRegular,
@@ -749,7 +744,7 @@ export default function App() {
 
   /** -------- Modal JSX -------- */
   // In SBS mode the left pane's X / scrim click no longer tears down the
-  // primary modal — it just animates the left half out and hands B to
+  // primary modal: it just animates the left half out and hands B to
   // the centre slot. Outside SBS, fall back to the regular closeModal.
   // Back and Escape close it the same way.
   const primaryCloseModal = sbsActive ? requestCloseLeftPaneSBS : closeModal;
@@ -882,7 +877,7 @@ export default function App() {
       onDuplicateNote={duplicateActiveNote}
       initialDrawMode={initialDrawMode}
       onConsumeInitialDrawMode={() => setInitialDrawMode(null)}
-      // Per-note AI chat — kebab entry, panel state, send/close handlers
+      // Per-note AI chat: kebab entry, panel state, send/close handlers
       aiAssistantEnabled={aiAssistantEnabled}
       {...noteAi.modalProps}
     />
@@ -927,7 +922,7 @@ export default function App() {
         onUnlocked={(payload) => {
           // Optimistically hide the banner the moment the unlock
           // request succeeds. Without this the banner lingers for the
-          // ~500 ms it takes refreshLockStatus to round-trip — long
+          // ~500 ms it takes refreshLockStatus to round-trip: long
           // enough for the user to wonder if anything actually
           // happened. The next status fetch will reset
           // lockBannerDismissed back to false in the effect above
@@ -936,7 +931,7 @@ export default function App() {
           setLockBannerDismissed(true);
           setLockOverlayOpen(false);
           refreshLockStatus();
-          // Passkey unlock returns { ok, token, user, ... } — when the
+          // Passkey unlock returns { ok, token, user, ... }: when the
           // server signs the admin in alongside the unlock, install
           // the session through the same path password login uses so
           // the user lands on /notes already authenticated. The
@@ -1035,7 +1030,7 @@ export default function App() {
           header down (no overlap) and scrolls away with the page.
           When the permanent sidebar is pinned we offset the banner
           by sidebarWidth so it starts at the right edge of the
-          sidebar — same horizontal alignment as the main content. */}
+          sidebar: same horizontal alignment as the main content. */}
       {isLocked && currentUser?.email && !lockBannerDismissed && !lockOverlayOpen && (
         <LockedBanner
           onUnlock={() => setLockOverlayOpen(true)}
@@ -1196,7 +1191,7 @@ export default function App() {
 
       {/* Headless: surfaces incoming cross-server pairing requests as
           actionable (Accept / Decline) notifications for admins, even
-          with the admin panel closed — and on next login for any that
+          with the admin panel closed: and on next login for any that
           arrived while they were away. */}
       {currentUser?.is_admin && <FederationInviteWatcher token={token} />}
 
@@ -1398,7 +1393,7 @@ export default function App() {
 
       {/* Mobile vs. desktop floating display. On coarse-pointer
           devices we swap the glass-card stack for an Android-style
-          dark pill at the bottom of the screen — the platform's
+          dark pill at the bottom of the screen: the platform's
           native toast aesthetic feels less out of place on a phone
           than a multi-card overlay would. Width gate is the same
           640 px breakpoint the rest of the UI uses for "mobile",
@@ -1410,7 +1405,7 @@ export default function App() {
           onAction={handleNotificationAction}
           position={notificationsPositionMobile}
           // Suppress the floating mobile pill while the notification
-          // centre sheet is on screen — every active toast is already
+          // centre sheet is on screen: every active toast is already
           // visible inside the panel, so doubling it up just covers
           // part of the list the user just opened.
           suppressed={notifCenterOpen}

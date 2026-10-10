@@ -40,7 +40,7 @@ export default function useSideBySide({
   // when the class is removed.
   const [sbsHandoffNoTransition, setSbsHandoffNoTransition] = useState(false);
 
-  // SBS AI coordination — when one note opens its AI panel in SBS mode,
+  // SBS AI coordination: when one note opens its AI panel in SBS mode,
   // the AI panel takes over the OPPOSITE pane's slot and the opposite
   // note is hidden (kept mounted). Cleared on close/hide and on SBS exit.
   const [sbsAiActiveSide, setSbsAiActiveSide] = useState(null); // null | "left" | "right"
@@ -88,7 +88,7 @@ export default function useSideBySide({
   };
 
   // Intercepts the LEFT pane's close button while in SBS mode. The trick
-  // is to NEVER tear down the primary modal here — instead we play a
+  // is to NEVER tear down the primary modal here: instead we play a
   // pure-CSS close animation on the left half, glide the right pane to
   // centre, then in the SAME render swap the primary's active note from
   // A → B and unmount the secondary. Because primary's `open` state
@@ -104,7 +104,7 @@ export default function useSideBySide({
       // SBS rules drop in the same React commit as openModal/setSbsSecondaryId,
       // and without this snap the residual `transition: transform var(--sbs-anim)`
       // would animate the primary from translateX(-50%-36px) back to translateX(0)
-      // — a left→right kick at the very end. Re-enable transitions after two
+      // a left→right kick at the very end. Re-enable transitions after two
       // frames so the next render has settled.
       setSbsHandoffNoTransition(true);
       openModal(String(remaining));
@@ -130,14 +130,14 @@ export default function useSideBySide({
     setTimeout(() => {
       // Sticky flag: stays true while the survivor remains mounted, so the
       // base .note-modal-anim { animation: noteModalIn } can never replay.
-      // Cleared by openModal / onOpenSideBySide / closeModal — never on a timer.
+      // Cleared by openModal / onOpenSideBySide / closeModal: never on a timer.
       setSbsSuppressOpenReplay(true);
       setSbsSecondaryId(null);
       setSbsClosingSide(null);
     }, SBS_ANIM_MS);
   }, [sbsClosingSide, cancelAndClearSbsAi, setSbsSuppressOpenReplay]);
   // Kept for backward-compat in case the secondary ever runs its own
-  // exit animation outside SBS — currently a no-op in SBS path.
+  // exit animation outside SBS: currently a no-op in SBS path.
   const onSbsRightClosed = useCallback(() => {
     setSbsSecondaryId(null);
     setSbsClosingSide(null);
@@ -191,14 +191,14 @@ export default function useSideBySide({
   const sbsActive = !!sbsSecondaryId;
 
   // Body-level classes that drive split-mode CSS:
-  //   .sbs-active            — both panes are mounted
-  //   .sbs-closing-left      — left is fading out, right glides to centre
-  //   .sbs-closing-right     — right is fading out, left glides to centre
+  //   .sbs-active           : both panes are mounted
+  //   .sbs-closing-left     : left is fading out, right glides to centre
+  //   .sbs-closing-right    : right is fading out, left glides to centre
   // Use useLayoutEffect (not useEffect) so the class change is applied
   // BEFORE the next paint, in the same commit cycle as data-split-* prop
   // updates on the primary scrim. This prevents an intermediate paint
   // where body still has sbs-active/sbs-closing-left while the primary's
-  // data-split-mode has already become undefined — the surviving right
+  // data-split-mode has already become undefined: the surviving right
   // pane's anchor-x rule would briefly flip from the recenter (0) back
   // to its default (calc(50%+gap/2)), kicking it rightward for one frame
   // before the rule drops entirely.

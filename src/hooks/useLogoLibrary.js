@@ -54,7 +54,7 @@ export default function useLogoLibrary({ token, currentUser, sessionId, setNotes
   const deleteLogoFromLibrary = useCallback(async (id) => {
     const token = getAuth()?.token;
     if (!token || !id) return;
-    // Optimistic remove — restore on failure.
+    // Optimistic remove: restore on failure.
     let removed = null;
     setLogoLibrary((prev) => {
       removed = prev.find((l) => l.id === id) || null;
@@ -68,7 +68,7 @@ export default function useLogoLibrary({ token, currentUser, sessionId, setNotes
     }
   }, []);
 
-  // Note icon (logo badge) — PER-USER and never synced to collaborators.
+  // Note icon (logo badge): PER-USER and never synced to collaborators.
   // It lives on note.icon and persists through its own endpoint, NOT in the
   // shared images_json. applyNoteIcon updates local state optimistically,
   // mirrors to IndexedDB, then saves to the per-user endpoint (best-effort).

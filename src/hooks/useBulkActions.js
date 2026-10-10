@@ -178,11 +178,11 @@ export default function useBulkActions({
     }
 
     if (!isArchiving && tagFilter === "ARCHIVED") {
-      // Unarchiving from archived view — remove them from current list and switch view
+      // Unarchiving from archived view: remove them from current list and switch view
       setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
       setTagFilter(null);
     } else if (isArchiving) {
-      // Archiving from normal view — remove them from current list
+      // Archiving from normal view: remove them from current list
       setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
     }
 
@@ -216,7 +216,7 @@ export default function useBulkActions({
 
   // Apply a note-icon (logo) to every selected note. The icon is per-user
   // (never synced), so each note's icon is saved through the dedicated
-  // per-user endpoint via applyNoteIcon — not written into images_json.
+  // per-user endpoint via applyNoteIcon: not written into images_json.
   const onBulkSetIcon = async (logo) => {
     if (!selectedIds.length || !logo?.src) return;
     for (const id of selectedIds) {
