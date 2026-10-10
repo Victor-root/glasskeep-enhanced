@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { t } from '../../i18n';
+import DrawingToolbarPopover from './DrawingToolbarPopover';
+import {
+  PenIcon,
+  EraserIcon,
+  AddPageIcon,
+  RemovePageIcon,
+  UndoIcon,
+  RedoIcon,
+  TrashIcon,
+  PageLinesIcon,
+  CheckIcon,
+  PaletteIcon,
+} from './DrawingIcons';
 
 /* ─── Quick palette: 8 well-chosen defaults ─── */
 const QUICK_COLORS = [
@@ -21,56 +33,6 @@ const SIZE_PRESETS = [
   { value: 12, label: () => t('sizeThick'), icon: 12 },
   { value: 24, label: () => t('sizeLarge'), icon: 24 },
 ];
-
-/* ─── SVG Icons ─── */
-const PenIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M3 17.25V21h3.75l11-11-3.75-3.75-11 11zM20.71 7.04a1.003 1.003 0 000-1.42L18.37 3.29a1.003 1.003 0 00-1.42 0L15.13 5.11l3.75 3.75 1.83-1.82z" />
-  </svg>
-);
-
-const EraserIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
-    <path d="M22 21H7" />
-    <path d="m5 11 9 9" />
-  </svg>
-);
-
-const AddPageIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="12" y1="18" x2="12" y2="12" />
-    <line x1="9" y1="15" x2="15" y2="15" />
-  </svg>
-);
-
-const RemovePageIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="9" y1="15" x2="15" y2="15" />
-  </svg>
-);
-
-const UndoIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M12.5 8c-2.35 0-4.45 1.02-5.9 2.64L4 8v8h8l-3.04-3.04A5.47 5.47 0 0112.5 11c2.76 0 5 2.24 5 5 0 .34-.03.67-.1.99l2.02 1.17c.28-.68.43-1.42.43-2.16 0-4.42-3.58-8-8-8z" />
-  </svg>
-);
-
-const RedoIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ transform: 'scaleX(-1)' }}>
-    <path d="M12.5 8c-2.35 0-4.45 1.02-5.9 2.64L4 8v8h8l-3.04-3.04A5.47 5.47 0 0112.5 11c2.76 0 5 2.24 5 5 0 .34-.03.67-.1.99l2.02 1.17c.28-.68.43-1.42.43-2.16 0-4.42-3.58-8-8-8z" />
-  </svg>
-);
-
-const TrashIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M6 19c0 1.1.9 2 2 2h8a2 2 0 002-2V7H6v12zm3.46-7.12 1.41-1.41L12 11.59l1.12-1.12 1.41 1.41L13.41 13l1.12 1.12-1.41 1.41L12 14.41l-1.12 1.12-1.41-1.41L10.59 13l-1.13-1.12zM15.5 4l-1-1h-5l-1 1H5v2h14V4z" />
-  </svg>
-);
 
 /* ─── Toolbar Button ─── */
 function TBtn({ active, onClick, disabled, tooltip, variant = 'default', compact = false, children, className = '' }) {
@@ -105,82 +67,6 @@ function TBtn({ active, onClick, disabled, tooltip, variant = 'default', compact
 
 /* ─── Separator (desktop only) ─── */
 const Sep = ({ hide }) => hide ? null : <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0" />;
-
-/* ─── Compact Popover (portal, auto-position, outside click to close) ─── */
-function ToolbarPopover({ anchorRef, open, onClose, darkMode, children }) {
-  const panelRef = useRef(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-  const [ready, setReady] = useState(false);
-
-  React.useLayoutEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on close so the next opening stays hidden until it is placed
-    if (!open) { setReady(false); return; }
-    const place = () => {
-      const a = anchorRef?.current;
-      if (!a) return;
-      const r = a.getBoundingClientRect();
-      const gap = 10;
-      // Try below first
-      let top = r.bottom + gap;
-      let left = r.left + r.width / 2;
-      setPos({ top, left });
-      requestAnimationFrame(() => {
-        const el = panelRef.current;
-        if (!el) return;
-        const bw = el.offsetWidth;
-        const bh = el.offsetHeight;
-        let t = top;
-        let l = left - bw / 2; // center on anchor
-        if (l + bw + 8 > window.innerWidth) l = window.innerWidth - bw - 8;
-        if (l < 8) l = 8;
-        if (t + bh + 8 > window.innerHeight) t = r.top - bh - gap;
-        setPos({ top: t, left: l });
-        setReady(true);
-      });
-    };
-    place();
-    window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-  }, [open, anchorRef]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e) => {
-      if (panelRef.current?.contains(e.target)) return;
-      if (anchorRef?.current?.contains(e.target)) return;
-      e.stopPropagation();
-      onClose?.();
-    };
-    document.addEventListener("mousedown", onDown, true);
-    document.addEventListener("touchstart", onDown, true);
-    return () => {
-      document.removeEventListener("mousedown", onDown, true);
-      document.removeEventListener("touchstart", onDown, true);
-    };
-  }, [open, onClose, anchorRef]);
-
-  if (!open) return null;
-  return createPortal(
-    <div
-      ref={panelRef}
-      style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 99999, visibility: ready ? "visible" : "hidden" }}
-      className={`rounded-2xl shadow-2xl backdrop-blur-xl border ring-1 ring-black/5 dark:ring-white/5 p-3 ${
-        darkMode ? "bg-gray-900/98 border-gray-700/50" : "bg-white/98 border-gray-100/80"
-      }`}
-    >
-      {children}
-    </div>,
-    document.body,
-  );
-}
-
-const PageLinesIcon = ({ active }) => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <line x1="4" y1="8" x2="20" y2="8" strokeDasharray={active ? "none" : "3 3"} />
-    <line x1="4" y1="16" x2="20" y2="16" strokeDasharray={active ? "none" : "3 3"} />
-    <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="none" />
-  </svg>
-);
 
 /* ─── Main Component ─── */
 export default function DrawingToolbar({
@@ -288,7 +174,7 @@ export default function DrawingToolbar({
                   <circle cx="13" cy="15" r="6" fill={color} />
                 </svg>
               </button>
-              <ToolbarPopover anchorRef={colorBtnRef} open={colorPopOpen} onClose={() => setColorPopOpen(false)} darkMode={darkMode}>
+              <DrawingToolbarPopover anchorRef={colorBtnRef} open={colorPopOpen} onClose={() => setColorPopOpen(false)} darkMode={darkMode}>
                 <div className="flex flex-wrap gap-2.5 justify-center" style={{ width: 200 }}>
                   {QUICK_COLORS.map(c => (
                     <button
@@ -302,9 +188,7 @@ export default function DrawingToolbar({
                       style={{ backgroundColor: c }}
                     >
                       {color === c && (
-                        <svg className="w-4 h-4 mx-auto drop-shadow-sm" viewBox="0 0 24 24" fill={c === '#FFFFFF' || c === '#fff' || c === '#FACC15' ? '#000' : '#fff'}>
-                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                        </svg>
+                        <CheckIcon className="w-4 h-4 mx-auto drop-shadow-sm" fill={c === '#FFFFFF' || c === '#fff' || c === '#FACC15' ? '#000' : '#fff'} />
                       )}
                     </button>
                   ))}
@@ -320,13 +204,9 @@ export default function DrawingToolbar({
                       style={isCustomColor ? { backgroundColor: color } : {}}
                     >
                       {isCustomColor ? (
-                        <svg className="w-4 h-4 drop-shadow-sm" viewBox="0 0 24 24" fill="#fff">
-                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                        </svg>
+                        <CheckIcon className="w-4 h-4 drop-shadow-sm" fill="#fff" />
                       ) : (
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10c1.38 0 2.5-1.12 2.5-2.5 0-.61-.23-1.2-.64-1.67-.08-.1-.13-.21-.13-.33 0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8 8 8.67 8 9.5 7.33 11 6.5 11zm3-4C8.67 7 8 6.33 8 5.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
-                        </svg>
+                        <PaletteIcon className="w-4 h-4" />
                       )}
                     </button>
                     <input
@@ -339,7 +219,7 @@ export default function DrawingToolbar({
                     />
                   </div>
                 </div>
-              </ToolbarPopover>
+              </DrawingToolbarPopover>
             </>
           ) : (
             /* Desktop: inline color swatches */
@@ -369,11 +249,7 @@ export default function DrawingToolbar({
                   style={isCustomColor ? { backgroundColor: color } : {}}
                   data-tooltip={t('customColor')}
                 >
-                  {!isCustomColor && (
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10c1.38 0 2.5-1.12 2.5-2.5 0-.61-.23-1.2-.64-1.67-.08-.1-.13-.21-.13-.33 0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8 8 8.67 8 9.5 7.33 11 6.5 11zm3-4C8.67 7 8 6.33 8 5.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
-                    </svg>
-                  )}
+                  {!isCustomColor && <PaletteIcon className="w-3.5 h-3.5" />}
                 </button>
                 <input
                   ref={customColorRef}
@@ -407,7 +283,7 @@ export default function DrawingToolbar({
               <line x1="3" y1="12.5" x2="15" y2="12.5" stroke={color} strokeWidth="4.5" strokeLinecap="round" />
             </svg>
           </button>
-          <ToolbarPopover anchorRef={sizeBtnRef} open={sizePopOpen} onClose={() => setSizePopOpen(false)} darkMode={darkMode}>
+          <DrawingToolbarPopover anchorRef={sizeBtnRef} open={sizePopOpen} onClose={() => setSizePopOpen(false)} darkMode={darkMode}>
             <div className="flex items-center gap-3 px-1">
               {SIZE_PRESETS.map(preset => (
                 <button
@@ -438,7 +314,7 @@ export default function DrawingToolbar({
                 </button>
               ))}
             </div>
-          </ToolbarPopover>
+          </DrawingToolbarPopover>
         </>
       ) : (
         /* Desktop: inline size buttons */
@@ -484,7 +360,7 @@ export default function DrawingToolbar({
               <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
             </svg>
           </button>
-          <ToolbarPopover anchorRef={actionsBtnRef} open={actionsPopOpen} onClose={() => setActionsPopOpen(false)} darkMode={darkMode}>
+          <DrawingToolbarPopover anchorRef={actionsBtnRef} open={actionsPopOpen} onClose={() => setActionsPopOpen(false)} darkMode={darkMode}>
             <div className="grid grid-cols-3 gap-1.5" style={{ width: 180 }}>
               {/* Undo */}
               <button
@@ -577,7 +453,7 @@ export default function DrawingToolbar({
                 </button>
               )}
             </div>
-          </ToolbarPopover>
+          </DrawingToolbarPopover>
         </>
       ) : (
         /* Desktop: inline action buttons */

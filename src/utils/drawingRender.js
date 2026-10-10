@@ -52,3 +52,12 @@ export function renderPaths(ctx, paths, scale = 1) {
     drawSmoothPath(ctx, scaledPoints);
   });
 }
+
+/* ─── Theme stroke conversion, black ↔ white (shared by DrawingCanvas + DrawingPreview) ─── */
+export function convertThemeStrokes(pathsData, darkMode) {
+  return pathsData.map(path => {
+    if (darkMode && path.color === '#000000') return { ...path, color: '#FFFFFF' };
+    if (!darkMode && path.color === '#FFFFFF') return { ...path, color: '#000000' };
+    return path;
+  });
+}
