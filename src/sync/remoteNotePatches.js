@@ -15,6 +15,7 @@ export async function patchSingleNote(noteId, ctx) {
   if (!noteId) return;
   const { token, userId, sessionId, setNotes, leases } = ctx;
   const nid = String(noteId);
+  const noLocalEdit = leases.snapshotEdits(nid);
 
   // Permanently deleted locally: never resurrected from the server.
   if (leases.isDeleteTombstoned(nid)) return;
@@ -30,6 +31,7 @@ export async function patchSingleNote(noteId, ctx) {
 
     // Final guard: a local mutation may have started during the fetch.
     if (await leases.isProtectedFromServerOverwrite(nid, userId)) return;
+    if (!noLocalEdit()) return;
 
     const belongsInView = noteBelongsInView(serverNote, ctx.viewFilter());
 
@@ -41,6 +43,7 @@ export async function patchSingleNote(noteId, ctx) {
       }, userId, sessionId);
     } catch { /* IDB best-effort */ }
 
+    if (!noLocalEdit()) return;
     if (belongsInView) {
       // Upsert and re-sort: position / pinned may have changed.
       setNotes((prev) => {
@@ -76,6 +79,7 @@ export async function patchNotes(ids, ctx) {
   const { token, userId: uid, sessionId: sid, setNotes, leases } = ctx;
   const currentFilter = ctx.viewFilter();
 
+  const noLocalEdit = new Map(ids.map((nid) => [nid, leases.snapshotEdits(nid)]));
   const toFetch = [];
   for (const nid of ids) {
     if (leases.isDeleteTombstoned(nid)) continue;
@@ -91,6 +95,7 @@ export async function patchNotes(ids, ctx) {
         const serverNote = await api(`/notes/${nid}`, { token });
         if (!serverNote || !serverNote.id) return null;
         if (await leases.isProtectedFromServerOverwrite(nid, uid)) return null;
+        if (!noLocalEdit.get(nid)()) return null;
         return serverNote;
       } catch (e) {
         return e.status === 404 ? { _deleted: true, _nid: nid } : null;
@@ -100,6 +105,7 @@ export async function patchNotes(ids, ctx) {
 
   const upserts = new Map(); // nid → serverNote
   const removals = new Set(); // nids leaving the view
+  const deleted = new Set(); // nids gone on the server (404)
   const idbWrites = [];
 
   for (const r of results) {
@@ -108,6 +114,7 @@ export async function patchNotes(ids, ctx) {
 
     if (val._deleted) {
       removals.add(val._nid);
+      deleted.add(val._nid);
       idbWrites.push(idbDeleteNote(val._nid, uid, sid).catch(() => {}));
       continue;
     }
@@ -125,6 +132,15 @@ export async function patchNotes(ids, ctx) {
 
   await Promise.allSettled(idbWrites);
 
+  // A note edited locally while the batch was applied keeps its edit.
+  for (const nid of [...upserts.keys(), ...removals]) {
+    if (deleted.has(nid)) continue;
+    const check = noLocalEdit.get(nid);
+    if (check && !check()) {
+      upserts.delete(nid);
+      removals.delete(nid);
+    }
+  }
   if (upserts.size > 0 || removals.size > 0) {
     setNotes((prev) => {
       let next = prev;
