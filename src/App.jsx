@@ -7,7 +7,6 @@ import React, {
   useCallback,
   useDeferredValue,
 } from "react";
-import { askAI } from "./ai";
 import { t } from "./i18n";
 import {
   getAllNotes as idbGetAllNotes,
@@ -15,10 +14,8 @@ import {
   putNote as idbPutNote,
   deleteNote as idbDeleteNote,
 } from "./sync/localDb.js";
-import { api, getAuth } from "./utils/api.js";
-import { localizeServerError } from "./utils/serverErrors.js";
 import { mdForDownload } from "./utils/markdown.jsx";
-import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, fileToCompressedDataURL } from "./utils/helpers.js";
+import { uid, sanitizeFilename, downloadText, triggerBlobDownload, fileToCompressedDataURL } from "./utils/helpers.js";
 import { sortNotesByRecency, sortNotesForOrderReset, computeRestoredPosition, sortByPositionDesc } from "./utils/noteList.js";
 import { textToChecklistItems, checklistItemsToText } from "./utils/noteConversion.js";
 import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "./utils/richText.js";
@@ -26,7 +23,6 @@ import { normalizeTypographyPresets } from "./utils/typographyPresets.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES, REMINDERS } from "./utils/constants.js";
 import { hasAndroidReminders, syncAndroidReminders, setAndroidReminderAuth } from "./utils/androidReminders.js";
-import { fetchLogoLibrary, createLogo, deleteLogo as apiDeleteLogo } from "./utils/logoLibrary.js";
 import TooltipPortal from "./components/common/TooltipPortal.jsx";
 import AuthShell from "./components/auth/AuthShell.jsx";
 import LoginView from "./components/auth/LoginView.jsx";
@@ -72,6 +68,10 @@ import usePublicLoginInfo from "./hooks/usePublicLoginInfo.js";
 import useInstanceLock from "./hooks/useInstanceLock.js";
 import useSession from "./hooks/useSession.js";
 import useAuthActions from "./hooks/useAuthActions.js";
+import useAiSearch from "./hooks/useAiSearch.js";
+import useMultiSelect from "./hooks/useMultiSelect.js";
+import useBulkActions from "./hooks/useBulkActions.js";
+import useLogoLibrary from "./hooks/useLogoLibrary.js";
 import useLocalLeases from "./sync/useLocalLeases.js";
 import useNoteSync from "./sync/useNoteSync.js";
 import useNotesLoader from "./sync/useNotesLoader.js";
@@ -191,16 +191,6 @@ export default function App() {
   // Set when the admin panel is opened from the passkey notice, so the
   // domain row can point itself out on arrival. Cleared once it has.
   const [highlightPasskeyDomain, setHighlightPasskeyDomain] = useState(false);
-  // AI assistant — visibility flag mirrored from the server. The
-  // authoritative state lives in user_ai_settings (loaded by
-  // UserAiSettingsSection, which calls back via setAiAssistantEnabled).
-  const [aiAssistantEnabled, setAiAssistantEnabled] = useState(false);
-
-  const [aiResponse, setAiResponse] = useState(null);
-  const [aiCitedNoteIds, setAiCitedNoteIds] = useState([]);
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [aiLoadingProgress, setAiLoadingProgress] = useState(null);
-
   // ─── Ref for closeModal (passed to useModalState for Escape handler) ───
   const closeModalRef = useRef(null);
 
@@ -380,341 +370,23 @@ export default function App() {
   const gkeepFileRef = useRef(null);
   const mdFileRef = useRef(null);
 
-  // -------- Multi-select state --------
-  const [multiMode, setMultiMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState([]); // array of string ids
-  // On desktop the notes list scrolls inside .notes-scroll-area (so its
-  // scrollbar starts below the sticky header) instead of the document;
-  // on mobile that same element keeps overflow:visible and window scrolls
-  // as before. Pick whichever one is actually the scrolling box.
-  const getNotesScrollTarget = () => {
-    const el = document.querySelector(".notes-scroll-area");
-    return el && getComputedStyle(el).overflowY === "auto" ? el : null;
-  };
-  const onStartMulti = () => {
-    // Toggle: a second click on the multi-select button closes the bar
-    // instead of re-running the open logic (which re-added the dock's padding
-    // to the scroll position, so each extra click scrolled the page down).
-    if (multiMode) { onExitMulti(); return; }
-    const scrollEl = getNotesScrollTarget();
-    const scrollX = scrollEl ? scrollEl.scrollLeft : window.scrollX;
-    const scrollY = scrollEl ? scrollEl.scrollTop : window.scrollY;
-    setMultiMode(true);
-    setSelectedIds([]);
-    setFabOpen(false); // dock lives at bottom; close FAB to avoid overlap
-    // Compensate the shim's padding-top so the visible content doesn't slide
-    // down when the dock appears. Read the actual padding after the commit
-    // so desktop (48px) and mobile (44px) both work.
-    requestAnimationFrame(() => {
-      const shim = document.querySelector(".multi-select-content-shim");
-      const pad = shim ? parseFloat(getComputedStyle(shim).paddingTop) || 0 : 0;
-      if (pad > 0) {
-        const target = { left: scrollX, top: scrollY + pad, behavior: "instant" };
-        if (scrollEl) scrollEl.scrollTo(target);
-        else window.scrollTo(target);
-      }
-    });
-  };
-  const onExitMulti = () => {
-    const scrollEl = getNotesScrollTarget();
-    const scrollX = scrollEl ? scrollEl.scrollLeft : window.scrollX;
-    const scrollY = scrollEl ? scrollEl.scrollTop : window.scrollY;
-    // Read the padding BEFORE the state change — after the commit it's gone.
-    const shim = document.querySelector(".multi-select-content-shim");
-    const pad = shim ? parseFloat(getComputedStyle(shim).paddingTop) || 0 : 0;
-    setMultiMode(false);
-    setSelectedIds([]);
-    // The shim's padding-top drops to 0 on the next paint; compensate by
-    // scrolling up by the same amount so the visible content stays put.
-    requestAnimationFrame(() => {
-      const targetY = Math.max(0, scrollY - pad);
-      const target = { left: scrollX, top: targetY, behavior: "instant" };
-      if (scrollEl) scrollEl.scrollTo(target);
-      else window.scrollTo(target);
-    });
-  };
-  const onToggleSelect = (id, checked) => {
-    const sid = String(id);
-    setSelectedIds((prev) =>
-      checked
-        ? Array.from(new Set([...prev, sid]))
-        : prev.filter((x) => x !== sid),
-    );
-  };
-  // Ctrl / Cmd + click on a note card from non-multi mode: enter
-  // multi-select with this note pre-selected. Lets the user gather two
-  // notes and trigger "Open side by side" without first hitting the
-  // multi-select toggle in the toolbar.
-  const onCtrlSelect = (id) => {
-    const sid = String(id);
-    setMultiMode(true);
-    setSelectedIds((prev) =>
-      prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid],
-    );
-  };
-  const onSelectAll = (filteredNotes) => {
-    const filteredIds = filteredNotes.map((n) => String(n.id));
-    const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.includes(id));
-    setSelectedIds(allSelected ? [] : filteredIds);
-  };
+  // FAB open state (lifted for Android back button support)
+  const [fabOpen, setFabOpen] = useState(false);
 
-  useEffect(() => {
-    if (!aiAssistantEnabled) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the AI answer whenever the assistant gets disabled, from any source
-      setAiResponse(null);
-      setAiCitedNoteIds([]);
-    }
-  }, [aiAssistantEnabled]);
+  const {
+    multiMode, setMultiMode,
+    selectedIds, setSelectedIds,
+    onStartMulti, onExitMulti, onToggleSelect, onCtrlSelect, onSelectAll,
+  } = useMultiSelect({ setFabOpen });
 
-  // Mirror the server-side AI preference into the local visibility flag
-  // as soon as the session is authenticated. The Settings panel does
-  // the same on open (and writes back), but this hydrates the search-
-  // bar AI icon immediately on app start.
-  useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
-    api("/user/ai/settings", { token })
-      .then((data) => {
-        if (!cancelled && data && typeof data.enabled === "boolean") {
-          // Effective AI availability — even if the user has it enabled,
-          // the admin's master switch overrides everything. Custom mode
-          // is not a workaround anymore (server enforces this too).
-          const adminGate = data.adminAiEnabled !== false;
-          setAiAssistantEnabled(data.enabled && adminGate);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
-
-  const onBulkDelete = async () => {
-    if (!selectedIds.length) return;
-
-    if (tagFilter === "TRASHED") {
-      showGenericConfirm({
-        title: t("permanentlyDelete"),
-        message: t("permanentlyDeleteConfirm"),
-        confirmText: t("permanentlyDelete"),
-        danger: true,
-        onConfirm: async () => {
-          const count = selectedIds.length;
-          for (const id of selectedIds) {
-            const nid = String(id);
-            addDeleteTombstone(nid);
-            const leaseId = acquireLocalLease(nid);
-            try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-            await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
-          }
-          setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
-          onExitMulti();
-          showToast(t("bulkDeletedSuccess").replace("{count}", String(count)), "success", undefined, "trash-x");
-        },
-      });
-    } else {
-      showGenericConfirm({
-        title: t("moveToTrash"),
-        message: t("bulkMoveToTrashConfirm").replace("{count}", String(selectedIds.length)),
-        confirmText: t("moveToTrash"),
-        danger: true,
-        onConfirm: async () => {
-          const count = selectedIds.length;
-          const nowIso = new Date().toISOString();
-          for (const id of selectedIds) {
-            const nid = String(id);
-            const note = notes.find((n) => String(n.id) === nid);
-            const isCollab = note && (note.user_id !== currentUser?.id || note.collaborators?.length > 0);
-            const leaseId = acquireLocalLease(nid);
-            if (isCollab) {
-              try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-            } else {
-              try {
-                const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-                if (existing) await idbPutNote({ ...existing, trashed: true, client_updated_at: nowIso }, currentUser?.id, sessionId);
-              } catch (e) { console.error(e); }
-            }
-            await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
-          }
-          setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
-          onExitMulti();
-          showToast(t("bulkTrashedSuccess").replace("{count}", String(count)), "success", undefined, "trash");
-        },
-      });
-    }
-  };
-
-  const onEmptyTrash = () => {
-    if (notes.length === 0) return;
-    showGenericConfirm({
-      title: t("emptyTrash"),
-      message: t("emptyTrashConfirm"),
-      confirmText: t("emptyTrash"),
-      danger: true,
-      onConfirm: async () => {
-        const count = notes.length;
-        for (const n of notes) {
-          const nid = String(n.id);
-          addDeleteTombstone(nid);
-          const leaseId = acquireLocalLease(nid);
-          try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-          await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
-        }
-        setNotes([]);
-        showToast(t("bulkDeletedSuccess").replace("{count}", String(count)), "success");
-      },
-    });
-  };
-
-  const onBulkPin = async (pinnedVal) => {
-    if (!selectedIds.length) return;
-    const nowIso = new Date().toISOString();
-    // Local-first: update UI + IndexedDB, then enqueue
-    setNotes((prev) =>
-      prev.map((n) =>
-        selectedIds.includes(String(n.id))
-          ? { ...n, pinned: !!pinnedVal }
-          : n,
-      ),
-    );
-    for (const id of selectedIds) {
-      const nid = String(id);
-      const leaseId = acquireLocalLease(nid);
-      try {
-        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, pinned: !!pinnedVal, client_updated_at: nowIso }, currentUser?.id, sessionId);
-      } catch (e) { console.error(e); }
-      await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { pinned: !!pinnedVal, client_updated_at: nowIso } }, leaseId);
-    }
-  };
-
-  const onBulkRestore = async () => {
-    if (!selectedIds.length) return;
-    const count = selectedIds.length;
-    const nowIso = new Date().toISOString();
-    // Pre-load active notes once for position calculation
-    let activeNotes = [];
-    try {
-      activeNotes = sortByPositionDesc(await idbGetAllNotes(currentUser?.id, sessionId, "active"));
-    } catch { /* IDB best-effort: positions computed without local notes */ }
-    for (const id of selectedIds) {
-      const nid = String(id);
-      const leaseId = acquireLocalLease(nid);
-      try {
-        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) {
-          const restoredPosition = computeRestoredPosition(existing, activeNotes);
-          await idbPutNote({ ...existing, trashed: false, position: restoredPosition, client_updated_at: nowIso }, currentUser?.id, sessionId);
-        }
-      } catch (e) { console.error(e); }
-      await enqueueWithLease(nid, { type: "restore", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
-    }
-    setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
-    onExitMulti();
-    showToast(t("bulkRestoredSuccess").replace("{count}", String(count)), "success", undefined, "restore");
-  };
-
-  const onBulkArchive = async () => {
-    if (!selectedIds.length) return;
-
-    const isArchiving = tagFilter !== "ARCHIVED";
-    const archivedValue = isArchiving;
-    const count = selectedIds.length;
-    const nowIso = new Date().toISOString();
-
-    // Local-first: update IndexedDB + UI, then enqueue
-    setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
-    for (const id of selectedIds) {
-      const nid = String(id);
-      const leaseId = acquireLocalLease(nid);
-      try {
-        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, archived: !!archivedValue, client_updated_at: nowIso }, currentUser?.id, sessionId);
-      } catch (e) { console.error(e); }
-      await enqueueWithLease(nid, { type: "archive", noteId: nid, payload: { archived: !!archivedValue, client_updated_at: nowIso } }, leaseId);
-    }
-
-    if (!isArchiving && tagFilter === "ARCHIVED") {
-      // Unarchiving from archived view — remove them from current list and switch view
-      setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
-      setTagFilter(null);
-    } else if (isArchiving) {
-      // Archiving from normal view — remove them from current list
-      setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
-    }
-
-    onExitMulti();
-    showToast(
-      t(isArchiving ? "bulkArchivedSuccess" : "bulkUnarchivedSuccess").replace("{count}", String(count)),
-      "success",
-      undefined,
-      isArchiving ? "archive" : "archive-off",
-    );
-  };
-
-  const onBulkColor = async (colorName) => {
-    if (!selectedIds.length) return;
-    const nowIso = new Date().toISOString();
-    setNotes((prev) =>
-      prev.map((n) =>
-        selectedIds.includes(String(n.id)) ? { ...n, color: colorName } : n,
-      ),
-    );
-    for (const id of selectedIds) {
-      const nid = String(id);
-      const leaseId = acquireLocalLease(nid);
-      try {
-        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, color: colorName, client_updated_at: nowIso }, currentUser?.id, sessionId);
-      } catch (e) { console.error(e); }
-      await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { color: colorName, client_updated_at: nowIso } }, leaseId);
-    }
-  };
-
-  // Apply a note-icon (logo) to every selected note. The icon is per-user
-  // (never synced), so each note's icon is saved through the dedicated
-  // per-user endpoint via applyNoteIcon — not written into images_json.
-  const onBulkSetIcon = async (logo) => {
-    if (!selectedIds.length || !logo?.src) return;
-    for (const id of selectedIds) {
-      await applyNoteIcon(id, { id: uid(), src: logo.src, name: logo.name });
-    }
-  };
-
-  // Upload a new logo via the OS file picker, register it in the user's
-  // logo library AND apply it to every selected note in one shot.
-  const onBulkAddLogoFromFile = async (file) => {
-    if (!file || !selectedIds.length) return;
-    try {
-      const src = await fileToCompressedDataURL(file);
-      addLogoToLibrary?.({ src, name: file.name });
-      await onBulkSetIcon({ src, name: file.name });
-    } catch (e) {
-      console.error("Bulk logo upload failed", e);
-    }
-  };
-
-  const onBulkDownloadZip = async () => {
-    try {
-      const ids = new Set(selectedIds);
-      const chosen = notes.filter((n) => ids.has(String(n.id)));
-      if (!chosen.length) return;
-      const JSZip = await ensureJSZip();
-      const zip = new JSZip();
-      chosen.forEach((n, idx) => {
-        const md = mdForDownload(n);
-        const base = sanitizeFilename(
-          n.title || `note-${String(n.id).slice(-6)}`,
-        );
-        zip.file(`${base || `note-${idx + 1}`}.md`, md);
-      });
-      const blob = await zip.generateAsync({ type: "blob" });
-      const ts = new Date().toISOString().replace(/[:.]/g, "-");
-      await triggerBlobDownload(`glass-keep-selected-${ts}.zip`, blob);
-    } catch (e) {
-      alert(localizeServerError(e.message, "zipDownloadFailed"));
-    }
-  };
+  const {
+    aiAssistantEnabled, setAiAssistantEnabled,
+    aiResponse, setAiResponse,
+    aiCitedNoteIds, setAiCitedNoteIds,
+    isAiLoading,
+    aiLoadingProgress,
+    handleAiSearch,
+  } = useAiSearch({ token, notes });
 
   // Instance branding (custom app name / logo / login background +
   // blur). The provider owns the fetch; we only need refreshBranding to
@@ -787,9 +459,6 @@ export default function App() {
 
   // Mobile search expand (lifted for back button support)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  // FAB open state (lifted for Android back button support)
-  const [fabOpen, setFabOpen] = useState(false);
-
 
   useEffect(() => {
     // Only close header kebab on outside click (modal kebab is handled by Popover)
@@ -828,34 +497,6 @@ export default function App() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [sidebarOpen]);
-
-  // Load notes
-  const handleAiSearch = async (question) => {
-    if (!question || question.trim().length < 3) return;
-    setIsAiLoading(true);
-    setAiResponse(null);
-    setAiCitedNoteIds([]);
-    setAiLoadingProgress(0);
-
-    try {
-      const result = await askAI(question, notes, (progress) => {
-        if (progress.status === "progress") {
-          setAiLoadingProgress(progress.progress);
-        } else if (progress.status === "ready") {
-          setAiLoadingProgress(100);
-        }
-      });
-      setAiResponse(result.answer);
-      setAiCitedNoteIds(result.citedNoteIds || []);
-    } catch (err) {
-      console.error("AI Error:", err);
-      setAiResponse(t("aiErrorGeneric"));
-      setAiCitedNoteIds([]);
-    } finally {
-      setIsAiLoading(false);
-      setAiLoadingProgress(null);
-    }
-  };
 
   const { notesLoading, notesAreRegular, loadNotes } = useNotesLoader({
     token,
@@ -1327,7 +968,7 @@ export default function App() {
       headerMenuOpen, multiMode, typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
       noteAiOpen, changelogOpen, qrScannerOpen,
       closeQrScanner, setImgViewOpen, setConfirmDeleteOpen, setCollaborationModalOpen, setShowModalColorPop, setShowModalFmt,
-      setModalKebabOpen, setLogoPickerOpen, setImageMenuOpen, setModalTagFocused, setAdminPanelOpen, setNoteAiOpen]);
+      setModalKebabOpen, setLogoPickerOpen, setImageMenuOpen, setModalTagFocused, setAdminPanelOpen, setNoteAiOpen, setMultiMode]);
 
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
@@ -1343,112 +984,32 @@ export default function App() {
     if (results.length) setter((prev) => [...prev, ...results]);
   };
 
-  // Persistent per-user logo library — server-backed (same list across
-  // all devices/sessions of the same user). Logos here are independent
-  // of any note: uploading a logo adds it to the library, deleting one
-  // removes it from the library only (notes that already use it keep
-  // their embedded copy).
-  const [logoLibrary, setLogoLibrary] = useState([]);
-  useEffect(() => {
-    const token = getAuth()?.token;
-    if (!currentUser?.id || !token) {
-      setLogoLibrary([]);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const rows = await fetchLogoLibrary(token);
-        if (!cancelled) setLogoLibrary(rows);
-      } catch (e) {
-        console.error("[logoLibrary] load failed", e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [currentUser?.id]);
+  const {
+    logoLibrary, setLogoLibrary,
+    addLogoToLibrary, deleteLogoFromLibrary,
+    applyNoteIcon, setNoteIconFromFile, removeNoteIcon, pickNoteIcon,
+  } = useLogoLibrary({ token, currentUser, sessionId, setNotes, activeId });
 
-  const addLogoToLibrary = useCallback(async ({ src, name }) => {
-    const token = getAuth()?.token;
-    if (!token || !src) return null;
-    try {
-      const saved = await createLogo(token, { src, name });
-      if (saved) {
-        setLogoLibrary((prev) => {
-          if (prev.some((l) => l.id === saved.id)) return prev;
-          return [...prev, saved];
-        });
-      }
-      return saved;
-    } catch (e) {
-      console.error("[logoLibrary] create failed", e);
-      return null;
-    }
-  }, []);
-
-  const deleteLogoFromLibrary = useCallback(async (id) => {
-    const token = getAuth()?.token;
-    if (!token || !id) return;
-    // Optimistic remove — restore on failure.
-    let removed = null;
-    setLogoLibrary((prev) => {
-      removed = prev.find((l) => l.id === id) || null;
-      return prev.filter((l) => l.id !== id);
-    });
-    try {
-      await apiDeleteLogo(token, id);
-    } catch (e) {
-      console.error("[logoLibrary] delete failed", e);
-      if (removed) setLogoLibrary((prev) => [...prev, removed]);
-    }
-  }, []);
-
-  // Note icon (logo badge) — PER-USER and never synced to collaborators.
-  // It lives on note.icon and persists through its own endpoint, NOT in the
-  // shared images_json. applyNoteIcon updates local state optimistically,
-  // mirrors to IndexedDB, then saves to the per-user endpoint (best-effort).
-  const applyNoteIcon = useCallback(async (noteId, icon) => {
-    if (!noteId) return;
-    const nid = String(noteId);
-    setNotes((prev) => prev.map((n) => (String(n.id) === nid ? { ...n, icon: icon || null } : n)));
-    try {
-      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-      if (existing) await idbPutNote({ ...existing, icon: icon || null }, currentUser?.id, sessionId);
-    } catch { /* IDB best-effort */ }
-    try {
-      if (icon) {
-        await api(`/notes/${nid}/icon`, { method: "PUT", token, body: { icon } });
-      } else {
-        await api(`/notes/${nid}/icon`, { method: "DELETE", token });
-      }
-    } catch (e) {
-      console.error("Note icon save failed", e);
-    }
-  }, [token, currentUser, sessionId, setNotes]);
-
-  const setNoteIconFromFile = useCallback(async (file) => {
-    if (!file || !activeId) return;
-    try {
-      const src = await fileToCompressedDataURL(file);
-      const iconEntry = { id: uid(), src, name: file.name };
-      await applyNoteIcon(activeId, iconEntry);
-      addLogoToLibrary({ src, name: file.name });
-    } catch (e) {
-      console.error("Note icon load failed", e);
-    }
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- false positive: these memoized callbacks are never mutated
-  }, [activeId, applyNoteIcon, addLogoToLibrary]);
-
-  const removeNoteIcon = useCallback(() => {
-    if (activeId) applyNoteIcon(activeId, null);
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- false positive: this memoized callback is never mutated
-  }, [activeId, applyNoteIcon]);
-
-  // Pick an existing logo from the library as the active note's icon.
-  const pickNoteIcon = useCallback((logo) => {
-    if (!activeId || !logo?.src) return;
-    applyNoteIcon(activeId, { id: uid(), src: logo.src, name: logo.name });
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- false positive: this memoized callback is never mutated
-  }, [activeId, applyNoteIcon]);
+  const {
+    onBulkDelete, onEmptyTrash, onBulkPin, onBulkRestore, onBulkArchive,
+    onBulkColor, onBulkSetIcon, onBulkAddLogoFromFile, onBulkDownloadZip,
+  } = useBulkActions({
+    notes,
+    setNotes,
+    selectedIds,
+    onExitMulti,
+    tagFilter,
+    setTagFilter,
+    currentUser,
+    sessionId,
+    acquireLocalLease,
+    addDeleteTombstone,
+    enqueueWithLease,
+    showGenericConfirm,
+    showToast,
+    applyNoteIcon,
+    addLogoToLibrary,
+  });
 
   // Track initial state when opening modal to detect if user actually edited
   // Must be defined before openModal
