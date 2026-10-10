@@ -8,7 +8,7 @@ import { Image as ImageLucide, Mic, Pencil, CheckSquare } from "lucide-react";
 import { countItems, countChecked, isItem } from "../../utils/checklist.js";
 import { parseAudioContent } from "../../utils/audioNote.js";
 import DrawingPreview from "../common/DrawingPreview.jsx";
-import { isColorDark, drawingTextHtml } from "./tvNoteContent.js";
+import { isColorDark } from "./tvNoteColors.js";
 
 // Closed note card for TV. Renders into the dark 10-foot palette and
 // is wrapped in React.memo so an unrelated parent rerender (clock tick,
@@ -27,7 +27,14 @@ function buildPreviewHtml(n) {
       : raw;
     return renderSafeMarkdown(sliced);
   }
-  if (n.type === "draw") return drawingTextHtml(n.content);
+  if (n.type === "draw") {
+    try {
+      const parsed = typeof n.content === "string" ? JSON.parse(n.content) : n.content;
+      const txt = parsed?.text || "";
+      if (!txt) return "";
+      return isRichContent(txt) ? contentToHTML(txt) : renderSafeMarkdown(txt);
+    } catch { return ""; }
+  }
   return "";
 }
 

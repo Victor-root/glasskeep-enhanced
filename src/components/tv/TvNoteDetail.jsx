@@ -1,20 +1,29 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { t } from "../../i18n";
 import { bgFor, solid } from "../../utils/colors.js";
+import { isRichContent, contentToHTML } from "../../utils/richText.js";
+import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { getSections, isItem, DEFAULT_SECTION_ID } from "../../utils/checklist.js";
 import { getContentImages } from "../../utils/noteIcon.js";
 import { parseAudioContent, formatDuration } from "../../utils/audioNote.js";
 import { Mic } from "lucide-react";
 import DrawingPreview from "../common/DrawingPreview.jsx";
-import { isColorDark, textToHtml, drawingTextHtml } from "./tvNoteContent.js";
+import { isColorDark } from "./tvNoteColors.js";
 
 function buildBodyHtml(note) {
   if (note.type === "text") {
     const raw = note.content || "";
     if (!raw) return "";
-    return textToHtml(raw);
+    return isRichContent(raw) ? contentToHTML(raw) : renderSafeMarkdown(raw);
   }
-  if (note.type === "draw") return drawingTextHtml(note.content);
+  if (note.type === "draw") {
+    try {
+      const parsed = typeof note.content === "string" ? JSON.parse(note.content) : note.content;
+      const txt = parsed?.text || "";
+      if (!txt) return "";
+      return isRichContent(txt) ? contentToHTML(txt) : renderSafeMarkdown(txt);
+    } catch { return ""; }
+  }
   return "";
 }
 

@@ -1,31 +1,5 @@
-import { marked } from "marked";
-import DOMPurify from "dompurify";
-import { installStyleGuard } from "../../utils/safeStyle.js";
-import changelogRaw from "../../../CHANGELOG.md?raw";
-
-// The bundled changelog compiled to sanitized HTML, and how its links
-// open.
-
-// One filter for every sanitizing path in the app. See safeStyle.js.
-installStyleGuard(DOMPurify);
-
-export function compileMarkdown(md) {
-    try {
-        const html = marked.parse(String(md || ""), {
-            breaks: false,
-            gfm: true,
-        });
-        return DOMPurify.sanitize(html);
-    } catch {
-        return "";
-    }
-}
-
-// Compile the bundled changelog once at module load: it is identical
-// for every render and parsing 5 KB of changelog on every mount would
-// be silly. AI-translated variants are compiled on the fly when the
-// user clicks "Translate with AI".
-export const compiledChangelog = compileMarkdown(changelogRaw);
+// How the changelog's links open: relative paths resolve against the
+// repository on GitHub, and every link leaves the app for the browser.
 
 // Where relative changelog links (e.g. `./PASSKEYS.md`) live online.
 // The changelog is markdown checked into the repo, so any in-repo
