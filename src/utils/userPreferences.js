@@ -64,6 +64,7 @@ export const clampSidebarBreakpoint = (value) => {
  *  - parse(v): the value to apply from a server payload, or undefined
  *              when the payload value is not acceptable
  *  - save(v):  the localStorage write for a value
+ *  - toServer(v): the value PATCHed, when it differs from the state
  */
 export const PREFERENCES = {
   // null = not known yet: the sidebar stays hidden until the server answers.
@@ -218,6 +219,7 @@ export const PREFERENCES = {
     read: () => stored("viewMode") === "list",
     parse: (v) => (v === "list" || v === "grid" ? v === "list" : undefined),
     save: (v) => store("viewMode", v ? "list" : "grid"),
+    toServer: (v) => (v ? "list" : "grid"),
   },
   qrQuickEnabled: {
     read: () => stored("glass-keep-qr-quick") === "1",

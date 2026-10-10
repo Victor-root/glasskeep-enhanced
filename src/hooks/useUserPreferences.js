@@ -31,11 +31,12 @@ function useSyncedPreference(key, value, sync, { patchOnTokenChange = false, deb
       return;
     }
     if (!token) return;
+    const body = { [key]: PREFERENCES[key].toServer ? PREFERENCES[key].toServer(value) : value };
     if (debounceMs > 0) {
       clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => patchSettings(token, { [key]: value }), debounceMs);
+      timerRef.current = setTimeout(() => patchSettings(token, body), debounceMs);
     } else {
-      patchSettings(token, { [key]: value });
+      patchSettings(token, body);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- PATCH when the preference changes (and on token change only where it always did)
   }, [value, tokenDep]);
