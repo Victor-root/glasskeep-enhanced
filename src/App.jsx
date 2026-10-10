@@ -26,7 +26,7 @@ import { api, getAuth, setAuth, getClientId } from "./utils/api.js";
 import { netLog } from "./utils/netDebug.js";
 import { localizeServerError } from "./utils/serverErrors.js";
 import { mdForDownload } from "./utils/markdown.jsx";
-import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, fileToCompressedDataURL, setThemeColor, currentStatusBarColor } from "./utils/helpers.js";
+import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, fileToCompressedDataURL } from "./utils/helpers.js";
 import { sortNotesByRecency, sortNotesForOrderReset, noteBelongsInView, computeRestoredPosition, sortByPositionDesc } from "./utils/noteList.js";
 import { textToChecklistItems, checklistItemsToText } from "./utils/noteConversion.js";
 import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "./utils/richText.js";
@@ -47,8 +47,6 @@ import SettingsPanel from "./components/panels/SettingsPanel.jsx";
 import AdminPanel from "./components/panels/AdminPanel.jsx";
 import FederationInviteWatcher from "./components/admin/federation/FederationInviteWatcher.jsx";
 import { acceptFederationLink, refuseFederationLink, federationErrorMessage } from "./components/admin/federation/federationActions.js";
-import { useUpdateCheck } from "./hooks/useUpdateCheck.js";
-import { useSelfUpdate } from "./hooks/useSelfUpdate.js";
 import SelfUpdateProgress from "./components/admin/SelfUpdateProgress.jsx";
 import ChangelogModal, { consumeChangelogShowFlag, onOpenChangelogRequest } from "./components/admin/ChangelogModal.jsx";
 import AdminView from "./components/notes/AdminView.jsx";
@@ -57,9 +55,6 @@ import GenericConfirmDialog from "./components/common/GenericConfirmDialog.jsx";
 import NotificationViewport from "./components/notifications/NotificationViewport.jsx";
 import NotificationMobileToast from "./components/notifications/NotificationMobileToast.jsx";
 import NotificationBell from "./components/notifications/NotificationBell.jsx";
-import { useNotifications } from "./components/notifications/NotificationProvider.jsx";
-import { playNotificationDing } from "./utils/notificationSound.js";
-import { soundCategoryFor, filterCategoryFor } from "./utils/notificationCategories.js";
 import QrScannerModal from "./components/auth/QrScannerModal.jsx";
 import FloatingCardsBackground from "./components/common/FloatingCardsBackground.jsx";
 import NoteModal from "./components/modal/NoteModal.jsx";
@@ -72,20 +67,25 @@ import useNoteSaveState from "./hooks/useNoteSaveState.js";
 import useDraftNote from "./hooks/useDraftNote.js";
 import useAdminActions from "./hooks/useAdminActions.js";
 import { useBranding } from "./branding/BrandingContext.jsx";
-import { useShareNotifications } from "./hooks/useShareNotifications.js";
 import useImportExport from "./hooks/useImportExport.js";
 import useCollaboration from "./hooks/useCollaboration.js";
-import useInstanceLockStatus from "./hooks/useInstanceLockStatus.js";
 import useKeyboardInset from "./hooks/useKeyboardInset.js";
 import useNoteAiChat from "./hooks/useNoteAiChat.js";
 import useUserPreferences from "./hooks/useUserPreferences.js";
+import useAppNotifications from "./hooks/useAppNotifications.js";
+import useServerUpdate from "./hooks/useServerUpdate.js";
+import useHashRoute from "./hooks/useHashRoute.js";
+import useDarkMode from "./hooks/useDarkMode.js";
+import useWindowSize from "./hooks/useWindowSize.js";
+import usePublicLoginInfo from "./hooks/usePublicLoginInfo.js";
+import useInstanceLock from "./hooks/useInstanceLock.js";
 import { useStableCallback } from "./hooks/useStableCallback.js";
 import InstanceUnlockScreen from "./components/lock/InstanceUnlockScreen.jsx";
 import LockedBanner from "./components/lock/LockedBanner.jsx";
 
 /** ---------- App ---------- */
 export default function App() {
-  const [route, setRoute] = useState(window.location.hash || "#/login");
+  const { route, navigate } = useHashRoute();
 
   // auth session { token, user }
   const [session, setSession] = useState(getAuth());
@@ -105,12 +105,7 @@ export default function App() {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
-  // Theme
-  const [dark, setDark] = useState(false);
-
-  // Screen width for responsive behavior
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  const [windowHeight, setWindowHeight] = useState(window.innerHeight);
+  const { windowWidth, windowHeight } = useWindowSize();
   const isMobileDevice = Math.min(windowWidth, windowHeight) < 500;
   const isLandscapeMobile = windowWidth > windowHeight && windowHeight < 500;
 
@@ -143,9 +138,6 @@ export default function App() {
   const currentUserRef = useRef(currentUser);
   // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
   currentUserRef.current = currentUser;
-  const isAdminRef = useRef(!!currentUser?.is_admin);
-  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
-  isAdminRef.current = !!currentUser?.is_admin;
   const sessionIdRef = useRef(sessionId);
   // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
   sessionIdRef.current = sessionId;
@@ -387,98 +379,28 @@ export default function App() {
     if (consumeChangelogShowFlag()) setChangelogOpen(true);
   }, []);
   useEffect(() => onOpenChangelogRequest(() => setChangelogOpen(true)), []);
-  // Notification system. `notify` is the modern API used directly by
-  // new code (share notifications, etc.). `showToast(message, type,
-  // duration)` is kept as a thin compatibility shim — the dozens of
-  // existing call sites in App.jsx, panels and hooks delegate to it,
-  // so we route their input through the same provider instead of
-  // touching them all.
   const {
     notify,
-    dismiss: dismissNotification,
-    remove: removeNotification,
+    showToast,
+    allNotifications,
+    dismissNotification,
+    removeNotification,
     dismissByServerIds: dismissByServerIdsNotif,
     removeByServerIds: removeByServerIdsNotif,
-    clear: clearNotifications,
-    clearServerBacked: clearServerBackedNotifications,
-    notifications: allNotifications,
-    setDefaultDuration: setNotifDefaultDuration,
-    setNotifyFilter,
-    setOnMarkDelivered: setNotifOnMarkDelivered,
-    setOnMarkRemoved: setNotifOnMarkRemoved,
-  } = useNotifications();
-
-  // Cross-device-aware "Clear all" wrapper. The provider's bare
-  // clear() is local-only; this version also POSTs to the server so
-  // every other tab / device of the same user wipes its own history
-  // in real time (the server broadcasts `notifications_cleared` to
-  // every connected SSE client). Marks any still-undelivered server
-  // rows as delivered too so they don't reappear in /pending.
-  const clearAllNotificationsSynced = useCallback(() => {
-    clearNotifications();
-    const tk = token;
-    if (!tk) return;
-    api("/notifications/clear", { method: "POST", token: tk }).catch(() => {});
-  }, [clearNotifications, token]);
-  // Apply the user's preferred default duration to the provider —
-  // every subsequent `notify()` without an explicit duration uses it.
-  useEffect(() => {
-    setNotifDefaultDuration(notificationsDuration);
-  }, [notificationsDuration, setNotifDefaultDuration]);
-  const showToast = useCallback(
-    (message, type = "success", duration, icon) => {
-      // Pre-existing variants used by the codebase: "success" | "error"
-      // | "info". The provider accepts the same set under `variant`.
-      // When the caller didn't pass a duration we let the provider's
-      // 10-second default apply. The optional 4th argument is a
-      // semantic icon key ("trash", "archive", "save", …); callers
-      // that don't pass one fall back to the variant glyph.
-      const variant =
-        type === "success" || type === "error" || type === "info" || type === "warning"
-          ? type
-          : "info";
-      return notify({
-        type: "toast",
-        variant,
-        message,
-        duration: duration === undefined ? undefined : duration,
-        icon: icon || null,
-      });
-    },
-    [notify],
-  );
-
-  // Wire the per-category display filter into the provider. Runs
-  // whenever notificationsFilterTypes changes so the provider's
-  // notify() ref is always up-to-date.
-  useEffect(() => {
-    setNotifyFilter((spec) => {
-      const cat = filterCategoryFor(spec);
-      return notificationsFilterTypes[cat] !== false;
-    });
-  }, [notificationsFilterTypes, setNotifyFilter]);
-
-  // Discrete ding whenever a NEW notification appears. We compare
-  // `createdAt` rather than the array's first id, because closing
-  // the top card promotes whatever was below it to index 0 —
-  // tracking the id alone would mistake the promotion for a new
-  // arrival and re-ding every time the user dismissed a card. The
-  // creation timestamp only moves forward when notify() actually
-  // inserts a new entry, so the comparison stays correct across
-  // dismiss / remove / close-X.
-  const lastDingedAtRef = useRef(0);
-  useEffect(() => {
-    const newest = allNotifications[0];
-    if (!newest) return;
-    const t = newest.createdAt || 0;
-    if (t <= lastDingedAtRef.current) return;
-    lastDingedAtRef.current = t;
-    if (newest.dismissed) return;
-    if (!notificationsSound) return;
-    const category = soundCategoryFor(newest);
-    if (notificationsSoundTypes[category] === false) return;
-    playNotificationDing();
-  }, [allNotifications, notificationsSound, notificationsSoundTypes]);
+    clearServerBackedNotifications,
+    clearAllNotificationsSynced,
+    showShareToast: showShareNotificationToast,
+    showRevokeToast: showRevokeNotificationToast,
+    showPendingUserToast,
+    showUserDeletedToast,
+  } = useAppNotifications({
+    token,
+    userId: currentUser?.id,
+    notificationsDuration,
+    notificationsFilterTypes,
+    notificationsSound,
+    notificationsSoundTypes,
+  });
 
   // Generic confirmation dialog helper
   const showGenericConfirm = (config) => {
@@ -486,103 +408,7 @@ export default function App() {
     setGenericConfirmOpen(true);
   };
 
-  // Share-notification toasts. The hook fetches anything still pending
-  // on auth (covers the recipient-was-offline case) and exposes a
-  // showShareToast helper the SSE dispatcher below uses for live
-  // events. Internal dedup keeps the rare fetch↔SSE race from
-  // showing the same toast twice.
-  const {
-    showShareToast: showShareNotificationToast,
-    showRevokeToast: showRevokeNotificationToast,
-    showPendingUserToast,
-    showUserDeletedToast,
-    markDelivered: markShareNotificationsDelivered,
-    markRemoved: markShareNotificationsRemoved,
-  } = useShareNotifications({ token, userId: currentUser?.id });
-
-  // Wire the App-level POST helpers into the provider so every
-  // dismiss / remove / auto-dismiss path acks the server. Without
-  // these, closing a card with X (or letting it auto-dismiss) would
-  // leave the row in the DB and /notifications/pending or /history
-  // would replay it at the next reload.
-  useEffect(() => {
-    setNotifOnMarkDelivered(markShareNotificationsDelivered);
-  }, [setNotifOnMarkDelivered, markShareNotificationsDelivered]);
-  useEffect(() => {
-    setNotifOnMarkRemoved(markShareNotificationsRemoved);
-  }, [setNotifOnMarkRemoved, markShareNotificationsRemoved]);
-
-  // GitHub release update notification (admin-only, fail-silent).
-  const updateInfo = useUpdateCheck({
-    token,
-    isAdmin: !!currentUser?.is_admin,
-  });
-  const selfUpdate = useSelfUpdate({
-    token,
-    isAdmin: !!currentUser?.is_admin,
-  });
-
-  // Surface "new version available" as a notification (admin-only).
-  // Replaces the old green "↘ Nouvelle version disponible" pointer
-  // next to the admin shield. The green status dot on the shield is
-  // kept; this card adds a one-click "Mettre à jour maintenant"
-  // action that hands off to selfUpdate.startUpdate. The duration is
-  // pinned to 30 s regardless of the user's notification-duration
-  // preference so the update CTA always gets a fair on-screen window.
-  //
-  // Capped at 3 displays per admin per latest-version. The counter
-  // lives server-side (table update_notification_views, keyed by
-  // user_id + version) so the cap holds across every device the
-  // admin signs in on, not just the current browser. The /update-check
-  // payload carries the current count; we read it here and skip the
-  // notify() call once it has reached 3. Each fired card POSTs
-  // /update-check/mark-shown to increment.
-  const updateNotifiedVersionRef = useRef(null);
-  useEffect(() => {
-    if (!currentUser?.is_admin) return;
-    if (!updateInfo?.updateAvailable || !updateInfo?.latestVersion) return;
-    if (updateNotifiedVersionRef.current === updateInfo.latestVersion) return;
-    if ((updateInfo.notificationShownCount || 0) >= 3) return;
-    updateNotifiedVersionRef.current = updateInfo.latestVersion;
-    const tk = token;
-    if (tk) {
-      api("/update-check/mark-shown", {
-        method: "POST",
-        body: { version: updateInfo.latestVersion },
-        token: tk,
-      }).catch(() => {
-        /* counter just won't tick this round; nothing else to do */
-      });
-    }
-    notify({
-      type: "update_available",
-      variant: "success",
-      icon: "refresh",
-      title: t("serverUpdateAvailable"),
-      message: t("serverUpdateAvailableDescription").replace(
-        "{version}",
-        updateInfo.latestVersion,
-      ),
-      duration: 30000,
-      action: {
-        kind: "start_self_update",
-        label: t("selfUpdateButton"),
-        latestVersion: updateInfo.latestVersion,
-      },
-      // Long message + a primary CTA — push the button onto its own
-      // row underneath so the description can wrap naturally at full
-      // card width instead of being squeezed beside the button.
-      actionLayout: "below",
-    });
-  }, [
-    currentUser?.is_admin,
-    currentUser?.id,
-    updateInfo?.updateAvailable,
-    updateInfo?.latestVersion,
-    updateInfo?.notificationShownCount,
-    notify,
-    token,
-  ]);
+  const { updateInfo, selfUpdate } = useServerUpdate({ token, currentUser, notify });
 
   // Sync-domain refs (owned by autosave, not by modal UI hook)
   const skipNextItemsAutosave = useRef(false);
@@ -801,16 +627,6 @@ export default function App() {
       cancelled = true;
     };
   }, [token]);
-
-  // Window resize listener for responsive sidebar behavior
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-      setWindowHeight(window.innerHeight);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   const onBulkDelete = async () => {
     if (!selectedIds.length) return;
@@ -1046,6 +862,7 @@ export default function App() {
   const { refreshBranding } = useBranding();
 
   // Admin panel state (hook)
+  const { allowRegistration, loginSlogan, setLoginSlogan, loginProfiles } = usePublicLoginInfo();
   const {
     adminPanelOpen, setAdminPanelOpen,
     adminSettings,
@@ -1064,40 +881,16 @@ export default function App() {
       refreshBranding();
     },
   });
-  const [allowRegistration, setAllowRegistration] = useState(true);
-  const [loginSlogan, setLoginSlogan] = useState("");
-  const [loginProfiles, setLoginProfiles] = useState([]);
 
-  // At-rest encryption: when the server reports `enabled && locked`,
-  // an unauthenticated visitor goes to the full unlock screen. An
-  // already-logged-in user gets a non-intrusive banner over their app
-  // instead so they keep reading their local-first cache while sync
-  // is paused; clicking the banner's unlock CTA opens the unlock
-  // screen as an overlay. The `refresh` callback is passed to the
-  // unlock screen so it can flip the UI back without waiting for the
-  // next poll tick.
-  const { status: instanceLockStatus, refresh: refreshLockStatus } = useInstanceLockStatus();
-  // Banner-level dismiss flag: starts off as "show banner". The user
-  // can hide it manually; it comes back on every fresh lock event so
-  // they see the heads-up after a service-side re-lock.
-  const [lockBannerDismissed, setLockBannerDismissed] = useState(false);
-  // Overlay flag: when true, render the unlock screen on top of the
-  // logged-in app instead of the banner.
-  const [lockOverlayOpen, setLockOverlayOpen] = useState(false);
-  // Reset banner-dismissed + close overlay whenever the server flips
-  // back to unlocked (e.g. another tab unlocked, or this tab did).
-  useEffect(() => {
-    if (instanceLockStatus && !instanceLockStatus.locked) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- react to lock changes reported by the polling hook
-      setLockBannerDismissed(false);
-      setLockOverlayOpen(false);
-    }
-    // Re-arm the banner when a fresh lock is detected.
-    if (instanceLockStatus && instanceLockStatus.locked) {
-      setLockBannerDismissed(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- run only when the locked flag flips, not on every poll result
-  }, [instanceLockStatus?.locked]);
+  const {
+    instanceLockStatus,
+    refreshLockStatus,
+    isLocked,
+    lockBannerDismissed,
+    setLockBannerDismissed,
+    lockOverlayOpen,
+    setLockOverlayOpen,
+  } = useInstanceLock();
 
   // Settings panel state
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
@@ -1160,81 +953,9 @@ export default function App() {
   }, []);
   useTouchScrollbars();
 
-  // Router
-  useEffect(() => {
-    const onHashChange = () => setRoute(window.location.hash || "#/login");
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
-  const navigate = (to) => {
-    if (window.location.hash !== to) window.location.hash = to;
-    setRoute(to);
-  };
-
-  // Theme init/toggle
-  useEffect(() => {
-    // Legacy localStorage keys from previous iterations — drop them so old installs reset cleanly.
-    // The manual preference now lives in sessionStorage so it's scoped to the current app session
-    // (preserved while backgrounded, cleared on full close/swipe-kill → next open follows system).
-    localStorage.removeItem("glass-keep-dark-mode");
-    localStorage.removeItem("glass-keep-dark-mode-manual");
-
-    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
-    const manualPref = sessionStorage.getItem("glass-keep-dark-mode-manual");
-    // Android WebView returns `false` for matchMedia("(prefers-color-
-    // scheme: dark)") unless dark mode is explicitly propagated to the
-    // renderer, so the native shell plants `window.__isAndroidDarkMode`
-    // (boolean) in onPageStarted before React mounts. That flag wins
-    // over matchMedia when it's defined; in regular browsers / PWAs
-    // it stays undefined and matchMedia keeps its usual role.
-    const androidDark =
-      typeof window.__isAndroidDarkMode === "boolean"
-        ? window.__isAndroidDarkMode
-        : null;
-    const savedDark = manualPref !== null
-      ? manualPref === "true"
-      : (androidDark != null ? androidDark : (mq?.matches ?? false));
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- apply the stored or system theme on mount, together with the DOM class
-    setDark(savedDark);
-    document.documentElement.classList.toggle("dark", savedDark);
-    setThemeColor(currentStatusBarColor());
-
-    // Apply dark mode from system/bridge without persisting — only toggleDark marks a manual pref
-    const applyDark = (isDark) => {
-      setDark(isDark);
-      document.documentElement.classList.toggle("dark", isDark);
-      // Skip if note modal is open — NoteModal effect handles its own color
-      if (!window.__noteModalOpen) setThemeColor(currentStatusBarColor());
-    };
-    const hasManualPref = () => sessionStorage.getItem("glass-keep-dark-mode-manual") !== null;
-
-    // Android WebView bridge: system preference doesn't propagate via matchMedia in WebView,
-    // so the native side calls this. Ignored when the user has set a manual preference.
-    window.__setDarkMode = (isDark) => {
-      if (hasManualPref()) return;
-      applyDark(isDark);
-    };
-
-    if (!mq) return () => { delete window.__setDarkMode; };
-    // Only follow system changes when no manual preference is set
-    const onChange = (e) => {
-      if (hasManualPref()) return;
-      applyDark(e.matches);
-    };
-    mq.addEventListener("change", onChange);
-    return () => {
-      mq.removeEventListener("change", onChange);
-      delete window.__setDarkMode;
-    };
-  }, []);
-  const toggleDark = () => {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    sessionStorage.setItem("glass-keep-dark-mode-manual", String(next));
-    // Skip if note modal is open — NoteModal effect handles its own color
-    if (!window.__noteModalOpen) setThemeColor(currentStatusBarColor());
-  };
+  // After the stylesheet injection above: the status bar colour is read
+  // from its CSS tokens.
+  const { dark, toggleDark } = useDarkMode();
 
   // Close sidebar with Escape
   useEffect(() => {
@@ -1891,30 +1612,6 @@ export default function App() {
   }, [token, tagFilter]);
 
   // tagFilterRef is now updated inside the load useEffect above (before calling load functions)
-
-  // Fetch login profiles (public)
-  const fetchLoginProfiles = async () => {
-    try {
-      const profiles = await api("/login/profiles");
-      setLoginProfiles(Array.isArray(profiles) ? profiles : []);
-    } catch (e) {
-      console.error("Failed to fetch login profiles:", e);
-      setLoginProfiles([]);
-    }
-  };
-
-  // Check registration setting and login slogan on app load
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability -- mount-only effect, it runs after the later declaration exists
-    checkRegistrationSetting();
-    // eslint-disable-next-line react-hooks/immutability -- mount-only effect, it runs after the later declaration exists
-    fetchLoginSlogan();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch the public login data once on mount
-    fetchLoginProfiles();
-  }, []);
-
-  // Handle token expiration globally - must be after signOut is defined
-  // This will be added after signOut is defined below
 
   useEffect(() => {
     if (!token) return;
@@ -3249,27 +2946,6 @@ export default function App() {
 
   const openSettingsPanel = () => {
     setSettingsPanelOpen(true);
-  };
-
-  // Fetch the login slogan (public)
-  const fetchLoginSlogan = async () => {
-    try {
-      const response = await api("/admin/login-slogan");
-      setLoginSlogan(response.loginSlogan || "");
-    } catch (e) {
-      console.error("Failed to fetch login slogan:", e);
-    }
-  };
-
-  // Check if registration is allowed
-  const checkRegistrationSetting = async () => {
-    try {
-      const response = await api("/admin/allow-registration");
-      setAllowRegistration(response.allowNewAccounts);
-    } catch (e) {
-      console.error("Failed to check registration setting:", e);
-      setAllowRegistration(false); // Default to false if check fails
-    }
   };
 
   // Import/Export actions (hook)
@@ -5603,7 +5279,6 @@ export default function App() {
   // Redirect if already logged in
   useEffect(() => {
     if (currentUser?.email && route !== "#/notes" && route !== "#/admin") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- redirect a signed-in user away from the auth routes
       navigate("#/notes");
     }
   }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps -- only when the signed-in user changes, not on every route change
@@ -5626,7 +5301,6 @@ export default function App() {
   //    and queue edits; the banner offers a one-click unlock.
   //  - Logged-in user who explicitly clicked the banner's unlock CTA
   //    → render the unlock screen as a full overlay (lockOverlayOpen).
-  const isLocked = !!(instanceLockStatus && instanceLockStatus.enabled && instanceLockStatus.locked);
   if (isLocked && (!currentUser?.email || lockOverlayOpen)) {
     // The "back to offline notes" escape hatch only makes sense when
     // the user has a session AND they reached this screen by clicking
