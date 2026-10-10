@@ -136,7 +136,7 @@ export default function useServerEvents({
         };
 
         // The backend emits NAMED SSE events as proof-of-life: `hello` right
-        // after connect and `ping` every 25s (server/index.js). Named events do
+        // after connect and `ping` every 25s (server/routes/eventsRoutes.js). Named events do
         // NOT trigger es.onmessage (that only fires for unnamed "message"
         // events), so we listen for them explicitly. Each is written by the
         // Node backend itself: a reverse proxy can't fabricate one: so

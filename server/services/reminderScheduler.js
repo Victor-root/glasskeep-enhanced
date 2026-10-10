@@ -19,8 +19,9 @@
 //
 // The scheduler knows nothing about HOW a reminder is delivered — it
 // calls the injected async `dispatch(noteId)` for each claimed reminder.
-// index.js wires that to "persist an in-app notification + push over SSE
-// + send Web Push" so this module stays free of i18n, SSE and push deps.
+// index.js wires that to reminderDispatch.js ("persist an in-app
+// notification + push over SSE + send Web Push") so this module stays free
+// of i18n, SSE and push deps.
 
 const DEFAULT_INTERVAL_MS = 30 * 1000;
 
