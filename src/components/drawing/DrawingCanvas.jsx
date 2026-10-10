@@ -213,18 +213,16 @@ function DrawingCanvas({
 
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
-        const result = historyRedo();
-        if (result !== null) { pathsRef.current = result; notifyChange(result); }
+        handleRedo();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
-        const result = historyUndo();
-        if (result !== null) { pathsRef.current = result; notifyChange(result); }
+        handleUndo();
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [readOnly, mode, historyUndo, historyRedo, notifyChange]);
+  }, [readOnly, mode, handleUndo, handleRedo]);
 
   // ─── Update canvas size from props (only if data has no dimensions and no fillContainer) ───
   useEffect(() => {
