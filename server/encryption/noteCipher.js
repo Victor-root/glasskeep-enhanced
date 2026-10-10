@@ -54,24 +54,44 @@ function isActive() {
   return runtime.isUnlocked();
 }
 
-function noteAad(ctx) {
+// The additional data that binds a ciphertext to its (owner, note) row.
+function aadFor(prefix, ctx) {
   if (!ctx || ctx.noteId == null || ctx.userId == null) {
     throw new Error("Missing AAD context (noteId/userId)");
   }
-  return Buffer.from(`${NOTE_AAD_PREFIX}|${ctx.userId}|${ctx.noteId}`, "utf8");
+  return Buffer.from(`${prefix}|${ctx.userId}|${ctx.noteId}`, "utf8");
 }
 
-function tagAad(ctx) {
-  if (!ctx || ctx.noteId == null || ctx.userId == null) {
-    throw new Error("Missing AAD context (noteId/userId)");
-  }
-  return Buffer.from(`${TAG_AAD_PREFIX}|${ctx.userId}|${ctx.noteId}`, "utf8");
+const noteAad = (ctx) => aadFor(NOTE_AAD_PREFIX, ctx);
+const tagAad = (ctx) => aadFor(TAG_AAD_PREFIX, ctx);
+
+function requireDek() {
+  const dek = runtime.getDek();
+  if (!dek) throw new Error("Instance is locked");
+  return dek;
+}
+
+// The JSON envelope stored in enc_payload: { v, iv, c, t }, base64.
+function sealEnvelope(version, { iv, ct, tag }) {
+  return JSON.stringify({
+    v: version,
+    iv: iv.toString("base64"),
+    c: ct.toString("base64"),
+    t: tag.toString("base64"),
+  });
+}
+
+function openEnvelope(obj) {
+  return {
+    iv: Buffer.from(obj.iv, "base64"),
+    ct: Buffer.from(obj.c, "base64"),
+    tag: Buffer.from(obj.t, "base64"),
+  };
 }
 
 // ── Note payload ──────────────────────────────────────────────────────
 function encryptFields(fields, ctx) {
-  const dek = runtime.getDek();
-  if (!dek) throw new Error("Instance is locked");
+  const dek = requireDek();
   const payload = JSON.stringify({
     v: 1,
     title: fields.title ?? "",
@@ -81,25 +101,16 @@ function encryptFields(fields, ctx) {
     images_json: fields.images_json ?? "[]",
     color: fields.color ?? "default",
   });
-  const { iv, ct, tag } = aead.encrypt(dek, payload, noteAad(ctx));
-  return JSON.stringify({
-    v: NOTE_VERSION_LATEST,
-    iv: iv.toString("base64"),
-    c: ct.toString("base64"),
-    t: tag.toString("base64"),
-  });
+  return sealEnvelope(NOTE_VERSION_LATEST, aead.encrypt(dek, payload, noteAad(ctx)));
 }
 
 function decryptPayload(encPayload, ctx) {
-  const dek = runtime.getDek();
-  if (!dek) throw new Error("Instance is locked");
+  const dek = requireDek();
   const obj = JSON.parse(encPayload);
   if (!obj || (obj.v !== 1 && obj.v !== 2)) {
     throw new Error("Unsupported enc payload version");
   }
-  const iv = Buffer.from(obj.iv, "base64");
-  const ct = Buffer.from(obj.c, "base64");
-  const tag = Buffer.from(obj.t, "base64");
+  const { iv, ct, tag } = openEnvelope(obj);
   // v1 was the original format with no AAD. v2 binds the ciphertext to
   // (ownerUserId, noteId) so a thief cannot move a payload from one
   // row to another without breaking the auth tag. Reader supports
@@ -174,27 +185,17 @@ function prepareRowForWrite(row, ctx) {
 // tags_json column so downstream code that reads the row outside the
 // helper still sees a syntactically valid empty list.
 function encryptTagsJson(tagsJson, ctx) {
-  const dek = runtime.getDek();
-  if (!dek) throw new Error("Instance is locked");
-  const { iv, ct, tag } = aead.encrypt(dek, tagsJson || "[]", tagAad(ctx));
-  return JSON.stringify({
-    v: TAG_VERSION_LATEST,
-    iv: iv.toString("base64"),
-    c: ct.toString("base64"),
-    t: tag.toString("base64"),
-  });
+  const dek = requireDek();
+  return sealEnvelope(TAG_VERSION_LATEST, aead.encrypt(dek, tagsJson || "[]", tagAad(ctx)));
 }
 
 function decryptTagsPayload(encPayload, ctx) {
-  const dek = runtime.getDek();
-  if (!dek) throw new Error("Instance is locked");
+  const dek = requireDek();
   const obj = JSON.parse(encPayload);
   if (!obj || obj.v !== TAG_VERSION_LATEST) {
     throw new Error("Unsupported tags payload version");
   }
-  const iv = Buffer.from(obj.iv, "base64");
-  const ct = Buffer.from(obj.c, "base64");
-  const tag = Buffer.from(obj.t, "base64");
+  const { iv, ct, tag } = openEnvelope(obj);
   return aead.decrypt(dek, iv, ct, tag, tagAad(ctx)).toString("utf8");
 }
 

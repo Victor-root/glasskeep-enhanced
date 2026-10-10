@@ -72,4 +72,22 @@ function decrypt(key, iv, ct, tag, aad) {
   return Buffer.concat([decipher.update(ct), decipher.final()]);
 }
 
-module.exports = { encrypt, decrypt, ALGORITHM, IV_LENGTH, TAG_LENGTH };
+// Wrap / unwrap a key under a key-encryption key derived for this one
+// use. The KEK is wiped afterwards, whatever happens.
+function wrapWithKek(kek, plaintext) {
+  try {
+    return encrypt(kek, plaintext);
+  } finally {
+    kek.fill(0);
+  }
+}
+
+function unwrapWithKek(kek, wrap) {
+  try {
+    return decrypt(kek, wrap.iv, wrap.ct, wrap.tag);
+  } finally {
+    kek.fill(0);
+  }
+}
+
+module.exports = { encrypt, decrypt, wrapWithKek, unwrapWithKek, ALGORITHM, IV_LENGTH, TAG_LENGTH };

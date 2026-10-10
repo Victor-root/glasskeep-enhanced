@@ -121,30 +121,17 @@ function deriveKekFromPrf(prfOutput, credentialId, instanceSalt) {
   return Buffer.isBuffer(kek) ? kek : Buffer.from(kek);
 }
 
+// ── Wrap / unwrap DEK with a passkey's PRF output ─────────────────────
 // Same construction as the vault and the note cipher, set up once in
 // aeadGcm.js so the tag length cannot drift between them.
-const aesGcmEncrypt = (key, plaintext) => aead.encrypt(key, plaintext);
-const aesGcmDecrypt = (key, iv, ct, tag) => aead.decrypt(key, iv, ct, tag);
-
-// ── Wrap / unwrap DEK with a passkey's PRF output ─────────────────────
 function wrapDekWithPrf(db, credentialId, prfOutput, dek) {
   const salt = ensurePrfSalt(db);
-  const kek = deriveKekFromPrf(prfOutput, credentialId, salt);
-  try {
-    return aesGcmEncrypt(kek, dek);
-  } finally {
-    kek.fill(0);
-  }
+  return aead.wrapWithKek(deriveKekFromPrf(prfOutput, credentialId, salt), dek);
 }
 
 function unwrapDekWithPrf(db, credentialId, prfOutput, wrap) {
   const salt = ensurePrfSalt(db);
-  const kek = deriveKekFromPrf(prfOutput, credentialId, salt);
-  try {
-    return aesGcmDecrypt(kek, wrap.iv, wrap.ct, wrap.tag);
-  } finally {
-    kek.fill(0);
-  }
+  return aead.unwrapWithKek(deriveKekFromPrf(prfOutput, credentialId, salt), wrap);
 }
 
 // ── Passkey CRUD ──────────────────────────────────────────────────────

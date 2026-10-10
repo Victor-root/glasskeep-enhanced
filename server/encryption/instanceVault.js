@@ -110,25 +110,12 @@ function deriveKek(secret, salt) {
 
 // Shared with the note cipher and the passkey wraps: the tag length and
 // the IV length are pinned in one place (see aeadGcm.js).
-const aesGcmEncrypt = (key, plaintext) => aead.encrypt(key, plaintext);
-const aesGcmDecrypt = (key, iv, ct, tag) => aead.decrypt(key, iv, ct, tag);
-
 function wrapDek(secret, salt, dek) {
-  const kek = deriveKek(secret, salt);
-  try {
-    return aesGcmEncrypt(kek, dek);
-  } finally {
-    kek.fill(0);
-  }
+  return aead.wrapWithKek(deriveKek(secret, salt), dek);
 }
 
 function unwrapDek(secret, salt, wrap) {
-  const kek = deriveKek(secret, salt);
-  try {
-    return aesGcmDecrypt(kek, wrap.iv, wrap.ct, wrap.tag);
-  } finally {
-    kek.fill(0);
-  }
+  return aead.unwrapWithKek(deriveKek(secret, salt), wrap);
 }
 
 // ── Public API ────────────────────────────────────────────────────────
@@ -165,7 +152,7 @@ function initialize(db, passphrase) {
   // KDF input is the normalised (24-char, no prefix, no dashes) form so
   // user-typed variants like "gkrv xxxx-xxxx ..." derive the same KEK.
   const recvWrap = wrapDek(recoveryNorm, recvSalt, dek);
-  const dekCheck = aesGcmEncrypt(dek, Buffer.from(DEK_CHECK_PLAINTEXT, "utf8"));
+  const dekCheck = aead.encrypt(dek, Buffer.from(DEK_CHECK_PLAINTEXT, "utf8"));
 
   const now = new Date().toISOString();
   const upsert = db.prepare(`
@@ -230,7 +217,7 @@ function initialize(db, passphrase) {
 // Verify a freshly-unwrapped DEK against the persisted sentinel.
 // Throws if the bytes don't decrypt the sentinel (= wrong key).
 function verifyDek(row, dek) {
-  const plain = aesGcmDecrypt(
+  const plain = aead.decrypt(
     dek,
     row.dek_check_iv,
     row.dek_check,

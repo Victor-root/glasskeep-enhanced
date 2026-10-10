@@ -13,212 +13,58 @@
 //                                            single transaction
 //   POST /api/instance/passphrase          — rotate passphrase
 //   POST /api/instance/recovery/regenerate — issue a new recovery key
+//
+// The bulk rewrites live in encryption/atRestMigrations.js, the transport
+// and attempt-limit checks in services/unlockGuard.js.
 
 const vault = require("../encryption/instanceVault");
 const runtime = require("../encryption/runtimeUnlockState");
-const noteCipher = require("../encryption/noteCipher");
 const recoveryKey = require("../encryption/recoveryKey");
 const passkeyVault = require("../encryption/passkeyVault");
-
-// Run after every successful unlock. Two upgrade paths:
-//   - notes encrypted in the v1 format (no AAD) get re-encrypted as
-//     v2 (AAD bound to noteId+ownerUserId) so a stolen ciphertext
-//     can no longer be moved between rows undetected.
-//   - per-user tag rows that pre-date the tag-encryption hardening
-//     get encrypted in place.
-// Both run in a single transaction; failure logs and falls through —
-// the user is still unlocked, the migration will simply retry on the
-// next unlock. After both passes finish we VACUUM (with the same
-// triple-pass as activation) so freed pages don't leak the previous
-// formats.
-function runUpgradeMigrations(db, log) {
-  let touchedNotes = 0;
-  let touchedTags = 0;
-
-  try {
-    const v1Notes = db.prepare(
-      "SELECT id, user_id, enc_payload FROM notes WHERE is_server_encrypted = 1 AND (enc_version IS NULL OR enc_version < ?)"
-    ).all(noteCipher.NOTE_VERSION_LATEST);
-    const updNote = db.prepare(
-      "UPDATE notes SET enc_version = ?, enc_payload = ? WHERE id = ?"
-    );
-    const noteTx = db.transaction(() => {
-      for (const r of v1Notes) {
-        const fields = noteCipher.decryptPayload(r.enc_payload, {
-          noteId: r.id,
-          userId: r.user_id,
-        });
-        const payload = noteCipher.encryptFields(fields, {
-          noteId: r.id,
-          userId: r.user_id,
-        });
-        updNote.run(noteCipher.NOTE_VERSION_LATEST, payload, r.id);
-        touchedNotes++;
-      }
-    });
-    noteTx();
-  } catch (e) {
-    log.warn?.(`[encrypt] note v1->v2 migration aborted: ${e.message}`);
-  }
-
-  try {
-    const plainTags = db.prepare(
-      "SELECT note_id, user_id, tags_json FROM note_user_tags WHERE is_encrypted = 0 AND tags_json IS NOT NULL AND tags_json != '[]' AND tags_json != ''"
-    ).all();
-    const updTag = db.prepare(
-      "UPDATE note_user_tags SET tags_json = '[]', is_encrypted = 1, enc_payload = ? WHERE note_id = ? AND user_id = ?"
-    );
-    const tagTx = db.transaction(() => {
-      for (const r of plainTags) {
-        const enc = noteCipher.encryptTagsJson(r.tags_json, {
-          noteId: r.note_id,
-          userId: r.user_id,
-        });
-        updTag.run(enc, r.note_id, r.user_id);
-        touchedTags++;
-      }
-    });
-    tagTx();
-  } catch (e) {
-    log.warn?.(`[encrypt] tag encryption migration aborted: ${e.message}`);
-  }
-
-  // Safety net: encrypt any per-user icon rows that are still plaintext
-  // (e.g. created while the instance was briefly unlocked-but-not-yet-
-  // re-encrypted). Mirrors the tag pass above.
-  try {
-    const plainIcons = db.prepare(
-      "SELECT note_id, user_id, icon_json FROM note_user_icons WHERE is_encrypted = 0 AND icon_json IS NOT NULL AND icon_json != ''"
-    ).all();
-    const updIcon = db.prepare(
-      "UPDATE note_user_icons SET icon_json = '', is_encrypted = 1, enc_payload = ? WHERE note_id = ? AND user_id = ?"
-    );
-    const iconTx = db.transaction(() => {
-      for (const r of plainIcons) {
-        const enc = noteCipher.encryptTagsJson(r.icon_json, {
-          noteId: r.note_id,
-          userId: r.user_id,
-        });
-        updIcon.run(enc, r.note_id, r.user_id);
-        touchedTags++;
-      }
-    });
-    iconTx();
-  } catch (e) {
-    log.warn?.(`[encrypt] icon encryption migration aborted: ${e.message}`);
-  }
-
-  if (touchedNotes > 0 || touchedTags > 0) {
-    log.info?.(`[encrypt] upgrade migration: notes=${touchedNotes} tags=${touchedTags}`);
-    try {
-      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
-      db.exec("VACUUM");
-      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
-    } catch (e) {
-      log.warn?.(`[encrypt] post-migration VACUUM failed: ${e.message}`);
-    }
-  }
-}
-
-function getClientIp(req) {
-  // Express's req.ip is good enough; keep a fallback so we never crash
-  // the rate limiter when behind an unusual proxy setup.
-  return req.ip || req.connection?.remoteAddress || "0.0.0.0";
-}
-
-function isLocalhost(req) {
-  const ip = getClientIp(req);
-  if (!ip) return false;
-  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
-}
-
-// Refuse unlock attempts that would send the secret over plain HTTP,
-// so nobody accidentally types their passphrase across the network
-// without transport encryption.
-//
-// Three trust paths, in order:
-//   1. Localhost: the CLI script (scripts/unlock-instance.cjs) and any
-//      reverse-proxy back-end on the same box come in via 127.0.0.1.
-//      Loopback is always exempt.
-//   2. req.secure === true: Express's view of the connection. True
-//      when Node terminates TLS itself (HTTPS_ENABLED=true with a
-//      cert), OR when `app.set('trust proxy', ...)` is set AND the
-//      reverse proxy forwarded `X-Forwarded-Proto: https`. This is
-//      the cleanest signal — when nginx is configured to send XFP, we
-//      can verify the upstream scheme without taking the operator's
-//      word for it.
-//   3. An EXPLICIT TRUST_PROXY set by the operator. That is an assertion
-//      from a person that TLS is terminated upstream, and it is honoured
-//      even when the proxy forgets to forward X-Forwarded-Proto, which is
-//      a common enough oversight that refusing outright would strand
-//      people whose browser-to-proxy hop really is encrypted. The
-//      boundary that matters is browser to proxy, which the operator owns
-//      and has asserted; proxy to Node is loopback or a private network
-//      where the body is no worse off than every other API call already
-//      crossing it.
-//
-//      HTTPS_ENABLED=false used to reach the same conclusion, and no
-//      longer does. install.sh always writes TRUST_PROXY explicitly, so
-//      that inference only ever fired for the Docker image, which ships
-//      HTTPS_ENABLED=false on its own: an operator who simply published
-//      the port with nothing in front had this check switched off without
-//      ever asking for it. Behind a correctly configured proxy nothing
-//      changes, because path 2 already covers it.
-//
-// What we deliberately do NOT do: inspect raw X-Forwarded-Proto /
-// X-Forwarded-Ssl / Front-End-Https headers without `trust proxy`
-// being configured. Without trust proxy, any client can send those
-// headers and bypass the check. Express's req.secure is the only
-// trustworthy view of "did this come over HTTPS upstream".
-function isSecureRequest(req) {
-  // req.secure is true when Node terminated TLS itself, and also when a
-  // TRUSTED hop forwarded X-Forwarded-Proto: https. Since trust is now
-  // scoped to the addresses a proxy actually sits on (see server/index.js),
-  // that second case is a statement from the proxy, not from the client.
-  if (req.secure === true) return true;
-
-  // What used to be here: "the operator declared a proxy, so assume https".
-  // That assumption was made for the operator rather than by them. The
-  // Docker image ships HTTPS_ENABLED=false, which the code read as the
-  // declaration, so an operator who simply published the port with nothing
-  // in front had the check silently switched off while believing it was on.
-  //
-  // An explicit TRUST_PROXY is different: the operator typed it. Honour it,
-  // because a reverse proxy that forgets X-Forwarded-Proto is a common
-  // enough misconfiguration that refusing outright would strand people whose
-  // browser-to-proxy hop really is encrypted. What is no longer accepted is
-  // the same conclusion drawn from a value the image set on its own.
-  const declared = (process.env.TRUST_PROXY || "").trim();
-  if (declared !== "" && declared !== "false") return true;
-
-  return false;
-}
-
-function transportOk(req) {
-  return isSecureRequest(req) || isLocalhost(req);
-}
-
-function setRetryAfter(res, ms) {
-  if (ms > 0) res.setHeader("Retry-After", String(Math.ceil(ms / 1000)));
-}
-
-function clientIdentifier(req) {
-  // Localhost requests share the same /loopback bucket on purpose: we
-  // don't want an admin running the CLI to accidentally lock themselves
-  // out from a separate web tab on the same host.
-  return isLocalhost(req) ? "localhost" : getClientIp(req);
-}
-
-// Small wait so we don't leak timing info on bad guesses. Combined with
-// the per-IP rate limiter below, this is enough friction for our
-// threat model.
-async function paceFailure(ms) {
-  if (ms <= 0) return;
-  await new Promise((r) => setTimeout(r, ms));
-}
+const {
+  purgeFreedPages,
+  runUpgradeMigrations,
+  encryptAllRows,
+  decryptAllRows,
+} = require("../encryption/atRestMigrations");
+const {
+  getClientIp,
+  transportOk,
+  clientIdentifier,
+  refuseOverLimit,
+  paceFailure,
+} = require("../services/unlockGuard");
 
 function attachUnlockRoutes(app, deps) {
   const { db, auth, adminOnly, log = console, broadcastToAll, onLockStateChanged } = deps;
+
+  // A secret was accepted: bring the DEK up, upgrade what an older
+  // version left behind, and tell the clients and the federation peers.
+  // `via` names the secret in the log.
+  function completeUnlock(res, dek, id, via) {
+    try {
+      runtime.unlockWithDek(dek);
+      vault.markUnlockedNow(db);
+      runtime.recordAttempt(id, true);
+      log.info?.(`[unlock] success via ${via} from ${id}`);
+      runUpgradeMigrations(db, log);
+      // Symmetric with the lock route: tell every connected client the
+      // instance is back so other sessions leave the unlock screen without
+      // waiting for the next status poll.
+      if (typeof broadcastToAll === "function") {
+        try { broadcastToAll({ type: "instance_unlocked" }); } catch { /* best-effort notice */ }
+      }
+      // Nudge federation so peers re-probe us promptly (our /health now
+      // reports unlocked) and our paused note-sync resumes.
+      if (typeof onLockStateChanged === "function") {
+        try { onLockStateChanged(); } catch { /* best-effort peer ping */ }
+      }
+      return res.json({ ok: true });
+    } finally {
+      // The runtime made its own copy: zero ours.
+      try { dek.fill(0); } catch { /* best-effort wipe */ }
+    }
+  }
 
   app.get("/api/instance/status", (_req, res) => {
     res.json({
@@ -258,10 +104,7 @@ function attachUnlockRoutes(app, deps) {
       });
     }
     const id = clientIdentifier(req);
-    if (runtime.attemptOverLimit(id)) {
-      setRetryAfter(res, 5 * 60 * 1000);
-      return res.status(429).json({ error: "Too many unlock attempts. Try again later." });
-    }
+    if (refuseOverLimit(res, id)) return;
     const delay = runtime.attemptDelayMs(id);
     if (delay) await paceFailure(delay);
 
@@ -279,28 +122,7 @@ function attachUnlockRoutes(app, deps) {
       log.warn?.(`[unlock] passphrase rejected from ${id}`);
       return res.status(401).json({ error: "Invalid passphrase" });
     }
-    try {
-      runtime.unlockWithDek(dek);
-      vault.markUnlockedNow(db);
-      runtime.recordAttempt(id, true);
-      log.info?.(`[unlock] success via passphrase from ${id}`);
-      runUpgradeMigrations(db, log);
-      // Symmetric with the lock route: tell every connected client the
-      // instance is back so other sessions leave the unlock screen without
-      // waiting for the next status poll.
-      if (typeof broadcastToAll === "function") {
-        try { broadcastToAll({ type: "instance_unlocked" }); } catch { /* best-effort notice */ }
-      }
-      // Nudge federation so peers re-probe us promptly (our /health now
-      // reports unlocked) and our paused note-sync resumes.
-      if (typeof onLockStateChanged === "function") {
-        try { onLockStateChanged(); } catch { /* best-effort peer ping */ }
-      }
-      return res.json({ ok: true });
-    } finally {
-      // The runtime made its own copy — zero ours.
-      try { dek.fill(0); } catch { /* best-effort wipe */ }
-    }
+    return completeUnlock(res, dek, id, "passphrase");
   });
 
   // ---- Unlock: recovery key ----------------------------------------------
@@ -315,10 +137,7 @@ function attachUnlockRoutes(app, deps) {
       });
     }
     const id = clientIdentifier(req);
-    if (runtime.attemptOverLimit(id)) {
-      setRetryAfter(res, 5 * 60 * 1000);
-      return res.status(429).json({ error: "Too many unlock attempts. Try again later." });
-    }
+    if (refuseOverLimit(res, id)) return;
     const delay = runtime.attemptDelayMs(id);
     if (delay) await paceFailure(delay);
 
@@ -340,22 +159,7 @@ function attachUnlockRoutes(app, deps) {
       log.warn?.(`[unlock] recovery key rejected from ${id}`);
       return res.status(401).json({ error: "Invalid recovery key" });
     }
-    try {
-      runtime.unlockWithDek(dek);
-      vault.markUnlockedNow(db);
-      runtime.recordAttempt(id, true);
-      log.info?.(`[unlock] success via recovery key from ${id}`);
-      runUpgradeMigrations(db, log);
-      if (typeof broadcastToAll === "function") {
-        try { broadcastToAll({ type: "instance_unlocked" }); } catch { /* best-effort notice */ }
-      }
-      if (typeof onLockStateChanged === "function") {
-        try { onLockStateChanged(); } catch { /* best-effort peer ping */ }
-      }
-      return res.json({ ok: true });
-    } finally {
-      try { dek.fill(0); } catch { /* best-effort wipe */ }
-    }
+    return completeUnlock(res, dek, id, "recovery key");
   });
 
   // ---- Lock (admin) ------------------------------------------------------
@@ -411,101 +215,15 @@ function attachUnlockRoutes(app, deps) {
     runtime.unlockWithDek(init.dek);
 
     try {
-      const migrate = db.transaction(() => {
-        const rows = db.prepare("SELECT * FROM notes").all();
-        const upd = db.prepare(`
-          UPDATE notes SET
-            title = @title, content = @content,
-            items_json = @items_json, tags_json = @tags_json,
-            images_json = @images_json, color = @color,
-            is_server_encrypted = @is_server_encrypted,
-            enc_version = @enc_version,
-            enc_payload = @enc_payload
-          WHERE id = @id
-        `);
-        for (const row of rows) {
-          if (row.is_server_encrypted) continue; // already encrypted
-          const prepared = noteCipher.prepareRowForWrite({
-            title: row.title,
-            content: row.content,
-            items_json: row.items_json,
-            tags_json: row.tags_json,
-            images_json: row.images_json,
-            color: row.color,
-          }, { noteId: row.id, userId: row.user_id });
-          upd.run({
-            id: row.id,
-            title: prepared.title,
-            content: prepared.content,
-            items_json: prepared.items_json,
-            tags_json: prepared.tags_json,
-            images_json: prepared.images_json,
-            color: prepared.color,
-            is_server_encrypted: prepared.is_server_encrypted,
-            enc_version: prepared.enc_version,
-            enc_payload: prepared.enc_payload,
-          });
-        }
-        // Encrypt the per-user tag rows in the same transaction so a
-        // partial activation can't leave readable tags on disk.
-        const tagRows = db.prepare(
-          "SELECT note_id, user_id, tags_json FROM note_user_tags WHERE is_encrypted = 0"
-        ).all();
-        const updTag = db.prepare(
-          "UPDATE note_user_tags SET tags_json = '[]', is_encrypted = 1, enc_payload = ? WHERE note_id = ? AND user_id = ?"
-        );
-        for (const r of tagRows) {
-          if (!r.tags_json || r.tags_json === "[]") continue;
-          const enc = noteCipher.encryptTagsJson(r.tags_json, {
-            noteId: r.note_id,
-            userId: r.user_id,
-          });
-          updTag.run(enc, r.note_id, r.user_id);
-        }
-        // Encrypt per-user note icons in the same transaction (an icon can
-        // be a custom image — same at-rest protection as tags/content).
-        const iconRows = db.prepare(
-          "SELECT note_id, user_id, icon_json FROM note_user_icons WHERE is_encrypted = 0"
-        ).all();
-        const updIcon = db.prepare(
-          "UPDATE note_user_icons SET icon_json = '', is_encrypted = 1, enc_payload = ? WHERE note_id = ? AND user_id = ?"
-        );
-        for (const r of iconRows) {
-          if (!r.icon_json) continue;
-          const enc = noteCipher.encryptTagsJson(r.icon_json, {
-            noteId: r.note_id,
-            userId: r.user_id,
-          });
-          updIcon.run(enc, r.note_id, r.user_id);
-        }
-        vault.markMigrated(db);
-      });
-      migrate();
+      encryptAllRows(db);
 
       // Critical: when notes already existed, the migration above only
-      // UPDATE-d the rows. SQLite marks the old (plaintext) pages as
-      // free but does NOT zero them, so a thief reading the raw .db
-      // file could still grep the old contents. WAL mode keeps an
-      // even longer trail.
-      //
-      // Three steps to physically purge:
-      //   1. checkpoint(TRUNCATE) — flush WAL into the main file and
-      //      drop the WAL.
-      //   2. VACUUM — copy live pages to a fresh file, freed pages
-      //      (still containing plaintext) are dropped on the floor.
-      //   3. checkpoint(TRUNCATE) again — VACUUM itself ran through
-      //      the WAL on a still-open connection, so we drain it once
-      //      more. Without this final pass the freshly-purged file
-      //      coexists with a WAL that holds the very pages we just
-      //      tried to discard.
-      // VACUUM cannot run inside a transaction, hence the separate
-      // calls. Failure to clean up is logged but doesn't fail the
-      // activation — better the operator know via journalctl than
-      // surface a partial-success error to the UI.
+      // UPDATE-d the rows, and the old (plaintext) pages are still in the
+      // file until purged (see purgeFreedPages). Failure to clean up is
+      // logged but doesn't fail the activation: better the operator know
+      // via journalctl than surface a partial-success error to the UI.
       try {
-        db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
-        db.exec("VACUUM");
-        db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+        purgeFreedPages(db);
         log.info?.("[encrypt] post-activation VACUUM complete (plaintext residue purged)");
       } catch (e) {
         log.warn?.(`[encrypt] post-activation cleanup failed: ${e.message}. Run manually after stopping the service: sqlite3 <db> "PRAGMA wal_checkpoint(TRUNCATE); VACUUM;"`);
@@ -572,81 +290,7 @@ function attachUnlockRoutes(app, deps) {
     }
 
     try {
-      const migrate = db.transaction(() => {
-        const rows = db.prepare("SELECT * FROM notes WHERE is_server_encrypted = 1").all();
-        const upd = db.prepare(`
-          UPDATE notes SET
-            title = @title, content = @content,
-            items_json = @items_json, tags_json = @tags_json,
-            images_json = @images_json, color = @color,
-            is_server_encrypted = 0,
-            enc_version = NULL,
-            enc_payload = NULL
-          WHERE id = @id
-        `);
-        for (const row of rows) {
-          // decryptRowInPlace mutates row.title / row.content / etc.
-          // back to their plaintext form; we then write them straight
-          // into the canonical columns.
-          noteCipher.decryptRowInPlace(row);
-          upd.run({
-            id: row.id,
-            title: row.title ?? "",
-            content: row.content ?? "",
-            items_json: row.items_json ?? "[]",
-            tags_json: row.tags_json ?? "[]",
-            images_json: row.images_json ?? "[]",
-            color: row.color ?? "default",
-          });
-        }
-        // Tag rows symmetrically: decrypt back into tags_json. We do
-        // it in the same transaction as the note decryption so a half-
-        // disabled state is impossible (either everything is plaintext
-        // again or nothing is, and the vault row stays "enabled").
-        const encTagRows = db.prepare(
-          "SELECT note_id, user_id, enc_payload FROM note_user_tags WHERE is_encrypted = 1"
-        ).all();
-        const updTag = db.prepare(
-          "UPDATE note_user_tags SET tags_json = ?, is_encrypted = 0, enc_payload = NULL WHERE note_id = ? AND user_id = ?"
-        );
-        for (const r of encTagRows) {
-          let plain = "[]";
-          if (r.enc_payload) {
-            try {
-              plain = noteCipher.decryptTagsPayload(r.enc_payload, {
-                noteId: r.note_id,
-                userId: r.user_id,
-              });
-            } catch (err) {
-              log.warn?.(`[encrypt] could not decrypt tags during deactivation note=${r.note_id} user=${r.user_id}: ${err.message}`);
-            }
-          }
-          updTag.run(plain, r.note_id, r.user_id);
-        }
-        // Per-user icons symmetrically: decrypt back into icon_json.
-        const encIconRows = db.prepare(
-          "SELECT note_id, user_id, enc_payload FROM note_user_icons WHERE is_encrypted = 1"
-        ).all();
-        const updIcon = db.prepare(
-          "UPDATE note_user_icons SET icon_json = ?, is_encrypted = 0, enc_payload = NULL WHERE note_id = ? AND user_id = ?"
-        );
-        for (const r of encIconRows) {
-          let plain = "";
-          if (r.enc_payload) {
-            try {
-              plain = noteCipher.decryptTagsPayload(r.enc_payload, {
-                noteId: r.note_id,
-                userId: r.user_id,
-              });
-            } catch (err) {
-              log.warn?.(`[encrypt] could not decrypt icon during deactivation note=${r.note_id} user=${r.user_id}: ${err.message}`);
-            }
-          }
-          updIcon.run(plain, r.note_id, r.user_id);
-        }
-        vault.disable(db);
-      });
-      migrate();
+      decryptAllRows(db, log);
     } catch (e) {
       log.error?.(`[encrypt] deactivation failed mid-transaction: ${e.message}`);
       return res.status(500).json({ error: "Deactivation failed: " + e.message });
@@ -675,9 +319,7 @@ function attachUnlockRoutes(app, deps) {
     // bytes. Symmetric with the activation purge — at-rest contents
     // before-and-after are both clean.
     try {
-      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
-      db.exec("VACUUM");
-      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+      purgeFreedPages(db);
       log.info?.("[encrypt] deactivation complete, ciphertext residue purged");
     } catch (e) {
       log.warn?.(`[encrypt] post-deactivation cleanup failed: ${e.message}`);
