@@ -28,6 +28,9 @@ import {
   rejectDeviceLink,
 } from "../../auth/deviceLinkClient.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
+import { QrSpinner, CloseGlyph } from "./QrGlyphs.jsx";
+import QrScanConfirmCard from "./QrScanConfirmCard.jsx";
+import QrScanPhaseCard from "./QrScanPhaseCard.jsx";
 
 // Phases:
 //   loading  → asking the OS for camera permission, starting the stream
@@ -295,13 +298,13 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
                 <path d="M5 7h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2" />
                 <path d="M9 13a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
               </svg>
-              <Spinner small />
+              <QrSpinner size="w-6 h-6" />
             </div>
           )}
         </div>
 
         {phase === PHASES.wrongOrigin && (
-          <PhaseCard
+          <QrScanPhaseCard
             kind="warning"
             title={t("qrScanWrongOrigin")}
             body={t("qrScanWrongOriginBody").replace("%s", scannedOrigin || "?")}
@@ -318,7 +321,7 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
         )}
 
         {phase === PHASES.fetching && (
-          <PhaseCard
+          <QrScanPhaseCard
             kind="info"
             title={t("qrScanFetching")}
             body=""
@@ -327,7 +330,7 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
         )}
 
         {phase === PHASES.confirm && info && (
-          <ConfirmCard
+          <QrScanConfirmCard
             info={info}
             onApprove={handleApprove}
             onReject={handleReject}
@@ -335,7 +338,7 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
         )}
 
         {phase === PHASES.approving && (
-          <PhaseCard
+          <QrScanPhaseCard
             kind="info"
             title={t("qrScanApproving")}
             body=""
@@ -344,7 +347,7 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
         )}
 
         {phase === PHASES.done && (
-          <PhaseCard
+          <QrScanPhaseCard
             kind="success"
             title={t("qrScanApproved")}
             body={t("qrScanApprovedBody")}
@@ -352,7 +355,7 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
         )}
 
         {phase === PHASES.error && (
-          <PhaseCard
+          <QrScanPhaseCard
             kind="error"
             title={t("qrScanError")}
             body={errorText || ""}
@@ -362,143 +365,4 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
       </div>
     </div>
   );
-}
-
-// ─── sub-components ──────────────────────────────────────────────────
-
-function ConfirmCard({ info, onApprove, onReject }) {
-  const browserGuess = guessBrowser(info?.userAgent || "");
-  const osGuess = guessOs(info?.userAgent || "");
-  return (
-    <div className="mt-2">
-      <div className="rounded-xl border border-[var(--border-light)] p-4 bg-gray-50 dark:bg-[#1f1f1f] space-y-2">
-        <Row label={t("qrScanFieldBrowser")} value={browserGuess} />
-        <Row label={t("qrScanFieldOs")} value={osGuess} />
-        <Row label={t("qrScanFieldIp")} value={info?.ip || "?"} mono />
-      </div>
-      <div className="mt-4 flex gap-2">
-        <button
-          type="button"
-          onClick={onReject}
-          className="flex-1 px-4 py-2 rounded-lg border border-[var(--border-light)] text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"
-        >
-          {t("qrScanReject")}
-        </button>
-        <button
-          type="button"
-          onClick={onApprove}
-          className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-        >
-          {t("qrScanApprove")}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Row({ label, value, mono }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 shrink-0">
-        {label}
-      </span>
-      <span className={`text-sm truncate text-gray-800 dark:text-gray-100 ${mono ? "font-mono" : ""}`}>
-        {value || "-"}
-      </span>
-    </div>
-  );
-}
-
-function PhaseCard({ kind, title, body, primary, spinner }) {
-  const color =
-    kind === "success"
-      ? "text-emerald-600 dark:text-emerald-300"
-      : kind === "error"
-      ? "text-red-600 dark:text-red-400"
-      : kind === "warning"
-      ? "text-amber-600 dark:text-amber-300"
-      : "text-gray-700 dark:text-gray-200";
-  return (
-    <div className="mt-2 text-center">
-      {spinner && (
-        <div className="flex justify-center mb-3">
-          <Spinner small />
-        </div>
-      )}
-      <h4 className={`text-base font-semibold ${color} mb-1`}>{title}</h4>
-      {body && (
-        <p className="text-sm text-gray-600 dark:text-gray-300 leading-snug">
-          {body}
-        </p>
-      )}
-      {primary && (
-        <button
-          type="button"
-          onClick={primary.onClick}
-          className="mt-4 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-        >
-          {primary.label}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function Spinner({ small }) {
-  const size = small ? "w-6 h-6" : "w-10 h-10";
-  return (
-    <svg
-      className={`${size} text-indigo-500 animate-spin`}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
-  );
-}
-
-function CloseGlyph() {
-  return (
-    <svg
-      className="w-5 h-5"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
-// Quick-and-dirty UA fingerprinting just for the confirmation card.
-// Used only for human-readable labels — never trusted for security
-// decisions — so a bare-string match is plenty.
-function guessBrowser(ua) {
-  if (!ua) return "?";
-  if (/Edg\//i.test(ua)) return "Edge";
-  if (/OPR\//i.test(ua)) return "Opera";
-  if (/Brave/i.test(ua)) return "Brave";
-  if (/Firefox/i.test(ua)) return "Firefox";
-  if (/Chrome\//i.test(ua) && !/Edg\//i.test(ua)) return "Chrome";
-  if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) return "Safari";
-  return ua.slice(0, 40);
-}
-function guessOs(ua) {
-  if (!ua) return "?";
-  if (/Windows NT/i.test(ua)) return "Windows";
-  if (/Mac OS X/i.test(ua)) return "macOS";
-  if (/Android/i.test(ua)) return "Android";
-  if (/iPhone|iPad|iOS/i.test(ua)) return "iOS";
-  if (/Linux/i.test(ua)) return "Linux";
-  return "?";
 }

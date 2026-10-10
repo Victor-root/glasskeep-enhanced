@@ -14,7 +14,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
 import { RowIcon } from "../common/SettingsAccordion.jsx";
-import OidcProviderForm, { FIELD_INPUT_CLASSES, PRIMARY_BTN, SECONDARY_BTN, Warning } from "./OidcProviderForm.jsx";
+import OidcProviderForm, { PRIMARY_BTN, SECONDARY_BTN, Warning } from "./OidcProviderForm.jsx";
+import { FIELD_INPUT_CLASSES } from "./fieldClasses.js";
 import {
   deleteMyOidc,
   getMyOidc,

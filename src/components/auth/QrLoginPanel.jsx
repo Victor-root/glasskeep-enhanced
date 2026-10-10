@@ -21,6 +21,7 @@ import {
   pollDeviceLink,
   buildLinkUrl,
 } from "../../auth/deviceLinkClient.js";
+import { QrSpinner, CloseGlyph, CheckGlyph } from "./QrGlyphs.jsx";
 
 // Don't poll harder than this regardless of what the server returns
 // in `pollIntervalMs` — keeps a rogue server config from DoS-ing
@@ -181,7 +182,7 @@ function QrCanvas({ status, qrDataUrl, dark }) {
   if (status === "loading") {
     return (
       <div className={`${wrapper} ${placeholderBg}`}>
-        <Spinner />
+        <QrSpinner size="w-8 h-8" />
       </div>
     );
   }
@@ -268,57 +269,4 @@ function StatusLine({ status, errorText, secondsLeft }) {
     );
   }
   return null;
-}
-
-function Spinner() {
-  return (
-    <svg
-      className="w-8 h-8 text-indigo-500 animate-spin"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
-  );
-}
-
-function CloseGlyph({ large }) {
-  const size = large ? "w-10 h-10" : "w-5 h-5";
-  return (
-    <svg
-      className={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
-function CheckGlyph() {
-  return (
-    <svg
-      className="w-12 h-12 text-emerald-600"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
 }
