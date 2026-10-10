@@ -93,7 +93,7 @@ export default function PasskeyListItem({
           disabled={busyId === p.credentialId}
           className="px-2.5 py-1 rounded text-xs border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50"
         >{t("delete")}</button>
-        {/* Instance-unlock toggle (admins, PRF-capable, unlocked vault) — last */}
+        {/* Instance-unlock toggle (admins, PRF-capable, unlocked vault), last */}
         {isAdmin && encryptionEnabled && p.prfSupported && (
           <button
             type="button"

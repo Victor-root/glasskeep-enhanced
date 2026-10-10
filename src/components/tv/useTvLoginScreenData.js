@@ -4,7 +4,7 @@ import { api } from "../../utils/api.js";
 // What the TV login screen shows while signed out: the admin's slogan and
 // the public profiles to pick from.
 export default function useTvLoginScreenData(token) {
-  // Public login slogan — set by the server admin, refreshed whenever
+  // Public login slogan: set by the server admin, refreshed whenever
   // the login screen is on display. Empty string when unset; TvLogin
   // hides the slogan pill entirely in that case.
   const [loginSlogan, setLoginSlogan] = useState("");
@@ -23,7 +23,7 @@ export default function useTvLoginScreenData(token) {
   }, [token]);
 
   // Public login profiles (Jellyfin-style avatar list). Lets users sign
-  // in by picking their face + typing the password — no email required,
+  // in by picking their face + typing the password: no email required,
   // which matters because the original phone account may not have one.
   const [loginProfiles, setLoginProfiles] = useState([]);
   useEffect(() => {

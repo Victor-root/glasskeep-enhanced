@@ -36,7 +36,7 @@ export default function useChangelogTranslation(open) {
 
     // Pull the AI availability flag once the modal opens so the
     // translate button starts in the right enabled / disabled state.
-    // Only the bundled `en` text can be skipped here — but we still
+    // Only the bundled `en` text can be skipped here, but we still
     // probe because the user may want to translate EN → other (and
     // a future locale could ship with EN bundled by default).
     useEffect(() => {
@@ -98,7 +98,7 @@ export default function useChangelogTranslation(open) {
                 signal: controller.signal,
             });
             if (!res.ok || !res.body) {
-                // Best-effort attempt to read a JSON error body — the
+                // Best-effort attempt to read a JSON error body: the
                 // server only switches to SSE once it has validated the
                 // request, so early failures still come back as JSON.
                 let msg = `HTTP ${res.status}`;
@@ -106,7 +106,7 @@ export default function useChangelogTranslation(open) {
                     const j = await res.json();
                     if (j?.error) msg = j.error;
                 } catch {
-                    /* ignore — keep the HTTP status */
+                    /* ignore: keep the HTTP status */
                 }
                 throw new Error(msg);
             }

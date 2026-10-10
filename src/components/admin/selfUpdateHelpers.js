@@ -31,7 +31,7 @@ export function stepLabel(state) {
 // a category. The category drives a friendlier subtext / hint in the
 // header so the admin sees "out of memory during build" instead of
 // just the generic "exit 134". Categories are intentionally
-// conservative — when in doubt, return null and we fall back to the
+// conservative: when in doubt, return null and we fall back to the
 // default rolled_back / error messaging.
 export function detectFailureHint(logText) {
     if (!logText) return null;

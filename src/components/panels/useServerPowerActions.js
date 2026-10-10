@@ -70,7 +70,7 @@ export default function useServerPowerActions({ showGenericConfirm, showToast, a
                 return;
               }
             } catch {
-              // Server still down — keep polling.
+              // Server still down: keep polling.
             }
             setTimeout(poll, 1500);
           };
@@ -122,7 +122,7 @@ export default function useServerPowerActions({ showGenericConfirm, showToast, a
               const t0 = setTimeout(() => ctrl.abort(), 3000);
               await fetch("/api/health", { signal: ctrl.signal });
               clearTimeout(t0);
-              // Still responding — keep polling.
+              // Still responding: keep polling.
               setTimeout(poll, 1500);
             } catch {
               // Fetch failed or aborted → server is down. Start 3s countdown then reload.

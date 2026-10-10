@@ -28,7 +28,7 @@ export default function UpdateCommandRow({ icon: Icon, label, description, comma
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      /* clipboard blocked — silent */
+      /* clipboard blocked: silent */
     }
   };
 

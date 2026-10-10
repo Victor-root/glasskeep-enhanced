@@ -27,7 +27,7 @@ export default function TvHeaderUserChip({ currentUser, onSignOut }) {
   }, [open]);
 
   // Close on native Back. The Android wrapper turns KEYCODE_BACK into
-  // window.history.back() — a popstate event, NOT a keydown. We push a
+  // window.history.back(): a popstate event, NOT a keydown. We push a
   // history marker on open and react to popstate to close. The cleanup
   // branch rewinds the entry if the popover closes by any other means
   // so we don't leak history entries.

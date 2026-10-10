@@ -6,7 +6,7 @@ import { CopyFeedback } from "./UpdateCommandRow.jsx";
 // unlock the one-click update. Kept here so we can show it inline.
 const DOCKER_SOCKET_MOUNT_HINT = "- /var/run/docker.sock:/var/run/docker.sock";
 
-// Inline hint shown when running in Docker without the socket mount —
+// Inline hint shown when running in Docker without the socket mount:
 // guides the admin through the one-time docker-compose.yml edit that
 // unlocks the one-click button.
 export function DockerSocketHint() {
@@ -46,8 +46,8 @@ export function DockerSocketHint() {
 
 // Shown when the socket IS mounted but the app still can't drive Docker:
 // permission denied (the Synology root:root case) or the daemon not
-// answering. Unlike DockerSocketHint there is no line to copy — the
-// remedy is to recreate/restart the container or fix the daemon — so
+// answering. Unlike DockerSocketHint there is no line to copy: the
+// remedy is to recreate/restart the container or fix the daemon, so
 // this is a text-only notice in a distinct (amber) colour.
 export function DockerNoticeHint({ intro, footnote }) {
   return (
