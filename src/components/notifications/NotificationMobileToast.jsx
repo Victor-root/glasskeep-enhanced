@@ -16,6 +16,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNotifications } from "./NotificationProvider.jsx";
 import TI from "../../icons/editor/index.jsx";
+import { renderNotificationMessage } from "./renderNotificationMessage.jsx";
 
 const VARIANT_GLYPH = {
   success: TI.CircleCheckFilled,
@@ -52,20 +53,6 @@ function pickGlyph(notif) {
   }
   const Filled = VARIANT_GLYPH[notif.variant] || TI.InfoCircleFilled;
   return { Comp: Filled, filled: true };
-}
-
-function renderMessage(message) {
-  if (message == null) return null;
-  if (typeof message !== "string") return message;
-  if (!message.includes("**")) return message;
-  const parts = message.split(/(\*\*[^*]+\*\*)/);
-  return parts.map((p, i) => {
-    if (!p) return null;
-    if (p.startsWith("**") && p.endsWith("**")) {
-      return <strong key={i}>{p.slice(2, -2)}</strong>;
-    }
-    return <React.Fragment key={i}>{p}</React.Fragment>;
-  });
 }
 
 // Native Toast.makeText bridge is intentionally disabled — we render
@@ -404,7 +391,7 @@ export default function NotificationMobileToast({ onAction, suppressed = false, 
         ) : null}
         {current.message ? (
           <span className="gk-mobile-toast__message">
-            {renderMessage(current.message)}
+            {renderNotificationMessage(current.message)}
           </span>
         ) : null}
       </span>

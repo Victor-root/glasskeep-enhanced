@@ -18,6 +18,7 @@
 import React, { useRef, useEffect, useLayoutEffect } from "react";
 import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
+import { renderNotificationMessage } from "./renderNotificationMessage.jsx";
 
 const VARIANT_CLASS = {
   success: "gk-notif-card--success",
@@ -94,20 +95,6 @@ function formatRelativeTime(ts) {
   if (diff < 86_400_000)
     return t("relativeHoursAgo", { n: Math.floor(diff / 3_600_000) });
   return t("relativeDaysAgo", { n: Math.floor(diff / 86_400_000) });
-}
-
-function renderMessage(message) {
-  if (message == null) return null;
-  if (typeof message !== "string") return message;
-  if (!message.includes("**")) return message;
-  const parts = message.split(/(\*\*[^*]+\*\*)/);
-  return parts.map((p, i) => {
-    if (!p) return null;
-    if (p.startsWith("**") && p.endsWith("**")) {
-      return <strong key={i}>{p.slice(2, -2)}</strong>;
-    }
-    return <React.Fragment key={i}>{p}</React.Fragment>;
-  });
 }
 
 // Swipe-to-dismiss threshold in pixels.
@@ -394,7 +381,7 @@ export default function NotificationCard({
         <div className="gk-notif-card__title">{headline}</div>
         <div className="gk-notif-card__body-end">
           {message ? (
-            <div className="gk-notif-card__message">{renderMessage(message)}</div>
+            <div className="gk-notif-card__message">{renderNotificationMessage(message)}</div>
           ) : (
             // Spacer so the action button still right-aligns inside
             // the flex row when no message is set.
