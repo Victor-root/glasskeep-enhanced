@@ -27,6 +27,7 @@
 
 const crypto = require("crypto");
 const protocol = require("./protocol");
+const { safeEqual } = require("../services/safeEqual");
 
 // Hysteresis: track consecutive probe failures per link in memory so a
 // single transient timeout (e.g. the peer's event-loop blocked by a
@@ -56,6 +57,16 @@ function normalizeBaseUrl(input) {
   if (u.protocol !== "https:") return null;
   if (!u.hostname) return null;
   return u.origin; // protocol + host (+ non-default port), no path/query
+}
+
+// A peer's host (and non-default port) for labels and synthetic
+// addresses. An address that does not parse just loses its scheme.
+function hostOf(baseUrl) {
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return String(baseUrl || "").replace(/^https?:\/\//i, "");
+  }
 }
 
 // ── Request signing ──────────────────────────────────────────────────
@@ -90,10 +101,7 @@ function verifySignedRequest(link, { method, path, headers, rawBody }) {
     return { ok: false, reason: "clock-skew" };
   }
   const expected = computeSignature(link.shared_secret, method, path, ts, rawBody);
-  const a = Buffer.from(String(sig));
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return { ok: false, reason: "bad-signature" };
-  return crypto.timingSafeEqual(a, b)
+  return safeEqual(String(sig), expected)
     ? { ok: true }
     : { ok: false, reason: "bad-signature" };
 }
@@ -129,6 +137,17 @@ async function httpJson(url, { method = "POST", body, secret, linkId, path } = {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// A signed POST to one endpoint of an active link's peer.
+function postSigned(link, path, body) {
+  return httpJson(link.peer_base_url + path, {
+    method: "POST",
+    secret: link.shared_secret,
+    linkId: link.id,
+    path,
+    body,
+  });
 }
 
 // Deliver the pairing invitation to the peer. Unsigned (no secret yet).
@@ -168,14 +187,7 @@ function sendAccept(link, { label }) {
 // Signed health probe of an active link. Returns the peer's self-report
 // so the tick can fold it into the link's live state.
 function probeHealth(link) {
-  const path = "/api/federation/health";
-  return httpJson(link.peer_base_url + path, {
-    method: "POST",
-    body: { linkId: link.id },
-    secret: link.shared_secret,
-    linkId: link.id,
-    path,
-  });
+  return postSigned(link, "/api/federation/health", { linkId: link.id });
 }
 
 // ── The tick ─────────────────────────────────────────────────────────
@@ -344,9 +356,11 @@ function tlsAwareMessage(e) {
 
 module.exports = {
   normalizeBaseUrl,
+  hostOf,
   computeSignature,
   verifySignedRequest,
   httpJson,
+  postSigned,
   sendInvite,
   sendAccept,
   probeHealth,
