@@ -24,27 +24,8 @@ const SCOPES = "openid profile email";
 const HTTP_TIMEOUT_S = 10;
 const CONFIG_TTL_MS = 60 * 60 * 1000;
 
-// What a user may type as an issuer: an http(s) URL with no
-// credentials, query or fragment. The path is kept as typed, trailing
-// slash included, because discovery compares it exactly with the issuer
-// the provider advertises (Authentik's ends with a slash, Keycloak's
-// does not).
-function normalizeIssuer(input) {
-  if (typeof input !== "string" || !input.trim()) return null;
-  let u;
-  try {
-    u = new URL(input.trim());
-  } catch {
-    return null;
-  }
-  if (u.protocol !== "https:" && u.protocol !== "http:") return null;
-  if (!u.hostname || u.username || u.password || u.search || u.hash) return null;
-  return u.href;
-}
-
-// The GlassKeep origin the browser reaches us at, as the settings page
-// reports it from window.location.origin.
-function normalizeOrigin(input) {
+// A typed http(s) URL with a host and no credentials, or null.
+function parseHttpUrl(input) {
   if (typeof input !== "string" || !input.trim()) return null;
   let u;
   try {
@@ -54,7 +35,25 @@ function normalizeOrigin(input) {
   }
   if (u.protocol !== "https:" && u.protocol !== "http:") return null;
   if (!u.hostname || u.username || u.password) return null;
-  return u.origin;
+  return u;
+}
+
+// What a user may type as an issuer: an http(s) URL with no
+// credentials, query or fragment. The path is kept as typed, trailing
+// slash included, because discovery compares it exactly with the issuer
+// the provider advertises (Authentik's ends with a slash, Keycloak's
+// does not).
+function normalizeIssuer(input) {
+  const u = parseHttpUrl(input);
+  if (!u || u.search || u.hash) return null;
+  return u.href;
+}
+
+// The GlassKeep origin the browser reaches us at, as the settings page
+// reports it from window.location.origin.
+function normalizeOrigin(input) {
+  const u = parseHttpUrl(input);
+  return u ? u.origin : null;
 }
 
 function callbackUrlFor(publicOrigin) {

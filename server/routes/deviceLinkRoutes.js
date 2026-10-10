@@ -106,6 +106,10 @@ function attachDeviceLinkRoutes(
     CREATE INDEX IF NOT EXISTS idx_dlc_token ON device_link_challenges(token);
     CREATE INDEX IF NOT EXISTS idx_dlc_status ON device_link_challenges(status);
   `);
+  const getChallenge = db.prepare(`SELECT * FROM device_link_challenges WHERE token = ?`);
+  const markExpired = db.prepare(
+    `UPDATE device_link_challenges SET status='expired' WHERE id=?`,
+  );
 
   // Best-effort housekeeping — fires whenever a new challenge is
   // created, which is more than often enough to keep the table small.
@@ -171,17 +175,13 @@ function attachDeviceLinkRoutes(
   app.get("/api/device-link/poll", (req, res) => {
     const token = String(req.query.token || "");
     if (!token) return res.status(400).json({ error: "Token required" });
-    const c = db
-      .prepare(`SELECT * FROM device_link_challenges WHERE token = ?`)
-      .get(token);
+    const c = getChallenge.get(token);
     if (!c) return res.status(404).json({ error: "Unknown token" });
 
     // Expire on-the-fly so a long-polling PC sees the right state
     // even if the cleanup pass hasn't fired since.
     if (c.status === "pending" && isExpired(c)) {
-      db.prepare(
-        `UPDATE device_link_challenges SET status='expired' WHERE id=?`,
-      ).run(c.id);
+      markExpired.run(c.id);
       return res.json({ status: "expired" });
     }
     if (c.status === "consumed") {
@@ -244,9 +244,7 @@ function attachDeviceLinkRoutes(
   app.get("/api/device-link/info", auth, (req, res) => {
     const token = String(req.query.token || "");
     if (!token) return res.status(400).json({ error: "Token required" });
-    const c = db
-      .prepare(`SELECT * FROM device_link_challenges WHERE token = ?`)
-      .get(token);
+    const c = getChallenge.get(token);
     if (!c) return res.status(404).json({ error: "Unknown token" });
     if (c.status !== "pending") {
       return res
@@ -254,9 +252,7 @@ function attachDeviceLinkRoutes(
         .json({ error: "Already processed", status: c.status });
     }
     if (isExpired(c)) {
-      db.prepare(
-        `UPDATE device_link_challenges SET status='expired' WHERE id=?`,
-      ).run(c.id);
+      markExpired.run(c.id);
       return res.status(410).json({ error: "Expired", status: "expired" });
     }
     res.json({
@@ -272,9 +268,7 @@ function attachDeviceLinkRoutes(
   app.post("/api/device-link/approve", auth, (req, res) => {
     const token = String(req.body?.token || "");
     if (!token) return res.status(400).json({ error: "Token required" });
-    const c = db
-      .prepare(`SELECT * FROM device_link_challenges WHERE token = ?`)
-      .get(token);
+    const c = getChallenge.get(token);
     if (!c) return res.status(404).json({ error: "Unknown token" });
     if (c.status !== "pending") {
       return res
@@ -282,9 +276,7 @@ function attachDeviceLinkRoutes(
         .json({ error: "Already processed", status: c.status });
     }
     if (isExpired(c)) {
-      db.prepare(
-        `UPDATE device_link_challenges SET status='expired' WHERE id=?`,
-      ).run(c.id);
+      markExpired.run(c.id);
       return res.status(410).json({ error: "Expired" });
     }
     const updated = db

@@ -47,6 +47,9 @@
 //
 // A provider never creates an account and never grants admin rights: it
 // only opens the account that linked it.
+//
+// The pending attempts, the tickets and the browser cookie live in
+// oidc/flowState.js.
 
 const SSO_POLICIES = new Set(["admin", "personal"]);
 
@@ -63,82 +66,20 @@ const {
   asProviderError,
 } = require("../oidc/provider");
 const { createOidcStore } = require("../oidc/store");
+const {
+  FLOW_TTL_MS,
+  TICKET_TTL_MS,
+  createExpiringMap,
+  bindBrowser,
+  browserMatches,
+  appBindingOf,
+  appMatches,
+  forgetBrowser,
+} = require("../oidc/flowState");
 
-const FLOW_TTL_MS = 10 * 60 * 1000;
-const TICKET_TTL_MS = 60 * 1000;
-const MAX_PENDING = 5000;
 const MAX_DISPLAY_NAME_LEN = 40;
-const BINDING_COOKIE = "gk_oidc";
-const BINDING_COOKIE_PATH = "/api/auth/oidc";
-const BINDING_RE = /^[A-Za-z0-9_-]{43}$/;
 // The Android app's own scheme, registered by SsoReturnActivity.
 const ANDROID_RETURN = "com.glasskeep.app:/oidc";
-
-function sha256(value) {
-  return crypto.createHash("sha256").update(value).digest("base64url");
-}
-
-function sameDigest(a, b) {
-  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
-
-// Pending sign-ins and tickets live in memory only: a restart simply
-// asks people to click the button again. Both maps are bounded so a
-// stream of anonymous requests cannot grow them without limit.
-function createExpiringMap(ttlMs) {
-  const entries = new Map();
-  const prune = () => {
-    const now = Date.now();
-    for (const [key, value] of entries) {
-      if (value.expiresAt <= now) entries.delete(key);
-    }
-    while (entries.size >= MAX_PENDING) entries.delete(entries.keys().next().value);
-  };
-  return {
-    put(key, value) {
-      prune();
-      entries.set(key, { ...value, expiresAt: Date.now() + ttlMs });
-    },
-    // Single use: reading an entry removes it.
-    take(key) {
-      if (typeof key !== "string") return null;
-      const value = entries.get(key);
-      entries.delete(key);
-      return value && value.expiresAt > Date.now() ? value : null;
-    },
-  };
-}
-
-function readBindingCookie(req) {
-  for (const part of String(req.headers.cookie || "").split(";")) {
-    const [name, ...rest] = part.trim().split("=");
-    if (name === BINDING_COOKIE) {
-      const value = rest.join("=");
-      return BINDING_RE.test(value) ? value : null;
-    }
-  }
-  return null;
-}
-
-// Returns the digest of this browser's binding value, setting the cookie
-// when the browser does not have one yet.
-function bindBrowser(req, res, publicOrigin) {
-  const value = readBindingCookie(req) || crypto.randomBytes(32).toString("base64url");
-  res.cookie(BINDING_COOKIE, value, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: publicOrigin.startsWith("https:"),
-    path: BINDING_COOKIE_PATH,
-    maxAge: FLOW_TTL_MS,
-  });
-  return sha256(value);
-}
-
-function browserMatches(req, bindingDigest) {
-  const value = readBindingCookie(req);
-  return !!value && sameDigest(sha256(value), bindingDigest);
-}
 
 // A provider as the one configuring it sees it: never its secret.
 function providerView(provider) {
@@ -231,8 +172,7 @@ a{padding:14px 28px;border-radius:999px;background:#4f46e5;color:#fff;font-weigh
     try {
       const { url, state, nonce, codeVerifier } = await beginAuthorization(provider, accessFor(provider.owner_user_id));
       const binding = bindBrowser(req, res, provider.public_origin);
-      const appSecret = req.body?.appSecret;
-      const appBinding = typeof appSecret === "string" && BINDING_RE.test(appSecret) ? sha256(appSecret) : null;
+      const appBinding = appBindingOf(req.body?.appSecret);
       flows.put(state, { providerId: provider.id, state, nonce, codeVerifier, binding, appBinding, purpose, userId });
       res.json({ authorizationUrl: url });
     } catch (err) {
@@ -328,9 +268,8 @@ a{padding:14px 28px;border-radius:999px;background:#4f46e5;color:#fff;font-weigh
 
   app.post("/api/auth/oidc/exchange", (req, res) => {
     const ticket = tickets.take(req.body?.ticket);
-    const appSecret = req.body?.appSecret;
     const bound = ticket?.appBinding
-      ? typeof appSecret === "string" && sameDigest(sha256(appSecret), ticket.appBinding)
+      ? appMatches(req.body?.appSecret, ticket.appBinding)
       : !!ticket && browserMatches(req, ticket.binding);
     if (!bound
         || !usableBy(store.getProvider(ticket.providerId), ticket.userId)) {
@@ -338,7 +277,7 @@ a{padding:14px 28px;border-radius:999px;background:#4f46e5;color:#fff;font-weigh
     }
     const user = getUserById.get(ticket.userId);
     if (!user || user.federated_origin) return res.status(401).json({ error: "oidc_expired" });
-    res.clearCookie(BINDING_COOKIE, { path: BINDING_COOKIE_PATH });
+    forgetBrowser(res);
     res.json(sessionResponse(user, "login-oidc"));
   });
 
