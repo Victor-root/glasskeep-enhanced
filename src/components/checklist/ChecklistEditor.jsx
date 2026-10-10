@@ -1,12 +1,12 @@
 import React from "react";
 import { t } from "../../i18n";
-import ChecklistRow from "../common/ChecklistRow.jsx";
-import SectionHeader, { SECTION_COLORS, DEFAULT_SECTION_COLOR, hexAlpha } from "./SectionHeader.jsx";
+import ChecklistItemRow from "./ChecklistItemRow.jsx";
+import ChecklistSection from "./ChecklistSection.jsx";
+import ChecklistDoneArea from "./ChecklistDoneArea.jsx";
 import { useDark } from "./useDark.js";
 import useChecklistDrag from "../../hooks/useChecklistDrag.js";
 import {
   DEFAULT_SECTION_ID,
-  INDENT_STEP_PX,
   canIndentItem,
   findPrevItemId,
   getIndentedChildren,
@@ -248,72 +248,25 @@ export default function ChecklistEditor({
   const showSectionBreaks = hasSections(items);
 
   const renderItemRow = (it) => (
-    <div
+    <ChecklistItemRow
       key={it.id}
-      data-checklist-item={it.id}
-      data-checklist-row
-      className="group flex items-center gap-2"
-      style={it.indent ? { marginLeft: INDENT_STEP_PX } : undefined}
-    >
-      {/* Only this wrapper slides during the horizontal indent/outdent
-          drag (useChecklistDrag targets [data-checklist-slide]) -- the
-          delete button below sits outside it, so it stays put instead
-          of chasing the row sideways. */}
-      <div data-checklist-slide className="flex items-center gap-2 flex-1 min-w-0">
-        {!readOnly && (
-          <div
-            onPointerDown={(e) => handlePointerDown(it.id, e)}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerCancel}
-            className="flex items-center justify-center px-1 checklist-grab-handle opacity-40 group-hover:opacity-70 transition-opacity"
-            style={{ touchAction: "none" }}
-          >
-            <div className="grid grid-cols-2 gap-0.5">
-              <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-              <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-              <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-              <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-              <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-              <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex-1 min-w-0">
-          <ChecklistRow
-            item={it}
-            readOnly={readOnly}
-            disableToggle={readOnly}
-            externalRemove
-            size="lg"
-            indentGutter={false}
-            focusItemId={focusItemId}
-            focusToken={focusToken}
-            focusCaret={focusCaret}
-            onToggle={(checked, e) => {
-              e?.stopPropagation();
-              toggleItem(it.id, checked);
-            }}
-            onChange={(txt) => changeText(it.id, txt)}
-            onEnter={(opts) => addItemAdjacent(it.id, opts)}
-            onBackspaceEmpty={() => removeAndFocusPrev(it.id)}
-            onIndent={() => indentItem(it.id)}
-            onOutdent={() => outdentItem(it.id)}
-          />
-        </div>
-      </div>
-
-      {!readOnly && (
-        <button
-          className="opacity-80 hover:opacity-100 ml-1.5 sm:ml-3 md:ml-2 -translate-x-2 transition-opacity text-gray-500 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 rounded-full flex items-center justify-center cursor-pointer w-6 h-6 text-lg font-semibold"
-          data-tooltip={t("removeItem")}
-          onClick={() => removeItem(it.id)}
-        >
-          ✕
-        </button>
-      )}
-    </div>
+      item={it}
+      readOnly={readOnly}
+      focusItemId={focusItemId}
+      focusToken={focusToken}
+      focusCaret={focusCaret}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onToggle={toggleItem}
+      onChangeText={changeText}
+      onEnter={addItemAdjacent}
+      onBackspaceEmpty={removeAndFocusPrev}
+      onIndent={indentItem}
+      onOutdent={outdentItem}
+      onRemove={removeItem}
+    />
   );
 
   // ---------- Layout ----------
@@ -326,6 +279,16 @@ export default function ChecklistEditor({
       <span className="text-lg leading-none">+</span>
       <span className="text-sm">{t("listItemEllipsis")}</span>
     </div>
+  );
+
+  const addSectionButton = (
+    <button
+      type="button"
+      onClick={addSection}
+      className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border border-dashed border-[var(--border-light)] rounded px-2 py-1"
+    >
+      + {t("addSection")}
+    </button>
   );
 
   return (
@@ -343,21 +306,8 @@ export default function ChecklistEditor({
         <div className="space-y-6 md:space-y-4">
           {sections.map((section) => {
             const uncheckedInSection = section.items.filter((it) => !it.done);
-            const isDefault = section.id === DEFAULT_SECTION_ID;
-            const isCollapsed = !isDefault && !!section.collapsed;
 
-            const colorKey = !isDefault ? (section.color ?? "none") : null;
-            const colorHex = colorKey
-              ? (SECTION_COLORS.find((c) => c.key === colorKey)?.hex ?? null)
-              : null;
-            const accentBorder = colorHex
-              ? { borderLeft: `3px solid ${hexAlpha(colorHex, dark ? 0.80 : 0.6)}` }
-              : undefined;
-            const itemsAreaStyle = colorHex
-              ? { background: hexAlpha(colorHex, dark ? 0.09 : 0.04) }
-              : undefined;
-
-            if (isDefault) {
+            if (section.id === DEFAULT_SECTION_ID) {
               return (
                 <div key={section.id} data-section-block={section.id} className="space-y-3 md:space-y-1">
                   {insertPosition === "top" && topAddRow}
@@ -368,149 +318,60 @@ export default function ChecklistEditor({
             }
 
             return (
-              <div key={section.id} data-section-block={section.id} className="space-y-1 max-sm:-ml-2 max-sm:-mr-2">
-                <div style={accentBorder}>
-                  <div data-checklist-row data-section-header={section.id}>
-                    <SectionHeader
-                      section={section}
-                      readOnly={readOnly}
-                      onRename={(title) => renameSection(section.id, title)}
-                      onRemove={() => removeSection(section.id)}
-                      onEnter={readOnly ? undefined : (pendingTitle) => {
-                        // Atomically apply a pending title rename (from Enter key) + add item
-                        // so both changes share one setEntries call and neither overwrites the other.
-                        const base = pendingTitle !== undefined
-                          ? updateEntry(items, section.id, { title: pendingTitle })
-                          : items;
-                        const newItem = makeItem("", false);
-                        const next = insertPosition === "top"
-                          ? insertAtSectionStart(base, section.id, newItem)
-                          : insertAtSectionEnd(base, section.id, newItem);
-                        setEntries(next);
-                        syncEntries(next);
-                        requestFocus(newItem.id, "end");
-                      }}
-                      onColorChange={readOnly ? undefined : (colorKey) => changeColor(section.id, colorKey)}
-                      onHandlePointerDown={readOnly ? undefined : handleSectionPointerDown}
-                      onHandlePointerMove={handleSectionPointerMove}
-                      onHandlePointerUp={handleSectionPointerUp}
-                      onHandlePointerCancel={handleSectionPointerCancel}
-                      collapsed={isCollapsed}
-                      onToggleCollapse={readOnly ? undefined : () => toggleSectionCollapse(section.id)}
-                      count={uncheckedInSection.length}
-                    />
-                  </div>
-                  {!isCollapsed && (
-                    <div style={itemsAreaStyle}>
-                      {uncheckedInSection.length > 0 && (
-                        <div className="pl-3 space-y-3 pt-1 pb-1">
-                          {uncheckedInSection.map(renderItemRow)}
-                        </div>
-                      )}
-                      {!readOnly && (
-                        <button
-                          type="button"
-                          data-checklist-row
-                          className="flex items-center gap-2 pl-4 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                          onClick={() => addItemToSection(section.id)}
-                        >
-                          <span className="leading-none">+</span>
-                          <span>{t("addToSectionEllipsis")}</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ChecklistSection
+                key={section.id}
+                section={section}
+                uncheckedItems={uncheckedInSection}
+                collapsed={!!section.collapsed}
+                dark={dark}
+                readOnly={readOnly}
+                renderItemRow={renderItemRow}
+                onRename={(title) => renameSection(section.id, title)}
+                onRemove={() => removeSection(section.id)}
+                onEnter={readOnly ? undefined : (pendingTitle) => {
+                  // Atomically apply a pending title rename (from Enter key) + add item
+                  // so both changes share one setEntries call and neither overwrites the other.
+                  const base = pendingTitle !== undefined
+                    ? updateEntry(items, section.id, { title: pendingTitle })
+                    : items;
+                  const newItem = makeItem("", false);
+                  const next = insertPosition === "top"
+                    ? insertAtSectionStart(base, section.id, newItem)
+                    : insertAtSectionEnd(base, section.id, newItem);
+                  setEntries(next);
+                  syncEntries(next);
+                  requestFocus(newItem.id, "end");
+                }}
+                onColorChange={readOnly ? undefined : (colorKey) => changeColor(section.id, colorKey)}
+                onHandlePointerDown={readOnly ? undefined : handleSectionPointerDown}
+                onHandlePointerMove={handleSectionPointerMove}
+                onHandlePointerUp={handleSectionPointerUp}
+                onHandlePointerCancel={handleSectionPointerCancel}
+                onToggleCollapse={readOnly ? undefined : () => toggleSectionCollapse(section.id)}
+                onAddItem={() => addItemToSection(section.id)}
+              />
             );
           })}
 
           {!readOnly && (
             <div className="pt-1">
-              <button
-                type="button"
-                onClick={addSection}
-                className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border border-dashed border-[var(--border-light)] rounded px-2 py-1"
-              >
-                + {t("addSection")}
-              </button>
+              {addSectionButton}
             </div>
           )}
 
           {checkedItems.length > 0 && (
-            <div className="border-t border-[var(--border-light)] pt-4 mt-4">
-              <button
-                type="button"
-                onClick={() => setDoneCollapsed((c) => !c)}
-                className="flex items-center gap-1.5 w-full text-left px-2 py-1.5 -mx-2 rounded-sm mb-3 transition-colors"
-              >
-                <svg
-                  className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 text-gray-400 dark:text-gray-500${doneCollapsed ? " -rotate-90" : ""}`}
-                  fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-                <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                  {t("done")}
-                </span>
-                <span
-                  className="text-xs font-medium tabular-nums px-1.5 py-0.5 rounded-full ml-0.5"
-                  style={{ background: hexAlpha("#64748b", 0.14), color: "#64748b" }}
-                >
-                  {checkedItems.length}
-                </span>
-              </button>
-              {!doneCollapsed && (
-                showSectionBreaks ? (
-                  Array.from(checkedBySection.entries()).map(([sid, arr]) => {
-                    const section = sections.find((s) => s.id === sid);
-                    const label = section && section.title ? section.title : null;
-                    return (
-                      <div key={sid} className="mb-3">
-                        {label && (
-                          <div className="text-xs font-semibold tracking-wide text-gray-400 dark:text-gray-500 mb-1">
-                            {label}
-                          </div>
-                        )}
-                        {arr.map((it) => (
-                          <ChecklistRow
-                            key={it.id}
-                            item={it}
-                            readOnly={readOnly}
-                            disableToggle={readOnly}
-                            showRemove={!readOnly}
-                            size="lg"
-                            onToggle={(checked, e) => {
-                              e?.stopPropagation();
-                              toggleItem(it.id, checked);
-                            }}
-                            onChange={(txt) => changeText(it.id, txt)}
-                            onRemove={() => removeItem(it.id)}
-                          />
-                        ))}
-                      </div>
-                    );
-                  })
-                ) : (
-                  (checkedBySection.get(DEFAULT_SECTION_ID) || []).map((it) => (
-                    <ChecklistRow
-                      key={it.id}
-                      item={it}
-                      readOnly={readOnly}
-                      disableToggle={readOnly}
-                      showRemove={!readOnly}
-                      size="lg"
-                      onToggle={(checked, e) => {
-                        e?.stopPropagation();
-                        toggleItem(it.id, checked);
-                      }}
-                      onChange={(txt) => changeText(it.id, txt)}
-                      onRemove={() => removeItem(it.id)}
-                    />
-                  ))
-                )
-              )}
-            </div>
+            <ChecklistDoneArea
+              checkedCount={checkedItems.length}
+              collapsed={doneCollapsed}
+              onToggleCollapsed={() => setDoneCollapsed((c) => !c)}
+              showSectionBreaks={showSectionBreaks}
+              checkedBySection={checkedBySection}
+              sections={sections}
+              readOnly={readOnly}
+              onToggle={toggleItem}
+              onChangeText={changeText}
+              onRemove={removeItem}
+            />
           )}
         </div>
       ) : (
@@ -519,15 +380,9 @@ export default function ChecklistEditor({
           <p className="text-sm text-gray-500">{t("noItemsYet")}</p>
           {insertPosition === "bottom" && topAddRow}
           {!readOnly && (
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={addSection}
-              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border border-dashed border-[var(--border-light)] rounded px-2 py-1"
-            >
-              + {t("addSection")}
-            </button>
-          </div>
+            <div className="pt-2">
+              {addSectionButton}
+            </div>
           )}
         </>
       )}
