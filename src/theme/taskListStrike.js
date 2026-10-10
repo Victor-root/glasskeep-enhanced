@@ -9,7 +9,7 @@
 // checked item looks. Stored locally because it's a reading preference, not
 // note data: it applies the same way to every note on this device.
 
-export const TASK_STRIKE_CLASS = "gk-strike-checked";
+const TASK_STRIKE_CLASS = "gk-strike-checked";
 const STORAGE_KEY = "gk:taskStrikeChecked";
 
 // Default OFF — matches the dedicated checklist note type (which does not

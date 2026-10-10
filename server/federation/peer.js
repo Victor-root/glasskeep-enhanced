@@ -357,16 +357,11 @@ function tlsAwareMessage(e) {
 module.exports = {
   normalizeBaseUrl,
   hostOf,
-  computeSignature,
   verifySignedRequest,
   httpJson,
   postSigned,
-  sendInvite,
-  sendAccept,
-  probeHealth,
   runTick,
   healthCheckOne,
   tlsAwareMessage,
   REQUEST_TIMEOUT_MS,
-  SIGNATURE_WINDOW_MS,
 };

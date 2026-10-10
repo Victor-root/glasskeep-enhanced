@@ -428,9 +428,6 @@ function resolveEffectiveConfig(db, userId) {
 module.exports = {
   sameProviderOrigin: sameOrigin,
   PROVIDER_OPENAI_COMPATIBLE,
-  MODES,
-  ADMIN_DEFAULTS,
-  USER_DEFAULTS,
   ensureSchema,
   // admin
   getAdminConfig,

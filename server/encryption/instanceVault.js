@@ -120,11 +120,6 @@ function unwrapDek(secret, salt, wrap) {
 
 // ── Public API ────────────────────────────────────────────────────────
 
-function isInitialized(db) {
-  const row = loadRow(db);
-  return !!(row && row.enabled);
-}
-
 function getStatusRow(db) { return loadRow(db); }
 
 // First-time setup: generate a DEK, wrap it under (passphrase, recovery
@@ -326,7 +321,6 @@ function disable(db) {
 
 module.exports = {
   ensureSchema,
-  isInitialized,
   getStatusRow,
   initialize,
   unlockWithPassphrase,

@@ -69,7 +69,6 @@ function getDek() {
 function isEnabled() { return state.enabled; }
 function isLocked()  { return state.enabled && state.locked; }
 function isUnlocked() { return state.enabled && !state.locked && !!state.dek; }
-function isUnlockedOrDisabled() { return !state.enabled || (!state.locked && !!state.dek); }
 
 function snapshot() {
   return {
@@ -117,7 +116,6 @@ module.exports = {
   isEnabled,
   isLocked,
   isUnlocked,
-  isUnlockedOrDisabled,
   snapshot,
   recordAttempt,
   attemptDelayMs,

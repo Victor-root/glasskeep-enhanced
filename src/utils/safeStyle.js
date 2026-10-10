@@ -30,7 +30,7 @@
 // Everything the Tiptap extensions in richTextSchema.js can emit:
 // Color, Highlight, FontFamily, FontSize, TextAlign, Indent and
 // UnderlineVariant. Nothing here can load anything.
-export const ALLOWED_STYLE_PROPS = new Set([
+const ALLOWED_STYLE_PROPS = new Set([
   "color",
   "background-color",
   "font-family",

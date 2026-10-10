@@ -17,7 +17,7 @@ const LANG_STORAGE_KEY = "gk:lang";
 // (e.g. Firefox's "Preferred languages" panel), which can differ from the
 // browser UI language exposed by `navigator.language`. Fall back to
 // `navigator.language` and then "en" if nothing usable is set.
-export function detectBrowserLanguage() {
+function detectBrowserLanguage() {
   const candidates = [];
   if (typeof navigator !== "undefined") {
     if (Array.isArray(navigator.languages)) candidates.push(...navigator.languages);
@@ -49,7 +49,7 @@ export function getLanguageOverride() {
 // The server-stored preference is only used to populate the settings
 // picker — it never overrides the browser at boot. Cross-device users
 // are expected to set their language on each device once.
-export function detectLanguage() {
+function detectLanguage() {
   return getLanguageOverride() || detectBrowserLanguage();
 }
 

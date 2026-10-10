@@ -79,18 +79,6 @@ export const renderSafeMarkdown = (md) => {
   }
 };
 
-export const mdToPlain = (md) => {
-  try {
-    const html = marked.parse(md || "");
-    const tmp = document.createElement("div");
-    tmp.innerHTML = html;
-    const text = tmp.textContent || tmp.innerText || "";
-    return text.replace(/\n{3,}/g, "\n\n");
-  } catch {
-    return md || "";
-  }
-};
-
 // Build MARKDOWN content for download.
 // Rich-JSON notes are flattened to plain text (no round-trip to Markdown) —
 // the Markdown export is best-effort and no longer a first-class feature.

@@ -2,13 +2,11 @@
 // status bar (theme-color meta tag) and, in the Android app, the
 // navigation bar and the scrim over both.
 
-/** App-chrome status-bar colours. Shared so the value can't drift across
- *  callers: useDarkMode sets these on load / dark-toggle, and NoteModal restores
- *  them when a note closes (it overrides with the open note's colour meanwhile).
+/** App-chrome status-bar colours, the fallback of currentStatusBarColor.
  *  MUST match the --gk-statusbar CSS variable in globalCSS (which also paints
  *  the flat mobile header), light and dark respectively. */
-export const STATUS_BAR_LIGHT = "#dce1fb";
-export const STATUS_BAR_DARK = "#171f30";
+const STATUS_BAR_LIGHT = "#dce1fb";
+const STATUS_BAR_DARK = "#171f30";
 
 /** Current shell status-bar colour, read from the live --gk-statusbar token so
  *  it follows the active workspace theme AND dark mode automatically. Falls

@@ -20,7 +20,6 @@ export default function SecretLoginView({ dark, onToggleDark, onLoginWithKey, go
 
   return (
     <AuthShell
-      data-tooltip={t("signInWithSecretKey")}
       dark={dark}
       onToggleDark={onToggleDark}
       floatingCardsEnabled={floatingCardsEnabled}

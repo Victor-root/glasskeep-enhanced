@@ -16,7 +16,7 @@
 import TI from "../../../icons/editor/index.jsx";
 
 // Mirrors server/federation/protocol.js LINK_STATE.
-export const FED_STATE = Object.freeze({
+const FED_STATE = Object.freeze({
   ONLINE: "online",
   OFFLINE: "offline",
   INCOMPATIBLE: "incompatible",

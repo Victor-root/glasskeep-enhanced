@@ -139,7 +139,6 @@ function reset() { buckets.clear(); }
 module.exports = {
   FREE_ATTEMPTS,
   MAX_PER_ACCOUNT,
-  MAX_PER_ADDRESS,
   blockedForSeconds,
   penaltyMs,
   recordFailure,

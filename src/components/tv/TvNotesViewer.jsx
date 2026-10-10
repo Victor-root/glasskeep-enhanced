@@ -348,7 +348,7 @@ export default function TvNotesViewer({
         </main>
       </div>
 
-      {openNote && <TvNoteDetail note={openNote} onClose={closeDetail} />}
+      {openNote && <TvNoteDetail note={openNote} />}
     </div>
   );
 }

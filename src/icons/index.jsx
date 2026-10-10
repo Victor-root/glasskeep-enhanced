@@ -121,26 +121,6 @@ export const ImageIcon = () => (
     <circle cx="8" cy="8" r="1.5" />
   </svg>
 );
-export const GalleryIcon = () => (
-  <svg
-    className="w-5 h-5"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="3" y="3" width="8" height="8" rx="1" />
-    <rect x="13" y="3" width="8" height="8" rx="1" />
-    <rect x="3" y="13" width="8" height="8" rx="1" />
-    <rect x="13" y="13" width="8" height="8" rx="1" />
-    <circle cx="6" cy="6" r="1" fill="currentColor" />
-    <circle cx="16" cy="6" r="1" fill="currentColor" />
-    <circle cx="6" cy="16" r="1" fill="currentColor" />
-    <circle cx="16" cy="16" r="1" fill="currentColor" />
-  </svg>
-);
 export const CloseIcon = () => (
   <svg
     className="w-6 h-6"
@@ -230,18 +210,6 @@ export const Hamburger = () => (
     strokeWidth="2"
   >
     <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" />
-  </svg>
-);
-// Formatting "Aa" icon
-export const FormatIcon = () => (
-  <svg
-    className="w-5 h-5"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.7"
-  >
-    <path strokeLinecap="round" d="M3 19h18M10 17V7l-3 8m10 2V7l-3 8" />
   </svg>
 );
 
@@ -421,15 +389,6 @@ export const LockIcon = () => (
     <path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6" />
     <path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0" />
     <path d="M8 11v-4a4 4 0 1 1 8 0v4" />
-  </svg>
-);
-
-// Floating cards toggle icon — Layers (Lucide)
-export const FloatingCardsIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
-    <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" />
-    <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />
   </svg>
 );
 

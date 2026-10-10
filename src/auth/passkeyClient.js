@@ -16,7 +16,6 @@ import {
   startRegistration,
   startAuthentication,
   browserSupportsWebAuthn,
-  platformAuthenticatorIsAvailable,
 } from "@simplewebauthn/browser";
 import { t } from "../i18n";
 import { API_BASE, AUTH_KEY } from "../utils/api.js";
@@ -145,11 +144,6 @@ function extractPrfOutput(assertion) {
 export function isWebAuthnSupported() {
   if (getAndroidBridge()) return true;
   try { return browserSupportsWebAuthn(); } catch { return false; }
-}
-
-export async function isPlatformAuthenticatorAvailable() {
-  if (getAndroidBridge()) return true;
-  try { return await platformAuthenticatorIsAvailable(); } catch { return false; }
 }
 
 /** True when this runtime can drive WebAuthn ceremonies via the

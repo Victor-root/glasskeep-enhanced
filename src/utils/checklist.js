@@ -39,7 +39,7 @@ import { uid } from "./ids.js";
  * the previous UX.
  */
 
-export const SECTION_KIND = "section";
+const SECTION_KIND = "section";
 
 // Single-level indent, Google-Keep style. Shared by the checklist editor's
 // row margin and the drag hook's horizontal commit distance so "how far you
@@ -123,24 +123,13 @@ export function getSections(entries) {
   return sections;
 }
 
-/** Returns the section id an item with the given id belongs to (walking markers before it). */
-export function sectionIdForItem(entries, itemId) {
-  const arr = Array.isArray(entries) ? entries : [];
-  let current = DEFAULT_SECTION_ID;
-  for (const e of arr) {
-    if (isSection(e)) current = e.id;
-    else if (e.id === itemId) return current;
-  }
-  return null;
-}
-
 /**
  * True if the item with the given id is the first item since the start of
  * the list or since the last section marker before it -- i.e. the one
  * position that Google-Keep-style single-level indent forbids indenting,
  * since there would be no item above it in the same section to nest under.
  */
-export function isFirstItemInSection(entries, itemId) {
+function isFirstItemInSection(entries, itemId) {
   const arr = Array.isArray(entries) ? entries : [];
   let atSectionStart = true;
   for (const e of arr) {
@@ -436,20 +425,6 @@ export function findPrevItemId(entries, itemId) {
   for (const e of arr) {
     if (e.id === itemId) return last;
     if (isItem(e)) last = e.id;
-  }
-  return null;
-}
-
-/**
- * Returns the next focusable entry (non-section item) after the entry
- * with id=itemId, or null.
- */
-export function findNextItemId(entries, itemId) {
-  const arr = Array.isArray(entries) ? entries : [];
-  let found = false;
-  for (const e of arr) {
-    if (found && isItem(e)) return e.id;
-    if (e.id === itemId) found = true;
   }
   return null;
 }
