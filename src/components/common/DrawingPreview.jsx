@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { renderPaths } from "../../utils/drawingRender";
+import { convertThemeStrokes, renderPaths } from "../../utils/drawingRender";
 import { t } from "../../i18n";
 
 // Parses the drawing and fits it into the preview box. Returns null when the
@@ -33,14 +33,7 @@ function layoutDrawing(data, width, height, darkMode, maxPages) {
   });
 
   // Theme-convert black/white strokes
-  paths = paths.map((path) => {
-    if (darkMode) {
-      if (path.color === "#000000") return { ...path, color: "#FFFFFF" };
-    } else if (path.color === "#FFFFFF") {
-      return { ...path, color: "#000000" };
-    }
-    return path;
-  });
+  paths = convertThemeStrokes(paths, darkMode);
 
   if (paths.length === 0) {
     return { empty: true, w: width, h: Math.round(width * 0.4) };

@@ -2,8 +2,11 @@ import { t } from "../../i18n";
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import useDrawingHistory from '../../hooks/useDrawingHistory';
+import useTouchDrawGestures from '../../hooks/useTouchDrawGestures';
 import DrawingToolbar from './DrawingToolbar';
-import { drawSmoothPath, renderPaths } from '../../utils/drawingRender';
+import DrawingCursor from './DrawingCursor';
+import DrawingPageLines from './DrawingPageLines';
+import { convertThemeStrokes, drawSmoothPath, renderPaths } from '../../utils/drawingRender';
 
 /* ─── Hit-test: is a point within radius of any point on a path? ─── */
 function isPointNearPath(px, py, path, radius) {
@@ -31,13 +34,17 @@ function isPointNearPath(px, py, path, radius) {
   return false;
 }
 
-/* ─── Theme stroke conversion (black ↔ white) ─── */
-function convertThemeStrokes(pathsData, darkMode) {
-  return pathsData.map(path => {
-    if (darkMode && path.color === '#000000') return { ...path, color: '#FFFFFF' };
-    if (!darkMode && path.color === '#FFFFFF') return { ...path, color: '#000000' };
-    return path;
-  });
+/* ─── Size stored with the drawing ({ width, height, originalHeight }), if any ─── */
+function storedDimensions(data) {
+  return (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) || null;
+}
+
+/* ─── Flags the next data props as the echo of our own onChange ─── */
+// Kept active for 2s to survive autosave debounce + network echo.
+function markInternalChange(flagRef, timerRef) {
+  flagRef.current = true;
+  clearTimeout(timerRef.current);
+  timerRef.current = setTimeout(() => { flagRef.current = false; }, 2000);
 }
 
 /* ─── Main Component ─── */
@@ -58,10 +65,7 @@ function DrawingCanvas({
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const canvasWrapperRef = useRef(null);
-  const isScrollingRef = useRef(false);
   const isDrawingRef = useRef(false);
-  const pendingTouchRef = useRef(null);
-  const scrollStateRef = useRef({ lastY: 0, velocity: 0, momentumId: null });
   const pathsRef = useRef([]);
   const currentPathRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -164,15 +168,11 @@ function DrawingCanvas({
   // ─── Notify parent (marks as internal so data-loading effect won't reset) ───
   const notifyChange = useCallback((newPaths) => {
     if (!onChange) return;
-    // Keep flag active for 2s to survive autosave debounce + network echo
-    isInternalChange.current = true;
-    clearTimeout(internalChangeTimer.current);
-    internalChangeTimer.current = setTimeout(() => {
-      isInternalChange.current = false;
-    }, 2000);
+    markInternalChange(isInternalChange, internalChangeTimer);
     let originalHeight;
-    if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions && data.dimensions.originalHeight) {
-      originalHeight = data.dimensions.originalHeight;
+    const dims = storedDimensions(data);
+    if (dims && dims.originalHeight) {
+      originalHeight = dims.originalHeight;
     } else {
       // For new drawings in fillContainer mode, use actual canvas height (from viewport)
       // instead of the height prop, which is a default that doesn't match the viewport.
@@ -229,7 +229,7 @@ function DrawingCanvas({
   // ─── Update canvas size from props (only if data has no dimensions and no fillContainer) ───
   useEffect(() => {
     if (fillContainer) return; // ResizeObserver handles sizing in fillContainer mode
-    if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) return;
+    if (storedDimensions(data)) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- canvas size is editable state that follows the size props
     setCanvasWidth(width);
     setCanvasHeight(height);
@@ -243,7 +243,7 @@ function DrawingCanvas({
     const wrapper = canvasWrapperRef.current;
     if (!wrapper) return;
 
-    const hasStoredDimensions = data && typeof data === 'object' && !Array.isArray(data) && data.dimensions;
+    const hasStoredDimensions = storedDimensions(data);
 
     const updateSize = () => {
       const rect = wrapper.getBoundingClientRect();
@@ -450,9 +450,8 @@ function DrawingCanvas({
 
   // ─── Page height (one page = originalHeight from stored data, or viewport height) ───
   const originalHeight = React.useMemo(() => {
-    if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) {
-      return data.dimensions.originalHeight || height;
-    }
+    const dims = storedDimensions(data);
+    if (dims) return dims.originalHeight || height;
     return height;
   }, [data, height]);
 
@@ -462,9 +461,7 @@ function DrawingCanvas({
     const newHeight = canvasHeight + originalHeight;
     setCanvasHeight(newHeight);
     if (onChange) {
-      isInternalChange.current = true;
-      clearTimeout(internalChangeTimer.current);
-      internalChangeTimer.current = setTimeout(() => { isInternalChange.current = false; }, 2000);
+      markInternalChange(isInternalChange, internalChangeTimer);
       onChange({
         paths,
         dimensions: { width: canvasWidth, height: newHeight, originalHeight },
@@ -485,9 +482,7 @@ function DrawingCanvas({
     setCanvasHeight(newHeight);
     pushPaths(filteredPaths);
     if (onChange) {
-      isInternalChange.current = true;
-      clearTimeout(internalChangeTimer.current);
-      internalChangeTimer.current = setTimeout(() => { isInternalChange.current = false; }, 2000);
+      markInternalChange(isInternalChange, internalChangeTimer);
       onChange({
         paths: filteredPaths,
         dimensions: { width: canvasWidth, height: newHeight, originalHeight },
@@ -497,121 +492,17 @@ function DrawingCanvas({
 
   // ─── Touch events (passive: false for preventDefault) ───
   // 1 finger = draw, 2 fingers = programmatic scroll with momentum
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ss = scrollStateRef; // ref persists across effect re-runs
-
-    const avgY = (touches) => {
-      let s = 0;
-      for (let i = 0; i < touches.length; i++) s += touches[i].clientY;
-      return s / touches.length;
-    };
-
-    const stopMomentum = () => {
-      if (ss.current.momentumId) {
-        cancelAnimationFrame(ss.current.momentumId);
-        ss.current.momentumId = null;
-      }
-    };
-
-    const startMomentum = () => {
-      const wrapper = canvasWrapperRef.current;
-      if (!wrapper || Math.abs(ss.current.velocity) < 0.5) return;
-      const step = () => {
-        ss.current.velocity *= 0.92;
-        wrapper.scrollTop -= ss.current.velocity;
-        if (Math.abs(ss.current.velocity) > 0.5) {
-          ss.current.momentumId = requestAnimationFrame(step);
-        } else {
-          ss.current.momentumId = null;
-        }
-      };
-      ss.current.momentumId = requestAnimationFrame(step);
-    };
-
-    const handleTouchStart = (e) => {
-      if (mode !== 'draw' || readOnly) return;
-      e.preventDefault();
-      stopMomentum();
-
-      if (e.touches.length >= 2) {
-        pendingTouchRef.current = null;
-        if (isDrawingRef.current) cancelCurrentStroke();
-        isScrollingRef.current = true;
-        ss.current.lastY = avgY(e.touches);
-        ss.current.velocity = 0;
-        return;
-      }
-
-      if (!isScrollingRef.current) {
-        const t = e.touches[0];
-        pendingTouchRef.current = { clientX: t.clientX, clientY: t.clientY };
-      }
-    };
-
-    const handleTouchMove = (e) => {
-      if (mode !== 'draw' || readOnly) return;
-      e.preventDefault();
-
-      if (e.touches.length >= 2 || isScrollingRef.current) {
-        pendingTouchRef.current = null;
-        if (isDrawingRef.current) cancelCurrentStroke();
-        isScrollingRef.current = true;
-        const currentY = avgY(e.touches);
-        const delta = currentY - ss.current.lastY;
-        ss.current.velocity = delta;
-        const wrapper = canvasWrapperRef.current;
-        if (wrapper) wrapper.scrollTop -= delta;
-        ss.current.lastY = currentY;
-        return;
-      }
-
-      if (pendingTouchRef.current) {
-        startDrawing(pendingTouchRef.current);
-        pendingTouchRef.current = null;
-      }
-      draw(e);
-    };
-
-    const handleTouchEnd = (e) => {
-      if (mode !== 'draw' || readOnly) return;
-      e.preventDefault();
-
-      if (e.touches.length === 0) {
-        if (pendingTouchRef.current) {
-          startDrawing(pendingTouchRef.current);
-          pendingTouchRef.current = null;
-        }
-        if (isScrollingRef.current) {
-          isScrollingRef.current = false;
-          startMomentum();
-          return;
-        }
-        stopDrawing();
-      }
-    };
-
-    const handleTouchCancel = () => {
-      pendingTouchRef.current = null;
-      isScrollingRef.current = false;
-      stopMomentum();
-      if (isDrawingRef.current) cancelCurrentStroke();
-    };
-
-    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
-    canvas.addEventListener('touchcancel', handleTouchCancel, { passive: true });
-
-    return () => {
-      canvas.removeEventListener('touchstart', handleTouchStart);
-      canvas.removeEventListener('touchmove', handleTouchMove);
-      canvas.removeEventListener('touchend', handleTouchEnd);
-      canvas.removeEventListener('touchcancel', handleTouchCancel);
-      stopMomentum();
-    };
-  }, [mode, readOnly, startDrawing, draw, stopDrawing, cancelCurrentStroke]);
+  useTouchDrawGestures({
+    canvasRef,
+    wrapperRef: canvasWrapperRef,
+    isDrawingRef,
+    mode,
+    readOnly,
+    startDrawing,
+    draw,
+    stopDrawing,
+    cancelCurrentStroke,
+  });
 
   // ─── Desktop cursor tracking ───
   const handleMouseMove = useCallback((e) => {
@@ -697,27 +588,15 @@ function DrawingCanvas({
         className={`relative${fillContainer ? ' flex-1 min-h-0 border-0 overflow-y-auto overflow-x-hidden' : ' overflow-hidden border border-gray-300 dark:border-gray-600 rounded-lg'}`}
       >
         {/* Page boundary lines (draw mode only) — behind canvas so strokes render on top */}
-        {mode === 'draw' && !readOnly && showPageLines && displaySize && displaySize.width > 0 && originalHeight > 0 && (() => {
-          // Convert logical originalHeight to CSS pixels
-          const scale = displaySize.width / canvasWidth;
-          const isMobile = displaySize.width < 768;
-          const lines = [];
-          for (let y = originalHeight; y <= canvasHeight; y += originalHeight) {
-            lines.push(
-              <div
-                key={y}
-                className="absolute left-0 right-0 pointer-events-none z-0"
-                style={{
-                  top: `${y * scale}px`,
-                  borderTop: `1px dashed ${darkMode
-                    ? (isMobile ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.18)')
-                    : (isMobile ? 'rgba(0,0,0,0.07)' : 'rgba(0,0,0,0.15)')}`,
-                }}
-              />
-            );
-          }
-          return lines;
-        })()}
+        {mode === 'draw' && !readOnly && showPageLines && displaySize && displaySize.width > 0 && originalHeight > 0 && (
+          <DrawingPageLines
+            displaySize={displaySize}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            originalHeight={originalHeight}
+            darkMode={darkMode}
+          />
+        )}
 
         <canvas
           ref={canvasRef}
@@ -737,50 +616,7 @@ function DrawingCanvas({
 
         {/* Dynamic cursor (desktop) — fixed position so it renders above header */}
         {showCursor && cursorPos && mode === 'draw' && !readOnly && (
-          tool === 'eraser' ? (
-            /* Eraser: eraser icon cursor */
-            <svg
-              className="pointer-events-none fixed z-50"
-              style={{
-                left: cursorPos.clientX - 4,
-                top: cursorPos.clientY - 22,
-                filter: darkMode
-                  ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))'
-                  : 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
-              }}
-              width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-            >
-              {/* Eraser body */}
-              <path d="M6 19l-3.3-3.3a1.5 1.5 0 0 1 0-2.1L13.4 2.9a1.5 1.5 0 0 1 2.1 0l5.6 5.6a1.5 1.5 0 0 1 0 2.1L12 19H6z"
-                fill={darkMode ? '#555' : '#e5e7eb'} stroke={darkMode ? '#fff' : '#374151'} strokeWidth="1.2" strokeLinejoin="round" />
-              {/* Eraser tip (pink/red) */}
-              <path d="M6 19l-3.3-3.3a1.5 1.5 0 0 1 0-2.1L8 8.3 15.7 16 12 19H6z"
-                fill={darkMode ? '#f87171' : '#fca5a5'} stroke={darkMode ? '#fff' : '#374151'} strokeWidth="1.2" strokeLinejoin="round" />
-              {/* Base line */}
-              <line x1="5" y1="21" x2="21" y2="21" stroke={darkMode ? '#fff' : '#374151'} strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          ) : (
-            /* Pen: pencil icon cursor */
-            <svg
-              className="pointer-events-none fixed z-50"
-              style={{
-                left: cursorPos.clientX - 2,
-                top: cursorPos.clientY - 24,
-                filter: darkMode
-                  ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))'
-                  : 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
-              }}
-              width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-            >
-              <path d="M3 21l1.5-4.5L17.1 3.9a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1L7.5 19.5 3 21z"
-                fill={color} stroke={darkMode ? '#fff' : '#000'} strokeWidth="1.2" strokeLinejoin="round" />
-              <path d="M14.5 6.5l3 3" stroke={
-                darkMode
-                  ? (color === '#FFFFFF' || color === '#fff' || color === '#FFF' ? '#000' : '#fff')
-                  : (color === '#000000' || color === '#000' ? '#fff' : '#000')
-              } strokeWidth="1" strokeLinecap="round" />
-            </svg>
-          )
+          <DrawingCursor tool={tool} cursorPos={cursorPos} color={color} darkMode={darkMode} />
         )}
       </div>
 
