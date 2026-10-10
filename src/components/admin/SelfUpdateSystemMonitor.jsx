@@ -64,7 +64,7 @@ export default function SelfUpdateSystemMonitor({ token, active }) {
     const [info, setInfo] = useState(null);
     // Number of consecutive failed (or aborted-too-slow) polls
     // since the last successful read. We flip the UI to "stale" when
-    // this gets high enough — the gauges keep showing the last
+    // this gets high enough: the gauges keep showing the last
     // valid values (still useful info) but it's clear they no
     // longer reflect reality. Common cause: the build has hijacked
     // every available CPU cycle and the API server can no longer
@@ -85,7 +85,7 @@ export default function SelfUpdateSystemMonitor({ token, active }) {
             // Bound each fetch so a CPU-starved server doesn't park
             // the gauge on its previous value for 30 s while the
             // browser quietly waits. If the server is too busy to
-            // answer in 5 s, we abort and re-tick — values stay on
+            // answer in 5 s, we abort and re-tick: values stay on
             // their last reading but the polling loop keeps a
             // predictable cadence.
             const ctrl = new AbortController();
@@ -101,7 +101,7 @@ export default function SelfUpdateSystemMonitor({ token, active }) {
                     }
                 }
             } catch {
-                /* abort or network hiccup — keep showing the last value */
+                /* abort or network hiccup: keep showing the last value */
             } finally {
                 clearTimeout(tHandle);
             }

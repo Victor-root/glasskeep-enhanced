@@ -23,7 +23,7 @@ export function partitionNotes(notes, filter) {
   return sortNotes(list);
 }
 
-// Column count from viewport width — independent of sidebar state so
+// Column count from viewport width: independent of sidebar state so
 // toggling the rail doesn't force the masonry to re-bucket every card
 // (the root cause of the 3-4s freeze on older Shields). With ~7 cols
 // at 1080p, each card still gets a comfortable ~220-260px regardless

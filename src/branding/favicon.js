@@ -8,7 +8,7 @@ let originalIconLinksHTML = null;
 function getOriginalIconLinksHTML() {
   if (originalIconLinksHTML !== null) return originalIconLinksHTML;
   // Prefer the snapshot the index.html boot script took BEFORE it may
-  // have swapped in a cached custom logo — that's the only place the
+  // have swapped in a cached custom logo: that's the only place the
   // bundled defaults still exist verbatim. Fall back to the live DOM
   // when the boot script didn't run (e.g. SSR/tests).
   if (typeof window !== "undefined" && typeof window.__GK_DEFAULT_ICONS__ === "string") {

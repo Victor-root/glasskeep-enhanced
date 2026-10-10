@@ -20,7 +20,7 @@ export default function useTvNotes(token, clearSession) {
       const list = Array.isArray(data?.notes) ? data.notes : Array.isArray(data) ? data : [];
       // Cheap signature: id+updated_at per note. If nothing actually
       // changed since the last poll, skip setState so React doesn't
-      // re-render the whole grid on a no-op tick — big perf win on
+      // re-render the whole grid on a no-op tick: big perf win on
       // older Shields where re-rendering 100+ cards is ~150ms.
       const sig = list.map((n) => `${n.id}:${n.updated_at || n.created_at || ""}`).join("|");
       if (sig !== notesEtagRef.current) {
@@ -52,7 +52,7 @@ export default function useTvNotes(token, clearSession) {
     return () => window.removeEventListener("online", loadNotes);
   }, [loadNotes]);
 
-  // Window-focus refresh — the user may have unlocked the TV after
+  // Window-focus refresh: the user may have unlocked the TV after
   // hours of standby; pull the latest notes so they're current.
   useEffect(() => {
     const refresh = () => { if (token) loadNotes(); };

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 
 // Date+time line as its own subtree. The 30s tick used to live on
 // TvNotesViewer, which made the whole tree re-render every half
-// minute — masonry diff + memo bust on every card check. Isolated
+// minute: masonry diff + memo bust on every card check. Isolated
 // here it costs literally one text node update per tick.
 export default function TvHeaderClock() {
   const [now, setNow] = useState(() => new Date());

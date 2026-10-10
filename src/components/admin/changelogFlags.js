@@ -15,7 +15,7 @@ function clearShowFlag() {
     try {
         localStorage.removeItem(SHOW_FLAG_KEY);
     } catch {
-        /* ignore — at worst the modal shows once more on next visit */
+        /* ignore: at worst the modal shows once more on next visit */
     }
 }
 
@@ -37,7 +37,7 @@ export function openChangelog() {
     try {
         window.dispatchEvent(new CustomEvent(OPEN_EVENT));
     } catch {
-        /* ignore — best-effort */
+        /* ignore: best-effort */
     }
 }
 
@@ -74,6 +74,6 @@ export function dismissStarCta() {
     try {
         localStorage.setItem(STAR_DISMISS_KEY, "1");
     } catch {
-        /* ignore — at worst the prompt shows once more next time */
+        /* ignore: at worst the prompt shows once more next time */
     }
 }

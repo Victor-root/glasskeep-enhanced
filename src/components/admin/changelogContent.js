@@ -21,7 +21,7 @@ export function compileMarkdown(md) {
     }
 }
 
-// Compile the bundled changelog once at module load — it is identical
+// Compile the bundled changelog once at module load: it is identical
 // for every render and parsing 5 KB of changelog on every mount would
 // be silly. AI-translated variants are compiled on the fly when the
 // user clicks "Translate with AI".
@@ -35,7 +35,7 @@ const REPO_BLOB_BASE =
 
 export function resolveChangelogHref(href) {
     if (!href) return null;
-    // Already absolute (http(s):, mailto:, tel:, etc.) — pass through.
+    // Already absolute (http(s):, mailto:, tel:, etc.): pass through.
     if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return href;
     // Strip a leading `./` so URL doesn't fold it into the basename, then
     // build against the GitHub blob root. Anchors and query strings are
@@ -58,7 +58,7 @@ export function openExternalUrl(url) {
             window.AndroidTheme.openExternalUrl(url);
             return;
         }
-    } catch { /* ignore — fall through to window.open */ }
+    } catch { /* ignore: fall through to window.open */ }
     try { window.open(url, "_blank", "noopener,noreferrer"); }
     catch { /* nothing else we can do */ }
 }

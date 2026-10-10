@@ -8,7 +8,7 @@ export default function useAndroidAppUpdate(open, isWebView) {
   // bridge. Empty string when running on the web/PWA (no bridge) so
   // the "v…" line stays hidden.
   const [appVersion, setAppVersion] = useState("");
-  // True when the APK was installed by F-Droid — we step out of the
+  // True when the APK was installed by F-Droid: we step out of the
   // updater UI in that case (F-Droid handles updates itself).
   const [installedFromFdroid, setInstalledFromFdroid] = useState(false);
   // Latest detected Android-app release as reported by the

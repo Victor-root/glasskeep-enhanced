@@ -14,7 +14,7 @@ export function notificationReducer(state, action) {
       // After a reconnect, /notifications/pending replays every still-
       // undelivered row server-side; without this guard a row whose
       // session-1 card is still active here would stack a duplicate.
-      // Only ACTIVE entries (dismissed === false) block — a dismissed
+      // Only ACTIVE entries (dismissed === false) block: a dismissed
       // entry means the user already closed it, and a replay implies
       // markDelivered didn't reach the server, so the re-show is
       // intentional.
@@ -40,7 +40,7 @@ export function notificationReducer(state, action) {
           : n,
       );
     case "DISMISS_BY_SERVER_IDS": {
-      // Cross-device sync — match by the stored
+      // Cross-device sync: match by the stored
       // metadata.serverNotificationId so a `notification_delivered`
       // broadcast can clear active cards even when the matching
       // ADD action is still being flushed by React. Running through
@@ -87,7 +87,7 @@ export function notificationReducer(state, action) {
     case "CLEAR":
       return [];
     case "CLEAR_SERVER_BACKED":
-      // Cross-device "Clear all" — only wipe rows backed by a server
+      // Cross-device "Clear all": only wipe rows backed by a server
       // notification id. Local-only toasts (UI feedback such as
       // "Note moved to trash") have no server counterpart and must
       // survive a remote clear so the user doesn't lose unrelated
@@ -102,7 +102,7 @@ export function notificationReducer(state, action) {
       // originally received each notification.
       //
       // Dedup rule: skip any incoming row whose serverNotificationId
-      // already appears in state (active OR dismissed) — the in-memory
+      // already appears in state (active OR dismissed): the in-memory
       // version is the authoritative one for this session.
       const incoming = action.notifications;
       if (!incoming || incoming.length === 0) return state;

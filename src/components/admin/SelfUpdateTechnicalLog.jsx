@@ -74,7 +74,7 @@ export default function SelfUpdateTechnicalLog({ token, phase, onTextChanged }) 
     // parent can scan the latest output for known failure patterns
     // (OOM during build, lost network, etc.) to surface a friendlier
     // hint in the header. Auto-scrolling lives at the modal level
-    // now — the technical log no longer has its own scroll area: a
+    // now, the technical log no longer has its own scroll area: a
     // long log just grows the modal and the user scrolls the whole
     // thing.
     useEffect(() => {
@@ -83,7 +83,7 @@ export default function SelfUpdateTechnicalLog({ token, phase, onTextChanged }) 
 
     useEffect(() => {
         // Fetch the log whenever the modal is non-idle, even if the
-        // details section is collapsed — the parent uses the text to
+        // details section is collapsed: the parent uses the text to
         // detect failure hints, which need to be available the
         // moment we hit a terminal failure state regardless of
         // whether the user expanded the panel.
@@ -102,7 +102,7 @@ export default function SelfUpdateTechnicalLog({ token, phase, onTextChanged }) 
 
         const fetchOnce = async () => {
             if (cancelled) return;
-            // Same bound as the system endpoint — the build can stall
+            // Same bound as the system endpoint: the build can stall
             // the server's event loop badly enough that a default
             // fetch would wait minutes.
             const ctrl = new AbortController();
@@ -117,7 +117,7 @@ export default function SelfUpdateTechnicalLog({ token, phase, onTextChanged }) 
                     if (!cancelled) setText(raw);
                 }
             } catch {
-                /* ignore — the modal is not the place to surface a fetch hiccup */
+                /* ignore: the modal is not the place to surface a fetch hiccup */
             } finally {
                 clearTimeout(tHandle);
             }

@@ -47,8 +47,8 @@ function Row({ label, value, mono }) {
 }
 
 // Quick-and-dirty UA fingerprinting just for the confirmation card.
-// Used only for human-readable labels — never trusted for security
-// decisions — so a bare-string match is plenty.
+// Used only for human-readable labels, never trusted for security
+// decisions, so a bare-string match is plenty.
 function guessBrowser(ua) {
   if (!ua) return "?";
   if (/Edg\//i.test(ua)) return "Edge";
