@@ -110,6 +110,34 @@ function clampNumber(n, min, max, fallback) {
   return Math.max(min, Math.min(max, v));
 }
 
+// The fields both configurations share, patched the same way: absent or
+// mistyped values keep the current one, numbers are clamped. `apiKey`:
+//   - undefined          -> keep
+//   - "" (empty string)  -> clear
+//   - other string       -> replace
+function mergeCommonPatch(current, patch) {
+  return {
+    enabled:
+      typeof patch.enabled === "boolean" ? patch.enabled : current.enabled,
+    baseUrl:
+      typeof patch.baseUrl === "string"
+        ? patch.baseUrl.trim()
+        : current.baseUrl,
+    apiKey:
+      typeof patch.apiKey === "string" ? patch.apiKey.trim() : current.apiKey,
+    model:
+      typeof patch.model === "string" ? patch.model.trim() : current.model,
+    temperature:
+      patch.temperature === undefined
+        ? current.temperature
+        : clampNumber(patch.temperature, 0, 2, current.temperature),
+    maxTokens:
+      patch.maxTokens === undefined
+        ? current.maxTokens
+        : Math.round(clampNumber(patch.maxTokens, 1, 32768, current.maxTokens)),
+  };
+}
+
 function adminRowToInternal(row) {
   return {
     enabled: !!row.enabled,
@@ -177,32 +205,12 @@ function getAdminPublicConfig(db) {
   };
 }
 
-// `patch.apiKey` semantics:
-//   - undefined          -> keep
-//   - "" (empty string)  -> clear
-//   - other string       -> replace
+// `patch.apiKey` semantics: see mergeCommonPatch.
 function updateAdminConfig(db, patch = {}) {
   const current = getAdminConfig(db);
   const next = {
-    enabled:
-      typeof patch.enabled === "boolean" ? patch.enabled : current.enabled,
+    ...mergeCommonPatch(current, patch),
     provider: PROVIDER_OPENAI_COMPATIBLE, // V1: single provider
-    baseUrl:
-      typeof patch.baseUrl === "string"
-        ? patch.baseUrl.trim()
-        : current.baseUrl,
-    apiKey:
-      typeof patch.apiKey === "string" ? patch.apiKey.trim() : current.apiKey,
-    model:
-      typeof patch.model === "string" ? patch.model.trim() : current.model,
-    temperature:
-      patch.temperature === undefined
-        ? current.temperature
-        : clampNumber(patch.temperature, 0, 2, current.temperature),
-    maxTokens:
-      patch.maxTokens === undefined
-        ? current.maxTokens
-        : Math.round(clampNumber(patch.maxTokens, 1, 32768, current.maxTokens)),
     allowServerAiForUsers:
       typeof patch.allowServerAiForUsers === "boolean"
         ? patch.allowServerAiForUsers
@@ -241,6 +249,34 @@ function updateAdminConfig(db, patch = {}) {
   return getAdminPublicConfig(db);
 }
 
+// Whether regular users may use the admin's AI right now: the feature is
+// on, the admin opted users in, and the provider is configured.
+function isServerAiAvailable(adminCfg) {
+  return (
+    !!adminCfg.enabled &&
+    !!adminCfg.allowServerAiForUsers &&
+    !!adminCfg.baseUrl &&
+    !!adminCfg.model
+  );
+}
+
+// The request configuration for the admin's AI used on a user's behalf.
+function serverAiConfig(adminCfg) {
+  return {
+    enabled: true,
+    provider: adminCfg.provider,
+    baseUrl: adminCfg.baseUrl,
+    apiKey: adminCfg.apiKey,
+    model: adminCfg.model,
+    temperature: adminCfg.temperature,
+    maxTokens: adminCfg.maxTokens,
+    origin: "server",
+    // The admin chose this address. Reaching a model on the LAN is the
+    // setup the README recommends, so nothing is restricted here.
+    allowPrivateEndpoint: true,
+  };
+}
+
 // ── User config ──────────────────────────────────────────────────────
 function getUserRow(db, userId) {
   const row = db
@@ -273,11 +309,7 @@ function getUserPublicConfig(db, userId) {
   const userCfg = getUserConfig(db, userId);
   const adminCfg = getAdminConfig(db);
   const adminAiEnabled = !!adminCfg.enabled;
-  const serverAiAvailable =
-    adminAiEnabled &&
-    !!adminCfg.allowServerAiForUsers &&
-    !!adminCfg.baseUrl &&
-    !!adminCfg.model;
+  const serverAiAvailable = isServerAiAvailable(adminCfg);
   return {
     enabled: userCfg.enabled,
     mode: userCfg.mode,
@@ -295,25 +327,8 @@ function updateUserConfig(db, userId, patch = {}) {
   const current = getUserConfig(db, userId);
   const nextMode = MODES.includes(patch.mode) ? patch.mode : current.mode;
   const next = {
-    enabled:
-      typeof patch.enabled === "boolean" ? patch.enabled : current.enabled,
+    ...mergeCommonPatch(current, patch),
     mode: nextMode,
-    baseUrl:
-      typeof patch.baseUrl === "string"
-        ? patch.baseUrl.trim()
-        : current.baseUrl,
-    apiKey:
-      typeof patch.apiKey === "string" ? patch.apiKey.trim() : current.apiKey,
-    model:
-      typeof patch.model === "string" ? patch.model.trim() : current.model,
-    temperature:
-      patch.temperature === undefined
-        ? current.temperature
-        : clampNumber(patch.temperature, 0, 2, current.temperature),
-    maxTokens:
-      patch.maxTokens === undefined
-        ? current.maxTokens
-        : Math.round(clampNumber(patch.maxTokens, 1, 32768, current.maxTokens)),
   };
 
   db.prepare(`
@@ -342,10 +357,6 @@ function updateUserConfig(db, userId, patch = {}) {
 }
 
 // ── Effective-config resolver ────────────────────────────────────────
-// Decides which config to use for an actual chat request. Throws an
-// Error tagged with `.status` so the route layer can surface a clean
-// HTTP response. Never returns the admin config when the admin hasn't
-// authorised it — even if a user previously set `mode = 'server'`.
 // Same scheme, host and port. Compared on the parsed origin so that a
 // trailing slash or a differing path does not decide a security question.
 function sameOrigin(a, b) {
@@ -354,13 +365,23 @@ function sameOrigin(a, b) {
   return pa.ok && pb.ok && pa.url.origin === pb.url.origin;
 }
 
+// An Error tagged with the HTTP status and machine code the route layer
+// answers with.
+function configError(message, status, code) {
+  const err = new Error(message);
+  err.status = status;
+  err.code = code;
+  return err;
+}
+
+// Decides which config to use for an actual chat request. Throws an
+// Error tagged with `.status` so the route layer can surface a clean
+// HTTP response. Never returns the admin config when the admin hasn't
+// authorised it, even if a user previously set `mode = 'server'`.
 function resolveEffectiveConfig(db, userId) {
   const userCfg = getUserConfig(db, userId);
   if (!userCfg.enabled) {
-    const err = new Error("AI is disabled for this user.");
-    err.status = 403;
-    err.code = "user_ai_disabled";
-    throw err;
+    throw configError("AI is disabled for this user.", 403, "user_ai_disabled");
   }
 
   // Master admin gate — when the admin has disabled the AI feature
@@ -369,46 +390,19 @@ function resolveEffectiveConfig(db, userId) {
   // but enforce here too in case a stale client tries anyway.
   const adminCfg = getAdminConfig(db);
   if (!adminCfg.enabled) {
-    const err = new Error("AI has been disabled by the administrator.");
-    err.status = 503;
-    err.code = "admin_ai_disabled";
-    throw err;
+    throw configError("AI has been disabled by the administrator.", 503, "admin_ai_disabled");
   }
 
   if (userCfg.mode === "server") {
-    if (!adminCfg.allowServerAiForUsers) {
-      const err = new Error("Server AI is not available.");
-      err.status = 503;
-      err.code = "server_ai_unavailable";
-      throw err;
+    if (!isServerAiAvailable(adminCfg)) {
+      throw configError("Server AI is not available.", 503, "server_ai_unavailable");
     }
-    if (!adminCfg.baseUrl || !adminCfg.model) {
-      const err = new Error("Server AI is not available.");
-      err.status = 503;
-      err.code = "server_ai_unavailable";
-      throw err;
-    }
-    return {
-      enabled: true,
-      provider: adminCfg.provider,
-      baseUrl: adminCfg.baseUrl,
-      apiKey: adminCfg.apiKey,
-      model: adminCfg.model,
-      temperature: adminCfg.temperature,
-      maxTokens: adminCfg.maxTokens,
-      origin: "server",
-      // The admin chose this address. Reaching a model on the LAN is the
-      // setup the README recommends, so nothing is restricted here.
-      allowPrivateEndpoint: true,
-    };
+    return serverAiConfig(adminCfg);
   }
 
   // mode === 'custom'
   if (!userCfg.baseUrl || !userCfg.model) {
-    const err = new Error("Custom AI is not configured.");
-    err.status = 400;
-    err.code = "custom_ai_missing";
-    throw err;
+    throw configError("Custom AI is not configured.", 400, "custom_ai_missing");
   }
   return {
     enabled: true,
@@ -447,5 +441,7 @@ module.exports = {
   getUserPublicConfig,
   updateUserConfig,
   // resolver
+  isServerAiAvailable,
+  serverAiConfig,
   resolveEffectiveConfig,
 };
