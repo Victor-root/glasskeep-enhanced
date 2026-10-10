@@ -31,6 +31,7 @@ import { mdForDownload } from "./utils/markdown.jsx";
 import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, fileToCompressedDataURL, setThemeColor, currentStatusBarColor } from "./utils/helpers.js";
 import { setShellTheme, isValidShellTheme } from "./theme/shellTheme.js";
 import { applyTaskStrikeClass, getStoredTaskStrike, TASK_STRIKE_EVENT } from "./theme/taskListStrike.js";
+import { sortNotesByRecency, sortNotesForOrderReset, noteBelongsInView, computeRestoredPosition, sortByPositionDesc } from "./utils/noteList.js";
 import { textToChecklistItems, checklistItemsToText } from "./utils/noteConversion.js";
 import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "./utils/richText.js";
 import {
@@ -71,6 +72,7 @@ import NotificationMobileToast from "./components/notifications/NotificationMobi
 import NotificationBell from "./components/notifications/NotificationBell.jsx";
 import { useNotifications } from "./components/notifications/NotificationProvider.jsx";
 import { playNotificationDing } from "./utils/notificationSound.js";
+import { soundCategoryFor, filterCategoryFor } from "./utils/notificationCategories.js";
 import QrScannerModal from "./components/auth/QrScannerModal.jsx";
 import FloatingCardsBackground from "./components/common/FloatingCardsBackground.jsx";
 import NoteModal from "./components/modal/NoteModal.jsx";
@@ -714,59 +716,6 @@ export default function App() {
     [notify],
   );
 
-  // Map a notification to one of the six sound categories the user
-  // can enable/disable independently. Explicit types (share / revoke)
-  // take precedence; everything else falls back to its `variant`,
-  // which is how the legacy showToast() shim categorises success /
-  // error / warning / info.
-  const soundCategoryFor = (n) => {
-    const typeKey = n?.type;
-    if (typeKey === "note_shared") return "share";
-    if (
-      typeKey === "note_access_revoked" ||
-      typeKey === "note_access_revoked_with_copy" ||
-      typeKey === "collaborator_removed" ||
-      typeKey === "collaborator_removed_with_copy" ||
-      typeKey === "collaborator_left" ||
-      typeKey === "shared_note_deleted" ||
-      typeKey === "shared_note_deleted_with_copy"
-    ) {
-      return "access";
-    }
-    const variant = n?.variant;
-    if (variant === "success") return "success";
-    if (variant === "warning") return "warning";
-    if (variant === "error") return "error";
-    return "info";
-  };
-
-  // Map a notification spec (as passed to notify()) to one of the
-  // eight display-filter categories. Same precedence as soundCategoryFor
-  // but also handles the `federation` and `reminder` types that the
-  // filter exposes but the sound system doesn't need separately.
-  const filterCategoryFor = (spec) => {
-    const typeKey = spec?.type;
-    if (typeKey === "federation") return "federation";
-    if (typeKey === "reminder") return "reminder";
-    if (typeKey === "note_shared") return "share";
-    if (
-      typeKey === "note_access_revoked" ||
-      typeKey === "note_access_revoked_with_copy" ||
-      typeKey === "collaborator_removed" ||
-      typeKey === "collaborator_removed_with_copy" ||
-      typeKey === "collaborator_left" ||
-      typeKey === "shared_note_deleted" ||
-      typeKey === "shared_note_deleted_with_copy"
-    ) {
-      return "access";
-    }
-    const variant = spec?.variant;
-    if (variant === "success") return "success";
-    if (variant === "warning") return "warning";
-    if (variant === "error") return "error";
-    return "info";
-  };
-
   // Wire the per-category display filter into the provider. Runs
   // whenever notificationsFilterTypes changes so the provider's
   // notify() ref is always up-to-date.
@@ -775,8 +724,6 @@ export default function App() {
       const cat = filterCategoryFor(spec);
       return notificationsFilterTypes[cat] !== false;
     });
-  // filterCategoryFor is a stable function defined in this render scope;
-  // only notificationsFilterTypes actually drives re-installation.
   }, [notificationsFilterTypes, setNotifyFilter]);
 
   // Discrete ding whenever a NEW notification appears. We compare
@@ -1745,7 +1692,6 @@ export default function App() {
             try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
             await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
           }
-          invalidateTrashedNotesCache();
           setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
           onExitMulti();
           showToast(t("bulkDeletedSuccess").replace("{count}", String(count)), "success", undefined, "trash-x");
@@ -1775,9 +1721,6 @@ export default function App() {
             }
             await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
           }
-          invalidateNotesCache();
-          invalidateArchivedNotesCache();
-          invalidateTrashedNotesCache();
           setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
           onExitMulti();
           showToast(t("bulkTrashedSuccess").replace("{count}", String(count)), "success", undefined, "trash");
@@ -1802,7 +1745,6 @@ export default function App() {
           try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
           await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
         }
-        invalidateTrashedNotesCache();
         setNotes([]);
         showToast(t("bulkDeletedSuccess").replace("{count}", String(count)), "success");
       },
@@ -1829,8 +1771,6 @@ export default function App() {
       } catch (e) { console.error(e); }
       await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { pinned: !!pinnedVal, client_updated_at: nowIso } }, leaseId);
     }
-    invalidateNotesCache();
-    invalidateArchivedNotesCache();
   };
 
   const onBulkRestore = async () => {
@@ -1840,8 +1780,7 @@ export default function App() {
     // Pre-load active notes once for position calculation
     let activeNotes = [];
     try {
-      activeNotes = (await idbGetAllNotes(currentUser?.id, sessionId, "active"))
-        .sort((a, b) => (+b.position || 0) - (+a.position || 0));
+      activeNotes = sortByPositionDesc(await idbGetAllNotes(currentUser?.id, sessionId, "active"));
     } catch { /* IDB best-effort: positions computed without local notes */ }
     for (const id of selectedIds) {
       const nid = String(id);
@@ -1849,31 +1788,12 @@ export default function App() {
       try {
         const existing = await idbGetNote(nid, currentUser?.id, sessionId);
         if (existing) {
-          // Compute restored position by timestamp among active notes
-          const noteTs = new Date(existing.timestamp).getTime() || 0;
-          let restoredPosition = existing.position;
-          if (activeNotes.length > 0) {
-            let insertIdx = activeNotes.length;
-            for (let i = 0; i < activeNotes.length; i++) {
-              const ts = new Date(activeNotes[i].timestamp).getTime() || 0;
-              if (noteTs >= ts) { insertIdx = i; break; }
-            }
-            if (insertIdx === 0) {
-              restoredPosition = (+activeNotes[0].position || 0) + 1;
-            } else if (insertIdx >= activeNotes.length) {
-              restoredPosition = (+activeNotes[activeNotes.length - 1].position || 0) - 1;
-            } else {
-              restoredPosition = ((+activeNotes[insertIdx - 1].position || 0) + (+activeNotes[insertIdx].position || 0)) / 2;
-            }
-          }
+          const restoredPosition = computeRestoredPosition(existing, activeNotes);
           await idbPutNote({ ...existing, trashed: false, position: restoredPosition, client_updated_at: nowIso }, currentUser?.id, sessionId);
         }
       } catch (e) { console.error(e); }
       await enqueueWithLease(nid, { type: "restore", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
     }
-    invalidateNotesCache();
-    invalidateArchivedNotesCache();
-    invalidateTrashedNotesCache();
     setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
     onExitMulti();
     showToast(t("bulkRestoredSuccess").replace("{count}", String(count)), "success", undefined, "restore");
@@ -1898,8 +1818,6 @@ export default function App() {
       } catch (e) { console.error(e); }
       await enqueueWithLease(nid, { type: "archive", noteId: nid, payload: { archived: !!archivedValue, client_updated_at: nowIso } }, leaseId);
     }
-    invalidateNotesCache();
-    invalidateArchivedNotesCache();
 
     if (!isArchiving && tagFilter === "ARCHIVED") {
       // Unarchiving from archived view — remove them from current list and switch view
@@ -2245,13 +2163,7 @@ export default function App() {
               await idbPutNote(canonical, uid, sid);
               // Determine if canonical note belongs in the current view
               const currentFilter = tagFilterRef.current;
-              const noteArchived = !!canonical.archived;
-              const noteTrashed = !!canonical.trashed;
-              const belongsInView =
-                (currentFilter === "ARCHIVED" && noteArchived && !noteTrashed) ||
-                (currentFilter === "TRASHED" && noteTrashed) ||
-                (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"))
-                  && !noteArchived && !noteTrashed;
+              const belongsInView = noteBelongsInView(canonical, currentFilter);
               setNotes((prev) => {
                 const idx = prev.findIndex((n) => String(n.id) === nid);
                 if (belongsInView) {
@@ -2262,7 +2174,6 @@ export default function App() {
                     return updated;
                   }
                   // Note should appear in this view but isn't present — insert it
-                  // eslint-disable-next-line react-hooks/immutability -- called from a sync engine callback, after render
                   return sortNotesByRecency([...prev, canonical]);
                 }
                 // Note doesn't belong in this view — remove if present
@@ -2300,13 +2211,7 @@ export default function App() {
               await idbPutNote(serverNote, uid, sid);
               // Determine if the created note belongs in the current view
               const currentFilter = tagFilterRef.current;
-              const noteArchived = !!serverNote.archived;
-              const noteTrashed = !!serverNote.trashed;
-              const belongsInView =
-                (currentFilter === "ARCHIVED" && noteArchived && !noteTrashed) ||
-                (currentFilter === "TRASHED" && noteTrashed) ||
-                (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"))
-                  && !noteArchived && !noteTrashed;
+              const belongsInView = noteBelongsInView(serverNote, currentFilter);
               setNotes((prev) => {
                 const idx = prev.findIndex((n) => String(n.id) === nid);
                 if (idx !== -1) {
@@ -2332,13 +2237,7 @@ export default function App() {
               // Converge React state: note may have changed view membership
               // (e.g. archive from active view, restore from trash view)
               const currentFilter = tagFilterRef.current;
-              const noteArchived = !!canonical.archived;
-              const noteTrashed = !!canonical.trashed;
-              const belongsInView =
-                (currentFilter === "ARCHIVED" && noteArchived && !noteTrashed) ||
-                (currentFilter === "TRASHED" && noteTrashed) ||
-                (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"))
-                  && !noteArchived && !noteTrashed;
+              const belongsInView = noteBelongsInView(canonical, currentFilter);
               setNotes((prev) => {
                 const idx = prev.findIndex((n) => String(n.id) === nid);
                 if (belongsInView) {
@@ -2464,12 +2363,6 @@ export default function App() {
     triggerSync();
   }, [triggerSync, currentUser?.id, sessionId]);
 
-  // Cache keys for localStorage
-  const NOTES_CACHE_KEY = `glass-keep-notes-${currentUser?.id || "anonymous"}-${sessionId || "no-session"}`;
-  const ARCHIVED_NOTES_CACHE_KEY = `glass-keep-archived-${currentUser?.id || "anonymous"}-${sessionId || "no-session"}`;
-  const TRASHED_NOTES_CACHE_KEY = `glass-keep-trashed-${currentUser?.id || "anonymous"}-${sessionId || "no-session"}`;
-  const CACHE_TIMESTAMP_KEY = `glass-keep-cache-timestamp-${currentUser?.id || "anonymous"}-${sessionId || "no-session"}`;
-
   // Purge stale localStorage notes caches to free quota (IndexedDB is now primary)
   useEffect(() => {
     try {
@@ -2483,42 +2376,6 @@ export default function App() {
       keys.forEach((k) => localStorage.removeItem(k));
     } catch { /* storage unavailable: nothing to clear */ }
   }, []);
-
-  // Cache invalidation functions (no-op now, kept for call-site compatibility)
-  const invalidateNotesCache = () => {};
-
-  const invalidateArchivedNotesCache = () => {};
-  const invalidateTrashedNotesCache = () => {};
-
-  const persistNotesCache = () => {};
-  // Consistent ordering: pinned first, then by position (server-persisted DnD),
-  // fallback to updated_at/timestamp when position is missing
-  const sortNotesByRecency = (arr) => {
-    try {
-      const list = Array.isArray(arr) ? arr.slice() : [];
-      return list.sort((a, b) => {
-        const ap = a?.pinned ? 1 : 0;
-        const bp = b?.pinned ? 1 : 0;
-        if (ap !== bp) return bp - ap; // pinned first
-        const apos = Number.isFinite(+a?.position) ? +a.position : null;
-        const bpos = Number.isFinite(+b?.position) ? +b.position : null;
-        if (
-          apos != null &&
-          bpos != null &&
-          !Number.isNaN(apos) &&
-          !Number.isNaN(bpos)
-        ) {
-          const posDiff = bpos - apos;
-          if (posDiff !== 0) return posDiff; // higher position first (most recent/top)
-        }
-        const at = new Date(a?.updated_at || a?.timestamp || 0).getTime();
-        const bt = new Date(b?.updated_at || b?.timestamp || 0).getTime();
-        return bt - at; // fallback newest first
-      });
-    } catch {
-      return Array.isArray(arr) ? arr : [];
-    }
-  };
 
   // When the note modal closes, the per-note AI panel must close too —
   // its conversation only exists in the context of an open note. Reset
@@ -2885,23 +2742,17 @@ export default function App() {
       const final = [...merged, ...localOnly].filter((n) => !n.archived && !n.trashed);
       if (tagFilterRef.current !== expectedFilter) return; // view changed
       setNotes(sortNotesByRecency(final));
-      persistNotesCache(final);
       return true; // server data fetched successfully
     } catch (error) {
       console.error("Error loading notes from server:", error);
       // Notify sync engine so it detects offline state quickly
       syncEngineRef.current?.healthCheck();
       if (tagFilterRef.current !== expectedFilter) return; // view changed
-      // Fallback: use IndexedDB data (already shown above), or localStorage
+      // Fallback: use the IndexedDB data already shown above
       try {
         const localNotes = await idbGetAllNotes(currentUser?.id, sessionId, "active");
         if (localNotes.length > 0) {
           if (tagFilterRef.current === expectedFilter) setNotes(sortNotesByRecency(localNotes));
-        } else {
-          const cachedData = localStorage.getItem(NOTES_CACHE_KEY);
-          if (cachedData) {
-            if (tagFilterRef.current === expectedFilter) setNotes(sortNotesByRecency(JSON.parse(cachedData)));
-          }
         }
       } catch (e) {
         console.error("Fallback load failed:", e);
@@ -3082,18 +2933,13 @@ export default function App() {
       console.error("Error loading trashed notes from server:", error);
       syncEngineRef.current?.healthCheck();
       if (tagFilterRef.current !== expectedFilter) return;
-      // Keep IndexedDB data already shown, or fallback to localStorage
+      // Keep the IndexedDB data already shown, or clear the list
       try {
         const localTrashed = await idbGetAllNotes(currentUser?.id, sessionId, "trashed");
         if (localTrashed.length > 0) {
           if (tagFilterRef.current === expectedFilter) setNotes(sortNotesByRecency(localTrashed));
-        } else {
-          const cachedData = localStorage.getItem(TRASHED_NOTES_CACHE_KEY);
-          if (cachedData) {
-            if (tagFilterRef.current === expectedFilter) setNotes(sortNotesByRecency(JSON.parse(cachedData)));
-          } else {
-            if (tagFilterRef.current === expectedFilter) setNotes([]);
-          }
+        } else if (tagFilterRef.current === expectedFilter) {
+          setNotes([]);
         }
       } catch {
         if (tagFilterRef.current === expectedFilter) setNotes([]);
@@ -3244,13 +3090,7 @@ export default function App() {
         }
 
         const nid = String(val.id);
-        const noteArchived = !!val.archived;
-        const noteTrashed = !!val.trashed;
-        const belongsInView =
-          (currentFilter === "ARCHIVED" && noteArchived && !noteTrashed) ||
-          (currentFilter === "TRASHED" && noteTrashed) ||
-          (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"))
-            && !noteArchived && !noteTrashed;
+        const belongsInView = noteBelongsInView(val, currentFilter);
 
         idbWrites.push(
           idbPutNote({ ...val, id: nid, user_id: val.user_id || uid }, uid, sid).catch(() => {})
@@ -3333,15 +3173,9 @@ export default function App() {
         if (await isProtectedFromServerOverwrite(nid, currentUser?.id)) return;
 
         const currentFilter = tagFilterRef.current;
-        const noteArchived = !!serverNote.archived;
-        const noteTrashed = !!serverNote.trashed;
 
         // Determine if this note belongs in the current view
-        const belongsInView =
-          (currentFilter === "ARCHIVED" && noteArchived && !noteTrashed) ||
-          (currentFilter === "TRASHED" && noteTrashed) ||
-          (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"))
-            && !noteArchived && !noteTrashed;
+        const belongsInView = noteBelongsInView(serverNote, currentFilter);
 
         // Update IndexedDB
         try {
@@ -4387,7 +4221,6 @@ export default function App() {
       pendingDrawingSaveRef.current = pending;
       return;
     }
-    invalidateNotesCache();
 
     // Write queue item — after this, hasPendingChanges() returns true for noteId
     try {
@@ -4724,11 +4557,6 @@ export default function App() {
       if (existing) await idbPutNote({ ...existing, archived: !!archived, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
 
-    // Invalidate all caches since archiving affects multiple views
-    invalidateNotesCache();
-    invalidateArchivedNotesCache();
-    invalidateTrashedNotesCache();
-
     // Update UI: remove note from current view (it moved to another view)
     if (tagFilter === "ARCHIVED") {
       if (!archived) {
@@ -4796,7 +4624,7 @@ export default function App() {
     availableLoading,
   } = useCollaboration(token, {
     currentUser, activeId,
-    showToast, invalidateNotesCache,
+    showToast,
   });
 
   // Side-by-side: open two selected notes simultaneously. The PRIMARY (left)
@@ -5104,7 +4932,7 @@ export default function App() {
     prevDrawingRef, prevItemsRef,
     initialModalStateRef, committedBaselineRef,
     acquireLocalLease, enqueueWithLease,
-    idbPutNote, invalidateNotesCache, sortNotesByRecency,
+    idbPutNote,
     getInitialTags: getInitialTagsForNewNote,
   });
 
@@ -5589,7 +5417,6 @@ export default function App() {
       // IDB failed — don't enqueue, keep lease, signal failure
       return false;
     }
-    invalidateNotesCache();
 
     // Enqueue targeted patch (only the changed fields)
     try {
@@ -5982,8 +5809,6 @@ export default function App() {
         // and the note doesn't end up stuck mid-pipeline.
         addDeleteTombstone(nid);
         setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-        invalidateNotesCache();
-        invalidateTrashedNotesCache();
         showToast(t("emptyNoteDeleted"), "info", 3000, "trash");
         freshlyCreatedNoteRef.current = null;
         (async () => {
@@ -6180,7 +6005,6 @@ export default function App() {
           String(n.id) === noteId ? { ...n, ...updatedFields } : n,
         ),
       );
-      invalidateNotesCache();
       const enqueued = await enqueueWithLease(noteId, { type: "update", noteId, payload }, leaseId);
       if (!enqueued) {
         // Enqueue failed — don't advance baselines so closeModal retry can detect diff
@@ -6223,7 +6047,6 @@ export default function App() {
       const leaseId = acquireLocalLease(nid);
       addDeleteTombstone(nid);
       try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-      invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("notePermanentlyDeleted"), "success", undefined, "trash-x");
@@ -6238,8 +6061,6 @@ export default function App() {
         const existing = await idbGetNote(nid, currentUser?.id, sessionId);
         if (existing) await idbPutNote({ ...existing, trashed: true, collaborators: [], client_updated_at: nowIso }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
-      invalidateNotesCache();
-      invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("noteDeletedForAll"), "success", undefined, "trash-x");
@@ -6248,11 +6069,9 @@ export default function App() {
       // Owner chose "remove for me" on a shared note. Server transfers
       // ownership to the first collaborator (note stays live for them) and
       // creates a trashed copy owned by the leaver so they can restore it.
-      // The trashed copy has a new id — local trash cache is invalidated so
-      // the next trash view fetches it from the server.
+      // The trashed copy has a new id; the next trash view fetches it from
+      // the server.
       try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-      invalidateNotesCache();
-      invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("noteMovedToTrash"), "success", undefined, "trash");
@@ -6267,8 +6086,6 @@ export default function App() {
       // created server-side and the next /notes/trashed fetch picks
       // it up.
       try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-      invalidateNotesCache();
-      invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("noteMovedToTrash"), "success", undefined, "trash");
@@ -6282,9 +6099,6 @@ export default function App() {
         const existing = await idbGetNote(nid, currentUser?.id, sessionId);
         if (existing) await idbPutNote({ ...existing, trashed: true, client_updated_at: nowIso }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
-      invalidateNotesCache();
-      invalidateArchivedNotesCache();
-      invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("noteMovedToTrash"), "success", undefined, "trash");
@@ -6301,34 +6115,12 @@ export default function App() {
     try {
       const existing = await idbGetNote(nid, currentUser?.id, sessionId);
       if (existing) {
-        // Compute restored position: find where this note fits by timestamp
-        // among currently active notes sorted by position DESC.
         const activeNotes = await idbGetAllNotes(currentUser?.id, sessionId, "active");
-        const sorted = activeNotes
-          .filter((n) => String(n.id) !== nid)
-          .sort((a, b) => (+b.position || 0) - (+a.position || 0));
-        const noteTs = new Date(existing.timestamp).getTime() || 0;
-        let restoredPosition = existing.position;
-        if (sorted.length > 0) {
-          let insertIdx = sorted.length;
-          for (let i = 0; i < sorted.length; i++) {
-            const ts = new Date(sorted[i].timestamp).getTime() || 0;
-            if (noteTs >= ts) { insertIdx = i; break; }
-          }
-          if (insertIdx === 0) {
-            restoredPosition = (+sorted[0].position || 0) + 1;
-          } else if (insertIdx >= sorted.length) {
-            restoredPosition = (+sorted[sorted.length - 1].position || 0) - 1;
-          } else {
-            restoredPosition = ((+sorted[insertIdx - 1].position || 0) + (+sorted[insertIdx].position || 0)) / 2;
-          }
-        }
+        const sorted = sortByPositionDesc(activeNotes.filter((n) => String(n.id) !== nid));
+        const restoredPosition = computeRestoredPosition(existing, sorted);
         await idbPutNote({ ...existing, trashed: false, position: restoredPosition, client_updated_at: nowIso }, currentUser?.id, sessionId);
       }
     } catch (e) { console.error(e); }
-    invalidateNotesCache();
-    invalidateArchivedNotesCache();
-    invalidateTrashedNotesCache();
     setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
     closeModal();
     showToast(t("noteRestoredFromTrash"), "success", undefined, "restore");
@@ -6367,7 +6159,6 @@ export default function App() {
       const existing = await idbGetNote(nid, currentUser?.id, sessionId);
       if (existing) await idbPutNote({ ...existing, pinned: !!toPinned, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
-    invalidateNotesCache();
     // Don't use enqueueWithLease here — it releases the lease immediately after
     // the server responds, but the server also sends an SSE note_updated event
     // that triggers patchSingleNote after a 300ms debounce. If the lease is
@@ -6426,7 +6217,6 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-    invalidateNotesCache();
 
     try {
       await enqueueAndSync({
@@ -6490,17 +6280,7 @@ export default function App() {
   const resetNoteOrder = async (overridePositions = true) => {
     // Reorder is per-user on the server (note_user_positions), so shared
     // notes are fine to include — each participant keeps their own order.
-    const sorted = notes.slice().sort((a, b) => {
-      const ap = a?.pinned ? 1 : 0;
-      const bp = b?.pinned ? 1 : 0;
-      if (ap !== bp) return bp - ap;
-      const aUpd = new Date(a?.updated_at || a?.timestamp || 0).getTime();
-      const bUpd = new Date(b?.updated_at || b?.timestamp || 0).getTime();
-      if (aUpd !== bUpd) return bUpd - aUpd;
-      const aCre = new Date(a?.created_at || 0).getTime();
-      const bCre = new Date(b?.created_at || 0).getTime();
-      return bCre - aCre;
-    });
+    const sorted = sortNotesForOrderReset(notes);
 
     // Acquire a lease per note BEFORE any local write — protects positions
     // from being overwritten by loaders / SSE until server confirms reorder.
@@ -6613,7 +6393,6 @@ export default function App() {
       } catch { /* IDB best-effort */ }
     }
 
-    invalidateNotesCache();
 
     // Enqueue reorder — leases are held until onSyncComplete confirms server-side.
     // Tag payload with token so onSyncComplete can find and release the leases.
@@ -6686,7 +6465,6 @@ export default function App() {
       // IDB failed — don't advance baseline, keep lease, signal failure
       return;
     }
-    invalidateNotesCache();
     // Enqueue for server sync — after this, hasPendingChanges() protects the note
     try {
       await enqueueAndSync({
@@ -6795,7 +6573,6 @@ export default function App() {
     setNotes((prev) =>
       prev.map((n) => (String(n.id) === noteId ? { ...n, ...updatedFields } : n)),
     );
-    invalidateNotesCache();
     const enqueued = await enqueueWithLease(
       noteId,
       { type: "update", noteId, payload },
@@ -6881,7 +6658,6 @@ export default function App() {
     setNotes((prev) =>
       sortNotesByRecency([localNote, ...(Array.isArray(prev) ? prev : [])]),
     );
-    invalidateNotesCache();
     enqueueWithLease(newId, { type: "create", noteId: newId, payload: newNote }, leaseId);
     // The icon (logo badge) is per-user and lives outside the note payload
     // (its own table + endpoint — see applyNoteIcon), so it isn't carried by
@@ -7662,10 +7438,6 @@ export default function App() {
           idbGetNote={idbGetNote}
           idbPutNote={idbPutNote}
           idbDeleteNote={idbDeleteNote}
-          invalidateNotesCache={invalidateNotesCache}
-          invalidateArchivedNotesCache={invalidateArchivedNotesCache}
-          invalidateTrashedNotesCache={invalidateTrashedNotesCache}
-          sortNotesByRecency={sortNotesByRecency}
           addDeleteTombstone={addDeleteTombstone}
           showToast={showToast}
           showGenericConfirm={showGenericConfirm}

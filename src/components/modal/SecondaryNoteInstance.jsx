@@ -15,6 +15,7 @@ import { api } from "../../utils/api.js";
 import { mdForDownload } from "../../utils/markdown.jsx";
 import { askNoteAIStream } from "../../ai.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
+import { sortNotesByRecency } from "../../utils/noteList.js";
 
 const noteAiStorageKey = (id) =>
   id != null && id !== "" ? `glass-keep-note-ai-${id}` : null;
@@ -86,8 +87,6 @@ export default function SecondaryNoteInstance({
   acquireLocalLease, releaseLocalLease, releaseLocalLeaseWithPrune,
   enqueueAndSync, enqueueWithLease,
   idbGetNote, idbPutNote, idbDeleteNote,
-  invalidateNotesCache, invalidateArchivedNotesCache, invalidateTrashedNotesCache,
-  sortNotesByRecency,
   addDeleteTombstone,
   // UI helpers
   showToast,
@@ -145,7 +144,7 @@ export default function SecondaryNoteInstance({
     availableLoading,
   } = useCollaboration(token, {
     currentUser, activeId,
-    showToast, invalidateNotesCache,
+    showToast,
   });
 
   // ─── Note-AI chat (own instance) ───────────────────────────────────────
@@ -331,7 +330,6 @@ export default function SecondaryNoteInstance({
         console.error("[SBS] IDB text auto-save failed:", e);
         return false;
       }
-      invalidateNotesCache();
 
       try {
         await enqueueAndSync({
@@ -349,7 +347,7 @@ export default function SecondaryNoteInstance({
     [
       acquireLocalLease, releaseLocalLeaseWithPrune,
       enqueueAndSync, idbGetNote, idbPutNote,
-      invalidateNotesCache, setNotes,
+      setNotes,
       currentUserId, sessionId,
     ],
   );
@@ -531,7 +529,6 @@ export default function SecondaryNoteInstance({
       pendingDrawingSaveRef.current = pending;
       return;
     }
-    invalidateNotesCache();
     try {
       await enqueueAndSync({
         type: "patch",
@@ -547,7 +544,7 @@ export default function SecondaryNoteInstance({
     releaseLocalLeaseWithPrune(nid, leaseId);
   }, [
     currentUserId, sessionId, enqueueAndSync,
-    idbGetNote, idbPutNote, invalidateNotesCache, setNotes,
+    idbGetNote, idbPutNote, setNotes,
     releaseLocalLeaseWithPrune,
   ]);
 
@@ -822,7 +819,6 @@ export default function SecondaryNoteInstance({
       setNotes((prev) =>
         prev.map((n) => (String(n.id) === noteId ? { ...n, ...updatedFields } : n)),
       );
-      invalidateNotesCache();
       const enqueued = await enqueueWithLease(noteId, { type: "update", noteId, payload }, leaseId);
       if (!enqueued) {
         setSavingModal(false);
@@ -847,7 +843,6 @@ export default function SecondaryNoteInstance({
       const leaseId = acquireLocalLease(nid);
       addDeleteTombstone(nid);
       try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-      invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("notePermanentlyDeleted"), "success", undefined, "trash-x");
@@ -858,16 +853,12 @@ export default function SecondaryNoteInstance({
         const existing = await idbGetNote(nid, currentUser?.id, sessionId);
         if (existing) await idbPutNote({ ...existing, trashed: true, collaborators: [], client_updated_at: nowIso }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
-      invalidateNotesCache();
-      invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("noteDeletedForAll"), "success", undefined, "trash-x");
       await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso, mode: "delete_for_all" } }, leaseId);
     } else if (isOwner && isCollabNote) {
       try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-      invalidateNotesCache();
-      invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("noteMovedToTrash"), "success", undefined, "trash");
@@ -875,8 +866,6 @@ export default function SecondaryNoteInstance({
       await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso, mode: "remove_self" } }, leaseId);
     } else if (!isOwner) {
       try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-      invalidateNotesCache();
-      invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("noteMovedToTrash"), "success", undefined, "trash");
@@ -888,9 +877,6 @@ export default function SecondaryNoteInstance({
         const existing = await idbGetNote(nid, currentUser?.id, sessionId);
         if (existing) await idbPutNote({ ...existing, trashed: true, client_updated_at: nowIso }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
-      invalidateNotesCache();
-      invalidateArchivedNotesCache();
-      invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("noteMovedToTrash"), "success", undefined, "trash");
@@ -909,9 +895,6 @@ export default function SecondaryNoteInstance({
         await idbPutNote({ ...existing, trashed: false, client_updated_at: nowIso }, currentUser?.id, sessionId);
       }
     } catch (e) { console.error(e); }
-    invalidateNotesCache();
-    invalidateArchivedNotesCache();
-    invalidateTrashedNotesCache();
     setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
     closeModal();
     showToast(t("noteRestoredFromTrash"), "success", undefined, "restore");
@@ -926,9 +909,6 @@ export default function SecondaryNoteInstance({
       const existing = await idbGetNote(nid, currentUser?.id, sessionId);
       if (existing) await idbPutNote({ ...existing, archived: !!archived, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
-    invalidateNotesCache();
-    invalidateArchivedNotesCache();
-    invalidateTrashedNotesCache();
     if (tagFilter === "ARCHIVED") {
       if (!archived) setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
     } else if (archived) {
@@ -956,7 +936,6 @@ export default function SecondaryNoteInstance({
       const existing = await idbGetNote(nid, currentUser?.id, sessionId);
       if (existing) await idbPutNote({ ...existing, pinned: !!toPinned, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
-    invalidateNotesCache();
     try {
       await enqueueAndSync({ type: "patch", noteId: nid, payload: { pinned: !!toPinned, client_updated_at: nowIso } });
     } catch {
@@ -987,7 +966,6 @@ export default function SecondaryNoteInstance({
       console.error("[SBS] IDB checklist update failed:", e);
       return;
     }
-    invalidateNotesCache();
     try {
       await enqueueAndSync({
         type: "patch",
@@ -1103,7 +1081,6 @@ export default function SecondaryNoteInstance({
     setNotes((prev) =>
       prev.map((n) => (String(n.id) === noteId ? { ...n, ...updatedFields } : n)),
     );
-    invalidateNotesCache();
     const enqueued = await enqueueWithLease(noteId, { type: "update", noteId, payload }, leaseId);
     if (enqueued) showToast(t(toastKey), "success");
   };
@@ -1151,7 +1128,6 @@ export default function SecondaryNoteInstance({
       await idbPutNote(localNote, currentUser?.id, sessionId);
     } catch (e) { console.error("[SBS] dup IDB failed:", e); }
     setNotes((prev) => sortNotesByRecency([localNote, ...(Array.isArray(prev) ? prev : [])]));
-    invalidateNotesCache();
     enqueueWithLease(newId, { type: "create", noteId: newId, payload: newNote }, leaseId);
     showToast(t("noteDuplicated"), "success", undefined, "copy");
     closeModal();
