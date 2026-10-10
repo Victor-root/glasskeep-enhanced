@@ -3,6 +3,7 @@ import { t } from "../../i18n";
 import NoteModal from "./NoteModal.jsx";
 import useModalState from "../../hooks/useModalState.js";
 import useCollaboration from "../../hooks/useCollaboration.js";
+import useNoteAiChat from "../../hooks/useNoteAiChat.js";
 import { uid, fileToCompressedDataURL, sanitizeFilename, downloadText } from "../../utils/helpers.js";
 import {
   isRichContent,
@@ -13,37 +14,7 @@ import {
 import { textToChecklistItems, checklistItemsToText } from "../../utils/noteConversion.js";
 import { api } from "../../utils/api.js";
 import { mdForDownload } from "../../utils/markdown.jsx";
-import { askNoteAIStream } from "../../ai.js";
-import { localizeServerError } from "../../utils/serverErrors.js";
 import { sortNotesByRecency } from "../../utils/noteList.js";
-
-const noteAiStorageKey = (id) =>
-  id != null && id !== "" ? `glass-keep-note-ai-${id}` : null;
-const loadSavedNoteAiMessages = (id) => {
-  const key = noteAiStorageKey(id);
-  if (!key) return null;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return null;
-    return parsed.filter(
-      (m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string",
-    );
-  } catch {
-    return null;
-  }
-};
-const persistNoteAiMessages = (id, messages) => {
-  const key = noteAiStorageKey(id);
-  if (!key) return;
-  try { localStorage.setItem(key, JSON.stringify(messages)); } catch { /* ignore */ }
-};
-const removeSavedNoteAi = (id) => {
-  const key = noteAiStorageKey(id);
-  if (!key) return;
-  try { localStorage.removeItem(key); } catch { /* ignore */ }
-};
 
 /**
  * SecondaryNoteInstance — self-contained per-note modal controller used as
@@ -148,142 +119,16 @@ export default function SecondaryNoteInstance({
   });
 
   // ─── Note-AI chat (own instance) ───────────────────────────────────────
-  const [noteAiOpen, setNoteAiOpen] = useState(false);
-  const [noteAiHasBeenOpened, setNoteAiHasBeenOpened] = useState(false);
-  const [noteAiMessages, setNoteAiMessages] = useState([]);
-  const [noteAiLoading, setNoteAiLoading] = useState(false);
-  const [noteAiError, setNoteAiError] = useState(null);
-  const [noteAiSaved, setNoteAiSaved] = useState(false);
-  const noteAiAbortRef = useRef(null);
-
-  const stopNoteAi = () => {
-    const ctrl = noteAiAbortRef.current;
-    if (ctrl) { try { ctrl.abort(); } catch { /* ignore */ } }
-  };
-  const openNoteAi = () => {
-    setNoteAiOpen(true);
-    setNoteAiHasBeenOpened(true);
-    setNoteAiError(null);
-    onAiOpen?.();
-    if (noteAiMessages.length > 0) return;
-    const saved = loadSavedNoteAiMessages(activeId);
-    if (saved && saved.length > 0) {
-      setNoteAiMessages(saved);
-      setNoteAiSaved(true);
-    } else {
-      setNoteAiMessages([]);
-      setNoteAiSaved(false);
-    }
-  };
-  const closeNoteAi = () => {
-    setNoteAiOpen(false);
-    setNoteAiHasBeenOpened(false);
-    setNoteAiError(null);
-    setNoteAiLoading(false);
-    if (!noteAiSaved) setNoteAiMessages([]);
-    onAiClose?.();
-  };
-  const hideNoteAi = () => {
-    setNoteAiOpen(false);
-    setNoteAiError(null);
-    onAiClose?.();
-  };
-  const saveNoteAi = () => {
-    if (!activeId) return;
-    setNoteAiSaved(true);
-    persistNoteAiMessages(activeId, noteAiMessages);
-  };
-  const resetNoteAi = () => {
-    setNoteAiSaved(false);
-    setNoteAiMessages([]);
-    setNoteAiError(null);
-    if (activeId) removeSavedNoteAi(activeId);
-  };
-
-  useEffect(() => {
-    if (!open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the AI chat when the pane closes and notifies the shell in the same pass
-      setNoteAiOpen(false);
-      setNoteAiError(null);
-      setNoteAiLoading(false);
-      if (!noteAiSaved) setNoteAiMessages([]);
-      onAiClose?.();
-    }
-  }, [open, noteAiSaved]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!noteAiOpen) return;
-    if (!noteAiSaved) return;
-    if (!activeId) return;
-    if (noteAiLoading) return;
-    persistNoteAiMessages(activeId, noteAiMessages);
-  }, [noteAiMessages, noteAiSaved, activeId, noteAiOpen, noteAiLoading]);
-
-  const sendNoteAiMessage = async (question) => {
-    const q = (question || "").trim();
-    if (!q || noteAiLoading) return;
-    const noteSnapshot = {
-      id: activeId,
-      title: mTitle || "",
-      type: mType,
-      tags: Array.isArray(mTagList) ? mTagList : [],
-      ...(mType === "checklist"
-        ? { items: Array.isArray(mItems) ? mItems : [] }
-        : mType === "draw"
-        ? { content: typeof mDrawingData === "string" ? mDrawingData : JSON.stringify(mDrawingData || {}) }
-        : { content: mBody || "" }),
-    };
-    const userMsg = { role: "user", content: q };
-    const historyForRequest = noteAiMessages;
-    setNoteAiMessages((prev) => [...prev, userMsg]);
-    setNoteAiError(null);
-    setNoteAiLoading(true);
-
-    let firstChunkSeen = false;
-    let assistantText = "";
-    const ctrl = new AbortController();
-    noteAiAbortRef.current = ctrl;
-    try {
-      await askNoteAIStream({
-        note: noteSnapshot,
-        messages: historyForRequest,
-        question: q,
-        signal: ctrl.signal,
-        onChunk: (delta) => {
-          assistantText += delta;
-          if (!firstChunkSeen) {
-            firstChunkSeen = true;
-            setNoteAiMessages((prev) => [...prev, { role: "assistant", content: assistantText }]);
-          } else {
-            setNoteAiMessages((prev) => {
-              if (prev.length === 0) return prev;
-              const last = prev[prev.length - 1];
-              if (!last || last.role !== "assistant") return prev;
-              const next = prev.slice(0, -1);
-              next.push({ ...last, content: assistantText });
-              return next;
-            });
-          }
-        },
-      });
-      if (!firstChunkSeen) setNoteAiError(t("noteAiChatGenericError"));
-    } catch (err) {
-      if (err?.name === "AbortError" || ctrl.signal.aborted) {
-        // intentional cancel
-      } else {
-        console.error("Note AI error (secondary):", err);
-        const fallback = t("noteAiChatGenericError");
-        setNoteAiError(
-          typeof err?.message === "string" && err.message
-            ? localizeServerError(err.message, "noteAiChatGenericError")
-            : fallback,
-        );
-      }
-    } finally {
-      if (noteAiAbortRef.current === ctrl) noteAiAbortRef.current = null;
-      setNoteAiLoading(false);
-    }
-  };
+  const noteAi = useNoteAiChat({
+    open,
+    activeId,
+    note: { mTitle, mType, mTagList, mItems, mDrawingData, mBody },
+    onOpen: onAiOpen,
+    onClose: onAiClose,
+    onModalClose: onAiClose,
+    errorLabel: "Note AI error (secondary):",
+  });
+  const { restoreSavedNoteAi } = noteAi;
 
   // ─── Initial / committed baseline tracking ─────────────────────────────
   const initialModalStateRef = useRef(null);
@@ -403,18 +248,12 @@ export default function SecondaryNoteInstance({
     setViewMode(n.type !== "audio" && readModeEnabled);
     setOpen(true);
 
-    const savedMsgs = loadSavedNoteAiMessages(id);
-    if (savedMsgs && savedMsgs.length > 0) {
-      setNoteAiMessages(savedMsgs);
-      setNoteAiSaved(true);
-      setNoteAiHasBeenOpened(true);
-    }
-  }, [notes, setActiveId, setMType, setMTitle, setMDrawingData, setMBody, setMItems, setMTagList, setMImages, setTagInput, setMColor, setViewMode, setOpen, readModeEnabled]);
+    restoreSavedNoteAi(id);
+  }, [notes, setActiveId, setMType, setMTitle, setMDrawingData, setMBody, setMItems, setMTagList, setMImages, setTagInput, setMColor, setViewMode, setOpen, readModeEnabled, restoreSavedNoteAi]);
 
   // Open whenever the controlled noteId prop changes
   useEffect(() => {
     if (noteId && (!open || String(activeId) !== String(noteId))) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the note whenever the controlled noteId prop changes
       openNoteIntoModal(noteId);
     } else if (!noteId && open) {
       // External request to drop without animation
@@ -666,16 +505,13 @@ export default function SecondaryNoteInstance({
         setConfirmDeleteOpen(false);
         setShowModalFmt(false);
         setIsModalClosing(false);
-        setNoteAiHasBeenOpened(false);
-        setNoteAiMessages([]);
-        setNoteAiSaved(false);
-        setNoteAiError(null);
+        noteAi.resetNoteAiAfterClose();
         if (typeof afterClose === "function") afterClose();
       }, MODAL_FADE_DURATION);
     };
-    if (noteAiOpen) {
-      setNoteAiOpen(false);
-      stopNoteAi();
+    if (noteAi.noteAiOpen) {
+      noteAi.setNoteAiOpen(false);
+      noteAi.stopNoteAi();
       modalClosingTimerRef.current = setTimeout(() => {
         modalClosingTimerRef.current = null;
         beginFade();
@@ -1253,20 +1089,7 @@ export default function SecondaryNoteInstance({
       initialDrawMode={initialDrawMode}
       onConsumeInitialDrawMode={() => setInitialDrawMode(null)}
       aiAssistantEnabled={aiAssistantEnabled}
-      noteAiOpen={noteAiOpen}
-      noteAiHasBeenOpened={noteAiHasBeenOpened}
-      noteAiMessages={noteAiMessages}
-      noteAiLoading={noteAiLoading}
-      noteAiError={noteAiError}
-      noteAiSaved={noteAiSaved}
-      noteAiCanSave={!!activeId}
-      onOpenNoteAi={openNoteAi}
-      onCloseNoteAi={closeNoteAi}
-      onHideNoteAi={hideNoteAi}
-      onSendNoteAiMessage={sendNoteAiMessage}
-      onStopNoteAi={stopNoteAi}
-      onSaveNoteAi={saveNoteAi}
-      onResetNoteAi={resetNoteAi}
+      {...noteAi.modalProps}
     />
   );
 }
