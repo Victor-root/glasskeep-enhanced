@@ -40,8 +40,8 @@ function getRenderSchema() {
   return renderSchema;
 }
 
-export const RICH_FORMAT_VERSION = 1;
-export const RICH_FORMAT_NAME = "tiptap";
+const RICH_FORMAT_VERSION = 1;
+const RICH_FORMAT_NAME = "tiptap";
 
 /** Empty Tiptap doc — used as a safe default when content is missing. */
 export function emptyRichDoc() {
@@ -49,7 +49,7 @@ export function emptyRichDoc() {
 }
 
 /** Wrap a ProseMirror doc in our versioned envelope. */
-export function wrapRichDoc(doc) {
+function wrapRichDoc(doc) {
   return { v: RICH_FORMAT_VERSION, format: RICH_FORMAT_NAME, doc };
 }
 
@@ -150,7 +150,7 @@ export function richDocToHTML(doc) {
 }
 
 /** Walk a Tiptap doc and return a plain-text version (for previews / search). */
-export function richDocToPlain(doc) {
+function richDocToPlain(doc) {
   if (!doc) return "";
   const parts = [];
   const walk = (node) => {

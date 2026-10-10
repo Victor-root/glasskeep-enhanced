@@ -24,7 +24,7 @@ export function dataUrlToBlob(dataUrl) {
   return new Blob([arr], { type: mime });
 }
 
-export async function decodeAudioBuffer(blob) {
+async function decodeAudioBuffer(blob) {
   const arrayBuffer = await blob.arrayBuffer();
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if (!Ctx) throw new Error(t("audioApiUnsupported"));
@@ -42,7 +42,7 @@ function writeStr(view, offset, str) {
 
 // 16-bit PCM WAV encoder. Handles mono and stereo (downmixes to stereo at
 // most). Float samples in [-1, 1] are clamped and scaled to Int16.
-export function encodeWavFromAudioBuffer(audioBuffer) {
+function encodeWavFromAudioBuffer(audioBuffer) {
   const numChannels = Math.min(2, audioBuffer.numberOfChannels);
   const sampleRate = audioBuffer.sampleRate;
   const length = audioBuffer.length;

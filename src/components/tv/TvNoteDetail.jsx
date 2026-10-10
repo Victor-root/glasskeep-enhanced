@@ -40,10 +40,9 @@ function formatDate(iso) {
   } catch { return ""; }
 }
 
-// onClose is kept in the signature for backward compatibility but the
-// detail no longer renders any clickable close affordance — Back / Esc
-// (handled by TvNotesViewer's useSpatialFocus.onBack) is the way out.
-export default function TvNoteDetail({ note /* , onClose */ }) {
+// The detail renders no close affordance: Back / Esc (handled by
+// TvNotesViewer's useSpatialFocus.onBack) is the way out.
+export default function TvNoteDetail({ note }) {
   const bg = bgFor(note?.color, true);
   const isDark = note ? isColorDark(bg) : true;
   const bodyRef = useRef(null);

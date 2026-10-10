@@ -216,7 +216,6 @@ export default function LoginView({
   // Manual login (classic form)
   return (
     <AuthShell
-      data-tooltip={t("signInToYourAccount")}
       dark={dark}
       onToggleDark={onToggleDark}
       floatingCardsEnabled={floatingCardsEnabled}

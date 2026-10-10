@@ -631,7 +631,6 @@ module.exports = {
     expandPluralVariants,
     expandToken,
     extractSnippets,
-    pruneScoredNotes,
     variantInField,
     countVariantInBody,
     STOP_WORDS,

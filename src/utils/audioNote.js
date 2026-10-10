@@ -37,22 +37,6 @@ import { t } from "../i18n";
 // once base64 inflation (~33%) and JSON wrapping are applied.
 export const AUDIO_MAX_TOTAL_BYTES = 100 * 1024 * 1024;
 
-export const ALLOWED_AUDIO_MIME_PREFIXES = [
-  "audio/webm",
-  "audio/ogg",
-  "audio/mp4",
-  "audio/mpeg",
-  "audio/wav",
-  "audio/x-wav",
-  "audio/aac",
-];
-
-export function isAllowedAudioMime(mime) {
-  if (typeof mime !== "string" || !mime) return false;
-  const lower = mime.toLowerCase();
-  return ALLOWED_AUDIO_MIME_PREFIXES.some((p) => lower.startsWith(p));
-}
-
 function normalizeClip(c) {
   if (!c || typeof c !== "object") return null;
   if (typeof c.audioDataUrl !== "string" || !c.audioDataUrl.startsWith("data:")) return null;

@@ -11,7 +11,7 @@
 
 import { Extension } from "@tiptap/core";
 
-export const INDENT_STEP_EM = 1.75;
+const INDENT_STEP_EM = 1.75;
 
 export const Indent = Extension.create({
   name: "indent",

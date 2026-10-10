@@ -207,7 +207,5 @@ module.exports = {
   prepareRowForWrite,
   encryptTagsJson,
   decryptTagsPayload,
-  PLACEHOLDERS,
   NOTE_VERSION_LATEST,
-  TAG_VERSION_LATEST,
 };

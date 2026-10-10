@@ -76,10 +76,6 @@ function setDeclaredRpId(value) {
   return declaredRpId;
 }
 
-function getDeclaredRpId() {
-  return declaredRpId;
-}
-
 function isLocalHostname(hostname) {
   const h = String(hostname || "").trim().replace(/^\[|\]$/g, "").toLowerCase();
   if (!h) return false;
@@ -272,8 +268,6 @@ module.exports = {
   REASON,
   resolveRp,
   describeConfig,
-  isLocalHostname,
   isValidRpId,
   setDeclaredRpId,
-  getDeclaredRpId,
 };

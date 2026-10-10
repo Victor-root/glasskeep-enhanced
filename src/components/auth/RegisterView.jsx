@@ -57,7 +57,6 @@ export default function RegisterView({ dark, onToggleDark, onRegister, goLogin, 
 
   return (
     <AuthShell
-      data-tooltip={t("createNewAccount")}
       dark={dark}
       onToggleDark={onToggleDark}
       floatingCardsEnabled={floatingCardsEnabled}

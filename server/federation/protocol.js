@@ -114,7 +114,6 @@ module.exports = {
   PROTOCOL_MIN_SUPPORTED,
   negotiateProtocol,
   STATUS,
-  LINK_STATE,
   deriveLinkState,
   isLinkWritable,
 };

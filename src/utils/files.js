@@ -77,7 +77,7 @@ export async function ensureJSZip() {
 }
 
 // --- Image filename helpers (fix double extensions) ---
-export const imageExtFromDataURL = (dataUrl) => {
+const imageExtFromDataURL = (dataUrl) => {
   const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,/.exec(dataUrl || "");
   const mime = (m?.[1] || "image/jpeg").toLowerCase();
   if (mime.includes("jpeg") || mime.includes("jpg")) return "jpg";

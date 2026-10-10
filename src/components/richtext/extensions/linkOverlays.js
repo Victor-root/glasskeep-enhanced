@@ -55,7 +55,7 @@ function getLinkPopoverEl() {
   document.body.appendChild(linkPopoverEl);
   return linkPopoverEl;
 }
-export function hideLinkPopover() {
+function hideLinkPopover() {
   if (!linkPopoverEl) return;
   linkPopoverEl.classList.remove("rt-link-popover--visible");
   if (linkPopoverDismiss) {

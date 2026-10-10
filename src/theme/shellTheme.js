@@ -33,7 +33,7 @@ export function isValidShellTheme(id) {
 }
 
 // Saved preference, or the default when absent / invalid.
-export function getStoredShellTheme() {
+function getStoredShellTheme() {
   let saved = null;
   try {
     saved = localStorage.getItem(STORAGE_KEY);

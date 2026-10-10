@@ -54,7 +54,7 @@ export const LIGHT_COLORS = {
   sand: "rgba(230, 200, 150, 0.85)",
   mauve: "rgba(210, 175, 218, 0.85)",
 };
-export const DARK_COLORS = {
+const DARK_COLORS = {
   default: "rgba(40, 40, 40, 0.85)",
   red: "rgba(140, 36, 36, 0.85)",
   yellow: "rgba(140, 110, 25, 0.85)",
@@ -111,7 +111,7 @@ export const compositeOver = (top, bottom) => {
   const mix = (x, y) => Math.round(x * t.a + y * (1 - t.a));
   return toHex(`rgb(${mix(t.r, b.r)}, ${mix(t.g, b.g)}, ${mix(t.b, b.b)})`);
 };
-export const mixWithWhite = (rgbaStr, whiteRatio = 0.8, outAlpha = 0.92) => {
+const mixWithWhite = (rgbaStr, whiteRatio = 0.8, outAlpha = 0.92) => {
   const { r, g, b } = parseRGBA(rgbaStr);
   const rr = Math.round(255 * whiteRatio + r * (1 - whiteRatio));
   const gg = Math.round(255 * whiteRatio + g * (1 - whiteRatio));

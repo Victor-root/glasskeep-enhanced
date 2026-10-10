@@ -7,7 +7,7 @@ import {
   normalizeTypographyPresets,
 } from "./typographyPresets.js";
 
-export const NOTIFICATION_POSITIONS = [
+const NOTIFICATION_POSITIONS = [
   "top-left",
   "top-center",
   "top-right",

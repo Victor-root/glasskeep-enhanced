@@ -3,7 +3,7 @@ import { SyncEngine } from "./syncEngine.js";
 import { enqueue as idbEnqueue } from "./localDb.js";
 
 // Canonical reset shape, used at init, teardown and sign-out.
-export const SYNC_STATUS_RESET = Object.freeze({
+const SYNC_STATUS_RESET = Object.freeze({
   syncState: "checking", serverReachable: null, hasPendingChanges: false, isSyncing: false,
   lastSyncAt: null, lastSyncError: null,
   pending: 0, processing: 0, failed: 0, total: 0, items: [],

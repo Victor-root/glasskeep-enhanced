@@ -35,15 +35,6 @@ function describeProviderStatus(status) {
   return PROVIDER_HTTP_HINTS[status] ? `HTTP ${status} — ${PROVIDER_HTTP_HINTS[status]}` : `HTTP ${status}`;
 }
 
-// Strip an OpenAI-style API key from a string before logging it. The
-// substring keeps just enough to disambiguate but not enough to reuse.
-function redactApiKey(value) {
-  if (!value) return value;
-  if (typeof value !== "string") return value;
-  if (value.length <= 8) return "***";
-  return `${value.slice(0, 4)}…${value.slice(-2)}`;
-}
-
 class AIProviderError extends Error {
   constructor(message, { status, providerStatus, providerBody } = {}) {
     super(message);
@@ -302,6 +293,4 @@ module.exports = {
   chatCompletion,
   chatCompletionStream,
   testConnection,
-  joinUrl,
-  redactApiKey,
 };

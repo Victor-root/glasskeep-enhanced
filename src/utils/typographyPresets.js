@@ -28,7 +28,7 @@ export const DEFAULT_PROFILE = Object.freeze({
 });
 
 export const PROFILE_KEYS = ["profile1", "profile2", "profile3"];
-export const DEFAULT_ACTIVE_PROFILE = "profile1";
+const DEFAULT_ACTIVE_PROFILE = "profile1";
 
 export const DEFAULT_TYPOGRAPHY_PRESETS = Object.freeze({
   active: DEFAULT_ACTIVE_PROFILE,
@@ -144,30 +144,6 @@ export function normalizeTypographyPresets(raw) {
     profile2: sanitizeProfile(input.profile2, DEFAULT_PROFILE),
     profile3: sanitizeProfile(input.profile3, DEFAULT_PROFILE),
   };
-}
-
-/** Return the currently active profile's block map. */
-export function getActiveProfile(presets) {
-  const n = normalizeTypographyPresets(presets);
-  return n[n.active];
-}
-
-export function isDefaultTypography(presets) {
-  const n = normalizeTypographyPresets(presets);
-  if (n.active !== DEFAULT_ACTIVE_PROFILE) return false;
-  return PROFILE_KEYS.every((pk) =>
-    BLOCKS.every((k) => {
-      const a = n[pk][k];
-      const b = DEFAULT_PROFILE[k];
-      return (
-        a.size === b.size &&
-        a.weight === b.weight &&
-        a.color === b.color &&
-        a.italic === b.italic &&
-        a.underline === b.underline
-      );
-    }),
-  );
 }
 
 /**

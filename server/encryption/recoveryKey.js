@@ -49,5 +49,4 @@ function normalizeRecoveryKey(input) {
 module.exports = {
   generateRecoveryKey,
   normalizeRecoveryKey,
-  PREFIX,
 };
