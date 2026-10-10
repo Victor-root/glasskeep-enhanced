@@ -23,14 +23,12 @@ import {
   enableInstanceUnlock,
   disableInstanceUnlock,
   testPasskey,
+  isPasskeyCancellation,
 } from "../../auth/passkeyClient.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import TI from "../../icons/editor/index.jsx";
-
-function formatDate(iso) {
-  if (!iso) return null;
-  try { return new Date(iso).toLocaleString(); } catch { return iso; }
-}
+import PasskeyListItem from "./PasskeyListItem.jsx";
+import { PasskeyTextDialog, PasskeyConfirmDialog } from "./PasskeyDialogs.jsx";
 
 export default function PasskeySettingsSection({
   token,
@@ -144,8 +142,7 @@ export default function PasskeySettingsSection({
           setListOpen(true);
         } catch (e) {
           const msg = (e && e.message) || "";
-          const cancelled = e?.name === "NotAllowedError" || /not[\s_-]*allowed|cancel|abort|interrupt|annul/i.test(msg);
-          if (!cancelled) {
+          if (!isPasskeyCancellation(e)) {
             toast(localizeServerError(msg, "passkeyAddFailed"), "error");
           }
         } finally {
@@ -206,8 +203,7 @@ export default function PasskeySettingsSection({
       toast(t("passkeyTestOk"), "success");
     } catch (e) {
       const msg = (e && e.message) || "";
-      const cancelled = e?.name === "NotAllowedError" || /not[\s_-]*allowed|cancel|abort|interrupt|annul/i.test(msg);
-      if (!cancelled) {
+      if (!isPasskeyCancellation(e)) {
         toast(localizeServerError(msg, "passkeyTestFailed"), "error");
       }
     } finally {
@@ -245,8 +241,7 @@ export default function PasskeySettingsSection({
           await refresh();
         } catch (e) {
           const msg = (e && e.message) || "";
-          const cancelled = e?.name === "NotAllowedError" || /not[\s_-]*allowed|cancel|abort|interrupt|annul/i.test(msg);
-          if (!cancelled) {
+          if (!isPasskeyCancellation(e)) {
             toast(localizeServerError(msg, "passkeyToggleFailed"), "error");
           }
         } finally {
@@ -383,84 +378,19 @@ export default function PasskeySettingsSection({
         <div hidden={!listOpen} aria-hidden={!listOpen} inert={!listOpen}>
         <ul className="space-y-2 pt-1">
           {list.map((p) => (
-            <li
+            <PasskeyListItem
               key={p.credentialId}
-              // One wrapping row: info + actions sit side by side when there's
-              // room and the actions drop to their own line when there isn't.
-              // The info column keeps a min width so it can never collapse to
-              // ~0 (which made its badges overflow on top of the buttons).
-              className="rounded-lg border border-[var(--border-light)] p-3 flex flex-wrap items-center gap-x-4 gap-y-3"
-            >
-              <div className="flex-1 min-w-[14rem]">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium truncate">
-                    {p.name || t("passkeyUnnamed")}
-                  </span>
-                  <Badge color="indigo">{t("passkeyBadgeLogin")}</Badge>
-                  {p.canUnlockInstance && (
-                    <Badge color="amber">{t("passkeyBadgeUnlock")}</Badge>
-                  )}
-                  {p.backedUp && (
-                    <Badge color="gray">{t("passkeyBadgeSynced")}</Badge>
-                  )}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {p.lastUsedAt
-                    ? t("passkeyLastUsed").replace("%s", formatDate(p.lastUsedAt))
-                    : t("passkeyNeverUsed")}
-                </div>
-                {!p.prfSupported && isAdmin && encryptionEnabled && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 italic">
-                    {t("passkeyNoPrfRow")}
-                  </div>
-                )}
-              </div>
-
-              {/* Actions stay wrappable and shrinkable: with the extra
-                  "allow unlock" button (long label) the old md:flex-nowrap +
-                  md:shrink-0 forced a fixed-width block that crushed the info
-                  column to ~0, so its badges overflowed on top of the buttons.
-                  Letting the buttons wrap keeps the info column from collapsing.
-                  Left-aligned; the long "(dis)allow unlock" button goes last. */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => handleTest(p)}
-                  disabled={busyId === p.credentialId || testingId === p.credentialId}
-                  className="px-2.5 py-1 rounded text-xs border border-[var(--border-light)] text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50"
-                >
-                  {testingId === p.credentialId ? t("passkeyTestInProgress") : t("passkeyTestCta")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRename(p)}
-                  disabled={busyId === p.credentialId}
-                  className="px-2.5 py-1 rounded text-xs border border-[var(--border-light)] text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50"
-                >{t("rename")}</button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(p)}
-                  disabled={busyId === p.credentialId}
-                  className="px-2.5 py-1 rounded text-xs border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50"
-                >{t("delete")}</button>
-                {/* Instance-unlock toggle (admins, PRF-capable, unlocked vault) — last */}
-                {isAdmin && encryptionEnabled && p.prfSupported && (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleUnlock(p)}
-                    disabled={busyId === p.credentialId || !unlockToggleAllowed}
-                    title={!unlockToggleAllowed ? t("passkeyUnlockToggleDisabledHint") : undefined}
-                    className={`px-2.5 py-1 rounded text-xs font-medium border ${
-                      p.canUnlockInstance
-                        ? "border-amber-500 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30"
-                        : "border-[var(--border-light)] text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"
-                    } disabled:opacity-50`}
-                  >
-                    {p.canUnlockInstance ? t("passkeyDisableUnlock") : t("passkeyEnableUnlock")}
-                  </button>
-                )}
-              </div>
-            </li>
+              p={p}
+              isAdmin={isAdmin}
+              encryptionEnabled={encryptionEnabled}
+              unlockToggleAllowed={unlockToggleAllowed}
+              busyId={busyId}
+              testingId={testingId}
+              onTest={handleTest}
+              onRename={handleRename}
+              onDelete={handleDelete}
+              onToggleUnlock={handleToggleUnlock}
+            />
           ))}
         </ul>
         </div>
@@ -474,153 +404,6 @@ export default function PasskeySettingsSection({
         prompt={confirmPrompt}
         onClose={() => setConfirmPrompt(null)}
       />
-    </div>
-  );
-}
-
-function Badge({ color, children }) {
-  const klass = {
-    indigo: "bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)]",
-    amber:  "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
-    gray:   "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
-  }[color] || "bg-gray-100 text-gray-700";
-  return (
-    <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${klass}`}>
-      {children}
-    </span>
-  );
-}
-
-// Styled in-app text prompt. Replaces `window.prompt(...)` for passkey
-// naming so the WebView doesn't render the bare "La page <url> indique:"
-// system dialog. Keeps focus on the input, submits on Enter, cancels on
-// Escape — matches the editor / settings dialogs people already know.
-function PasskeyTextDialog({ prompt, onClose }) {
-  const [value, setValue] = useState("");
-  const inputRef = useRef(null);
-
-  // Re-seed the field every time a fresh prompt opens. We keep the
-  // input controlled (rather than reading from a ref on submit) so the
-  // confirm button can be disabled while empty without a re-render
-  // dance.
-  useEffect(() => {
-    if (prompt) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- re-seed the field each time a fresh prompt opens
-      setValue(prompt.defaultValue || "");
-      // The focus has to happen *after* the input mounts. A microtask
-      // tick is enough — requestAnimationFrame would also work but
-      // delays focus by a paint cycle on slow devices.
-      queueMicrotask(() => {
-        const el = inputRef.current;
-        if (el) {
-          el.focus();
-          el.select();
-        }
-      });
-    }
-  }, [prompt]);
-
-  if (!prompt) return null;
-
-  const submit = () => {
-    onClose();
-    if (prompt.onSubmit) prompt.onSubmit(value);
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div
-        className="rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative bg-white dark:bg-[#282828] border border-[var(--border-light)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-lg font-semibold mb-2">{prompt.title}</h3>
-        {prompt.message && (
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-            {prompt.message}
-          </p>
-        )}
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          maxLength={64}
-          placeholder={prompt.placeholder || ""}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); submit(); }
-            else if (e.key === "Escape") { e.preventDefault(); onClose(); }
-          }}
-          className="w-full px-3 py-2 rounded-lg border border-[var(--border-light)] bg-white dark:bg-[#1f1f1f] focus:outline-none focus:ring-2 focus:ring-[var(--gk-chrome-accent)]"
-        />
-        <div className="mt-5 flex justify-end gap-3">
-          <button
-            type="button"
-            className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
-            onClick={onClose}
-          >
-            {t("cancel")}
-          </button>
-          <button
-            type="button"
-            className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] btn-gradient bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none"
-            onClick={submit}
-          >
-            {prompt.confirmText || t("confirm")}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Styled in-app confirmation dialog. Used for "delete this passkey?"
-// in place of `window.confirm()` — same reasons as PasskeyTextDialog:
-// the system dialog leaks the WebView URL and ignores the app theme.
-function PasskeyConfirmDialog({ prompt, onClose }) {
-  if (!prompt) return null;
-
-  const confirmClass = prompt.danger
-    ? "bg-red-600 text-white hover:bg-red-700 hover:shadow-lg hover:shadow-red-300/50"
-    : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300/50";
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div
-        className="rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative bg-white dark:bg-[#282828] border border-[var(--border-light)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-lg font-semibold mb-2">{prompt.title}</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-300">{prompt.message}</p>
-        <div className="mt-5 flex justify-end gap-3">
-          <button
-            type="button"
-            className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
-            onClick={onClose}
-          >
-            {t("cancel")}
-          </button>
-          <button
-            type="button"
-            className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] btn-gradient${prompt.danger ? " gk-fixed-btn" : ""} ${confirmClass}`}
-            onClick={() => {
-              onClose();
-              if (prompt.onConfirm) prompt.onConfirm();
-            }}
-          >
-            {prompt.confirmText || t("confirm")}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
