@@ -8,6 +8,7 @@
 
 import { api, getAuth, API_BASE } from "../utils/api.js";
 import { contentToPlain } from "../utils/richText.js";
+import { readSseFrames } from "../utils/sse.js";
 import { t, locale } from "../i18n";
 
 function detectLang() {
@@ -254,36 +255,24 @@ export async function askNoteAIStream({ note, messages, question, onChunk, signa
     throw err;
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let buffer = "";
   let finishReason = null;
 
-  // SSE frame parser — frames are separated by a blank line, each
-  // frame may carry one or more `data:` lines whose payloads we JSON-
-  // parse. Anything else (comments, retry hints, …) is ignored.
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let sep;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      const frame = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
-      for (const rawLine of frame.split("\n")) {
-        const line = rawLine.replace(/\r$/, "");
-        if (!line.startsWith("data:")) continue;
-        const data = line.slice(5).trim();
-        if (!data) continue;
-        if (data === "[DONE]") return { finishReason };
-        let json;
-        try { json = JSON.parse(data); } catch { continue; }
-        if (json.error) throw new Error(json.error);
-        if (typeof json.delta === "string" && json.delta.length > 0) {
-          onChunk?.(json.delta);
-        }
-        if (json.finishReason) finishReason = json.finishReason;
+  // Each SSE frame may carry one or more `data:` lines whose payloads we
+  // JSON-parse. Anything else (comments, retry hints, …) is ignored.
+  for await (const frame of readSseFrames(res.body)) {
+    for (const rawLine of frame.split("\n")) {
+      const line = rawLine.replace(/\r$/, "");
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (!data) continue;
+      if (data === "[DONE]") return { finishReason };
+      let json;
+      try { json = JSON.parse(data); } catch { continue; }
+      if (json.error) throw new Error(json.error);
+      if (typeof json.delta === "string" && json.delta.length > 0) {
+        onChunk?.(json.delta);
       }
+      if (json.finishReason) finishReason = json.finishReason;
     }
   }
   return { finishReason };

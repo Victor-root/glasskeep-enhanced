@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
 import { api } from "../../utils/api.js";
 import TI from "../../icons/editor/index.jsx";
-import { markChangelogToShow } from "./ChangelogModal.jsx";
+import { markChangelogToShow } from "./changelogFlags.js";
 import SelfUpdateSystemMonitor from "./SelfUpdateSystemMonitor.jsx";
 import SelfUpdateTechnicalLog from "./SelfUpdateTechnicalLog.jsx";
 import SelfUpdateDetails from "./SelfUpdateDetails.jsx";

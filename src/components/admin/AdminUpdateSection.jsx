@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
-import { openChangelog } from "./ChangelogModal.jsx";
+import { openChangelog } from "./changelogFlags.js";
 
 const REPO_URL = "https://github.com/Victor-root/glasskeep-enhanced";
 
