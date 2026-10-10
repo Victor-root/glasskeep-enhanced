@@ -2,10 +2,11 @@
 //
 // What the maintenance scripts read from the Glass Keep install they
 // run next to: its .env file, whether the service on this machine
-// speaks HTTPS, and the admin account the test scripts act as.
+// speaks HTTPS, and where and as which admin the test scripts act.
 
 const fs = require("fs");
 const path = require("path");
+const { usesHttps } = require("./secureRequest.cjs");
 
 // The .env written by install.sh, or the one $GLASSKEEP_ENV points at.
 function envFilePath() {
@@ -82,6 +83,35 @@ function findAdmin(db, email) {
   return admin;
 }
 
+// Where the test scripts reach the instance (host, port, HTTPS) and what
+// they need to act as its admin (JWT secret, database file), from the
+// .env file overlaid by the environment and the --host / --port flags.
+// Exits when the secret is missing, printing `missingSecretHint` too when
+// given.
+function loadTestScriptConfig(args, missingSecretHint = null) {
+  const envFile = envFilePath();
+  const env = parseEnvFile(envFile);
+  const merged = { ...env, ...process.env };
+  const port = args.port || Number(merged.API_PORT || merged.PORT) || 8080;
+  const host = args.host || "127.0.0.1";
+  const localHttpsEnabled = isLocalHttpsEnabled(merged);
+  const httpsEnabled = usesHttps({ host, localHttpsEnabled });
+  const jwtSecret = merged.JWT_SECRET;
+  if (!jwtSecret) {
+    console.error("[error] JWT_SECRET is not set (env or " + envFile + ").");
+    if (missingSecretHint) console.error(missingSecretHint);
+    process.exit(1);
+  }
+  // DB discovery mirrors server/index.js: DB_FILE, then SQLITE_FILE,
+  // then the default next to the server source.
+  const serverDir = path.resolve(__dirname, "..", "..", "server");
+  const dbFile =
+    merged.DB_FILE ||
+    merged.SQLITE_FILE ||
+    path.join(serverDir, "data.sqlite");
+  return { host, port, httpsEnabled, jwtSecret, dbFile, envFile };
+}
+
 // A short-lived token for that admin, signed with the server's secret.
 function signAdminToken(jwt, user, secret) {
   return jwt.sign(
@@ -95,6 +125,7 @@ module.exports = {
   envFilePath,
   parseEnvFile,
   isLocalHttpsEnabled,
+  loadTestScriptConfig,
   requireNativeDeps,
   findAdmin,
   signAdminToken,

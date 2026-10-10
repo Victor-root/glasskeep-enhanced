@@ -41,17 +41,13 @@
 // glass-keep service user).
 
 const fs = require("fs");
-const path = require("path");
 const {
   parseTlsArgs,
-  usesHttps,
   requestJson,
   TLS_USAGE,
 } = require("./lib/secureRequest.cjs");
 const {
-  envFilePath,
-  parseEnvFile,
-  isLocalHttpsEnabled,
+  loadTestScriptConfig,
   requireNativeDeps,
   findAdmin,
   signAdminToken,
@@ -95,25 +91,6 @@ function usage() {
   );
 }
 
-function loadConfig(args) {
-  const envFile = envFilePath();
-  const env = parseEnvFile(envFile);
-  const merged = { ...env, ...process.env };
-  const port = args.port || Number(merged.API_PORT || merged.PORT) || 8080;
-  const host = args.host || "127.0.0.1";
-  const localHttpsEnabled = isLocalHttpsEnabled(merged);
-  const httpsEnabled = usesHttps({ host, localHttpsEnabled });
-  const jwtSecret = merged.JWT_SECRET;
-  if (!jwtSecret) {
-    console.error("[error] JWT_SECRET is not set (env or " + envFile + ").");
-    process.exit(1);
-  }
-  const serverDir = path.resolve(__dirname, "..", "server");
-  const dbFile =
-    merged.DB_FILE || merged.SQLITE_FILE || path.join(serverDir, "data.sqlite");
-  return { host, port, httpsEnabled, jwtSecret, dbFile, envFile };
-}
-
 async function main() {
   const args = parseArgs(process.argv);
   if (args.help) {
@@ -126,7 +103,7 @@ async function main() {
     process.exit(1);
   }
 
-  const cfg = loadConfig(args);
+  const cfg = loadTestScriptConfig(args);
 
   const { Database, jwt } = requireNativeDeps();
 

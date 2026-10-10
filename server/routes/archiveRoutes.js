@@ -2,7 +2,7 @@
 //
 // Archiving and unarchiving a note, and the list of archived notes.
 
-const { nowISO, validateLwwTimestamp, isNewerOrEqual } = require("../utils/timestamps");
+const { validateLwwTimestamp, isNewerOrEqual } = require("../utils/timestamps");
 
 function attachArchiveRoutes(app, deps) {
   const {
@@ -11,7 +11,7 @@ function attachArchiveRoutes(app, deps) {
     getNote,
     getNoteById,
     listArchivedNotes,
-    updateNoteWithEditor,
+    markEditedBy,
     serializeNote,
     broadcastNoteUpdated,
   } = deps;
@@ -55,7 +55,7 @@ function attachArchiveRoutes(app, deps) {
       return res.status(404).json({ error: "Note not found or access denied" });
     }
 
-    updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+    markEditedBy(id, req.user);
     broadcastNoteUpdated(id);
     const fresh = getNoteById.get(id);
     res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });

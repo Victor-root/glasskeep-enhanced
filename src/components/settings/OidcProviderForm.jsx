@@ -12,7 +12,7 @@
 import React, { useState } from "react";
 import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
-import { FIELD_INPUT_CLASSES } from "../common/fieldClasses.js";
+import { FIELD_INPUT_CLASSES, GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
 import CopyButton from "../common/CopyButton.jsx";
 import { oidcErrorMessage } from "../../auth/oidcClient.js";
 
@@ -20,7 +20,7 @@ const LABEL_CLASSES = "block text-xs font-semibold uppercase tracking-wide text-
 export const SECONDARY_BTN =
   "px-4 py-2 rounded-lg font-semibold text-sm border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50";
 export const PRIMARY_BTN =
-  "px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none";
+  `px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 ${GRADIENT_BUTTON_CLASSES} disabled:opacity-50 disabled:pointer-events-none`;
 
 const TEST_WARNING_KEYS = {
   issuer_not_https: "oidcTestWarnIssuerHttp",

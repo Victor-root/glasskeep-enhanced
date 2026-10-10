@@ -60,12 +60,23 @@ const t = runner("Règles pures");
           ["notes.example.com", "192.168.1.10"]
             .every((h) => req.usesHttps({ host: h, localHttpsEnabled: false }) === true));
 
-  for (const nom of ["unlock-instance.cjs", "test-notification.cjs", "test-reminder.cjs"]) {
+  // test-notification.cjs et test-reminder.cjs lisent leur configuration
+  // par loadTestScriptConfig (lib/instanceEnv.cjs): la règle doit y être,
+  // et chacun doit bien passer par elle.
+  for (const nom of ["unlock-instance.cjs", "lib/instanceEnv.cjs"]) {
     const source = readFileSync(path.join(ROOT, "scripts", nom), "utf8");
     t.check(`${nom} choisit son protocole d'après la destination`,
             source.includes("usesHttps({ host, localHttpsEnabled })"));
+  }
+  for (const nom of ["unlock-instance.cjs", "lib/instanceEnv.cjs", "test-notification.cjs", "test-reminder.cjs"]) {
+    const source = readFileSync(path.join(ROOT, "scripts", nom), "utf8");
     t.check(`${nom} ne rebranche pas sa propre règle à côté`,
             !/const httpsEnabled =\s*\n?\s*(env|merged)\./.test(source));
+  }
+  for (const nom of ["test-notification.cjs", "test-reminder.cjs"]) {
+    const source = readFileSync(path.join(ROOT, "scripts", nom), "utf8");
+    t.check(`${nom} passe par la configuration partagée`,
+            source.includes("loadTestScriptConfig(args"));
   }
 }
 

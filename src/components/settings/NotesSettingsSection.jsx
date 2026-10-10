@@ -2,6 +2,7 @@ import React from "react";
 import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
 import { RowIcon, SettingsSubHeading } from "../common/SettingsAccordion.jsx";
+import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
 
 // Notes section of the Settings panel: read mode, editor toolbar,
 // typography, paste behaviour and the checklist sub-group.
@@ -61,7 +62,7 @@ export default function NotesSettingsSection({
           <button
             className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
               editorToolbarMode === "simple"
-                ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                ? GRADIENT_BUTTON_CLASSES
                 : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
             }`}
             onClick={() => setEditorToolbarMode("simple")}
@@ -71,7 +72,7 @@ export default function NotesSettingsSection({
           <button
             className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
               editorToolbarMode === "advanced"
-                ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                ? GRADIENT_BUTTON_CLASSES
                 : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
             }`}
             onClick={() => setEditorToolbarMode("advanced")}
@@ -95,7 +96,7 @@ export default function NotesSettingsSection({
         </div>
         <button
           type="button"
-          className="shrink-0 self-end sm:self-auto px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+          className={`shrink-0 self-end sm:self-auto px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 ${GRADIENT_BUTTON_CLASSES}`}
           onClick={() => setTypographyModalOpen(true)}
         >
           {t("typographyOpen")}
@@ -118,7 +119,7 @@ export default function NotesSettingsSection({
           <button
             className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
               pasteMode === "rich"
-                ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                ? GRADIENT_BUTTON_CLASSES
                 : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
             }`}
             onClick={() => setPasteMode("rich")}
@@ -128,7 +129,7 @@ export default function NotesSettingsSection({
           <button
             className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
               pasteMode === "plain"
-                ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                ? GRADIENT_BUTTON_CLASSES
                 : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
             }`}
             onClick={() => setPasteMode("plain")}
@@ -152,7 +153,7 @@ export default function NotesSettingsSection({
           <button
             className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
               checklistInsertPosition === "top"
-                ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                ? GRADIENT_BUTTON_CLASSES
                 : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
             }`}
             onClick={() => setChecklistInsertPosition("top")}
@@ -162,7 +163,7 @@ export default function NotesSettingsSection({
           <button
             className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
               checklistInsertPosition === "bottom"
-                ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                ? GRADIENT_BUTTON_CLASSES
                 : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
             }`}
             onClick={() => setChecklistInsertPosition("bottom")}
@@ -184,7 +185,7 @@ export default function NotesSettingsSection({
           <button
             className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
               checklistRemoveSectionBehavior === "cascade"
-                ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                ? GRADIENT_BUTTON_CLASSES
                 : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
             }`}
             onClick={() => setChecklistRemoveSectionBehavior("cascade")}
@@ -194,7 +195,7 @@ export default function NotesSettingsSection({
           <button
             className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
               checklistRemoveSectionBehavior === "keep"
-                ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                ? GRADIENT_BUTTON_CLASSES
                 : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
             }`}
             onClick={() => setChecklistRemoveSectionBehavior("keep")}

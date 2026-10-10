@@ -7,6 +7,8 @@
 
 const { verifyAuthenticationResponse } = require("@simplewebauthn/server");
 const webauthnRp = require("./webauthnRp");
+const passkeyVault = require("../encryption/passkeyVault");
+const challengeStore = require("../encryption/challengeStore");
 const assetLinks = require("../routes/assetLinksRoutes")._internals;
 
 // ── RP config resolution ──────────────────────────────────────────────
@@ -115,6 +117,43 @@ function verifyAssertion(req, response, challenge, passkey) {
   });
 }
 
+// The second step of a ceremony run on one of the signed-in user's own
+// passkeys (req.params.id): the challenge must be the one issued for
+// `kind`, this user and this credential, and the assertion must verify.
+// Answers the request (400 / 404) and resolves with null when it does
+// not; resolves with { passkey, verification } otherwise. `label` names
+// the ceremony in the log.
+async function verifyOwnPasskeyAssertion(req, res, { db, response, challengeId, kind, label, log }) {
+  const entry = challengeStore.consume(challengeId);
+  if (!entry
+      || entry.kind !== kind
+      || entry.userId !== req.user.id
+      || entry.meta?.credentialId !== req.params.id) {
+    res.status(400).json({ error: "Challenge expired or invalid" });
+    return null;
+  }
+
+  const passkey = passkeyVault.getPasskeyForUser(db, req.params.id, req.user.id);
+  if (!passkey) {
+    res.status(404).json({ error: "Passkey not found" });
+    return null;
+  }
+
+  let verification;
+  try {
+    verification = await verifyAssertion(req, response, entry.challenge, passkey);
+  } catch (e) {
+    log.warn?.(`[passkey] ${label} verify failed: ${e.message}`);
+    res.status(400).json({ error: "Verification failed" });
+    return null;
+  }
+  if (!verification.verified) {
+    res.status(400).json({ error: "Verification failed" });
+    return null;
+  }
+  return { passkey, verification };
+}
+
 // The signed-in session handed back by a passkey sign-in, in lockstep
 // with /api/login and the QR device-link poll. Any field that one flow
 // returns and another omits ends up wiped from auth state when that flow
@@ -140,5 +179,6 @@ module.exports = {
   base64UrlToBuf,
   transportsOf,
   verifyAssertion,
+  verifyOwnPasskeyAssertion,
   sessionUser,
 };

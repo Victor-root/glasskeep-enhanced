@@ -16,7 +16,7 @@ function attachTrashRoutes(app, deps) {
     listTrashedNotes,
     runInsertNote,
     deleteNote,
-    updateNoteWithEditor,
+    markEditedBy,
     getUserTags,
     runUpsertUserTags,
     getUserIcon,
@@ -175,7 +175,7 @@ function attachTrashRoutes(app, deps) {
           db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, cid);
         }
         db.prepare("UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ?").run(tsResult.iso, id);
-        updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+        markEditedBy(id, req.user);
         // Push the revocation to a federation peer right away: the note is now
         // trashed, so its mirror must go. Every other deletion path calls this;
         // without it "delete for all" only reached the peer on the next sync
@@ -225,7 +225,7 @@ function attachTrashRoutes(app, deps) {
           db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, c.id);
         }
         db.prepare("UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ?").run(tsResult.iso, id);
-        updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+        markEditedBy(id, req.user);
         // Ici la note n'est transmise à personne: elle reste au propriétaire,
         // simplement à la corbeille. Effacer ses étiquettes lui ferait perdre
         // son classement sur une note qu'il peut encore restaurer. Seul son
@@ -304,7 +304,7 @@ function attachTrashRoutes(app, deps) {
       return res.status(404).json({ error: "Note not found or access denied" });
     }
 
-    updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+    markEditedBy(id, req.user);
     broadcastNoteUpdated(id);
     const fresh = getNoteById.get(id);
     res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });
@@ -386,7 +386,7 @@ function attachTrashRoutes(app, deps) {
       return res.status(404).json({ error: "Note not found or access denied" });
     }
 
-    updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+    markEditedBy(id, req.user);
     broadcastNoteUpdated(id);
     const fresh = getNoteById.get(id);
     res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });

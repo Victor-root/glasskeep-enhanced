@@ -11,6 +11,7 @@ import {
   dataUrlToBlob,
 } from "../../utils/audioConvert.js";
 import { sanitizeFilename, triggerBlobDownload } from "../../utils/files.js";
+import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
 
 // Download button of the audio player (hero layout) and its format menu:
 // the original recording, or an MP3 / WAV conversion when the browser can
@@ -69,7 +70,7 @@ export default function AudioDownloadMenu({ audio, title }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
+        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${GRADIENT_BUTTON_CLASSES} disabled:opacity-50 disabled:pointer-events-none`}
         aria-haspopup="menu"
         aria-expanded={open}
       >

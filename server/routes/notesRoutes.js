@@ -30,7 +30,7 @@ function attachNotesRoutes(app, deps) {
     runInsertNote,
     runUpdateNoteFullCollab,
     runPatchNoteSensitiveCollab,
-    updateNoteWithEditor,
+    markEditedBy,
     runUpsertUserTags,
     setUserPinOrPosition,
     runSetUserIcon,
@@ -158,9 +158,9 @@ function attachNotesRoutes(app, deps) {
 
     runInsertNote(n);
     if (userTags !== "[]") runUpsertUserTags(noteId, req.user.id, userTags);
-    updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), n.id);
+    markEditedBy(n.id, req.user);
     broadcastNoteUpdated(n.id);
-    // Re-read to get updated_at/last_edited_* set by updateNoteWithEditor
+    // Re-read to get updated_at/last_edited_* set by markEditedBy
     const created = getNoteById.get(n.id);
     res.status(201).json(serializeNote(created || n, req.user.id));
   });
@@ -239,7 +239,7 @@ function attachNotesRoutes(app, deps) {
       });
     }
 
-    updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+    markEditedBy(id, req.user);
     broadcastNoteUpdated(id);
     const fresh = getNoteById.get(id);
     res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });
@@ -379,7 +379,7 @@ function attachNotesRoutes(app, deps) {
       setUserPinOrPosition(id, req.user.id, { pinned: req.body.pinned });
     }
 
-    updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+    markEditedBy(id, req.user);
     broadcastNoteUpdated(id);
     const fresh = getNoteById.get(id);
     res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });

@@ -35,6 +35,7 @@ const {
   userIdToBuf,
   transportsOf,
   verifyAssertion,
+  verifyOwnPasskeyAssertion,
   sessionUser,
 } = require("../services/passkeyCeremony");
 const {
@@ -320,25 +321,11 @@ function attachPasskeyRoutes(app, deps) {
     const { response, challengeId } = req.body || {};
     if (!response || !challengeId) return res.status(400).json({ error: "Missing fields" });
 
-    const entry = challengeStore.consume(challengeId);
-    if (!entry
-        || entry.kind !== "test"
-        || entry.userId !== req.user.id
-        || entry.meta?.credentialId !== req.params.id) {
-      return res.status(400).json({ error: "Challenge expired or invalid" });
-    }
-
-    const passkey = passkeyVault.getPasskeyForUser(db, req.params.id, req.user.id);
-    if (!passkey) return res.status(404).json({ error: "Passkey not found" });
-
-    let verification;
-    try {
-      verification = await verifyAssertion(req, response, entry.challenge, passkey);
-    } catch (e) {
-      log.warn?.(`[passkey] test verify failed: ${e.message}`);
-      return res.status(400).json({ error: "Verification failed" });
-    }
-    if (!verification.verified) return res.status(400).json({ error: "Verification failed" });
+    const verified = await verifyOwnPasskeyAssertion(req, res, {
+      db, response, challengeId, kind: "test", label: "test", log,
+    });
+    if (!verified) return;
+    const { passkey, verification } = verified;
 
     passkeyVault.updateCounter(db, passkey.credential_id, verification.authenticationInfo.newCounter);
     log.info?.(`[passkey] test OK credential=${passkey.credential_id} user=${req.user.id}`);
