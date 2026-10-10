@@ -1,19 +1,55 @@
 import React from "react";
-import { createPortal, flushSync } from "react-dom";
 import { t } from "../../i18n";
-import { Hamburger, SearchIcon, CloseIcon, GridIcon, ListIcon, SunIcon, MoonIcon, CheckSquareIcon, SettingsIcon, ShieldIcon, LogOutIcon, LockIcon, Kebab } from "../../icons/index.jsx";
+import { Hamburger, GridIcon, ListIcon, SunIcon, MoonIcon, CheckSquareIcon, SettingsIcon, ShieldIcon, LogOutIcon, LockIcon, Kebab } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import SyncStatusIcon from "../../sync/SyncStatusIcon.jsx";
 import { useSwallowClosingClick } from "../../hooks/useSwallowClosingClick.js";
 import { usePresence } from "../../hooks/usePresence.js";
-import UserAvatar from "../common/UserAvatar.jsx";
 import { useBranding, DEFAULT_APP_NAME } from "../../branding/BrandingContext.jsx";
+import DesktopHeaderSearch from "./DesktopHeaderSearch.jsx";
+import MobileHeaderSearch from "./MobileHeaderSearch.jsx";
+import HeaderAccountButton from "./HeaderAccountButton.jsx";
 
 // Matches the closing transition of .gk-header-menu in globalCSS, plus a
 // margin in case transitionend never fires.
 const HEADER_MENU_EXIT_MS = 180;
-// Same for the closing fold of .gk-mobile-search.
-const SEARCH_EXIT_MS = 260;
+
+// Shared by every row of the mobile kebab menu.
+const MENU_ITEM = "gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap";
+
+// Pulsing green dot on the admin entries when a server update is available.
+function UpdateDot({ dark }) {
+  return (
+    <span aria-hidden="true" className="absolute top-1 right-1 flex items-center justify-center">
+      <span className="absolute inline-flex w-2.5 h-2.5 rounded-full bg-emerald-400 opacity-75 animate-ping" />
+      <span className={`relative inline-flex w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ${dark ? "ring-gray-800" : "ring-white"}`} />
+    </span>
+  );
+}
+
+// One row of the mobile kebab menu: closes the menu, then runs `onSelect`.
+function HeaderMenuItem({ className, setHeaderMenuOpen, onSelect, children }) {
+  return (
+    <button
+      className={className}
+      onClick={() => {
+        setHeaderMenuOpen(false);
+        onSelect?.();
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+// Hidden file inputs: hand the picked files to `onImport`, then reset the
+// input so picking the same file again still fires.
+const importFiles = (onImport) => async (e) => {
+  if (e.target.files && e.target.files.length) {
+    await onImport?.(e.target.files);
+    e.target.value = "";
+  }
+};
 
 export default function NotesHeader({
   dark,
@@ -72,32 +108,6 @@ export default function NotesHeader({
   const { branding } = useBranding();
   const appName = branding.appName || DEFAULT_APP_NAME;
 
-  // Desktop sign-out, two-step in place: the first click "arms" the account
-  // button — the avatar crossfades into a red logout glyph (and the pseudo
-  // turns red) — and the second click signs out. It disarms on an outside
-  // click or after a few idle seconds so it never gets stuck. This keeps the
-  // header clean (no bare logout icon) while making room for the lock button.
-  // Mobile keeps sign-out in the kebab menu.
-  const [signOutArmed, setSignOutArmed] = React.useState(false);
-  const userBtnRef = React.useRef(null);
-  const signOutDisarmTimerRef = React.useRef(null);
-
-  React.useEffect(() => {
-    if (!signOutArmed) return undefined;
-    // Auto-disarm after a short idle window.
-    signOutDisarmTimerRef.current = setTimeout(() => setSignOutArmed(false), 3500);
-    // Disarm on any pointer-down outside the account button.
-    const onDown = (e) => {
-      if (userBtnRef.current?.contains(e.target)) return;
-      setSignOutArmed(false);
-    };
-    document.addEventListener("pointerdown", onDown, true);
-    return () => {
-      clearTimeout(signOutDisarmTimerRef.current);
-      document.removeEventListener("pointerdown", onDown, true);
-    };
-  }, [signOutArmed]);
-
   // Header instance-lock: shown only for admins on an encryption-enabled
   // server. POST /api/instance/lock is admin-only, so a non-admin tap would
   // just 403 — gate the affordance on both conditions. On desktop it's an
@@ -136,10 +146,6 @@ export default function NotesHeader({
   // useSwallowClosingClick, whose listeners outlive the menu.
   const swallowClickOf = useSwallowClosingClick();
   const headerMenuPresence = usePresence(headerMenuOpen, headerMenuRef, HEADER_MENU_EXIT_MS);
-  const searchBarRef = React.useRef(null);
-  const searchPresence = usePresence(mobileSearchOpen, searchBarRef, SEARCH_EXIT_MS);
-  // Header x of the search icon, where the bar unfolds from and folds back to.
-  const [searchOrigin, setSearchOrigin] = React.useState(null);
 
   // Publish the header's exact rendered height as --gk-header-h. TagSidebar
   // sizes its own header row to this same value, so its body nav's
@@ -195,6 +201,8 @@ export default function NotesHeader({
   // event → engine.notifyOffline → emit), so the badge still appears at once
   // when we're really offline.
   const showOfflineBadge = syncStatus?.syncState === "offline" || syncStatus?.serverReachable === false;
+  const menuItemHover = dark ? "hover:bg-white/10" : "hover:bg-gray-100";
+  const menuItemClass = `flex items-center ${MENU_ITEM} ${menuItemHover}`;
   return (
       <header
         ref={headerRef}
@@ -283,142 +291,27 @@ export default function NotesHeader({
             widths (sm/lg) so the input has room for the full
             "Rechercher ou demander à l'IA" placeholder, generous at xl+
             where the layout has space again. */}
-        <div className={`${desktopOnly} flex-grow min-w-0 justify-center px-2 xl:px-8`}>
-          <div className="relative w-full max-w-lg">
-            <input
-              type="text"
-              placeholder={aiAssistantEnabled ? t("searchOrAskAi") : t("search")}
-              className={`w-full bg-transparent border border-transparent rounded-lg pl-4 ${aiAssistantEnabled ? "pr-20" : "pr-8"} py-2 ring-1 ring-slate-400/15 transition-shadow focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  aiAssistantEnabled &&
-                  search.trim().length > 0
-                ) {
-                  onAiSearch?.(search);
-                }
-              }}
-            />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {aiAssistantEnabled && search.trim().length > 0 && (
-                <button
-                  type="button"
-                  data-tooltip={t("askAi")}
-                  className="h-7 w-7 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
-                  onClick={() => onAiSearch?.(search)}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M10 21h-3a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v3.5"/><path d="M9 9h1"/><path d="M9 13h2.5"/><path d="M9 17h1"/><path d="M14 21v-4a2 2 0 1 1 4 0v4"/><path d="M14 19h4"/><path d="M21 15v6"/></svg>
-                </button>
-              )}
-              {search && (
-                <button
-                  type="button"
-                  aria-label={t("clearSearch")}
-                  className="h-6 w-6 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
-                  onClick={() => setSearch("")}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <DesktopHeaderSearch
+          desktopOnly={desktopOnly}
+          search={search}
+          setSearch={setSearch}
+          aiAssistantEnabled={aiAssistantEnabled}
+          onAiSearch={onAiSearch}
+        />
 
         {/* Mobile: search icon that expands into a full search bar */}
-        <div className={`${mobileOnly} flex items-center ml-auto mr-1`}>
-          {!mobileSearchOpen && (
-            <button
-              type="button"
-              className={`${qrQuickEnabled ? "p-1.5" : "p-2"} rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-600 dark:text-gray-300`}
-              aria-label={t("search")}
-              onClick={(e) => {
-                const header = headerRef.current.getBoundingClientRect();
-                const btn = e.currentTarget.getBoundingClientRect();
-                setSearchOrigin(btn.left + btn.width / 2 - header.left);
-                // iOS Safari only opens the soft keyboard when focus() is
-                // called synchronously inside the user-gesture handler.
-                // flushSync forces React to mount the input immediately so
-                // we can focus it within the same click without setTimeout
-                // (which would let Safari drop the gesture context). Android
-                // is unaffected — the call sequence stays equivalent.
-                flushSync(() => setMobileSearchOpen(true));
-                mobileSearchRef.current?.focus();
-              }}
-            >
-              <SearchIcon />
-            </button>
-          )}
-        </div>
-        {/* Mobile expanded search overlay - covers the header content */}
-        {mobileSearchOpen && !search && createPortal(
-          <div
-            className={`${mobileOnly} fixed inset-0 z-[999]`}
-            onClick={() => setMobileSearchOpen(false)}
-          />,
-          document.body
-        )}
-        {/* Mobile search bar: unfolds left and right from the search icon
-            over the whole header (.gk-mobile-search). */}
-        {(mobileSearchOpen || searchPresence.mounted) && (
-          <div
-            ref={searchBarRef}
-            className={`${mobileOnly} gk-mobile-search absolute inset-0 z-30 flex items-center gap-3 ${qrQuickEnabled ? "px-3" : "px-4"}`}
-            data-state={searchPresence.shown ? "open" : "closed"}
-            style={searchOrigin == null ? undefined : { "--gk-search-origin": `${searchOrigin}px` }}
-            onTransitionEnd={(e) => {
-              if (e.target === e.currentTarget && !mobileSearchOpen) searchPresence.unmount();
-            }}
-          >
-            <span className="shrink-0 text-[var(--gk-chrome-accent)]" aria-hidden="true">
-              <SearchIcon />
-            </span>
-            <input
-              ref={mobileSearchRef}
-              type="text"
-              placeholder={aiAssistantEnabled ? t("searchOrAskAi") : t("search")}
-              className="flex-1 min-w-0 h-full bg-transparent border-0 text-lg outline-none focus:outline-none focus:ring-0 placeholder-gray-500 dark:placeholder-gray-400"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  if (search) {
-                    setSearch("");
-                  } else {
-                    setMobileSearchOpen(false);
-                  }
-                }
-                if (
-                  e.key === "Enter" &&
-                  aiAssistantEnabled &&
-                  search.trim().length > 0
-                ) {
-                  onAiSearch?.(search);
-                }
-              }}
-            />
-            {aiAssistantEnabled && search.trim().length > 0 && (
-              <button
-                type="button"
-                className="shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
-                onClick={() => onAiSearch?.(search)}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M10 21h-3a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v3.5"/><path d="M9 9h1"/><path d="M9 13h2.5"/><path d="M9 17h1"/><path d="M14 21v-4a2 2 0 1 1 4 0v4"/><path d="M14 19h4"/><path d="M21 15v6"/></svg>
-              </button>
-            )}
-            {search && (
-              <button
-                type="button"
-                aria-label={t("clearSearch")}
-                className="shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-2xl leading-none text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
-                onClick={() => { setSearch(""); setMobileSearchOpen(false); }}
-              >
-                ×
-              </button>
-            )}
-          </div>
-        )}
+        <MobileHeaderSearch
+          headerRef={headerRef}
+          mobileOnly={mobileOnly}
+          qrQuickEnabled={qrQuickEnabled}
+          mobileSearchOpen={mobileSearchOpen}
+          setMobileSearchOpen={setMobileSearchOpen}
+          mobileSearchRef={mobileSearchRef}
+          search={search}
+          setSearch={setSearch}
+          aiAssistantEnabled={aiAssistantEnabled}
+          onAiSearch={onAiSearch}
+        />
 
         <div className="relative flex items-center gap-3 shrink-0">
           {/* Desktop: icon buttons directly in header bar */}
@@ -468,80 +361,15 @@ export default function NotesHeader({
                   aria-label={t("adminPanel")}
                 >
                   <ShieldIcon />
-                  {hasUpdate && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute top-1 right-1 flex items-center justify-center"
-                    >
-                      <span className="absolute inline-flex w-2.5 h-2.5 rounded-full bg-emerald-400 opacity-75 animate-ping" />
-                      <span
-                        className={`relative inline-flex w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ${dark ? "ring-gray-800" : "ring-white"}`}
-                      />
-                    </span>
-                  )}
+                  {hasUpdate && <UpdateDot dark={dark} />}
                 </button>
               </div>
             )}
             {/* Account button with two-step in-place sign-out. First click
                 arms it: the avatar crossfades into a red logout glyph and the
                 pseudo turns red. Second click signs out. Disarms on outside
-                click / idle timeout (handled in the effect above). */}
-            <button
-              ref={userBtnRef}
-              type="button"
-              onClick={() => {
-                if (signOutArmed) { signOut?.(); return; }
-                setSignOutArmed(true);
-              }}
-              className={`flex items-center gap-2 rounded-full pl-1 pr-2.5 py-1 transition-colors duration-200 focus:outline-none focus:ring-2 ${
-                signOutArmed
-                  ? "bg-red-500/10 hover:bg-red-500/[0.15] focus:ring-red-400"
-                  : "hover:bg-black/5 dark:hover:bg-white/10 focus:ring-indigo-500"
-              }`}
-              aria-label={signOutArmed ? t("signOut") : (currentUser?.name || currentUser?.email)}
-              data-tooltip={signOutArmed ? t("signOut") : undefined}
-            >
-              {/* Fixed-size slot: avatar and logout glyph are layered and
-                  crossfade + scale between the two states for a smooth swap. */}
-              <span className="relative w-7 h-7 shrink-0">
-                <span
-                  className="absolute inset-0 transition-all duration-300 ease-out"
-                  style={{
-                    opacity: signOutArmed ? 0 : 1,
-                    transform: signOutArmed ? "scale(0.8)" : "scale(1)",
-                  }}
-                  aria-hidden={signOutArmed}
-                >
-                  <UserAvatar
-                    name={currentUser?.name}
-                    email={currentUser?.email}
-                    avatarUrl={currentUser?.avatar_url}
-                    size="w-7 h-7"
-                    textSize="text-xs"
-                    dark={dark}
-                  />
-                </span>
-                <span
-                  className="absolute inset-0 flex items-center justify-center text-red-500 dark:text-red-400 transition-all duration-300 ease-out pointer-events-none"
-                  style={{
-                    opacity: signOutArmed ? 1 : 0,
-                    transform: signOutArmed ? "scale(1)" : "scale(0.8)",
-                  }}
-                  aria-hidden={!signOutArmed}
-                >
-                  <LogOutIcon />
-                </span>
-              </span>
-              <span
-                className={`text-sm font-medium transition-colors duration-200 ${
-                  signOutArmed
-                    ? "text-red-500 dark:text-red-400"
-                    : (dark ? "text-gray-200" : "text-gray-700")
-                }`}
-              >
-                {currentUser?.name || currentUser?.email}
-              </span>
-            </button>
+                click / idle timeout. */}
+            <HeaderAccountButton dark={dark} currentUser={currentUser} signOut={signOut} />
           </div>
 
           {/* Mobile: bell + sync + (optional QR) + 3-dot menu. When the
@@ -606,12 +434,7 @@ export default function NotesHeader({
               <span style={{ visibility: headerMenuOpen ? "hidden" : "visible" }}>
                 <Kebab />
               </span>
-              {hasUpdate && currentUser?.is_admin && (
-                <span aria-hidden="true" className="absolute top-1 right-1 flex items-center justify-center">
-                  <span className="absolute inline-flex w-2.5 h-2.5 rounded-full bg-emerald-400 opacity-75 animate-ping" />
-                  <span className={`relative inline-flex w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ${dark ? "ring-gray-800" : "ring-white"}`} />
-                </span>
-              )}
+              {hasUpdate && currentUser?.is_admin && <UpdateDot dark={dark} />}
             </button>
 
             {headerMenuPresence.mounted && (
@@ -634,58 +457,22 @@ export default function NotesHeader({
                     if (e.target === e.currentTarget && e.propertyName === "opacity" && !headerMenuOpen) headerMenuPresence.unmount();
                   }}
                   onClick={(e) => e.stopPropagation()}
-                >                  <button
-                    className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      openSettingsPanel?.();
-                    }}
-                  >
-                    <span className={dark ? "text-gray-400" : "text-gray-500"}><SettingsIcon /></span>{t("settings")}</button>
-                  <button
-                    className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      onToggleViewMode?.();
-                    }}
-                  >
+                >                  <HeaderMenuItem className={menuItemClass} setHeaderMenuOpen={setHeaderMenuOpen} onSelect={openSettingsPanel}>
+                    <span className={dark ? "text-gray-400" : "text-gray-500"}><SettingsIcon /></span>{t("settings")}</HeaderMenuItem>
+                  <HeaderMenuItem className={menuItemClass} setHeaderMenuOpen={setHeaderMenuOpen} onSelect={onToggleViewMode}>
                     <span className={dark ? "text-blue-400" : "text-blue-600"}>{listView ? <GridIcon /> : <ListIcon />}</span>
                     {listView ? t("gridView") : t("listView")}
-                  </button>
-                  <button
-                    className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      toggleDark?.();
-                    }}
-                  >
+                  </HeaderMenuItem>
+                  <HeaderMenuItem className={menuItemClass} setHeaderMenuOpen={setHeaderMenuOpen} onSelect={toggleDark}>
                     <span className={dark ? "text-amber-400" : "text-indigo-600"}>{dark ? <SunIcon /> : <MoonIcon />}</span>
                     {dark ? t("lightMode") : t("darkMode")}
-                  </button>
-                  <button
-                    className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      onStartMulti?.();
-                    }}
-                  >
-                    <span className={dark ? "text-violet-400" : "text-violet-600"}><CheckSquareIcon /></span>{t("multiSelect")}</button>
-                  <button
-                    className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      onOpenQrScanner?.();
-                    }}
-                  >
-                    <span className={dark ? "text-teal-400" : "text-teal-600"}><TI.Qrcode style={{ width: "1.5rem", height: "1.5rem" }} /></span>{t("qrScanTitle")}</button>
+                  </HeaderMenuItem>
+                  <HeaderMenuItem className={menuItemClass} setHeaderMenuOpen={setHeaderMenuOpen} onSelect={onStartMulti}>
+                    <span className={dark ? "text-violet-400" : "text-violet-600"}><CheckSquareIcon /></span>{t("multiSelect")}</HeaderMenuItem>
+                  <HeaderMenuItem className={menuItemClass} setHeaderMenuOpen={setHeaderMenuOpen} onSelect={onOpenQrScanner}>
+                    <span className={dark ? "text-teal-400" : "text-teal-600"}><TI.Qrcode style={{ width: "1.5rem", height: "1.5rem" }} /></span>{t("qrScanTitle")}</HeaderMenuItem>
                   {currentUser?.is_admin && (
-                    <button
-                      className={`flex items-start gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                      onClick={() => {
-                        setHeaderMenuOpen(false);
-                        openAdminPanel?.();
-                      }}
-                    >
+                    <HeaderMenuItem className={`flex items-start ${MENU_ITEM} ${menuItemHover}`} setHeaderMenuOpen={setHeaderMenuOpen} onSelect={openAdminPanel}>
                       <span className={`relative mt-0.5 shrink-0 ${dark ? "text-red-400" : "text-red-600"}`}>
                         <ShieldIcon />
                         {hasUpdate && (
@@ -696,26 +483,14 @@ export default function NotesHeader({
                         )}
                       </span>
                       <span>{t("adminPanel")}</span>
-                    </button>
+                    </HeaderMenuItem>
                   )}
                   {showLockBtn && (
-                    <button
-                      className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                      onClick={() => {
-                        setHeaderMenuOpen(false);
-                        onLockInstance?.();
-                      }}
-                    >
-                      <span className={dark ? "text-red-400" : "text-red-600"}><LockIcon /></span>{t("lockInstanceTooltip")}</button>
+                    <HeaderMenuItem className={menuItemClass} setHeaderMenuOpen={setHeaderMenuOpen} onSelect={onLockInstance}>
+                      <span className={dark ? "text-red-400" : "text-red-600"}><LockIcon /></span>{t("lockInstanceTooltip")}</HeaderMenuItem>
                   )}
-                  <button
-                    className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      signOut?.();
-                    }}
-                  >
-                    <LogOutIcon />{t("signOut")}</button>
+                  <HeaderMenuItem className={`flex items-center ${MENU_ITEM} ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`} setHeaderMenuOpen={setHeaderMenuOpen} onSelect={signOut}>
+                    <LogOutIcon />{t("signOut")}</HeaderMenuItem>
                 </div>
               </>
             )}
@@ -727,12 +502,7 @@ export default function NotesHeader({
             type="file"
             accept="application/json"
             className="hidden"
-            onChange={async (e) => {
-              if (e.target.files && e.target.files.length) {
-                await onImportAll?.(e.target.files);
-                e.target.value = "";
-              }
-            }}
+            onChange={importFiles(onImportAll)}
           />
           {/* Hidden Google Keep import input. Accepts the raw Takeout
               .zip (recommended), or any combination of the loose .json
@@ -744,12 +514,7 @@ export default function NotesHeader({
             accept=".zip,application/zip,application/x-zip-compressed,application/json,.json,image/*"
             multiple
             className="hidden"
-            onChange={async (e) => {
-              if (e.target.files && e.target.files.length) {
-                await onImportGKeep?.(e.target.files);
-                e.target.value = "";
-              }
-            }}
+            onChange={importFiles(onImportGKeep)}
           />
           {/* Hidden Markdown import input (multiple) */}
           <input
@@ -758,12 +523,7 @@ export default function NotesHeader({
             accept=".md,text/markdown"
             multiple
             className="hidden"
-            onChange={async (e) => {
-              if (e.target.files && e.target.files.length) {
-                await onImportMd?.(e.target.files);
-                e.target.value = "";
-              }
-            }}
+            onChange={importFiles(onImportMd)}
           />
         </div>
       </header>
