@@ -10,7 +10,6 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -140,6 +138,15 @@ fun WelcomeScreen(onContinue: () -> Unit) {
     val batteryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { batteryTried = true; bump() }
+    val openAppSettings: () -> Unit = {
+        appSettingsLauncher.launch(appInfoIntent(context.packageName))
+    }
+    val openInstallSettings: () -> Unit = {
+        installSettingsLauncher.launch(
+            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                .setData(Uri.parse("package:${context.packageName}"))
+        )
+    }
 
     val bgModifier = if (dark) {
         Modifier.background(DarkBgColor)
@@ -167,14 +174,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.glasskeep_logo),
-                contentDescription = "GlassKeep",
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .shadow(8.dp, RoundedCornerShape(16.dp)),
-            )
+            GlassKeepLogo(size = 72.dp, cornerRadius = 16.dp, elevation = 8.dp)
             Spacer(modifier = Modifier.height(20.dp))
             Text(
                 text = stringResource(R.string.welcome_title),
@@ -204,7 +204,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 titleColor = titleColor,
                 subtextColor = subtextColor,
                 onGrant = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) },
-                onSettings = { appSettingsLauncher.launch(appInfoIntent(context.packageName)) },
+                onSettings = openAppSettings,
                 modifier = Modifier.onFocusChanged {
                     if (it.hasFocus) scope.launch { scrollState.animateScrollTo(0) }
                 },
@@ -220,7 +220,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 titleColor = titleColor,
                 subtextColor = subtextColor,
                 onGrant = { cameraLauncher.launch(Manifest.permission.CAMERA) },
-                onSettings = { appSettingsLauncher.launch(appInfoIntent(context.packageName)) },
+                onSettings = openAppSettings,
             )
             if (!isFdroid) {
                 Spacer(modifier = Modifier.height(14.dp))
@@ -242,7 +242,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                             bump()
                         }
                     },
-                    onSettings = { appSettingsLauncher.launch(appInfoIntent(context.packageName)) },
+                    onSettings = openAppSettings,
                 )
             }
             // Battery optimization — optional, shown for every install source.
@@ -270,7 +270,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                         bump()
                     }
                 },
-                onSettings = { appSettingsLauncher.launch(appInfoIntent(context.packageName)) },
+                onSettings = openAppSettings,
             )
             if (!isFdroid) {
                 Spacer(modifier = Modifier.height(14.dp))
@@ -284,21 +284,11 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                     titleColor = titleColor,
                     subtextColor = subtextColor,
                     // "Install unknown apps" is a special-access setting,
-                    // never a runtime permission popup — both the initial
+                    // never a runtime permission popup: both the initial
                     // grant action AND the post-denial "Ouvrir les
                     // réglages" route to the same per-app toggle.
-                    onGrant = {
-                        installSettingsLauncher.launch(
-                            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
-                                .setData(Uri.parse("package:${context.packageName}"))
-                        )
-                    },
-                    onSettings = {
-                        installSettingsLauncher.launch(
-                            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
-                                .setData(Uri.parse("package:${context.packageName}"))
-                        )
-                    },
+                    onGrant = openInstallSettings,
+                    onSettings = openInstallSettings,
                 )
             }
 

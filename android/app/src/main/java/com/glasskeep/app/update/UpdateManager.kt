@@ -188,11 +188,7 @@ object UpdateManager {
                 // still respects the throttle, and mirror the result
                 // into the "available release" prefs so the Settings
                 // card can survive an Activity recreation.
-                appCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putLong(KEY_LAST_CHECK, System.currentTimeMillis())
-                    .apply()
-                storeAvailableRelease(appCtx, result)
+                recordCheck(appCtx, System.currentTimeMillis(), result)
                 Log.i(TAG, "force check: ${result?.assetName ?: "already up to date"}")
             } catch (t: Throwable) {
                 Log.w(TAG, "force check crashed: ${t.message}", t)
@@ -254,6 +250,16 @@ object UpdateManager {
         editor.apply()
     }
 
+    /** Stamps the time of a check that ran and mirrors its outcome into
+     *  the "available release" prefs. */
+    private fun recordCheck(context: Context, checkedAt: Long, release: ReleaseInfo?) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(KEY_LAST_CHECK, checkedAt)
+            .apply()
+        storeAvailableRelease(context, release)
+    }
+
     /**
      * Synchronous "is there a newer APK we should notify about?"
      * probe. Runs the network call and version comparison; everything
@@ -275,8 +281,7 @@ object UpdateManager {
         // every single launch. Mirror the outcome into the available-
         // release prefs so the Settings card stays in sync with the
         // latest network state.
-        prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
-        storeAvailableRelease(context, release)
+        recordCheck(context, now, release)
         if (release == null) {
             Log.i(TAG, "no newer APK published (or check failed)")
             return null

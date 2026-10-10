@@ -74,19 +74,10 @@ class ReminderSyncWorker(
             return@withContext Result.success()
         }
 
-        val items = ArrayList<ReminderScheduler.ReminderItem>()
-        try {
+        val items = try {
             val arr = JSONObject(body).optJSONArray("reminders")
                 ?: return@withContext Result.success()
-            for (i in 0 until arr.length()) {
-                val o = arr.getJSONObject(i)
-                val id = o.optString("noteId")
-                val at = o.optLong("t")
-                if (id.isBlank() || at <= 0L) continue
-                items.add(
-                    ReminderScheduler.ReminderItem(id, at, o.optString("title"), o.optString("body")),
-                )
-            }
+            ReminderScheduler.parseItems(arr)
         } catch (e: Exception) {
             return@withContext Result.success() // malformed response — don't spin on it
         }
@@ -141,11 +132,8 @@ class ReminderSyncWorker(
 
         /** Idempotent: keep the existing schedule if one is already enqueued. */
         fun schedulePeriodic(ctx: Context) {
-            val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
             val req = PeriodicWorkRequestBuilder<ReminderSyncWorker>(SYNC_MINUTES, TimeUnit.MINUTES)
-                .setConstraints(constraints)
+                .setConstraints(networkConnected())
                 .build()
             WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(
                 UNIQUE_WORK, ExistingPeriodicWorkPolicy.KEEP, req,
@@ -154,13 +142,14 @@ class ReminderSyncWorker(
 
         /** One-off immediate sync (e.g. right after login / token refresh). */
         fun syncNow(ctx: Context) {
-            val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
             val req = OneTimeWorkRequestBuilder<ReminderSyncWorker>()
-                .setConstraints(constraints)
+                .setConstraints(networkConnected())
                 .build()
             WorkManager.getInstance(ctx).enqueue(req)
         }
+
+        private fun networkConnected(): Constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
     }
 }
