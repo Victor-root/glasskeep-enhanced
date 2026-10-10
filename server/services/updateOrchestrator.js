@@ -10,225 +10,38 @@
 //  All long-running work happens outside the main process so the API
 //  call returns instantly. Progress is reported through the status file
 //  (atomic JSON), which the frontend polls.
+//
+//  The install layout and the status files live in updateStatus.js, the
+//  Docker socket and the helper container in dockerControl.js.
 // =============================================================================
 
 const fs = require("fs");
 const path = require("path");
-const http = require("http");
 const { spawn, spawnSync, execFile } = require("child_process");
 
 const pkg = require("../../package.json");
-
-const NATIVE_DEFAULTS = {
-    installDir: "/opt/glass-keep/app",
-    dataDir: "/opt/glass-keep/data",
-    serviceName: "glass-keep",
-    updaterService: "glass-keep-updater.service",
-};
-
-const DOCKER_DEFAULTS = {
-    dataDir: "/data",
-    socket: "/var/run/docker.sock",
-    helperScript: "/app/scripts/docker-update-helper.cjs",
-};
-
-let cachedMode = null;
-
-// ── Mode detection ───────────────────────────────────────────────────────────
-function detectMode() {
-    if (cachedMode) return cachedMode;
-    const inDocker =
-        !!process.env.IN_DOCKER ||
-        safeExists("/.dockerenv") ||
-        safeExists("/run/.containerenv");
-    if (inDocker) {
-        cachedMode = "docker";
-    } else if (safeExists("/etc/systemd/system/glass-keep.service")) {
-        cachedMode = "native";
-    } else {
-        cachedMode = "unsupported";
-    }
-    return cachedMode;
-}
-
-function safeExists(p) {
-    try {
-        return fs.existsSync(p);
-    } catch {
-        return false;
-    }
-}
-
-function getDataDir() {
-    if (detectMode() === "docker") {
-        return process.env.DATA_DIR || DOCKER_DEFAULTS.dataDir;
-    }
-    return process.env.DATA_DIR || NATIVE_DEFAULTS.dataDir;
-}
-
-function getStatusFilePath() {
-    return (
-        process.env.UPDATE_STATUS_FILE ||
-        path.join(getDataDir(), ".update-status.json")
-    );
-}
-
-function getLockFilePath() {
-    return (
-        process.env.UPDATE_LOCK_FILE ||
-        path.join(getDataDir(), ".update.lock")
-    );
-}
-
-// The exact release the admin was told about, handed off to
-// self-update.sh so it checks out that tag instead of whatever
-// currently sits on the tracked branch. A file rather than an
-// environment variable: `systemctl start` does not forward the
-// caller's environment to the unit it starts, only what the unit
-// file's own Environment=/EnvironmentFile= already provide.
-function getTargetVersionFilePath() {
-    return (
-        process.env.UPDATE_TARGET_VERSION_FILE ||
-        path.join(getDataDir(), ".update-target-version")
-    );
-}
-
-// ── Status I/O ───────────────────────────────────────────────────────────────
-function readStatus() {
-    try {
-        const raw = fs.readFileSync(getStatusFilePath(), "utf8");
-        return JSON.parse(raw);
-    } catch {
-        return null;
-    }
-}
-
-// In-progress = the status file says we are running AND the last write
-// is recent enough (stale-lock recovery: if the process died, we let
-// the user retry after 10 minutes).
-function isUpdateInProgress() {
-    const s = readStatus();
-    if (!s) return false;
-    if (["success", "error", "rolled_back", "cancelled"].includes(s.state)) return false;
-    try {
-        const stat = fs.statSync(getStatusFilePath());
-        const ageMs = Date.now() - stat.mtimeMs;
-        if (ageMs > 10 * 60 * 1000) return false;
-    } catch {
-        return false;
-    }
-    return true;
-}
-
-function writeInitialStatus({ fromVersion, toVersion }) {
-    const mode = detectMode();
-    // Native exposes 5 visible steps (fetch / Node.js / install /
-    // build / restart). Docker exposes only 2: the pull and the swap-and-
-    // healthcheck — because the rest of the swap dance happens while
-    // the API server is offline and would never reach the frontend.
-    // Each updater later rewrites this file with its own totalSteps,
-    // but matching the initial value avoids a flicker in the
-    // progress bar denominator.
-    const totalSteps = mode === "docker" ? 2 : 5;
-    const data = {
-        mode,
-        state: "queued",
-        step: 0,
-        totalSteps,
-        message: "Update queued...",
-        startedAt: new Date().toISOString(),
-        endedAt: null,
-        fromVersion: fromVersion || null,
-        toVersion: toVersion || null,
-        error: null,
-        rolledBack: false,
-    };
-    const p = getStatusFilePath();
-    try {
-        fs.mkdirSync(path.dirname(p), { recursive: true });
-        fs.writeFileSync(p + ".tmp", JSON.stringify(data));
-        fs.renameSync(p + ".tmp", p);
-    } catch (e) {
-        throw new Error(`cannot write status file at ${p}: ${e.message}`, { cause: e });
-    }
-    return data;
-}
-
-// ── Docker capability check ──────────────────────────────────────────────────
-// Probe the Docker socket and classify WHY one-click is unavailable so the
-// admin panel can show an accurate remedy instead of a single catch-all
-// "the socket is missing" message. The distinction matters on platforms
-// like Synology, where the socket IS mounted but owned by root:root — the
-// app user gets EACCES, which used to be reported as "missing".
-async function probeDockerSocket() {
-    if (!safeExists(DOCKER_DEFAULTS.socket)) {
-        return { ok: false, reason: "docker-socket-missing" };
-    }
-    try {
-        await dockerApi("GET", "/_ping");
-        return { ok: true, reason: null };
-    } catch (e) {
-        const code = e && e.code;
-        // EACCES/EPERM: socket exists but the app user cannot open it
-        // (the classic Synology root:root case).
-        if (code === "EACCES" || code === "EPERM") {
-            return { ok: false, reason: "docker-socket-permission-denied" };
-        }
-        // ENOENT: the socket vanished between the existence check and the
-        // connect — treat it as missing.
-        if (code === "ENOENT") {
-            return { ok: false, reason: "docker-socket-missing" };
-        }
-        // ECONNREFUSED, timeouts, or a non-2xx /_ping reply: the socket is
-        // reachable but the daemon did not answer cleanly.
-        return { ok: false, reason: "docker-daemon-unreachable" };
-    }
-}
-
-async function dockerSocketAvailable() {
-    return (await probeDockerSocket()).ok;
-}
-
-function dockerApi(method, apiPath, body, { stream = false } = {}) {
-    return new Promise((resolve, reject) => {
-        const opts = {
-            socketPath: DOCKER_DEFAULTS.socket,
-            method,
-            path: apiPath,
-            headers: {},
-        };
-        let payload = null;
-        if (body !== undefined && body !== null) {
-            payload = typeof body === "string" ? body : JSON.stringify(body);
-            opts.headers["Content-Type"] = "application/json";
-            opts.headers["Content-Length"] = Buffer.byteLength(payload);
-        }
-        const req = http.request(opts, (res) => {
-            if (stream) return resolve(res);
-            const chunks = [];
-            res.on("data", (c) => chunks.push(c));
-            res.on("end", () => {
-                const raw = Buffer.concat(chunks).toString("utf8");
-                if (res.statusCode >= 400) {
-                    return reject(
-                        new Error(
-                            `Docker API ${res.statusCode} on ${method} ${apiPath}: ${raw.slice(0, 400)}`
-                        )
-                    );
-                }
-                if (!raw) return resolve(null);
-                try {
-                    resolve(JSON.parse(raw));
-                } catch {
-                    resolve(raw);
-                }
-            });
-        });
-        req.on("error", reject);
-        if (payload) req.write(payload);
-        req.end();
-    });
-}
+const {
+    NATIVE_DEFAULTS,
+    detectMode,
+    readFile,
+    getDataDir,
+    getStatusFilePath,
+    getLockFilePath,
+    getTargetVersionFilePath,
+    readStatus,
+    writeStatus,
+    isUpdateInProgress,
+    writeInitialStatus,
+    readLog,
+    acknowledgeStatus,
+} = require("./updateStatus");
+const {
+    probeDockerSocket,
+    dockerSocketAvailable,
+    dockerApi,
+    getOwnContainerId,
+    startDockerUpdate,
+} = require("./dockerControl");
 
 async function getMode({ verifyDocker = true } = {}) {
     const mode = detectMode();
@@ -293,156 +106,6 @@ function startNativeUpdate(toVersion) {
         }, 8000);
         child.unref();
     });
-}
-
-// ── Docker trigger ───────────────────────────────────────────────────────────
-async function startDockerUpdate({ fromVersion, toVersion }) {
-    // 1. Find our own container by hostname (Docker sets HOSTNAME to the
-    //    short container ID by default).
-    const ownId = (process.env.HOSTNAME || readFile("/etc/hostname")).trim();
-    if (!ownId) throw new Error("cannot determine own container id");
-    const own = await dockerApi("GET", `/containers/${encodeURIComponent(ownId)}/json`);
-    const ownName = (own.Name || "").replace(/^\//, "");
-    if (!ownName) throw new Error("cannot determine own container name");
-
-    // 2. Compute target image — always pull the same repo at ":latest"
-    //    so the admin gets whatever GitHub Actions published last.
-    const currentImageRef = (own.Config && own.Config.Image) || "";
-    const [repo] = splitImageRef(currentImageRef);
-    const targetImage = `${repo}:latest`;
-
-    // 3. Spawn helper container using the SAME image (it ships the
-    //    helper script in /app/scripts/). The helper mounts the data
-    //    volume so it can write the status file and the Docker socket
-    //    so it can drive Docker.
-    const dataMount = findDataMount(own);
-    if (!dataMount) {
-        throw new Error("could not locate the /data mount on the main container");
-    }
-    const helperName = `${ownName}-updater-${Date.now()}`;
-    // AutoRemove is normally true so the helper cleans itself up after
-    // the swap. Setting UPDATE_KEEP_HELPER=1 in the main container's
-    // environment keeps the helper around (exited state) so the admin
-    // can run `docker logs <helper>` to inspect a failure.
-    const keepHelper = process.env.UPDATE_KEEP_HELPER === "1";
-    const helperConfig = {
-        Image: currentImageRef, // use the OLD image — it has our helper
-        Cmd: ["node", DOCKER_DEFAULTS.helperScript],
-        Env: [
-            `MAIN_CONTAINER=${ownName}`,
-            `TARGET_IMAGE=${targetImage}`,
-            `STATUS_FILE=${path.join(DOCKER_DEFAULTS.dataDir, ".update-status.json")}`,
-            `DOCKER_SOCKET=${DOCKER_DEFAULTS.socket}`,
-            `FROM_VERSION=${fromVersion || ""}`,
-            `TO_VERSION=${toVersion || ""}`,
-            `STARTED_AT=${new Date().toISOString()}`,
-        ],
-        HostConfig: {
-            AutoRemove: !keepHelper,
-            Binds: [
-                `${dataMount}:${DOCKER_DEFAULTS.dataDir}`,
-                `${DOCKER_DEFAULTS.socket}:${DOCKER_DEFAULTS.socket}`,
-            ],
-            RestartPolicy: { Name: "no" },
-        },
-        // The helper does not need to be in the main container's
-        // networks — Docker socket access is enough.
-    };
-
-    const created = await dockerApi(
-        "POST",
-        `/containers/create?name=${encodeURIComponent(helperName)}`,
-        helperConfig
-    );
-    await dockerApi("POST", `/containers/${created.Id}/start`);
-    return { helperContainer: helperName };
-}
-
-function readFile(p) {
-    try {
-        return fs.readFileSync(p, "utf8");
-    } catch {
-        return "";
-    }
-}
-
-function splitImageRef(ref) {
-    const lastColon = ref.lastIndexOf(":");
-    const lastSlash = ref.lastIndexOf("/");
-    if (lastColon > lastSlash) {
-        return [ref.slice(0, lastColon), ref.slice(lastColon + 1)];
-    }
-    return [ref, "latest"];
-}
-
-// Find what the host side of the /data bind/volume is so the helper
-// container can mount the same persistent storage.
-function findDataMount(ownInspect) {
-    const mounts = ownInspect.Mounts || [];
-    for (const m of mounts) {
-        if (m.Destination === DOCKER_DEFAULTS.dataDir) {
-            // Bind mount → return host path; named volume → return volume name.
-            return m.Source || m.Name || null;
-        }
-    }
-    return null;
-}
-
-// Returns the tail of the script's stdout/stderr log (capped to keep
-// the response small). The script truncates the file at every run so
-// the content always belongs to the current / most recent update.
-function readLog({ maxBytes = 256 * 1024 } = {}) {
-    const logPath = path.join(getDataDir(), ".update.log");
-    try {
-        const stats = fs.statSync(logPath);
-        const start = Math.max(0, stats.size - maxBytes);
-        const buf = Buffer.alloc(stats.size - start);
-        const fd = fs.openSync(logPath, "r");
-        try {
-            fs.readSync(fd, buf, 0, buf.length, start);
-        } finally {
-            fs.closeSync(fd);
-        }
-        let text = buf.toString("utf8");
-        // Drop a partial first line if we truncated mid-line.
-        if (start > 0) {
-            const nl = text.indexOf("\n");
-            if (nl >= 0) text = text.slice(nl + 1);
-        }
-        return { ok: true, text, truncated: start > 0, size: stats.size };
-    } catch (e) {
-        if (e.code === "ENOENT") return { ok: false, reason: "not-found" };
-        return { ok: false, reason: e.message };
-    }
-}
-
-// Marks the current terminal status as "seen by the admin" so the
-// progress modal does not pop again on the next refresh / login.
-// Only stamps the file when the recorded endedAt matches the one the
-// client thinks it is acknowledging — protects against acking the
-// wrong outcome if a new update started between the user's click and
-// this call.
-function acknowledgeStatus(endedAt) {
-    const current = readStatus();
-    if (!current) return { ok: false, reason: "no-status" };
-    if (!["success", "error", "rolled_back", "cancelled"].includes(current.state)) {
-        return { ok: false, reason: "not-terminal" };
-    }
-    if (!current.endedAt || current.endedAt !== endedAt) {
-        return { ok: false, reason: "stale" };
-    }
-    if (current.acknowledgedAt) {
-        return { ok: true, reason: "already-acknowledged" };
-    }
-    const next = { ...current, acknowledgedAt: new Date().toISOString() };
-    const p = getStatusFilePath();
-    try {
-        fs.writeFileSync(p + ".tmp", JSON.stringify(next));
-        fs.renameSync(p + ".tmp", p);
-    } catch (e) {
-        return { ok: false, reason: "write-failed", error: e.message };
-    }
-    return { ok: true };
 }
 
 // ── Public: start an update ─────────────────────────────────────────────────
@@ -580,9 +243,7 @@ async function cancelUpdate() {
         rolledBack: true,
     };
     try {
-        const sp = getStatusFilePath();
-        fs.writeFileSync(sp + ".tmp", JSON.stringify(cancelStatus));
-        fs.renameSync(sp + ".tmp", sp);
+        writeStatus(cancelStatus);
     } catch (e) {
         // Status write failed — log but proceed. Frontend can still
         // tell the update is over via the empty/stale status.
@@ -655,32 +316,26 @@ function completeRuntimeUpgrade(log = console) {
 // ── Lifecycle (restart / shutdown the running instance) ─────────────────────
 // In native mode we delegate to systemd, which already supervises the unit.
 // In docker mode we ask the Docker daemon (via the mounted socket) to act on
-// our own container — the running JS process never has to coordinate its
+// our own container: the running JS process never has to coordinate its
 // own death, the daemon SIGTERMs us and either starts a fresh container or
-// leaves us stopped, depending on the call.
-function getOwnContainerId() {
-    const fromEnv = process.env.HOSTNAME;
-    if (fromEnv) return fromEnv.trim();
-    const fromFile = readFile("/etc/hostname");
-    return fromFile ? fromFile.trim() : "";
-}
-
-async function restartSelf() {
+// leaves us stopped, depending on the call. `action` is "restart" or
+// "stop", the verb both systemctl and the Docker API use.
+async function controlSelf(action) {
     const mode = detectMode();
     if (mode === "docker") {
         if (!(await dockerSocketAvailable())) {
-            throw new Error("Docker socket is not mounted — cannot restart from inside the container.");
+            throw new Error(`Docker socket is not mounted — cannot ${action} from inside the container.`);
         }
         const ownId = getOwnContainerId();
         if (!ownId) throw new Error("Could not determine own container ID.");
-        await dockerApi("POST", `/containers/${encodeURIComponent(ownId)}/restart?t=10`);
+        await dockerApi("POST", `/containers/${encodeURIComponent(ownId)}/${action}?t=10`);
         return;
     }
     if (mode === "native") {
         return new Promise((resolve, reject) => {
             execFile(
                 "systemctl",
-                ["restart", NATIVE_DEFAULTS.serviceName],
+                [action, NATIVE_DEFAULTS.serviceName],
                 { timeout: 15000 },
                 (err) => (err ? reject(err) : resolve()),
             );
@@ -689,28 +344,12 @@ async function restartSelf() {
     throw new Error("Server lifecycle not supported in this environment.");
 }
 
-async function shutdownSelf() {
-    const mode = detectMode();
-    if (mode === "docker") {
-        if (!(await dockerSocketAvailable())) {
-            throw new Error("Docker socket is not mounted — cannot stop from inside the container.");
-        }
-        const ownId = getOwnContainerId();
-        if (!ownId) throw new Error("Could not determine own container ID.");
-        await dockerApi("POST", `/containers/${encodeURIComponent(ownId)}/stop?t=10`);
-        return;
-    }
-    if (mode === "native") {
-        return new Promise((resolve, reject) => {
-            execFile(
-                "systemctl",
-                ["stop", NATIVE_DEFAULTS.serviceName],
-                { timeout: 15000 },
-                (err) => (err ? reject(err) : resolve()),
-            );
-        });
-    }
-    throw new Error("Server lifecycle not supported in this environment.");
+function restartSelf() {
+    return controlSelf("restart");
+}
+
+function shutdownSelf() {
+    return controlSelf("stop");
 }
 
 module.exports = {

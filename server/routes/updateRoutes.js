@@ -1,4 +1,11 @@
+// server/routes/updateRoutes.js
+//
+// The "a new version is available" check for admins: the latest GitHub
+// release, cached for a few hours, and how many times each admin has
+// been shown the notification for it.
+
 const pkg = require("../../package.json");
+const { isStrictlyNewer } = require("../services/semver");
 
 const GITHUB_URL =
   "https://api.github.com/repos/Victor-root/glasskeep-enhanced/releases/latest";
@@ -11,23 +18,6 @@ function getTtlMs() {
 }
 
 let cache = null; // { data, fetchedAt }
-
-function parseSemver(v) {
-  if (!v) return null;
-  const m = String(v).trim().replace(/^v/i, "").match(/^(\d+)\.(\d+)\.(\d+)/);
-  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
-}
-
-function isNewer(latest, current) {
-  const a = parseSemver(latest);
-  const b = parseSemver(current);
-  if (!a || !b) return false;
-  for (let i = 0; i < 3; i++) {
-    if (a[i] > b[i]) return true;
-    if (a[i] < b[i]) return false;
-  }
-  return false;
-}
 
 async function fetchLatest() {
   if (typeof fetch !== "function") {
@@ -124,7 +114,7 @@ function attachUpdateRoutes(app, { db, auth, adminOnly, log = console } = {}) {
         currentVersion,
         latestVersion,
         updateAvailable: latestVersion
-          ? isNewer(latestVersion, currentVersion)
+          ? isStrictlyNewer(latestVersion, currentVersion)
           : false,
         releaseUrl: r.url || null,
         publishedAt: r.publishedAt || null,
