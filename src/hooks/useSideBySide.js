@@ -81,7 +81,7 @@ export default function useSideBySide({
     // anchor positions (same animation as opening a single note).
     document.body.classList.add("sbs-active");
     // Open the left pane via the existing primary pipeline (full features
-    // unchanged). Open the right pane via the SecondaryNoteInstance below.
+    // unchanged). The right pane is the SecondaryNoteInstance App renders for sbsSecondaryId.
     openModal(String(ids[0]));
     setSbsSecondaryId(String(ids[1]));
     setSbsClosingSide(null);

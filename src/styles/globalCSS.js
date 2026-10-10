@@ -485,7 +485,7 @@ body {
 
 /* Disable browser pull-to-refresh while any overlay (notification
    center, sync popover, modals, sidebar, …) is open. The attribute is
-   toggled by App.jsx from a single effect — every panel benefits
+   toggled by useOverlayBackStack from a single effect — every panel benefits
    without each having to do its own DOM-level cleanup.
    Only overscroll-behavior is set: no overflow:hidden, no positioning
    changes, so the panel's own scrollable list and any underlying

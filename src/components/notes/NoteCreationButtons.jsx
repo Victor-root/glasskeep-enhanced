@@ -6,7 +6,7 @@ import { TextNoteIcon, ChecklistIcon, BrushIcon, MicIcon } from "../../icons/ind
  * Desktop-only note creation buttons.
  * Replaces the collapsed composer rectangle: clicking a button creates a
  * blank note of the matching type and opens the modal in edit mode
- * (see handleDirectText/Checklist/Draw/Audio in App.jsx).
+ * (see handleDirectText/Checklist/Draw/Audio in useDraftNote).
  *
  * Each button is self-describing (icon tile + title + one-line description
  * + a subtle "+" pill on the right) and uses the app-wide `btn-gradient`

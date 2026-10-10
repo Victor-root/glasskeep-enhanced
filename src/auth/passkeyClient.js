@@ -69,7 +69,7 @@ function authHeaders(token) {
 }
 
 // Mirror api.js's behaviour on 401: clear the cached auth and fire the
-// auth-expired event so App.jsx's centralised cleanup runs once. Without
+// auth-expired event so the centralised cleanup (useAuthActions) runs once. Without
 // this, a stale token sitting in localStorage would keep producing 401s
 // every time the settings panel re-fetched the passkey list.
 function _handleAuthExpired() {
@@ -251,7 +251,7 @@ export async function registerPasskey(token, label) {
 // ── Login ─────────────────────────────────────────────────────────────
 //
 // Returns { token, user, must_change_password } on success, mirroring
-// /api/login's response shape so App.jsx's existing completeLogin
+// /api/login's response shape so the existing completeLogin (useSession)
 // helper can consume it unchanged. We strip the `ok` field the server
 // adds — it's redundant once we got a 200 back, and leaving it on the
 // payload pollutes the in-memory session object with a stray boolean
@@ -333,7 +333,7 @@ export async function unlockInstanceWithPasskey() {
   const verify = await postJSON("/instance/unlock-passkey/verify", {
     response, challengeId, prfOutput,
   });
-  // Strip `ok` like loginWithPasskey() does, so App.jsx's completeLogin
+  // Strip `ok` like loginWithPasskey() does, so completeLogin (useSession)
   // sees the same shape as the password login response.
   const { ok: _ok, ...session } = verify || {};
   return session;

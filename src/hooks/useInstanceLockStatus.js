@@ -75,7 +75,7 @@ export default function useInstanceLockStatus() {
 
   // Listen to lock-events fired by the api wrapper when a 423 lands —
   // any in-flight request can flip us back into the lock screen. The
-  // server also pushes an SSE 'instance_locked' that App.jsx forwards
+  // server also pushes an SSE 'instance_locked' that dispatchServerEvent forwards
   // here through the same custom event.
   useEffect(() => {
     const onLocked = () => {
@@ -88,7 +88,7 @@ export default function useInstanceLockStatus() {
   }, []);
 
   // Symmetric with the lock event: the server pushes an SSE
-  // 'instance_unlocked' (forwarded by App.jsx as this custom event) when an
+  // 'instance_unlocked' (forwarded by dispatchServerEvent as this custom event) when an
   // admin unlocks elsewhere, so a waiting client leaves the unlock screen
   // immediately instead of waiting up to 3 s for the next status poll.
   useEffect(() => {
