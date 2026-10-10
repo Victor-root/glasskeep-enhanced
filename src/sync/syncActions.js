@@ -51,7 +51,7 @@ export async function sendQueuedAction(item, token) {
     } catch (err) {
       clearTimeout(timeoutId);
       if (err.name === "AbortError") {
-        // Timeout is NOT a network error — the server may just be busy.
+        // Timeout is NOT a network error: the server may just be busy.
         // Don't mark server as unreachable, just retry the item.
         const e = new Error("Request timeout");
         e.status = 408;
