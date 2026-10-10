@@ -7,7 +7,7 @@ import React, {
   useCallback,
   useDeferredValue,
 } from "react";
-import { askAI, askNoteAIStream } from "./ai";
+import { askAI } from "./ai";
 import { t, syncLanguageFromServer } from "./i18n";
 import Masonry from "react-masonry-css";
 import SyncStatusIcon from "./sync/SyncStatusIcon.jsx";
@@ -90,6 +90,7 @@ import useImportExport from "./hooks/useImportExport.js";
 import useCollaboration from "./hooks/useCollaboration.js";
 import useInstanceLockStatus from "./hooks/useInstanceLockStatus.js";
 import useKeyboardInset from "./hooks/useKeyboardInset.js";
+import useNoteAiChat from "./hooks/useNoteAiChat.js";
 import { useStableCallback } from "./hooks/useStableCallback.js";
 import InstanceUnlockScreen from "./components/lock/InstanceUnlockScreen.jsx";
 import LockedBanner from "./components/lock/LockedBanner.jsx";
@@ -298,19 +299,6 @@ export default function App() {
   // UserAiSettingsSection, which calls back via setAiAssistantEnabled).
   const [aiAssistantEnabled, setAiAssistantEnabled] = useState(false);
 
-  // Per-note AI chat panel — temporary, in-memory only. Lives next to
-  // the open note and is cleared whenever the note or the panel closes.
-  // Nothing here is persisted, synced, or written to the database; the
-  // whole point is a throwaway "explain / rewrite this note" surface.
-  // Opt-in persistence: noteAiSaved flips on when the user clicks the
-  // save button — only then are messages mirrored to localStorage and
-  // restored on next open. The default remains throwaway.
-  const [noteAiOpen, setNoteAiOpen] = useState(false);
-  const [noteAiHasBeenOpened, setNoteAiHasBeenOpened] = useState(false);
-  const [noteAiMessages, setNoteAiMessages] = useState([]);
-  const [noteAiLoading, setNoteAiLoading] = useState(false);
-  const [noteAiError, setNoteAiError] = useState(null);
-  const [noteAiSaved, setNoteAiSaved] = useState(false);
   // Checklist insert position: "top" or "bottom"
   const [checklistInsertPosition, setChecklistInsertPosition] = useState(() => {
     try {
@@ -570,6 +558,23 @@ export default function App() {
     onModalBodyClick, isCollaborativeNote,
   } = useModalState({ notes, currentUser, closeModalRef });
   const noteSaveState = useNoteSaveState(open ? activeId : null, modalHasChanges, syncStatus);
+
+  // Per-note AI chat panel. In side-by-side mode the panel takes over the
+  // opposite pane's slot, so the shell follows its open/close.
+  const noteAi = useNoteAiChat({
+    open,
+    activeId,
+    note: { mTitle, mType, mTagList, mItems, mDrawingData, mBody },
+    onOpen: () => {
+      if (sbsSecondaryId) setSbsAiActiveSide("left");
+    },
+    onClose: () => {
+      // Keep the SBS body class alive for the AI close animation so the
+      // panel can slide out before the opposite note reappears.
+      if (sbsAiActiveSide === "left") scheduleSbsAiClear();
+    },
+  });
+  const { noteAiOpen, setNoteAiOpen } = noteAi;
 
   // Reminder picker open state — lifted here (not in ModalFooter) so it joins
   // the central overlay stack: the Android back button closes it and the
@@ -2376,244 +2381,6 @@ export default function App() {
       keys.forEach((k) => localStorage.removeItem(k));
     } catch { /* storage unavailable: nothing to clear */ }
   }, []);
-
-  // When the note modal closes, the per-note AI panel must close too —
-  // its conversation only exists in the context of an open note. Reset
-  // every related piece of state so reopening the same note starts
-  // fresh, as the spec requires.
-  useEffect(() => {
-    if (!open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the note AI panel when the note modal closes
-      setNoteAiOpen(false);
-      setNoteAiError(null);
-      setNoteAiLoading(false);
-      // Saved conversations survive a modal close — they're flushed
-      // to localStorage and the in-memory copy is left intact so the
-      // next open for the same note can resume instantly. Throwaway
-      // ones are wiped here exactly like before.
-      if (!noteAiSaved) {
-        setNoteAiMessages([]);
-      }
-    }
-  }, [open, noteAiSaved]);
-
-  // Per-note AI chat — open/close/send/save/reset handlers. By default
-  // the conversation is purely client-side and wiped on close. The
-  // user can opt in to persistence per note via the panel's save
-  // button: a saved conversation is mirrored to localStorage and
-  // re-loaded on next open until they explicitly reset it.
-  const noteAiStorageKey = (id) =>
-    id != null && id !== "" ? `glass-keep-note-ai-${id}` : null;
-  const loadSavedNoteAiMessages = (id) => {
-    const key = noteAiStorageKey(id);
-    if (!key) return null;
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return null;
-      return parsed.filter(
-        (m) =>
-          m
-          && (m.role === "user" || m.role === "assistant")
-          && typeof m.content === "string",
-      );
-    } catch {
-      return null;
-    }
-  };
-  const persistNoteAiMessages = (id, messages) => {
-    const key = noteAiStorageKey(id);
-    if (!key) return;
-    try {
-      localStorage.setItem(key, JSON.stringify(messages));
-    } catch {
-      // localStorage may be full or disabled — best-effort, silent.
-    }
-  };
-  const removeSavedNoteAi = (id) => {
-    const key = noteAiStorageKey(id);
-    if (!key) return;
-    try {
-      localStorage.removeItem(key);
-    } catch { /* storage unavailable: nothing to remove */ }
-  };
-
-  const openNoteAi = () => {
-    setNoteAiOpen(true);
-    setNoteAiHasBeenOpened(true);
-    setNoteAiError(null);
-    if (sbsSecondaryId) setSbsAiActiveSide("left");
-    // If a conversation is already in memory (e.g. re-opening after a
-    // mobile "back to note" hide), keep it intact and don't overwrite.
-    if (noteAiMessages.length > 0) return;
-    // Otherwise restore a previously saved conversation, or start fresh.
-    const saved = loadSavedNoteAiMessages(activeId);
-    if (saved && saved.length > 0) {
-      setNoteAiMessages(saved);
-      setNoteAiSaved(true);
-    } else {
-      setNoteAiMessages([]);
-      setNoteAiSaved(false);
-    }
-  };
-  const closeNoteAi = () => {
-    setNoteAiOpen(false);
-    setNoteAiHasBeenOpened(false);
-    setNoteAiError(null);
-    setNoteAiLoading(false);
-    // In SBS, keep the body class (and CSS positioning) alive for the
-    // duration of the AI close animation so the panel can slide out before
-    // the opposite note reappears and the wrapper loses its absolute slot.
-    if (sbsAiActiveSide === "left") scheduleSbsAiClear();
-    // Saved conversations stay in localStorage and in memory so a
-    // later open can resume them. Temporary ones are wiped.
-    if (!noteAiSaved) {
-      setNoteAiMessages([]);
-    }
-  };
-  // Mobile "back to note" — hides the panel without clearing the
-  // conversation. The user can re-open the panel and resume where they
-  // left off. Explicit close (X) still calls closeNoteAi and wipes.
-  const hideNoteAi = () => {
-    setNoteAiOpen(false);
-    setNoteAiError(null);
-    if (sbsAiActiveSide === "left") scheduleSbsAiClear();
-  };
-  const saveNoteAi = () => {
-    if (!activeId) return;
-    setNoteAiSaved(true);
-    persistNoteAiMessages(activeId, noteAiMessages);
-  };
-  const resetNoteAi = () => {
-    setNoteAiSaved(false);
-    setNoteAiMessages([]);
-    setNoteAiError(null);
-    if (activeId) removeSavedNoteAi(activeId);
-  };
-
-  // Persistence side-effect — flush the saved conversation to
-  // localStorage whenever a turn lands. Gated on `noteAiOpen` so a
-  // mid-flight note switch (which would briefly pair the previous
-  // note's messages with the new note's id) can't write to the wrong
-  // key. Also skipped while a stream is in flight so the JSON isn't
-  // rewritten on every assistant chunk; the final state lands once
-  // loading flips back off.
-  useEffect(() => {
-    if (!noteAiOpen) return;
-    if (!noteAiSaved) return;
-    if (!activeId) return;
-    if (noteAiLoading) return;
-    persistNoteAiMessages(activeId, noteAiMessages);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- persistNoteAiMessages is recreated each render; persist only when a turn lands
-  }, [noteAiMessages, noteAiSaved, activeId, noteAiOpen, noteAiLoading]);
-  // AbortController for the in-flight Note-AI streaming request. The user
-  // can interrupt mid-stream via the Stop button, which calls .abort() —
-  // the streaming fetch then rejects with an AbortError that we swallow
-  // silently (no error banner) and the partial assistant message stays
-  // visible exactly as it had streamed in.
-  const noteAiAbortRef = useRef(null);
-  const stopNoteAi = () => {
-    const ctrl = noteAiAbortRef.current;
-    if (ctrl) {
-      try { ctrl.abort(); } catch { /* abort is best-effort */ }
-    }
-  };
-  const sendNoteAiMessage = async (question) => {
-    const q = (question || "").trim();
-    if (!q || noteAiLoading) return;
-
-    // Snapshot the open note from the editor state (mTitle/mBody/…) so
-    // unsaved local edits are part of the AI context. The user expects
-    // "Chat with AI" to operate on what they currently see, not the
-    // last-saved version. Each note type uses different storage fields,
-    // so we follow the same envelope noteToPlainText() reads on the
-    // client side: content for text/draw notes, items for checklists.
-    const noteSnapshot = {
-      id: activeId,
-      title: mTitle || "",
-      type: mType,
-      tags: Array.isArray(mTagList) ? mTagList : [],
-      ...(mType === "checklist"
-        ? { items: Array.isArray(mItems) ? mItems : [] }
-        : mType === "draw"
-        ? {
-            content:
-              typeof mDrawingData === "string"
-                ? mDrawingData
-                : JSON.stringify(mDrawingData || {}),
-          }
-        : { content: mBody || "" }),
-    };
-
-    const userMsg = { role: "user", content: q };
-    const historyForRequest = noteAiMessages;
-    setNoteAiMessages((prev) => [...prev, userMsg]);
-    setNoteAiError(null);
-    setNoteAiLoading(true);
-
-    // Streaming receive — the first delta clears the "thinking" state
-    // and seeds an assistant message; subsequent deltas append to the
-    // last assistant message in place so the user sees the answer
-    // grow word-by-word.
-    // noteAiLoading stays true for the whole request — input + send
-    // remain locked while a stream is in flight so the user can't fire
-    // a second turn that would race with the live one. The "thinking"
-    // indicator in the panel hides itself once the first chunk lands
-    // (the new assistant message becomes the visible progress).
-    let firstChunkSeen = false;
-    let assistantText = "";
-    const ctrl = new AbortController();
-    noteAiAbortRef.current = ctrl;
-    try {
-      await askNoteAIStream({
-        note: noteSnapshot,
-        messages: historyForRequest,
-        question: q,
-        signal: ctrl.signal,
-        onChunk: (delta) => {
-          assistantText += delta;
-          if (!firstChunkSeen) {
-            firstChunkSeen = true;
-            setNoteAiMessages((prev) => [
-              ...prev,
-              { role: "assistant", content: assistantText },
-            ]);
-          } else {
-            setNoteAiMessages((prev) => {
-              if (prev.length === 0) return prev;
-              const last = prev[prev.length - 1];
-              if (!last || last.role !== "assistant") return prev;
-              const next = prev.slice(0, -1);
-              next.push({ ...last, content: assistantText });
-              return next;
-            });
-          }
-        },
-      });
-      if (!firstChunkSeen) {
-        setNoteAiError(t("noteAiChatGenericError"));
-      }
-    } catch (err) {
-      // User-initiated abort via the Stop button — no error banner, the
-      // partial assistant message (whatever streamed before abort) stays
-      // visible as-is.
-      if (err?.name === "AbortError" || ctrl.signal.aborted) {
-        // Intentional cancel — silent.
-      } else {
-        console.error("Note AI error:", err);
-        const fallback = t("noteAiChatGenericError");
-        setNoteAiError(
-          typeof err?.message === "string" && err.message
-            ? localizeServerError(err.message, "noteAiChatGenericError")
-            : fallback,
-        );
-      }
-    } finally {
-      if (noteAiAbortRef.current === ctrl) noteAiAbortRef.current = null;
-      setNoteAiLoading(false);
-    }
-  };
 
   // Load notes
   const handleAiSearch = async (question) => {
@@ -4746,7 +4513,7 @@ export default function App() {
       headerMenuOpen, multiMode, typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
       noteAiOpen, changelogOpen, qrScannerOpen,
       closeQrScanner, setImgViewOpen, setConfirmDeleteOpen, setCollaborationModalOpen, setShowModalColorPop, setShowModalFmt,
-      setModalKebabOpen, setLogoPickerOpen, setImageMenuOpen, setModalTagFocused, setAdminPanelOpen]);
+      setModalKebabOpen, setLogoPickerOpen, setImageMenuOpen, setModalTagFocused, setAdminPanelOpen, setNoteAiOpen]);
 
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
@@ -5054,12 +4821,7 @@ export default function App() {
     // the messages and mark the panel as "has been opened" so the header
     // toggle is immediately visible (the user can resume the saved chat
     // without having to re-open via the kebab menu).
-    const savedMsgs = loadSavedNoteAiMessages(id);
-    if (savedMsgs && savedMsgs.length > 0) {
-      setNoteAiMessages(savedMsgs);
-      setNoteAiSaved(true);
-      setNoteAiHasBeenOpened(true);
-    }
+    noteAi.restoreSavedNoteAi(id);
   };
 
   // Handler for notification action buttons (the "Ouvrir" affordance
@@ -5697,20 +5459,14 @@ export default function App() {
         setConfirmDeleteOpen(false);
         setShowModalFmt(false);
         setIsModalClosing(false);
-        // Reset AI panel state so the header toggle doesn't reappear
-        // when re-opening a note. Saved conversations stay in localStorage
-        // and will be restored on the next openNoteAi call.
-        setNoteAiHasBeenOpened(false);
-        setNoteAiMessages([]);
-        setNoteAiSaved(false);
-        setNoteAiError(null);
+        noteAi.resetNoteAiAfterClose();
       }, MODAL_FADE_DURATION);
     };
     if (noteAiOpen) {
       setNoteAiOpen(false);
       // Cancel any in-flight AI request so chunks don't arrive after
       // the note has unmounted.
-      stopNoteAi();
+      noteAi.stopNoteAi();
       modalClosingTimerRef.current = setTimeout(() => {
         modalClosingTimerRef.current = null;
         beginFade();
@@ -6943,20 +6699,7 @@ export default function App() {
       onConsumeInitialDrawMode={() => setInitialDrawMode(null)}
       // Per-note AI chat — kebab entry, panel state, send/close handlers
       aiAssistantEnabled={aiAssistantEnabled}
-      noteAiOpen={noteAiOpen}
-      noteAiHasBeenOpened={noteAiHasBeenOpened}
-      noteAiMessages={noteAiMessages}
-      noteAiLoading={noteAiLoading}
-      noteAiError={noteAiError}
-      noteAiSaved={noteAiSaved}
-      noteAiCanSave={!!activeId}
-      onOpenNoteAi={openNoteAi}
-      onCloseNoteAi={closeNoteAi}
-      onHideNoteAi={hideNoteAi}
-      onSendNoteAiMessage={sendNoteAiMessage}
-      onStopNoteAi={stopNoteAi}
-      onSaveNoteAi={saveNoteAi}
-      onResetNoteAi={resetNoteAi}
+      {...noteAi.modalProps}
     />
   );
 
