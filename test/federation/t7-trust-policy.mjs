@@ -24,10 +24,10 @@ const t = runner("Scénario 7, politique de confiance des intermédiaires");
 
 // Le réglage réellement appliqué par le serveur, lu dans son code plutôt que
 // recopié ici: si quelqu'un le change, ce test suit.
-const src = readFileSync(path.join(ROOT, "server", "index.js"), "utf8");
+const src = readFileSync(path.join(ROOT, "server", "middleware", "trustProxy.js"), "utf8");
 const m = src.match(/const SAFE_PROXY_RANGES = "([^"]+)"/);
 t.check("le serveur définit bien un ensemble d'intermédiaires de confiance", !!m,
-        m ? `"${m[1]}"` : "introuvable dans server/index.js");
+        m ? `"${m[1]}"` : "introuvable dans server/middleware/trustProxy.js");
 if (!m) process.exit(t.summary() ? 0 : 1);
 
 function trustFn(setting) {
