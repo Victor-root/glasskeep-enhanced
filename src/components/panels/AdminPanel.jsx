@@ -1,228 +1,18 @@
 import React, { useState } from "react";
 import { t } from "../../i18n";
-import UserAvatar from "../common/UserAvatar.jsx";
 import { CloseIcon, ShieldIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import EncryptionAdminSection from "../lock/EncryptionAdminSection.jsx";
 import AiAdminSection from "./AiAdminSection.jsx";
 import AdminUpdateSection from "../admin/AdminUpdateSection.jsx";
 import FederationSection from "../admin/federation/FederationSection.jsx";
-import OidcAdminSection from "../admin/OidcAdminSection.jsx";
-import LoginBrandingSection from "./LoginBrandingSection.jsx";
+import PendingRegistrationsSection from "../admin/PendingRegistrationsSection.jsx";
+import SiteSettingsSection from "../admin/SiteSettingsSection.jsx";
+import UsersSection from "../admin/UsersSection.jsx";
+import CreateUserSection from "../admin/CreateUserSection.jsx";
+import EditUserModal from "../admin/EditUserModal.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
-import { RowIcon, SettingsSection } from "../common/SettingsAccordion.jsx";
-const SectionHeaderIcon = RowIcon;
-
-// Inline editor for the public login slogan. Keeps a draft state local
-// to the input so we can show an explicit Save button (instead of the
-// silent on-blur save the previous version had — users couldn't tell
-// whether their change had been persisted).
-function LoginSloganRow({ value, onSave, showToast }) {
-  const [draft, setDraft] = useState(value || "");
-  const [busy, setBusy] = useState(false);
-  const [savedFlash, setSavedFlash] = useState(false);
-
-  // Sync the draft when the persisted value changes (e.g. another tab
-  // saved a different slogan). We only overwrite the draft if the user
-  // has no pending change to avoid clobbering their typing.
-  React.useEffect(() => {
-    // Keep the draft in sync when the panel re-opens with fresh data,
-    // but don't clobber typing in progress.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resync the editable draft with the persisted value
-    setDraft((prev) => (prev === (value || "") ? prev : (value || "")));
-  }, [value]);
-
-  const dirty = (draft || "") !== (value || "");
-
-  const save = async () => {
-    if (!dirty) return;
-    setBusy(true);
-    try {
-      await onSave(draft || "");
-      setSavedFlash(true);
-      showToast?.(t("saved"), "success");
-      setTimeout(() => setSavedFlash(false), 1500);
-    } catch (e) {
-      showToast?.(localizeServerError(e?.message, "saveFailed"), "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-2 px-3">
-      <div className="flex items-center gap-3 min-w-0">
-        <RowIcon icon={TI.Quote} />
-        <div className="min-w-0">
-          <div className="font-medium">{t("loginSloganLabel")}</div>
-          <div className="text-sm text-gray-500">{t("loginSlogan")}</div>
-        </div>
-      </div>
-      <div className="flex flex-col sm:flex-row gap-2">
-        <input
-          type="text"
-          maxLength={200}
-          className="flex-1 px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--gk-chrome-accent)] placeholder-gray-500 dark:placeholder-gray-400 text-sm"
-          placeholder={t("loginSloganPlaceholder")}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              save();
-            }
-          }}
-          disabled={busy}
-        />
-        <button
-          type="button"
-          onClick={save}
-          disabled={!dirty || busy}
-          className="shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none disabled:hover:scale-100"
-        >
-          {busy ? t("saving") : savedFlash ? t("saved") : t("save")}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// The domain passkeys belong to. Behind a reverse proxy the server has
-// no honest way to learn it: the only place it appears is a header the
-// caller wrote, so an admin states it once here. Every other case
-// (local network, a certificate, an env var) resolves on its own and
-// this row just says so instead of asking for anything.
-function PasskeyDomainRow({ state, onSave, showToast, highlight, onHighlightDone }) {
-  const declared = state?.declared || "";
-  const suggested = state?.suggested || "";
-  const source = state?.source || "none";
-  const undecided = source === "none";
-  const readOnly = state?.lockedByEnv || source === "certificate";
-
-  const [draft, setDraft] = useState(declared || (undecided ? suggested : ""));
-  const [busy, setBusy] = useState(false);
-  const [savedFlash, setSavedFlash] = useState(false);
-
-  React.useEffect(() => {
-    const wanted = declared || (undecided ? suggested : "");
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resync the editable draft with the server state
-    setDraft((prev) => (prev === wanted ? prev : wanted));
-  }, [declared, suggested, undecided]);
-
-  // Arriving here from the passkey notice in the user settings: the
-  // section it lives in is long, so bring the row into view and let it
-  // pulse. The flag is cleared once, so re-opening the panel by hand
-  // afterwards does not replay it.
-  const ligne = React.useRef(null);
-  // The parent passes a fresh arrow on every render, so it is held in a
-  // ref rather than depended on: as a dependency it would restart the
-  // timer on each render and the flag would never clear.
-  const finRef = React.useRef(onHighlightDone);
-  React.useEffect(() => { finRef.current = onHighlightDone; }, [onHighlightDone]);
-  React.useEffect(() => {
-    if (!highlight) return;
-    ligne.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    const fin = setTimeout(() => finRef.current?.(), 3600);
-    return () => clearTimeout(fin);
-  }, [highlight]);
-
-  const dirty = draft.trim().toLowerCase() !== declared;
-
-  const save = async () => {
-    if (!dirty) return;
-    setBusy(true);
-    try {
-      // updateAdminSettings reports its own failures and resolves with
-      // nothing, so a refused domain must not flash "saved".
-      const stored = await onSave(draft.trim().toLowerCase());
-      if (!stored) return;
-      setSavedFlash(true);
-      showToast?.(t("saved"), "success");
-      setTimeout(() => setSavedFlash(false), 1500);
-    } catch (e) {
-      showToast?.(localizeServerError(e?.message, "saveFailed"), "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Where the domain in force comes from. Nothing to say while none is
-  // settled: the description already asks for the confirmation, and a
-  // second block saying the same thing was just noise.
-  const etat = {
-    configured: t("passkeyDomainFromEnv"),
-    admin: t("passkeyDomainFromPanel"),
-    certificate: t("passkeyDomainFromCertificate"),
-    "local-request": t("passkeyDomainFromLocal"),
-  }[source];
-
-  return (
-    <div
-      ref={ligne}
-      className={`flex flex-col gap-2 px-3 py-2 ${highlight ? "gk-attention" : ""}`}
-    >
-      <div className="flex items-center gap-3 min-w-0">
-        <RowIcon icon={TI.Key} />
-        <div className="min-w-0">
-          <div className="font-medium">{t("passkeyDomainLabel")}</div>
-          <div className="text-sm text-gray-500">{t("passkeyDomainDesc")}</div>
-        </div>
-      </div>
-
-      <div className="text-sm rounded-lg px-3 py-2 text-gray-500" hidden={!etat}>
-        {etat}
-        {state?.effective ? <> <code className="font-mono">{state.effective}</code></> : null}
-      </div>
-
-      {!readOnly && (
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="text"
-            inputMode="url"
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={253}
-            className="flex-1 px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--gk-chrome-accent)] placeholder-gray-500 dark:placeholder-gray-400 text-sm font-mono"
-            placeholder={suggested || t("passkeyDomainPlaceholder")}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                save();
-              }
-            }}
-            disabled={busy}
-          />
-          <button
-            type="button"
-            onClick={save}
-            disabled={!dirty || busy}
-            className="shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none disabled:hover:scale-100"
-          >
-            {/* Nothing declared yet means the field is showing a
-                suggestion, not a stored value: the admin is confirming
-                what is already in front of them, not saving an edit. */}
-            {busy ? t("saving") : savedFlash ? t("saved")
-              : undecided ? t("passkeyDomainConfirmCta") : t("save")}
-          </button>
-        </div>
-      )}
-
-      {!readOnly && declared && (
-        <div className="text-xs text-gray-500">{t("passkeyDomainChangeWarning")}</div>
-      )}
-    </div>
-  );
-}
-
-function formatBytes(bytes) {
-  if (!bytes) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-}
+import { SettingsSection } from "../common/SettingsAccordion.jsx";
 
 export default function AdminPanel({
   open,
@@ -257,7 +47,6 @@ export default function AdminPanel({
 }) {
   const toggleSection = (key) =>
     setOpenSections?.((prev) => ({ ...prev, [key]: !prev[key] }));
-  const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [editUserModalOpen, setEditUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [editUserForm, setEditUserForm] = useState({
@@ -408,23 +197,6 @@ export default function AdminPanel({
     });
   };
 
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
-    if (!newUserForm.name || !newUserForm.email || !newUserForm.password) {
-      showToast(t("pleaseFillRequiredFields"), "error");
-      return;
-    }
-    setIsCreatingUser(true);
-    try {
-      await createUser(newUserForm);
-      showToast(t("userCreatedSuccessfullyBang"), "success", undefined, "user-plus");
-    } catch {
-      // useAdminActions already surfaces the error toast.
-    } finally {
-      setIsCreatingUser(false);
-    }
-  };
-
   const openEditUserModal = (user) => {
     setEditingUser(user);
     setEditUserForm({
@@ -542,366 +314,53 @@ export default function AdminPanel({
               actionable items without scrolling. Hidden when the
               queue is empty. */}
           {pendingUsers && pendingUsers.length > 0 && (
-            <div className="mb-2">
-              <SettingsSection
-                icon={TI.UserClock}
-                title={
-                  <span className="flex items-center gap-2">
-                    <span>{t("pendingRegistrations")}</span>
-                    <span className="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 rounded-full">
-                      {pendingUsers.length}
-                    </span>
-                  </span>
-                }
-                open={openSections.pending}
-                onToggle={() => toggleSection("pending")}
-              >
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 pl-3">
-                  {t("pendingRegistrationsDesc")}
-                </p>
-                <div className="space-y-3">
-                  {pendingUsers.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center gap-3 px-3 py-3 border border-amber-300 dark:border-amber-700 rounded-lg bg-amber-50/50 dark:bg-amber-900/20"
-                    >
-                      <RowIcon icon={TI.UserCircle} />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium truncate">{p.name}</div>
-                        <div className="text-sm text-gray-500 truncate">{p.email}</div>
-                        <div className="text-xs text-gray-400 mt-1">
-                          {t("requestedOnPrefix")} {new Date(p.created_at).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="flex flex-shrink-0 gap-2">
-                        <button
-                          onClick={() => {
-                            showGenericConfirm({
-                              title: t("rejectRegistrationTitle"),
-                              message: t("rejectRegistrationConfirm").replace("{name}", p.name),
-                              confirmText: t("reject"),
-                              danger: true,
-                              onConfirm: async () => {
-                                try {
-                                  await rejectPendingUser(p.id);
-                                  showToast(t("registrationRejected"), "info", undefined, "user-x");
-                                } catch (err) {
-                                  showToast(localizeServerError(err.message, "failedRejectUser"), "error");
-                                }
-                              },
-                            });
-                          }}
-                          className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
-                          data-tooltip={t("reject")}
-                          aria-label={t("reject")}
-                        >
-                          <TI.X className="tabler-icon w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await approvePendingUser(p.id);
-                              showToast(t("registrationApproved"), "success", undefined, "user-check");
-                            } catch (err) {
-                              showToast(localizeServerError(err.message, "failedApproveUser"), "error");
-                            }
-                          }}
-                          className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
-                          data-tooltip={t("approve")}
-                          aria-label={t("approve")}
-                        >
-                          <TI.Check className="tabler-icon w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </SettingsSection>
-            </div>
+            <PendingRegistrationsSection
+              open={openSections.pending}
+              onToggle={() => toggleSection("pending")}
+              pendingUsers={pendingUsers}
+              approvePendingUser={approvePendingUser}
+              rejectPendingUser={rejectPendingUser}
+              showGenericConfirm={showGenericConfirm}
+              showToast={showToast}
+            />
           )}
 
           {/* Site settings (login slogan, registration toggle) */}
-          <div className="mb-2">
-            <SettingsSection
-              icon={TI.HomeLock}
-              title={t("siteSettings")}
-              open={openSections.site}
-              onToggle={() => toggleSection("site")}
-            >
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 px-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <RowIcon icon={TI.UserPlus} />
-                  <div className="min-w-0">
-                    <div className="font-medium">{t("allowNewAccountCreation")}</div>
-                    <div className="text-sm text-gray-500">{t("allowNewAccountCreationDesc")}</div>
-                  </div>
-                </div>
-                <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    adminSettings.allowNewAccounts
-                      ? "bg-[var(--gk-switch-on)]"
-                      : "bg-gray-300 dark:bg-gray-600"
-                  }`}
-                  onClick={() =>
-                    updateAdminSettings({
-                      allowNewAccounts: !adminSettings.allowNewAccounts,
-                    })
-                  }
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      adminSettings.allowNewAccounts ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Single sign-on: once allowed, the policy, the local
-                  network option and the instance's provider. */}
-              <div className="flex items-center justify-between gap-3 px-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <RowIcon icon={TI.UserCircle} />
-                  <div className="min-w-0">
-                    <div className="font-medium">{t("allowSso")}</div>
-                    <div className="text-sm text-gray-500">{t("allowSsoDesc")}</div>
-                  </div>
-                </div>
-                <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    adminSettings.ssoAllowed
-                      ? "bg-[var(--gk-switch-on)]"
-                      : "bg-gray-300 dark:bg-gray-600"
-                  }`}
-                  onClick={() =>
-                    updateAdminSettings({
-                      ssoAllowed: !adminSettings.ssoAllowed,
-                    })
-                  }
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      adminSettings.ssoAllowed ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-              {adminSettings.ssoAllowed && (
-                <OidcAdminSection
-                  token={authToken}
-                  adminSettings={adminSettings}
-                  updateAdminSettings={updateAdminSettings}
-                  showToast={showToast}
-                  showGenericConfirm={showGenericConfirm}
-                />
-              )}
-
-              <LoginSloganRow
-                value={adminSettings.loginSlogan}
-                onSave={(slogan) => updateAdminSettings({ loginSlogan: slogan })}
-                showToast={showToast}
-              />
-
-              <PasskeyDomainRow
-                state={adminSettings.passkeyDomainState}
-                onSave={(domain) => updateAdminSettings({ passkeyDomain: domain })}
-                showToast={showToast}
-                highlight={highlightPasskeyDomain}
-                onHighlightDone={onPasskeyDomainHighlighted}
-              />
-
-              {/* Branding (custom app name, logo, login background +
-                  blur) — separated from the toggle/slogan rows by a
-                  hairline so the section reads as two logical groups. */}
-              <div className="pt-2 border-t border-[var(--border-light)]">
-                <LoginBrandingSection
-                  dark={dark}
-                  adminSettings={adminSettings}
-                  updateAdminSettings={updateAdminSettings}
-                  showToast={showToast}
-                />
-              </div>
-            </div>
-            </SettingsSection>
-          </div>
+          <SiteSettingsSection
+            open={openSections.site}
+            onToggle={() => toggleSection("site")}
+            dark={dark}
+            adminSettings={adminSettings}
+            updateAdminSettings={updateAdminSettings}
+            authToken={authToken}
+            showToast={showToast}
+            showGenericConfirm={showGenericConfirm}
+            highlightPasskeyDomain={highlightPasskeyDomain}
+            onPasskeyDomainHighlighted={onPasskeyDomainHighlighted}
+          />
 
           {/* All users — same row pattern as Settings, with avatar in
               the leading icon slot and edit/delete actions on the right. */}
-          <div className="mb-2">
-            <SettingsSection
-              icon={TI.Users}
-              title={
-                <span className="flex items-center gap-2">
-                  <span>{t("allUsers")}</span>
-                  <span className="px-2 py-0.5 text-xs font-semibold bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)] rounded-full">
-                    {allUsers.length}
-                  </span>
-                </span>
-              }
-              open={openSections.users}
-              onToggle={() => toggleSection("users")}
-            >
-            <div className="space-y-3">
-              {allUsers.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex flex-col gap-2 px-3 py-3 border border-[var(--border-light)] rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <UserAvatar
-                      name={user.name}
-                      email={user.email}
-                      avatarUrl={user.avatar_url}
-                      size="w-9 h-9"
-                      textSize="text-sm"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium flex items-center gap-2">
-                        <span className="truncate">{user.name}</span>
-                        {user.is_admin && (
-                          <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200 rounded uppercase tracking-wide">
-                            {t("admin")}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-500 truncate">{user.email}</div>
-                    </div>
-                    <div className="flex flex-shrink-0 gap-2">
-                      <button
-                        onClick={() => openEditUserModal(user)}
-                        className="w-9 h-9 flex items-center justify-center rounded-lg gk-admin-edit-btn transition-colors"
-                        data-tooltip={t("edit")}
-                        aria-label={t("edit")}
-                      >
-                        <TI.Pencil className="tabler-icon w-5 h-5" />
-                      </button>
-                      {user.id !== currentUser?.id && (
-                        <button
-                          onClick={() => {
-                            showGenericConfirm({
-                              title: t("deleteUser"),
-                              // Include the email in the danger message
-                              // so the admin can tell two same-named
-                              // accounts apart before confirming.
-                              message: t("deleteUserConfirm", {
-                                name: user.name,
-                                email: user.email,
-                              }),
-                              confirmText: t("delete"),
-                              danger: true,
-                              onConfirm: async () => {
-                                // Only show the success toast AFTER
-                                // the server confirms — useAdminActions
-                                // throws on error and the alert there
-                                // surfaces the failure.
-                                try {
-                                  const deleted = await deleteUser(user.id);
-                                  if (deleted) {
-                                    showToast?.(
-                                      t("userDeletedToast", {
-                                        name: deleted.name || deleted.email,
-                                      }),
-                                      "success",
-                                      undefined,
-                                      "user-x",
-                                    );
-                                  }
-                                } catch {
-                                  // Error already surfaced by deleteUser
-                                }
-                              },
-                            });
-                          }}
-                          className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
-                          data-tooltip={t("delete")}
-                          aria-label={t("delete")}
-                        >
-                          <TI.Trash className="tabler-icon w-5 h-5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 pl-12 text-xs text-gray-500 dark:text-gray-400">
-                    <span>{t("notes")}: {user.notes}</span>
-                    <span>{t("storage")}: {formatBytes(user.storage_bytes ?? 0)}</span>
-                    <span>{t("joinedPrefix")} {new Date(user.created_at).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            </SettingsSection>
-          </div>
+          <UsersSection
+            open={openSections.users}
+            onToggle={() => toggleSection("users")}
+            allUsers={allUsers}
+            currentUser={currentUser}
+            deleteUser={deleteUser}
+            onEditUser={openEditUserModal}
+            showGenericConfirm={showGenericConfirm}
+            showToast={showToast}
+          />
 
           {/* Create new user */}
-          <div className="mb-2">
-            <SettingsSection
-              icon={TI.UserPlus}
-              title={t("createNewUser")}
-              open={openSections.createUser}
-              onToggle={() => toggleSection("createUser")}
-            >
-            <form onSubmit={handleCreateUser} className="space-y-3 pl-3">
-              <input
-                type="text"
-                placeholder={t("name")}
-                value={newUserForm.name}
-                onChange={(e) =>
-                  setNewUserForm((prev) => ({ ...prev, name: e.target.value }))
-                }
-                className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--gk-chrome-accent)] placeholder-gray-500 dark:placeholder-gray-400"
-              />
-              <input
-                type="text"
-                placeholder={t("username")}
-                value={newUserForm.email}
-                onChange={(e) =>
-                  setNewUserForm((prev) => ({ ...prev, email: e.target.value }))
-                }
-                className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--gk-chrome-accent)] placeholder-gray-500 dark:placeholder-gray-400"
-              />
-              <input
-                type="password"
-                placeholder={t("temporaryPassword")}
-                value={newUserForm.password}
-                onChange={(e) =>
-                  setNewUserForm((prev) => ({ ...prev, password: e.target.value }))
-                }
-                className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--gk-chrome-accent)] placeholder-gray-500 dark:placeholder-gray-400"
-              />
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                {t("temporaryPasswordHint")}
-              </p>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm">{t("makeAdmin")}</span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setNewUserForm((prev) => ({ ...prev, is_admin: !prev.is_admin }))
-                  }
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    newUserForm.is_admin
-                      ? "bg-[var(--gk-switch-on)]"
-                      : "bg-gray-300 dark:bg-gray-600"
-                  }`}
-                  aria-pressed={newUserForm.is_admin}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      newUserForm.is_admin ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-              <button
-                type="submit"
-                disabled={isCreatingUser}
-                className="block w-[90%] mx-auto px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
-              >
-                {isCreatingUser ? t("creating") : t("createUser")}
-              </button>
-            </form>
-            </SettingsSection>
-          </div>
+          <CreateUserSection
+            open={openSections.createUser}
+            onToggle={() => toggleSection("createUser")}
+            newUserForm={newUserForm}
+            setNewUserForm={setNewUserForm}
+            createUser={createUser}
+            showToast={showToast}
+          />
 
           {/* AI provider — OpenAI-compatible endpoint (Ollama, Open
               WebUI, LiteLLM, OpenAI, …). Configuration is admin-only;
@@ -962,97 +421,14 @@ export default function AdminPanel({
       {/* Edit user modal — kept identical to before; the panel is just
           the launcher. */}
       {editUserModalOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div
-            className="rounded-xl shadow-2xl w-full max-w-md p-6"
-            style={{
-              backgroundColor: dark
-                ? "rgba(40,40,40,0.98)"
-                : "rgba(255,255,255,0.98)",
-            }}
-          >
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-3">
-              <SectionHeaderIcon icon={TI.Pencil} />
-              {t("editUser")}
-            </h3>
-            <form onSubmit={handleUpdateUser} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">{t("name")}</label>
-                <input
-                  type="text"
-                  value={editUserForm.name}
-                  onChange={(e) =>
-                    setEditUserForm((prev) => ({ ...prev, name: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--gk-chrome-accent)]"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">{t("username")}</label>
-                <input
-                  type="text"
-                  value={editUserForm.email}
-                  onChange={(e) =>
-                    setEditUserForm((prev) => ({ ...prev, email: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--gk-chrome-accent)]"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">{t("resetPasswordLabel")}</label>
-                <input
-                  type="password"
-                  value={editUserForm.password}
-                  onChange={(e) =>
-                    setEditUserForm((prev) => ({ ...prev, password: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--gk-chrome-accent)]"
-                  placeholder={t("leaveEmptyKeepCurrentPassword")}
-                />
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  {t("resetPasswordHint")}
-                </p>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm">{t("makeAdmin")}</span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setEditUserForm((prev) => ({ ...prev, is_admin: !prev.is_admin }))
-                  }
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    editUserForm.is_admin
-                      ? "bg-[var(--gk-switch-on)]"
-                      : "bg-gray-300 dark:bg-gray-600"
-                  }`}
-                  aria-pressed={editUserForm.is_admin}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      editUserForm.is_admin ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setEditUserModalOpen(false)}
-                  className="px-4 py-2 border border-[var(--border-light)] rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
-                >{t("cancel")}</button>
-                <button
-                  type="submit"
-                  disabled={isUpdatingUser}
-                  className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
-                >
-                  {isUpdatingUser ? t("updating") : t("updateUser")}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <EditUserModal
+          dark={dark}
+          editUserForm={editUserForm}
+          setEditUserForm={setEditUserForm}
+          isUpdatingUser={isUpdatingUser}
+          onSubmit={handleUpdateUser}
+          onCancel={() => setEditUserModalOpen(false)}
+        />
       )}
 
       {restartPhase && (
