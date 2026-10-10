@@ -152,8 +152,10 @@ export const audioAccentColor = (colorKey, dark) => {
 };
 
 export const scrollColorsFor = (colorKey, dark) => {
+  // A note with no colour of its own wears the workspace theme's scrollbar,
+  // the one the rest of the app uses (mode-aware tokens, see globalCSS).
   if (!colorKey || colorKey === "default")
-    return dark ? { thumb: "#7c3aed", track: "#3b0764" } : { thumb: "#a78bfa", track: "#e3d0ff" };
+    return { thumb: "var(--gk-scroll-thumb)", track: "var(--gk-scroll-track)" };
   const base = solid(bgFor(colorKey, dark));
   if (dark) {
     const { r, g, b } = parseRGBA(base);
