@@ -50,7 +50,7 @@ export default function EncryptionAdminSection({ token, showToast }) {
       await api("/instance/lock", { method: "POST", token });
       // The very next request to a non-allowlisted endpoint will return
       // 423 and our api wrapper will fire `instance-locked`, which the
-      // useInstanceLockStatus hook in App.jsx listens to. The user
+      // useInstanceLockStatus hook (via useInstanceLock) listens to. The user
       // immediately drops to the unlock screen.
       window.dispatchEvent(new CustomEvent("instance-locked"));
     } catch (e) {

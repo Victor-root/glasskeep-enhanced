@@ -24,9 +24,6 @@ import { readStarDismissed, dismissStarCta } from "./changelogFlags.js";
 //  injected via dangerouslySetInnerHTML is sanitized.
 // =============================================================================
 
-// eslint-disable-next-line react-refresh/only-export-components -- App.jsx imports these flag helpers from here
-export { consumeChangelogShowFlag, onOpenChangelogRequest } from "./changelogFlags.js";
-
 // One filter for every sanitizing path in the app. See safeStyle.js.
 installStyleGuard(DOMPurify);
 

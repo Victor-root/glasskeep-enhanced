@@ -170,7 +170,7 @@ function createNoteTeardown({ q, store, peer, deps, log, findRealUser, splitOrig
   // by the recipient's REAL account: a copy made on the owner's server
   // could only ever belong to the powerless shadow user standing in for
   // them there. Field-for-field the same shape as the local
-  // remove-collaborator "keep a copy" flow in server/index.js.
+  // remove-collaborator "keep a copy" flow in server/routes/collaborationRoutes.js.
   // Returns the new note id, or null if it could not be created.
   function makeStandaloneCopy(note, userId) {
     try {

@@ -78,9 +78,9 @@ function createAppSettings({ db }) {
 
   // Hand the stored domain to the resolver, which holds it for every
   // passkey ceremony. Re-pushed on every settings change by
-  // adminSettingsRoutes.js. Said once
-  // here rather than discovered when a passkey fails: the operator learns
-  // which source their domain comes from, and what to do if none applies.
+  // adminSettingsRoutes.js. Said once here rather than discovered when a
+  // passkey fails: the operator learns which source their domain comes
+  // from, and what to do if none applies.
   webauthnRp.setDeclaredRpId(adminSettings.passkeyDomain);
   console.log(webauthnRp.describeConfig());
 
