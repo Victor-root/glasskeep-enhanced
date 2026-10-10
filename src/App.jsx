@@ -8,32 +8,26 @@ import React, {
   useDeferredValue,
 } from "react";
 import { askAI } from "./ai";
-import { t, syncLanguageFromServer } from "./i18n";
-import { SyncEngine } from "./sync/syncEngine.js";
+import { t } from "./i18n";
 import {
   getAllNotes as idbGetAllNotes,
   getNote as idbGetNote,
   putNote as idbPutNote,
-  putNotes as idbPutNotes,
   deleteNote as idbDeleteNote,
-  enqueue as idbEnqueue,
-  hasPendingChanges,
   clearQueueForUser as idbClearQueueForUser,
   clearNotesForSession as idbClearNotesForSession,
-  purgeQueueForNote as idbPurgeQueueForNote,
 } from "./sync/localDb.js";
-import { api, getAuth, setAuth, getClientId } from "./utils/api.js";
-import { netLog } from "./utils/netDebug.js";
+import { api, getAuth, setAuth } from "./utils/api.js";
 import { localizeServerError } from "./utils/serverErrors.js";
 import { mdForDownload } from "./utils/markdown.jsx";
 import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, fileToCompressedDataURL } from "./utils/helpers.js";
-import { sortNotesByRecency, sortNotesForOrderReset, noteBelongsInView, computeRestoredPosition, sortByPositionDesc } from "./utils/noteList.js";
+import { sortNotesByRecency, sortNotesForOrderReset, computeRestoredPosition, sortByPositionDesc } from "./utils/noteList.js";
 import { textToChecklistItems, checklistItemsToText } from "./utils/noteConversion.js";
 import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "./utils/richText.js";
 import { normalizeTypographyPresets } from "./utils/typographyPresets.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES, REMINDERS } from "./utils/constants.js";
-import { hasAndroidReminders, syncAndroidReminders, setAndroidReminderAuth, notifyAndroidNow } from "./utils/androidReminders.js";
+import { hasAndroidReminders, syncAndroidReminders, setAndroidReminderAuth } from "./utils/androidReminders.js";
 import { fetchLogoLibrary, createLogo, deleteLogo as apiDeleteLogo } from "./utils/logoLibrary.js";
 import TooltipPortal from "./components/common/TooltipPortal.jsx";
 import AuthShell from "./components/auth/AuthShell.jsx";
@@ -79,6 +73,13 @@ import useDarkMode from "./hooks/useDarkMode.js";
 import useWindowSize from "./hooks/useWindowSize.js";
 import usePublicLoginInfo from "./hooks/usePublicLoginInfo.js";
 import useInstanceLock from "./hooks/useInstanceLock.js";
+import useLocalLeases from "./sync/useLocalLeases.js";
+import useNoteSync from "./sync/useNoteSync.js";
+import useNotesLoader from "./sync/useNotesLoader.js";
+import useServerEvents from "./sync/useServerEvents.js";
+import { reconcileSyncResult } from "./sync/reconcileSyncResult.js";
+import { patchNotes } from "./sync/remoteNotePatches.js";
+import { dispatchServerEvent } from "./sync/dispatchServerEvent.js";
 import { useStableCallback } from "./hooks/useStableCallback.js";
 import InstanceUnlockScreen from "./components/lock/InstanceUnlockScreen.jsx";
 import LockedBanner from "./components/lock/LockedBanner.jsx";
@@ -119,19 +120,42 @@ export default function App() {
   const [allNotesForTags, setAllNotesForTags] = useState([]);
   const [search, setSearch] = useState("");
 
-  // ─── Local-first sync state ───
-  // Canonical reset shape — used at init, cleanup, and sign-out to avoid divergence.
-  const SYNC_STATUS_RESET = useMemo(() => ({
-    syncState: "checking", serverReachable: null, hasPendingChanges: false, isSyncing: false,
-    lastSyncAt: null, lastSyncError: null,
-    pending: 0, processing: 0, failed: 0, total: 0, items: [],
-  }), []);
-  const [syncStatus, setSyncStatus] = useState(SYNC_STATUS_RESET);
-  const syncEngineRef = useRef(null);
-  const reconnectSseRef = useRef(null); // called when server recovers to revive SSE
-  const tokenRef = useRef(token);
-  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
-  tokenRef.current = token;
+  // Local-first sync: leases protecting unsent local changes, the sync
+  // engine and its queue.
+  const leases = useLocalLeases();
+  const {
+    acquireLocalLease, releaseLocalLease, releaseLocalLeaseWithPrune,
+    isNoteLocallyProtected, addDeleteTombstone,
+  } = leases;
+  const {
+    syncStatus, syncEngineRef, reloadCurrentViewRef,
+    triggerSync, handleSyncNow, enqueueAndSync, enqueueWithLease, resetSync,
+  } = useNoteSync({
+    token,
+    userId: currentUser?.id,
+    sessionId,
+    leases,
+    onSyncComplete: (item, result) => reconcileSyncResult(item, result, {
+      userId: currentUser?.id,
+      sessionId,
+      viewFilter: () => tagFilterRef.current,
+      setNotes,
+      leases,
+      onNoteGone: closeNoteIfOpen,
+      reloadCurrentView: () => reloadCurrentViewRef.current?.(),
+    }),
+    // 403 on a mutation: access was revoked while offline (the live event
+    // was missed). The engine already purged the queue; drop the note
+    // everywhere else.
+    onNoteInaccessible: async (noteId) => {
+      const nid = String(noteId);
+      setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+      idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+      leases.forgetNote(nid);
+      closeNoteIfOpen(nid);
+    },
+  });
+
   const currentUserIdRef = useRef(currentUser?.id);
   // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
   currentUserIdRef.current = currentUser?.id;
@@ -434,90 +458,6 @@ export default function App() {
   const importFileRef = useRef(null);
   const gkeepFileRef = useRef(null);
   const mdFileRef = useRef(null);
-
-  // Loading state for notes
-  const [notesLoading, setNotesLoading] = useState(!!token);
-  const notesAreRegular = useRef(true); // tracks whether notes[] holds regular (non-archive/trash) notes
-
-  // ─── Per-noteId lease-based protection against SSE overwrite ───
-  // Each local mutation acquires a unique lease with a monotonic sequence number.
-  // A note is protected as long as it holds at least one active lease.
-  // On successful enqueue, the caller releases its lease AND prunes all older
-  // leases for the same note (seq <= its own), clearing zombie leases left by
-  // earlier failed operations. Newer leases (higher seq) are never touched.
-  // Map<noteId, Map<leaseId, { seq: number }>>
-  const localLeaseRef = useRef(new Map());
-  const leaseSeqRef = useRef(0);
-
-  const acquireLocalLease = (noteId) => {
-    const seq = ++leaseSeqRef.current;
-    const leaseId = `L${seq}`;
-    const map = localLeaseRef.current;
-    if (!map.has(noteId)) map.set(noteId, new Map());
-    map.get(noteId).set(leaseId, { seq });
-    return leaseId;
-  };
-  const releaseLocalLease = (noteId, leaseId) => {
-    const map = localLeaseRef.current;
-    const leases = map.get(noteId);
-    if (!leases) return;
-    leases.delete(leaseId);
-    if (leases.size === 0) map.delete(noteId);
-  };
-  // Release own lease + prune all older leases for the same note.
-  // Called after a successful enqueueAndSync — any earlier failed lease on this
-  // note is now superseded because a newer mutation reached the queue safely.
-  const releaseLocalLeaseWithPrune = (noteId, leaseId) => {
-    const map = localLeaseRef.current;
-    const leases = map.get(noteId);
-    if (!leases) return;
-    const own = leases.get(leaseId);
-    const maxSeq = own ? own.seq : -1;
-    // Collect IDs to delete (cannot mutate Map during iteration in all engines)
-    const toDelete = [];
-    for (const [lid, meta] of leases) {
-      if (meta.seq <= maxSeq) toDelete.push(lid);
-    }
-    for (const lid of toDelete) leases.delete(lid);
-    if (leases.size === 0) map.delete(noteId);
-  };
-  const isNoteLocallyProtected = (noteId) => {
-    const leases = localLeaseRef.current.get(noteId);
-    return !!leases && leases.size > 0;
-  };
-  const clearAllLocalLeases = () => {
-    localLeaseRef.current.clear();
-  };
-  // Acquire lease → await enqueue → prune on success. Lease stays on failure.
-  // Caller acquires lease BEFORE local mutations, passes leaseId here.
-  const enqueueWithLease = async (noteId, syncAction, leaseId) => {
-    try {
-      await enqueueAndSync(syncAction);
-    } catch {
-      return false; // lease stays active — SSE protection maintained
-    }
-    releaseLocalLeaseWithPrune(noteId, leaseId);
-    return true;
-  };
-  // ─── Pending reorder leases ───
-  // Reorder queue items use noteId:"__reorder__", so hasPendingChanges(realNoteId)
-  // returns false after enqueue. We hold per-note leases here until onSyncComplete
-  // confirms the reorder server-side. Map<reorderToken, Array<{noteId, leaseId}>>
-  const pendingReorderLeasesRef = useRef(new Map());
-  const reorderTokenSeqRef = useRef(0);
-
-  // ─── Permanent-delete tombstones ───
-  // When a note is permanently deleted locally but not yet confirmed by the
-  // server, its id lives here. Loaders and patchSingleNote skip tombstoned
-  // notes entirely — they cannot reappear from server data while pending.
-  // Cleared per-note by onSyncComplete after server confirms, or globally
-  // by cleanupClientSession on sign-out.
-  const localDeleteTombstoneRef = useRef(new Set());
-  const addDeleteTombstone = (noteId) => localDeleteTombstoneRef.current.add(String(noteId));
-  const removeDeleteTombstone = (noteId) => localDeleteTombstoneRef.current.delete(String(noteId));
-  const isDeleteTombstoned = (noteId) => localDeleteTombstoneRef.current.has(String(noteId));
-
-  // Remove lazy loading state
 
   // -------- Multi-select state --------
   const [multiMode, setMultiMode] = useState(false);
@@ -967,275 +907,6 @@ export default function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, [sidebarOpen]);
 
-  // ─── SyncEngine lifecycle ───
-  //
-  // CANONICAL SYNC PATH (single source of truth):
-  //
-  //   User action → IDB write → enqueueAndSync(action) → idbEnqueue → triggerSync
-  //     → syncEngineRef.current.processQueue() → HTTP calls → onStatusChange → setSyncStatus
-  //
-  //   Remote updates: SSE → patchSingleNote(noteId) → hasPendingChanges guard → IDB + setNotes
-  //   Retry:          processQueue self-reschedules on retryable failures
-  //   Recovery:       healthCheck (adaptive 5s/10s/30s) resets transient failures → processQueue
-  //   Manual:         handleSyncNow → syncEngine.forceSync() → healthCheck + reset all + processQueue
-  //
-  //   State ownership:
-  //   - syncStatus (React state)     ← ONLY written by syncEngine.onStatusChange + reset points
-  //   - IndexedDB syncQueue          ← ONLY written by idbEnqueue + syncEngine queue updates
-  //   - IndexedDB notes store        ← Written by load functions, auto-save, patchSingleNote
-  //   - localLeaseRef                 ← Per-noteId lease-based SSE protection (Map<noteId, Map<leaseId, { seq }>>); success prunes older leases
-  //   - localDeleteTombstoneRef       ← Set<noteId> of pending permanent deletes; prevents resurrection by loaders/SSE
-  //
-  useEffect(() => {
-    if (!token || !currentUser?.id) {
-      if (syncEngineRef.current) {
-        syncEngineRef.current.destroy();
-        syncEngineRef.current = null;
-      }
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the sync status when the engine is torn down on sign-out
-      setSyncStatus(SYNC_STATUS_RESET);
-      return;
-    }
-
-    const engine = new SyncEngine({
-      getToken: () => tokenRef.current,
-      userId: currentUser.id,
-      sessionId,
-      onStatusChange: (status) => setSyncStatus(status),
-      onSyncComplete: async (item, result) => {
-        // Reconcile local cache with server response after successful sync.
-        // Only act when the server returned useful canonical data.
-        try {
-          const uid = currentUser?.id;
-          const sid = sessionId;
-          if (!uid || !sid) return;
-
-          // ── LWW stale write reconciliation ──
-          // Server returned { ok, stale: true, note } → our write was older than
-          // what's already stored. Replace local state with the canonical server note
-          // so the client converges immediately (no full reload needed).
-          if (result && result.stale && result.note) {
-            const canonical = result.note;
-            const nid = String(canonical.id || item.noteId);
-            const pending = await hasPendingChanges(nid, uid);
-            if (!pending && !isNoteLocallyProtected(nid)) {
-              await idbPutNote(canonical, uid, sid);
-              // Determine if canonical note belongs in the current view
-              const currentFilter = tagFilterRef.current;
-              const belongsInView = noteBelongsInView(canonical, currentFilter);
-              setNotes((prev) => {
-                const idx = prev.findIndex((n) => String(n.id) === nid);
-                if (belongsInView) {
-                  if (idx !== -1) {
-                    // Update in place
-                    const updated = prev.slice();
-                    updated[idx] = canonical;
-                    return updated;
-                  }
-                  // Note should appear in this view but isn't present — insert it
-                  return sortNotesByRecency([...prev, canonical]);
-                }
-                // Note doesn't belong in this view — remove if present
-                if (idx !== -1) return prev.filter((n) => String(n.id) !== nid);
-                return prev;
-              });
-            }
-            return; // stale write fully handled — skip normal reconciliation
-          }
-
-          // ── Dropped mutation (404): note gone on server ──
-          // Purge local ghost so UI converges without a full reload.
-          const DROPPABLE_TYPES = new Set(["update", "patch", "archive", "trash", "restore"]);
-          if (result?.dropped && DROPPABLE_TYPES.has(item.type) && item.noteId) {
-            const nid = String(item.noteId);
-            console.warn(`[Sync] ${item.type} dropped (404) for note ${nid}, purging locally`);
-            setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-            try { await idbDeleteNote(nid, uid, sid); } catch { /* IDB best-effort */ }
-            localLeaseRef.current.delete(nid);
-            if (String(activeIdRef.current) === nid) {
-              // eslint-disable-next-line react-hooks/immutability -- called from a sync engine callback, after render
-              forceCloseModalForRemoteDelete(nid);
-            }
-            return;
-          }
-
-          // ── Normal reconciliation: server accepted the write ──
-          // Endpoints now return { ok, note } — reconcile with canonical note.
-          const serverNote = result?.note || (result?.id ? result : null);
-
-          if (item.type === "create" && serverNote && serverNote.id) {
-            const nid = String(serverNote.id);
-            const pending = await hasPendingChanges(nid, uid);
-            if (!pending) {
-              await idbPutNote(serverNote, uid, sid);
-              // Determine if the created note belongs in the current view
-              const currentFilter = tagFilterRef.current;
-              const belongsInView = noteBelongsInView(serverNote, currentFilter);
-              setNotes((prev) => {
-                const idx = prev.findIndex((n) => String(n.id) === nid);
-                if (idx !== -1) {
-                  const updated = prev.slice();
-                  updated[idx] = { ...prev[idx], ...serverNote };
-                  return updated;
-                }
-                // Note not in state (e.g. state cleared by page refresh while
-                // queue item was pending) — insert if it belongs in current view
-                if (belongsInView) {
-                  return sortNotesByRecency([...prev, serverNote]);
-                }
-                return prev;
-              });
-            }
-          } else if (serverNote && item.noteId) {
-            // update/patch/archive/trash/restore — reconcile with canonical note
-            const nid = String(item.noteId);
-            const pending = await hasPendingChanges(nid, uid);
-            if (!pending && !isNoteLocallyProtected(nid)) {
-              const canonical = { ...serverNote, id: nid };
-              await idbPutNote(canonical, uid, sid);
-              // Converge React state: note may have changed view membership
-              // (e.g. archive from active view, restore from trash view)
-              const currentFilter = tagFilterRef.current;
-              const belongsInView = noteBelongsInView(canonical, currentFilter);
-              setNotes((prev) => {
-                const idx = prev.findIndex((n) => String(n.id) === nid);
-                if (belongsInView) {
-                  if (idx !== -1) {
-                    const updated = prev.slice();
-                    updated[idx] = canonical;
-                    return sortNotesByRecency(updated);
-                  }
-                  return sortNotesByRecency([...prev, canonical]);
-                }
-                if (idx !== -1) return prev.filter((n) => String(n.id) !== nid);
-                return prev;
-              });
-            }
-          } else if (item.type === "permanentDelete" && item.noteId) {
-            const nid = String(item.noteId);
-            removeDeleteTombstone(nid);
-            if (result?.stale && result?.note) {
-              // Server rejected delete (note was restored by another device).
-              // Re-add the canonical note to local state so it reappears.
-              console.warn(`[Sync] permanentDelete stale for ${nid}, note was restored — re-adding`);
-              const canonical = result.note;
-              await idbPutNote(canonical, uid, sid);
-              setNotes((prev) => {
-                if (prev.some((n) => String(n.id) === nid)) return prev;
-                return sortNotesByRecency([...prev, canonical]);
-              });
-            } else {
-              try { await idbDeleteNote(nid, uid, sid); } catch { /* IDB best-effort */ }
-            }
-          } else if (item.type === "reorder" && item.payload?._reorderToken) {
-            const token = item.payload._reorderToken;
-            const leases = pendingReorderLeasesRef.current.get(token);
-            if (leases) {
-              for (const { noteId, leaseId } of leases) {
-                releaseLocalLeaseWithPrune(noteId, leaseId);
-              }
-              pendingReorderLeasesRef.current.delete(token);
-            }
-            // If server rejected the reorder as stale or the item was dropped,
-            // reload canonical positions so local state converges.
-            if (result?.stale || result?.dropped) {
-              console.warn("[Sync] Reorder not applied (stale/dropped), reloading notes for canonical order");
-              const cf = tagFilterRef.current;
-              // eslint-disable-next-line react-hooks/immutability -- called from a sync engine callback, after render
-              if (cf === "ARCHIVED") loadArchivedNotes().catch(() => {});
-              // eslint-disable-next-line react-hooks/immutability -- called from a sync engine callback, after render
-              else if (cf === "TRASHED") loadTrashedNotes().catch(() => {});
-              // eslint-disable-next-line react-hooks/immutability -- called from a sync engine callback, after render
-              else loadNotes().catch(() => {});
-            }
-          }
-        } catch (e) {
-          console.error("[Sync] reconciliation error:", e);
-        }
-      },
-      onSyncError: (item, err) => console.warn("[Sync] Failed:", item.type, item.noteId, err.message),
-      onNoteInaccessible: async (noteId) => {
-        // Server returned 403 on a note mutation — access was revoked while
-        // we were offline (SSE note_access_revoked was missed). Force full
-        // local convergence: remove note from UI, IDB, leases, and modal.
-        const nid = String(noteId);
-        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-        idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
-        // Queue already purged by the sync engine before calling us
-        localLeaseRef.current.delete(nid);
-        if (String(activeIdRef.current) === nid) {
-          forceCloseModalForRemoteDelete(nid);
-        }
-      },
-    });
-    syncEngineRef.current = engine;
-    engine.startHealthChecks();
-
-    // Process leftover queue from previous session
-    engine.processQueue();
-
-    return () => {
-      engine.destroy();
-      syncEngineRef.current = null;
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- the sync engine must be rebuilt only when the user or the session changes
-  }, [token, currentUser?.id, sessionId]);
-
-  const triggerSync = useCallback(() => {
-    syncEngineRef.current?.processQueue();
-  }, []);
-
-  // Ref to always hold the latest reload function (avoids stale closure in handleSyncNow)
-  const reloadCurrentViewRef = useRef(null);
-
-  const handleSyncNow = useCallback(async () => {
-    const engine = syncEngineRef.current;
-    await engine?.forceSync();
-    // After syncing the queue, also reload notes from server to pick up
-    // changes made by other devices (new notes, edits, etc.)
-    if (engine?.serverReachable) {
-      if (engine) await engine.beginPull();
-      try {
-        await reloadCurrentViewRef.current?.();
-      } finally {
-        if (engine) await engine.endPull();
-      }
-    }
-  }, []);
-
-  // Warn before closing if there are pending local changes
-  useEffect(() => {
-    const handler = (e) => {
-      if (syncStatus.hasPendingChanges) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [syncStatus.hasPendingChanges]);
-
-  // ─── Local-first helpers ───
-  // Enqueue a sync action and immediately trigger the engine
-  const enqueueAndSync = useCallback(async (action) => {
-    await idbEnqueue({ ...action, userId: currentUser?.id, sessionId });
-    triggerSync();
-  }, [triggerSync, currentUser?.id, sessionId]);
-
-  // Purge stale localStorage notes caches to free quota (IndexedDB is now primary)
-  useEffect(() => {
-    try {
-      const keys = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && (k.startsWith("glass-keep-notes-") || k.startsWith("glass-keep-archived-") || k.startsWith("glass-keep-trashed-"))) {
-          keys.push(k);
-        }
-      }
-      keys.forEach((k) => localStorage.removeItem(k));
-    } catch { /* storage unavailable: nothing to clear */ }
-  }, []);
-
   // Load notes
   const handleAiSearch = async (question) => {
     if (!question || question.trim().length < 3) return;
@@ -1264,1266 +935,60 @@ export default function App() {
     }
   };
 
-  // Helper: combines queue-based protection (hasPendingChanges, async/IDB) with
-  // in-memory lease protection (isNoteLocallyProtected, sync/ref) and delete
-  // tombstones. Used as both early snapshot AND late "final guard before write"
-  // to close TOCTOU races where protection appears between check and write.
-  const isProtectedFromServerOverwrite = async (noteId, userId) => {
-    if (isDeleteTombstoned(noteId)) return true;
-    if (isNoteLocallyProtected(noteId)) return true;
-    return hasPendingChanges(noteId, userId);
-  };
-
-  const loadNotes = async () => {
-    if (!token) return;
-    const expectedFilter = tagFilterRef.current;
-    // Guard: only load active notes when we're actually in the active view
-    if (expectedFilter === "ARCHIVED" || expectedFilter === "TRASHED") return;
-    notesAreRegular.current = true;
-    setNotesLoading(true);
-
-    try {
-      // First: show notes from IndexedDB immediately (local-first)
-      try {
-        const localNotes = await idbGetAllNotes(currentUser?.id, sessionId, "active");
-        if (localNotes.length > 0) {
-          if (tagFilterRef.current !== expectedFilter) return; // view changed
-          setNotes(sortNotesByRecency(localNotes));
-        }
-      } catch (e) {
-        console.error("IndexedDB read failed:", e);
-      }
-
-      // Then: fetch from server and merge (protecting pending local changes)
-      // If server status is unknown, resolve with a quick health check first (2s max)
-      if (syncEngineRef.current && syncEngineRef.current.serverReachable === null) {
-        await syncEngineRef.current.healthCheck();
-      }
-      // Skip API call entirely if sync engine knows server is down
-      if (syncEngineRef.current?.serverReachable === false) throw new Error("Server offline (skip)");
-      const data = await api("/notes", { token });
-      if (tagFilterRef.current !== expectedFilter) return; // view changed during fetch
-      const serverNotes = Array.isArray(data) ? data : [];
-
-      // Snapshot protection status ONCE to avoid race conditions:
-      // The sync queue runs concurrently — if we check multiple times, an
-      // item could be removed between checks. We also check in-memory leases
-      // so notes in the pre-enqueue or failed-enqueue window are protected.
-      const pendingSet = new Set();
-      for (const sn of serverNotes) {
-        if (await isProtectedFromServerOverwrite(String(sn.id), currentUser?.id)) pendingSet.add(String(sn.id));
-      }
-
-      // Hydrate IndexedDB, skipping protected notes.
-      // Late-check each note: a mutation may have started since the pendingSet snapshot.
-      const toWrite = [];
-      for (const sn of serverNotes) {
-        const nid = String(sn.id);
-        if (pendingSet.has(nid) || await isProtectedFromServerOverwrite(nid, currentUser?.id)) continue;
-        toWrite.push({ ...sn, id: nid, user_id: sn.user_id || currentUser?.id, archived: false, trashed: false });
-      }
-      if (toWrite.length > 0) await idbPutNotes(toWrite, currentUser?.id, sessionId);
-
-      // Build final list: server notes + locally-only notes with pending sync
-      const serverIds = new Set(serverNotes.map((n) => String(n.id)));
-      const localOnly = [];
-      const deadIds = [];
-      try {
-        const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "active");
-        for (const ln of allLocal) {
-          if (!serverIds.has(String(ln.id))) {
-            if (await isProtectedFromServerOverwrite(String(ln.id), currentUser?.id)) {
-              localOnly.push(ln);
-            } else {
-              deadIds.push(String(ln.id));
-            }
-          }
-        }
-      } catch { /* IDB unavailable: keep the server notes only */ }
-      // Purge dead notes from IDB in parallel
-      if (deadIds.length > 0) {
-        await Promise.allSettled(deadIds.map((id) => idbDeleteNote(id, currentUser?.id, sessionId)));
-      }
-
-      // Merge: for each server note, late-check protection again before inclusion.
-      // A mutation may have started during the IDB hydration / dead-note pass above.
-      const merged = [];
-      for (const sn of serverNotes) {
-        const nid = String(sn.id);
-        if (await isProtectedFromServerOverwrite(nid, currentUser?.id)) {
-          const localVer = await idbGetNote(nid, currentUser?.id, sessionId);
-          if (localVer) merged.push(localVer);
-        } else {
-          merged.push(sn);
-        }
-      }
-
-      // Filter: only keep notes that belong in the active view
-      // (local versions of notes with pending changes might have trashed/archived flags)
-      const final = [...merged, ...localOnly].filter((n) => !n.archived && !n.trashed);
-      if (tagFilterRef.current !== expectedFilter) return; // view changed
-      setNotes(sortNotesByRecency(final));
-      return true; // server data fetched successfully
-    } catch (error) {
-      console.error("Error loading notes from server:", error);
-      // Notify sync engine so it detects offline state quickly
-      syncEngineRef.current?.healthCheck();
-      if (tagFilterRef.current !== expectedFilter) return; // view changed
-      // Fallback: use the IndexedDB data already shown above
-      try {
-        const localNotes = await idbGetAllNotes(currentUser?.id, sessionId, "active");
-        if (localNotes.length > 0) {
-          if (tagFilterRef.current === expectedFilter) setNotes(sortNotesByRecency(localNotes));
-        }
-      } catch (e) {
-        console.error("Fallback load failed:", e);
-      }
-    } finally {
-      setNotesLoading(false);
-    }
-  };
-
-  // Load archived notes
-  const loadArchivedNotes = async () => {
-    if (!token) return;
-    const expectedFilter = "ARCHIVED";
-    if (tagFilterRef.current !== expectedFilter) return;
-    notesAreRegular.current = false;
-    setNotesLoading(true);
-
-    try {
-      // Show IndexedDB archived notes immediately
-      try {
-        const localArchived = await idbGetAllNotes(currentUser?.id, sessionId, "archived");
-        if (localArchived.length > 0) {
-          if (tagFilterRef.current !== expectedFilter) return;
-          setNotes(sortNotesByRecency(localArchived));
-        }
-      } catch { /* IDB unavailable: wait for the server response */ }
-
-      // If server status is unknown, resolve with a quick health check first (2s max)
-      if (syncEngineRef.current && syncEngineRef.current.serverReachable === null) {
-        await syncEngineRef.current.healthCheck();
-      }
-      if (syncEngineRef.current?.serverReachable === false) throw new Error("Server offline (skip)");
-      const data = await api("/notes/archived", { token });
-      if (tagFilterRef.current !== expectedFilter) return;
-      const notesArray = Array.isArray(data) ? data : [];
-
-      // Snapshot protection status once to avoid race with concurrent queue processing
-      const pendingSet = new Set();
-      for (const sn of notesArray) {
-        if (await isProtectedFromServerOverwrite(String(sn.id), currentUser?.id)) pendingSet.add(String(sn.id));
-      }
-
-      // Hydrate IndexedDB, late-checking each note for protection
-      const toWrite = [];
-      for (const sn of notesArray) {
-        const nid = String(sn.id);
-        if (pendingSet.has(nid) || await isProtectedFromServerOverwrite(nid, currentUser?.id)) continue;
-        toWrite.push({ ...sn, id: nid, user_id: sn.user_id || currentUser?.id, archived: true, trashed: false });
-      }
-      if (toWrite.length > 0) await idbPutNotes(toWrite, currentUser?.id, sessionId);
-
-      // Merge with local-only archived notes that have pending sync
-      const serverIds = new Set(notesArray.map((n) => String(n.id)));
-      const localOnly = [];
-      const deadIds = [];
-      try {
-        const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "archived");
-        for (const ln of allLocal) {
-          if (!serverIds.has(String(ln.id))) {
-            if (await isProtectedFromServerOverwrite(String(ln.id), currentUser?.id)) {
-              localOnly.push(ln);
-            } else {
-              deadIds.push(String(ln.id));
-            }
-          }
-        }
-      } catch { /* IDB unavailable: keep the server notes only */ }
-      if (deadIds.length > 0) {
-        await Promise.allSettled(deadIds.map((id) => idbDeleteNote(id, currentUser?.id, sessionId)));
-      }
-
-      // Merge: late-check each note before inclusion
-      const merged = [];
-      for (const sn of notesArray) {
-        const nid = String(sn.id);
-        if (await isProtectedFromServerOverwrite(nid, currentUser?.id)) {
-          const localVer = await idbGetNote(nid, currentUser?.id, sessionId);
-          if (localVer) merged.push(localVer);
-        } else {
-          merged.push(sn);
-        }
-      }
-
-      // Filter: only keep notes that belong in the archived view
-      const final = [...merged, ...localOnly].filter((n) => !!n.archived && !n.trashed);
-      if (tagFilterRef.current !== expectedFilter) return;
-      setNotes(sortNotesByRecency(final));
-      return true; // server data fetched successfully
-    } catch (error) {
-      console.error("Error loading archived notes from server:", error);
-      syncEngineRef.current?.healthCheck();
-      // Keep IndexedDB data already shown
-    } finally {
-      setNotesLoading(false);
-    }
-  };
-
-  // Load trashed notes
-  const loadTrashedNotes = async () => {
-    if (!token) return;
-    const expectedFilter = "TRASHED";
-    if (tagFilterRef.current !== expectedFilter) return;
-    notesAreRegular.current = false;
-    setNotesLoading(true);
-
-    try {
-      // Show IndexedDB trashed notes immediately
-      try {
-        const localTrashed = await idbGetAllNotes(currentUser?.id, sessionId, "trashed");
-        if (localTrashed.length > 0) {
-          if (tagFilterRef.current !== expectedFilter) return;
-          setNotes(sortNotesByRecency(localTrashed));
-        }
-      } catch { /* IDB unavailable: wait for the server response */ }
-
-      // If server status is unknown, resolve with a quick health check first (2s max)
-      if (syncEngineRef.current && syncEngineRef.current.serverReachable === null) {
-        await syncEngineRef.current.healthCheck();
-      }
-      if (syncEngineRef.current?.serverReachable === false) throw new Error("Server offline (skip)");
-      const data = await api("/notes/trashed", { token });
-      if (tagFilterRef.current !== expectedFilter) return;
-      const notesArray = Array.isArray(data) ? data : [];
-
-      // Snapshot protection status once to avoid race with concurrent queue processing
-      const pendingSet = new Set();
-      for (const sn of notesArray) {
-        if (await isProtectedFromServerOverwrite(String(sn.id), currentUser?.id)) pendingSet.add(String(sn.id));
-      }
-
-      // Hydrate IndexedDB, late-checking each note for protection
-      const toWrite = [];
-      for (const sn of notesArray) {
-        const nid = String(sn.id);
-        if (pendingSet.has(nid) || await isProtectedFromServerOverwrite(nid, currentUser?.id)) continue;
-        toWrite.push({ ...sn, id: nid, user_id: sn.user_id || currentUser?.id, archived: false, trashed: true });
-      }
-      if (toWrite.length > 0) await idbPutNotes(toWrite, currentUser?.id, sessionId);
-
-      // Merge with locally-trashed notes that have pending sync
-      const serverIds = new Set(notesArray.map((n) => String(n.id)));
-      const localOnly = [];
-      const deadIds = [];
-      try {
-        const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "trashed");
-        for (const ln of allLocal) {
-          if (!serverIds.has(String(ln.id))) {
-            if (await isProtectedFromServerOverwrite(String(ln.id), currentUser?.id)) {
-              localOnly.push(ln);
-            } else {
-              deadIds.push(String(ln.id));
-            }
-          }
-        }
-      } catch { /* IDB unavailable: keep the server notes only */ }
-      if (deadIds.length > 0) {
-        await Promise.allSettled(deadIds.map((id) => idbDeleteNote(id, currentUser?.id, sessionId)));
-      }
-
-      // Merge: late-check each note before inclusion
-      const merged = [];
-      for (const sn of notesArray) {
-        const nid = String(sn.id);
-        if (await isProtectedFromServerOverwrite(nid, currentUser?.id)) {
-          const localVer = await idbGetNote(nid, currentUser?.id, sessionId);
-          if (localVer) merged.push(localVer);
-        } else {
-          merged.push(sn);
-        }
-      }
-
-      // Filter: only keep notes that belong in the trashed view
-      const final = [...merged, ...localOnly].filter((n) => !!n.trashed);
-      if (tagFilterRef.current !== expectedFilter) return;
-      setNotes(sortNotesByRecency(final));
-      return true; // server data fetched successfully
-    } catch (error) {
-      console.error("Error loading trashed notes from server:", error);
-      syncEngineRef.current?.healthCheck();
-      if (tagFilterRef.current !== expectedFilter) return;
-      // Keep the IndexedDB data already shown, or clear the list
-      try {
-        const localTrashed = await idbGetAllNotes(currentUser?.id, sessionId, "trashed");
-        if (localTrashed.length > 0) {
-          if (tagFilterRef.current === expectedFilter) setNotes(sortNotesByRecency(localTrashed));
-        } else if (tagFilterRef.current === expectedFilter) {
-          setNotes([]);
-        }
-      } catch {
-        if (tagFilterRef.current === expectedFilter) setNotes([]);
-      }
-    } finally {
-      setNotesLoading(false);
-    }
-  };
-
-  // Keep ref up to date so handleSyncNow always calls the latest version
-  // Returns true if server data was fetched, false/undefined if fallback to IDB
-  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by the sync recovery callbacks, outside render
-  reloadCurrentViewRef.current = async () => {
-    const currentFilter = tagFilterRef.current;
-    try {
-      if (currentFilter === "ARCHIVED") {
-        return await loadArchivedNotes();
-      } else if (currentFilter === "TRASHED") {
-        return await loadTrashedNotes();
-      } else {
-        return await loadNotes();
-      }
-    } catch {
-      return false;
-    }
-  };
-
-  useEffect(() => {
-    if (!token) return;
-
-    // Update ref FIRST so load functions can use it for async staleness checks
-    tagFilterRef.current = tagFilter;
-
-    // Load appropriate notes based on tag filter
-    if (tagFilter === "ARCHIVED") {
-      loadArchivedNotes().catch((error) => {
-        console.error("Failed to load archived notes:", error);
-      });
-    } else if (tagFilter === "TRASHED") {
-      loadTrashedNotes().catch((error) => {
-        console.error("Failed to load trashed notes:", error);
-      });
-    } else {
-      loadNotes().catch((error) => {
-        console.error("Failed to load regular notes:", error);
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only when the token or the view filter changes
-  }, [token, tagFilter]);
-
-  // tagFilterRef is now updated inside the load useEffect above (before calling load functions)
-
-  useEffect(() => {
-    if (!token) return;
-
-    let es;
-    let reconnectTimeout;
-    let reconnectAttempts = 0;
-    let hasConnectedOnce = false; // track first vs reconnection
-    const maxReconnectDelay = 30000; // cap backoff at 30s, never give up
-    let reloadCooldownUntil = 0; // suppress patches during full reload
-
-    // ─── Debounced batch patch: collect noteIds, reload once ───
-    let patchBatchTimeout = null;
-    const patchBatchIds = new Set();
-    let cooldownDeferredIds = new Set(); // events received during reload cooldown
-
-    const flushPatchBatch = async () => {
-      patchBatchTimeout = null;
-      const ids = [...patchBatchIds];
-      patchBatchIds.clear();
-      if (ids.length === 0) return;
-
-      // Single note — fast path, no batching overhead
-      if (ids.length === 1) {
-        await patchSingleNote(ids[0]);
-        return;
-      }
-
-      // Multiple notes — fetch all in parallel, then apply ONE setNotes update
-      // to avoid N sequential re-renders that cause grid flicker.
-      const uid = currentUser?.id;
-      const sid = sessionId;
-      const currentFilter = tagFilterRef.current;
-
-      // Pre-filter: skip protected notes before fetching
-      const toFetch = [];
-      for (const nid of ids) {
-        if (isDeleteTombstoned(nid)) continue;
-        if (isNoteLocallyProtected(nid)) continue;
-        if (await hasPendingChanges(nid, uid)) continue;
-        toFetch.push(nid);
-      }
-      if (toFetch.length === 0) return;
-
-      // Fetch all in parallel
-      const results = await Promise.allSettled(
-        toFetch.map(async (nid) => {
-          try {
-            const serverNote = await api(`/notes/${nid}`, { token });
-            if (!serverNote || !serverNote.id) return null;
-            // Final TOCTOU guard
-            if (await isProtectedFromServerOverwrite(nid, uid)) return null;
-            return serverNote;
-          } catch (e) {
-            return e.status === 404 ? { _deleted: true, _nid: nid } : null;
-          }
-        })
-      );
-
-      // Collect updates and removals
-      const upserts = new Map();  // nid → serverNote
-      const removals = new Set(); // nids to remove from view
-      const idbWrites = [];
-
-      for (const r of results) {
-        if (r.status !== "fulfilled" || !r.value) continue;
-        const val = r.value;
-
-        if (val._deleted) {
-          removals.add(val._nid);
-          idbWrites.push(idbDeleteNote(val._nid, uid, sid).catch(() => {}));
-          continue;
-        }
-
-        const nid = String(val.id);
-        const belongsInView = noteBelongsInView(val, currentFilter);
-
-        idbWrites.push(
-          idbPutNote({ ...val, id: nid, user_id: val.user_id || uid }, uid, sid).catch(() => {})
-        );
-
-        if (belongsInView) {
-          upserts.set(nid, val);
-        } else {
-          removals.add(nid);
-        }
-      }
-
-      // Fire IDB writes in parallel (best-effort)
-      await Promise.allSettled(idbWrites);
-
-      // Single atomic state update — no intermediate re-renders
-      if (upserts.size > 0 || removals.size > 0) {
-        setNotes((prev) => {
-          let next = prev;
-          // Apply removals
-          if (removals.size > 0) {
-            next = next.filter((n) => !removals.has(String(n.id)));
-          }
-          // Apply upserts
-          if (upserts.size > 0) {
-            const updated = next.map((n) => {
-              const sn = upserts.get(String(n.id));
-              return sn ? sn : n;
-            });
-            // Add any truly new notes (not already in list)
-            const existingIds = new Set(updated.map((n) => String(n.id)));
-            const newNotes = [];
-            for (const [nid, sn] of upserts) {
-              if (!existingIds.has(nid)) newNotes.push(sn);
-            }
-            next = newNotes.length > 0
-              ? sortNotesByRecency([...updated, ...newNotes])
-              : sortNotesByRecency(updated);
-          }
-          return next;
-        });
-      }
-    };
-
-    const debouncedPatch = (noteId) => {
-      // During reload cooldown, buffer instead of dropping — the full reload
-      // may have started BEFORE these notes existed on the server (e.g. another
-      // device synced while the reload was in flight).
-      if (Date.now() < reloadCooldownUntil) {
-        cooldownDeferredIds.add(String(noteId));
-        return;
-      }
-      patchBatchIds.add(String(noteId));
-      if (patchBatchTimeout) clearTimeout(patchBatchTimeout);
-      patchBatchTimeout = setTimeout(flushPatchBatch, 300);
-    };
-
-    // ─── Targeted single-note patch (local-first safe) ───
-    const patchSingleNote = async (noteId) => {
-      if (!noteId) return;
-      const nid = String(noteId);
-
-      // Note permanently deleted locally — never resurrect from server
-      if (isDeleteTombstoned(nid)) return;
-
-      // Don't overwrite notes with pending local changes (already in sync queue)
-      const pending = await hasPendingChanges(nid, currentUser?.id);
-      if (pending) return;
-
-      // Don't overwrite note with an active local lease (debounce, pending IDB write,
-      // in-flight enqueue, or failed enqueue not yet recovered)
-      if (isNoteLocallyProtected(nid)) return;
-
-      try {
-        const serverNote = await api(`/notes/${nid}`, { token });
-        if (!serverNote || !serverNote.id) return;
-
-        // ── Final guard before write (closes TOCTOU race) ──
-        // A local mutation may have started while the fetch was in flight.
-        if (await isProtectedFromServerOverwrite(nid, currentUser?.id)) return;
-
-        const currentFilter = tagFilterRef.current;
-
-        // Determine if this note belongs in the current view
-        const belongsInView = noteBelongsInView(serverNote, currentFilter);
-
-        // Update IndexedDB
-        try {
-          await idbPutNote({
-            ...serverNote,
-            id: nid,
-            user_id: serverNote.user_id || currentUser?.id,
-          }, currentUser?.id, sessionId);
-        } catch { /* IDB best-effort */ }
-
-        if (belongsInView) {
-          // Upsert into current notes list and re-sort (position/pinned may have changed)
-          setNotes((prev) => {
-            const idx = prev.findIndex((n) => String(n.id) === nid);
-            if (idx >= 0) {
-              const updated = [...prev];
-              updated[idx] = serverNote;
-              return sortNotesByRecency(updated);
-            } else {
-              // New note that belongs in this view - add to list
-              return sortNotesByRecency([...prev, serverNote]);
-            }
-          });
-        } else {
-          // Note no longer belongs in the current view — remove it
-          setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-        }
-      } catch (e) {
-        // Fetch failed (404, network, etc.) — if 404, note was deleted
-        if (e.status === 404) {
-          setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-          try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch { /* IDB best-effort */ }
-        }
-        // Other errors: silently ignore, state stays as-is
-      }
-    };
-
-    const connectSSE = () => {
-      netLog("sse: connecting, attempt " + reconnectAttempts);
-      try {
-        const url = new URL(`${window.location.origin}/api/events`);
-        url.searchParams.set("token", token);
-        url.searchParams.set("_t", Date.now());
-        es = new EventSource(url.toString());
-
-        es.onopen = () => {
-          console.log("SSE connected");
-          netLog("sse: open");
-          // SSE onopen through a reverse proxy does NOT prove the backend is
-          // alive — the proxy accepts the TCP connection even when the backend
-          // is down. Only a real SSE data message (onmessage) is proof.
-          // Trigger a health check instead to verify properly.
-          if (syncEngineRef.current && !syncEngineRef.current.isRateLimited) {
-            syncEngineRef.current.healthCheck();
-          }
-          // On reconnection (not first connect), reload the view — but only
-          // AFTER the sync queue has finished processing. If we reload while
-          // processQueue is running, the server may return stale data (patches
-          // not yet applied) and overwrite correct local state.
-          if (hasConnectedOnce) {
-            console.log("[SSE] reconnected — will reload after queue drains");
-            const waitForQueue = async () => {
-              const engine = syncEngineRef.current;
-              if (engine && engine._processing) {
-                // Queue still running — check again in 500ms
-                setTimeout(waitForQueue, 500);
-                return;
-              }
-              // Skip reload if:
-              // 1. Server not confirmed reachable — loadNotes() would skip the
-              //    server fetch and we'd go green with stale IDB data.
-              // 2. A pull is already in progress (recovery useEffect owns it) —
-              //    avoid duplicate reloads racing each other.
-              // In both cases, the recovery useEffect handles the reload.
-              if (engine && (engine.serverReachable !== true || engine.isPulling)) {
-                console.log("[SSE] queue idle but %s — skipping reload (recovery useEffect will handle it)",
-                  engine.isPulling ? "pull already in progress" : "server not confirmed reachable");
-                return;
-              }
-              console.log("[SSE] queue idle — reloading current view");
-              cooldownDeferredIds = new Set(); // clear before cooldown starts
-              reloadCooldownUntil = Date.now() + 3000;
-              // Use beginPull/endPull so status stays "syncing" until reload completes
-              if (engine) await engine.beginPull();
-              try {
-                await reloadCurrentViewRef.current?.();
-              } finally {
-                if (engine) await engine.endPull();
-              }
-              // After cooldown expires, flush any SSE events that arrived during the
-              // reload window (e.g. another device synced while reload was in flight).
-              setTimeout(() => {
-                if (cooldownDeferredIds.size > 0) {
-                  console.log("[SSE] flushing", cooldownDeferredIds.size, "deferred events");
-                  for (const nid of cooldownDeferredIds) patchBatchIds.add(nid);
-                  cooldownDeferredIds = new Set();
-                  if (patchBatchTimeout) clearTimeout(patchBatchTimeout);
-                  patchBatchTimeout = setTimeout(flushPatchBatch, 300);
-                }
-              }, 3100);
-            };
-            // Small initial delay to let processQueue start if it hasn't yet
-            setTimeout(waitForQueue, 300);
-          }
-          hasConnectedOnce = true;
-          reconnectAttempts = 0;
-        };
-
-        // The backend emits NAMED SSE events as proof-of-life: `hello` right
-        // after connect and `ping` every 25s (server/index.js). Named events do
-        // NOT trigger es.onmessage (that only fires for unnamed "message"
-        // events), so we listen for them explicitly. Each is written by the
-        // Node backend itself — a reverse proxy can't fabricate one — so
-        // receiving it proves the backend, not just the proxy, is reachable.
-        // This is what breaks the "stuck offline after resuming from
-        // background" deadlock: on resume the /health fetch can keep timing out
-        // (AbortError) while SSE reconnects fine, leaving serverReachable=false
-        // and the recovery reload gated forever until a manual refresh. The
-        // hello on reconnect (and the 25s ping as a safety net) now confirms
-        // reachability and triggers recovery. notifyServerReachable() is a
-        // no-op once we're already online, so the heartbeat is essentially free.
-        const onBackendAlive = () => {
-          syncEngineRef.current?.notifyServerReachable();
-        };
-        es.addEventListener("hello", onBackendAlive);
-        es.addEventListener("ping", onBackendAlive);
-
-        // SSE message handler (server sends generic data: messages)
-        es.onmessage = (e) => {
-          try {
-            // A real SSE data message = proof the GlassKeep backend is alive.
-            // This is the ONLY place we call notifyServerReachable from SSE
-            // (onopen doesn't count — the proxy can accept connections even
-            // when the backend is down).
-            if (syncEngineRef.current) {
-              syncEngineRef.current.notifyServerReachable();
-            }
-            const msg = JSON.parse(e.data || "{}");
-            if (msg && msg.type === "instance_locked") {
-              // Another admin (or the CLI) locked the instance. Drop
-              // the user straight onto the unlock screen instead of
-              // waiting for the next status poll. The api wrapper
-              // already fires `instance-locked` on a 423 response;
-              // this just makes the redirect immediate.
-              window.dispatchEvent(new CustomEvent("instance-locked"));
-            } else if (msg && msg.type === "instance_unlocked") {
-              // An admin unlocked the instance elsewhere — leave the unlock
-              // screen at once (mirror of instance_locked above).
-              window.dispatchEvent(new CustomEvent("instance-unlocked"));
-            } else if (msg && msg.type === "note_updated" && msg.noteId) {
-              debouncedPatch(msg.noteId);
-              // The participant list is announced by this same event (the
-              // server broadcasts it whenever a collaborator is added,
-              // removed or has their access changed, locally or via a
-              // federated peer's roster). Forward it on its own bus rather
-              // than letting the collaborator list ride the note patch
-              // above: that patch is deliberately skipped while the note
-              // holds unsaved local edits, and who the note is shared with
-              // has no reason to be held hostage to content protection.
-              try {
-                window.dispatchEvent(new CustomEvent("note-updated", { detail: { noteId: msg.noteId } }));
-              } catch { /* bus is best-effort */ }
-            } else if (msg && msg.type === "note_access_changed" && msg.noteId) {
-              // The owner changed THIS user's read/write permission on a
-              // shared note. Apply it immediately — even when the note is open
-              // and locally protected (which suppresses the generic patch) —
-              // by updating ONLY the `access` field, so the editor locks /
-              // unlocks live without a reload and without touching content.
-              const nid = String(msg.noteId);
-              const nextAccess = msg.access === "read" ? "read" : "write";
-              setNotes((prev) => prev.map((n) => {
-                if (String(n.id) !== nid || n.access === nextAccess) return n;
-                const updated = { ...n, access: nextAccess };
-                idbPutNote(updated, currentUser?.id, sessionId).catch(() => {});
-                return updated;
-              }));
-            } else if (msg && msg.type === "logo_added" && msg.logo) {
-              // eslint-disable-next-line react-hooks/immutability -- SSE handler, it runs after render once setLogoLibrary exists
-              setLogoLibrary((prev) => {
-                if (prev.some((l) => l.id === msg.logo.id)) return prev;
-                return [...prev, msg.logo];
-              });
-            } else if (msg && msg.type === "logo_deleted" && msg.id) {
-              setLogoLibrary((prev) => prev.filter((l) => l.id !== msg.id));
-            } else if (msg && msg.type === "notes_reordered") {
-              // Another session reordered notes — reload the full list once
-              // instead of fetching each note individually (avoids rate limits).
-              reloadCurrentViewRef.current?.();
-            } else if (msg && msg.type === "notes_imported") {
-              // Another session restored a backup. Same treatment as a
-              // reorder: one reload of the whole view rather than one fetch
-              // per imported note, which would be hundreds of requests.
-              reloadCurrentViewRef.current?.();
-            } else if (msg && msg.type === "note_deleted" && msg.noteId) {
-              // Another session permanently deleted this note — remove locally
-              const nid = String(msg.noteId);
-              if (!isDeleteTombstoned(nid)) {
-                setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-                idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
-                idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
-                // If this note is currently open in the modal, force-close
-                // without triggering any save/flush (the note no longer exists)
-                if (String(activeIdRef.current) === nid) {
-                  forceCloseModalForRemoteDelete(nid);
-                }
-              }
-            } else if (msg && msg.type === "note_shared") {
-              // A live share notification. The bell calls markDelivered
-              // when the panel is opened — we don't ack here because the
-              // server's notification_delivered broadcast would race with
-              // the just-rendered card and clear it on the same tick.
-              showShareNotificationToast({
-                id: msg.notificationId,
-                senderName: msg.senderName,
-                noteTitle: msg.noteTitle,
-                noteId: msg.noteId,
-                readOnly: msg.readOnly,
-              });
-            } else if (msg && msg.type === "note_access_revoked_notification") {
-              // Live notification for either side of a revoke. The
-              // notificationType field on the payload picks the right
-              // title/message pair (ex-collaborator vs owner, with
-              // copy vs without). The accompanying `note_access_revoked`
-              // event still drives the local note removal on the
-              // ex-collaborator side. Delivery ack is deferred to the
-              // bell (same reason as note_shared above).
-              showRevokeNotificationToast({
-                id: msg.notificationId,
-                notificationType: msg.notificationType,
-                senderName: msg.senderName,
-                noteTitle: msg.noteTitle,
-                noteId: msg.noteId,
-              });
-            } else if (msg && msg.type === "test_notification") {
-              // Dev/test notification dispatched via the
-              // scripts/test-notification.cjs CLI. Routed through the
-              // generic notify() so it inherits the standard card UI,
-              // history entry and unread badge. metadata carries the
-              // server-side id so the cross-device dismiss broadcast
-              // (`notification_delivered`) can find this card in
-              // state — without it, dismissByServerIds would have
-              // nothing to match against.
-              notify({
-                type: "test",
-                variant: msg.variant || "info",
-                title: msg.title || null,
-                message: msg.message || "",
-                persistent: !!msg.persistent,
-                icon: msg.icon || null,
-                metadata: msg.notificationId
-                  ? { serverNotificationId: msg.notificationId }
-                  : null,
-              });
-              // Do NOT mark delivered here: that would trigger a
-              // `notification_delivered` SSE back from the server which
-              // immediately dismisses the card we just showed. The bell
-              // calls markDelivered when the panel is opened, which is
-              // the right moment to record "user has seen this".
-            } else if (msg && msg.type === "reminder_due") {
-              // A note's reminder came due (server scheduler). Same generic
-              // notify() path as test_notification so it gets the standard
-              // card, history entry, unread badge and ding. Persistent: a
-              // reminder stays until the user closes it (no auto-dismiss /
-              // timer bar). The action opens the linked note; metadata
-              // carries the server id (cross-device dismiss) and the noteId.
-              console.log("[reminders] reminder_due received", {
-                noteId: msg.noteId,
-                notificationId: msg.notificationId,
-              });
-              notify({
-                type: "reminder",
-                variant: msg.variant || "info",
-                // Always render the title in THIS client's locale (the
-                // server-sent title can be English when the recipient's
-                // language is on "auto"). The body is the note's own
-                // title/preview, which is language-neutral.
-                title: t("reminderNotificationTitle"),
-                message: msg.message || "",
-                icon: msg.icon || "reminder",
-                persistent: true,
-                action: msg.noteId
-                  ? { label: t("reminderOpenNoteAction"), noteId: String(msg.noteId) }
-                  : null,
-                metadata: {
-                  ...(msg.notificationId ? { serverNotificationId: msg.notificationId } : {}),
-                  ...(msg.noteId ? { noteId: msg.noteId } : {}),
-                },
-              });
-              // Android APK: if the app isn't in the foreground, the in-app
-              // card is invisible — so post a real SYSTEM notification
-              // natively (this SSE event already reached us, so no push
-              // service is needed). Foreground stays in-app only. Same note
-              // id as the local-alarm path → they collapse, no duplicate.
-              // No-op in the browser/PWA, where Web Push covers the
-              // backgrounded/closed case.
-              if (
-                msg.noteId &&
-                typeof document !== "undefined" &&
-                document.visibilityState !== "visible"
-              ) {
-                notifyAndroidNow(msg.noteId, t("reminderNotificationTitle"), msg.message || "");
-              }
-            } else if (msg && msg.type === "notifications_cleared") {
-              // Another device wiped the user's notification history.
-              // Only drop server-backed rows: local-only toasts (e.g.
-              // "Note moved to trash", in-app UI feedback) have no DB
-              // counterpart and a remote clear must not erase them
-              // from this device.
-              clearServerBackedNotifications();
-            } else if (msg && msg.type === "notification_delivered" && Array.isArray(msg.ids)) {
-              // Cross-device dismissal — another tab/device (or this
-              // one) just acknowledged these server notification ids.
-              // We route through the reducer dispatcher because
-              // notificationsRef hasn't necessarily caught up with a
-              // just-added card (React commits the mirror useEffect
-              // after the current microtask). The reducer sees the
-              // latest state for every row, including the one whose
-              // ADD action ran one microtask ago.
-              dismissByServerIdsNotif(msg.ids);
-            } else if (msg && msg.type === "notification_removed" && Array.isArray(msg.ids)) {
-              // Cross-device per-item removal — another tab/device
-              // permanently deleted these notifications. Drop matching
-              // rows from local state so the history panel stays
-              // identical everywhere.
-              removeByServerIdsNotif(msg.ids);
-            } else if (msg && msg.type === "pending_user_registered") {
-              // Admin notification: a new user is awaiting approval.
-              // Routes through showPendingUserToast so the live toast
-              // carries the same Accepter / Refuser actions as its
-              // history twin (built from the persisted DB row).
-              if (currentUserRef.current?.is_admin) {
-                showPendingUserToast({
-                  notificationId: msg.notificationId,
-                  pendingId: msg.pendingId,
-                  name: msg.name,
-                  email: msg.email,
-                });
-                loadPendingUsers?.();
-              }
-            } else if (msg && msg.type === "pending_user_resolved") {
-              // Another admin (or this one on a different tab) just
-              // approved / rejected a pending registration. Refresh
-              // the AdminPanel lists so the row disappears for every
-              // admin in real time. The bell-notification card is
-              // already cleared by the existing notification_removed
-              // SSE the server sends alongside (via
-              // cleanupPendingUserNotifications), so we only handle
-              // the panel state here.
-              if (currentUserRef.current?.is_admin) {
-                loadPendingUsers?.();
-                if (msg.action === "approved") loadAllUsers?.();
-              }
-            } else if (msg && msg.type === "user_list_changed") {
-              // Another admin created / updated a user. Reload the
-              // users list so every admin's AdminPanel reflects the
-              // change in real time. Deletion is handled separately
-              // by user_deleted_notification.
-              if (currentUserRef.current?.is_admin) {
-                loadAllUsers?.();
-              }
-            } else if (msg && msg.type === "admin_settings_updated") {
-              // Another admin flipped the "allow new accounts"
-              // toggle or changed the login slogan / branding. Pull the
-              // fresh server-side admin settings so this admin's panel
-              // shows the new values immediately, and refresh the live
-              // branding so the header logo/name update without a reload.
-              // (This event is only broadcast to admins.)
-              if (currentUserRef.current?.is_admin) {
-                loadAdminSettings?.();
-                refreshBranding();
-              }
-            } else if (msg && msg.type === "user_settings_updated" && msg.settings) {
-              // Live sync of user preferences from another session of
-              // the same user. Skip our own echo (originClientId
-              // matches this tab's getClientId()); otherwise mark the
-              // affected keys so each PATCH-trigger useEffect knows
-              // to skip its outbound write, then apply state updates
-              // through the same validators the initial load uses.
-              if (msg.originClientId && msg.originClientId === getClientId()) {
-                // Our own write — server confirmed it, nothing else to do.
-              } else {
-                applyRemoteUserSettings(msg.settings);
-              }
-            } else if (msg && msg.type === "user_profile_updated" && msg.profile) {
-              // Live sync for the profile fields that live outside the
-              // settings blob (/api/user/settings): whether the account
-              // shows up on the login screen, the interface language, and
-              // the avatar (/api/user/profile and /api/user/avatar). Same
-              // echo-skip as user_settings_updated above.
-              if (!(msg.originClientId && msg.originClientId === getClientId())) {
-                if (typeof msg.profile.language === "string") {
-                  if (syncLanguageFromServer(msg.profile.language)) window.location.reload();
-                }
-                if (typeof msg.profile.show_on_login === "boolean") {
-                  try {
-                    window.dispatchEvent(
-                      new CustomEvent("user-profile-updated", { detail: msg.profile }),
-                    );
-                  } catch { /* bus is best-effort */ }
-                }
-                if (
-                  "avatar_url" in msg.profile &&
-                  (msg.profile.avatar_url === null || typeof msg.profile.avatar_url === "string")
-                ) {
-                  applyProfileUpdate({ avatar_url: msg.profile.avatar_url });
-                }
-              }
-            } else if (msg && msg.type === "user_ai_settings_updated" && msg.settings) {
-              // Live sync of the personal AI settings (/api/user/ai/settings)
-              // — enable/mode/provider — to every other session of this
-              // user. Setting state directly here never re-triggers a
-              // PATCH, so no echo-skip is needed beyond ignoring our own
-              // write (the sender already applied it locally on success).
-              if (!(msg.originClientId && msg.originClientId === getClientId())) {
-                try {
-                  window.dispatchEvent(
-                    new CustomEvent("user-ai-settings-updated", { detail: msg.settings }),
-                  );
-                } catch { /* bus is best-effort */ }
-              }
-            } else if (msg && msg.type === "admin_ai_settings_updated" && msg.settings) {
-              // Live sync of the shared/server AI configuration to every
-              // other connected admin, mirroring admin_settings_updated.
-              if (currentUserRef.current?.is_admin) {
-                try {
-                  window.dispatchEvent(
-                    new CustomEvent("admin-ai-settings-updated", { detail: msg.settings }),
-                  );
-                } catch { /* bus is best-effort */ }
-              }
-            } else if (msg && msg.type === "user_deleted_notification") {
-              // Audit notification for OTHER admins: someone got
-              // deleted. The acting admin doesn't receive this — they
-              // saw the success toast in the panel.
-              if (currentUserRef.current?.is_admin) {
-                showUserDeletedToast({
-                  notificationId: msg.notificationId,
-                  deletedName: msg.deletedName,
-                  adminName: msg.adminName,
-                });
-                // Refresh the user list so the deleted row disappears
-                // from this admin's panel without a manual reload.
-                loadAllUsers?.();
-              }
-            } else if (msg && msg.type === "note_access_revoked" && msg.noteId) {
-              // Collaboration access revoked — note owner removed us.
-              const nid = String(msg.noteId);
-              if (msg.copyNoteId) {
-                // Grant-copy path: fetch the copy first, then swap the
-                // original out and the copy in within a single setNotes
-                // update so the user doesn't see a flash of empty slot.
-                (async () => {
-                  let copy = null;
-                  // A transient blip on this ONE fetch used to silently drop
-                  // the note from view with nothing to replace it — the copy
-                  // genuinely exists server-side, only this request failed —
-                  // until the next full reload quietly fixed it. Retry a
-                  // couple of times before falling back to a full resync.
-                  for (let attempt = 0; attempt < 3 && !copy; attempt++) {
-                    try {
-                      copy = await api(`/notes/${msg.copyNoteId}`, { token });
-                    } catch (e) {
-                      if (attempt < 2) {
-                        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
-                      } else {
-                        console.warn("[note_access_revoked] could not fetch the kept copy after retries:", e?.message);
-                      }
-                    }
-                  }
-                  if (!copy) {
-                    // Still nothing — don't silently lose the note from view.
-                    // Re-sync from the authoritative server list instead,
-                    // exactly what a manual refresh already does today.
-                    reloadCurrentViewRef.current?.();
-                    return;
-                  }
-                  const currentFilter = tagFilterRef.current;
-                  const belongsInView =
-                    copy.id
-                    && !copy.archived && !copy.trashed
-                    && (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"));
-                  setNotes((prev) => {
-                    const filtered = prev.filter((n) => String(n.id) !== nid);
-                    return belongsInView ? sortNotesByRecency([...filtered, copy]) : filtered;
-                  });
-                  try { await idbPutNote(copy, currentUser?.id, sessionId); } catch { /* IDB best-effort */ }
-                  idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
-                  idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
-                  if (String(activeIdRef.current) === nid) {
-                    forceCloseModalForRemoteDelete(nid);
-                  }
-                })();
-              } else {
-                // Legacy revoke-only path: drop the note immediately.
-                setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-                idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
-                idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
-                if (String(activeIdRef.current) === nid) {
-                  forceCloseModalForRemoteDelete(nid);
-                }
-              }
-            } else if (msg && typeof msg.type === "string" && msg.type.startsWith("federation_")) {
-              // Cross-server collaboration (federation) events. App.jsx
-              // stays out of the feature's logic: it just forwards the
-              // event on a window bus that the Federation admin section
-              // (useFederation hook) listens to.
-              try {
-                window.dispatchEvent(new CustomEvent("federation-event", { detail: msg }));
-              } catch { /* bus is best-effort */ }
-            }
-          } catch { /* malformed or unhandled event: skip it */ }
-        };
-
-        es.onerror = (error) => {
-          console.log("SSE error, attempting reconnect...", error);
-          netLog("sse: error, readyState=" + es.readyState, "onLine=" + navigator.onLine);
-          const engine = syncEngineRef.current;
-          if (engine) {
-            engine.notifySseDisconnected();
-            // SSE died — trigger a health check to detect server outage fast.
-            // healthCheck() has built-in throttling (3s min gap) so rapid SSE
-            // errors won't flood the server.
-            if (!engine.isRateLimited) {
-              engine.healthCheck();
-            }
-          }
-
-          if (es.readyState === EventSource.CLOSED) {
-            const currentAuth = getAuth();
-            if (!currentAuth || !currentAuth.token) {
-              return;
-            }
-          }
-
-          es.close();
-
-          // Backoff: exponential with cap. When rate-limited (403/429),
-          // use a much longer minimum delay to let the proxy cool down.
-          const isRL = engine?.isRateLimited;
-          const minDelay = isRL ? 10000 : 1000;
-          const delay = Math.max(minDelay, Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay));
-          netLog("sse: reconnecting in " + delay + "ms");
-          reconnectTimeout = setTimeout(() => {
-            reconnectAttempts++;
-            const currentAuth = getAuth();
-            if (!currentAuth || !currentAuth.token) return;
-            connectSSE();
-          }, delay);
-        };
-      } catch (error) {
-        console.error("Failed to create EventSource:", error);
-      }
-    };
-
-    netLog("boot: " + navigator.userAgent, "onLine=" + navigator.onLine,
-      "swController=" + !!navigator.serviceWorker?.controller);
-    connectSSE();
-
-    // Expose reconnect for use when sync engine detects server recovery
-    reconnectSseRef.current = () => {
-      if (!es || es.readyState === EventSource.CLOSED) {
-        // Cancel any pending backoff timer to avoid duplicate connections
-        if (reconnectTimeout) clearTimeout(reconnectTimeout);
-        reconnectAttempts = 0; // reset backoff on explicit reconnect
-        connectSSE();
-      }
-    };
-
-    // Fallback polling: only when SSE is dead, and only every 60s
-    let pollInterval;
-    const startPolling = () => {
-      pollInterval = setInterval(() => {
-        if (!es || es.readyState === EventSource.CLOSED) {
-          // SSE is dead — do a full reload as last resort
-          const currentFilter = tagFilterRef.current;
-          if (currentFilter === "ARCHIVED") {
-            loadArchivedNotes().catch(() => {});
-          } else if (currentFilter === "TRASHED") {
-            loadTrashedNotes().catch(() => {});
-          } else {
-            loadNotes().catch(() => {});
-          }
-        }
-        // When SSE is connected, polling does nothing
-      }, 60000);
-    };
-
-    const pollTimeout = setTimeout(startPolling, 15000);
-
-    // Visibility change: reconnect SSE if dead, kick sync engine recovery.
-    // CRITICAL: use the engine's healthCheck() — NOT a separate api("/health") —
-    // so that _serverReachable gets updated. Without this, processQueue()
-    // early-exits when _serverReachable===false (stuck "offline" on mobile
-    // after the health-check timer chain breaks during tab suspension).
-    const handleVisibilityChange = async () => {
-      netLog("page " + document.visibilityState, "sse readyState=" + es?.readyState);
-      if (document.visibilityState !== "visible") return;
-
-      const engine = syncEngineRef.current;
-
-      // Run engine health check — this updates _serverReachable and
-      // auto-triggers processQueue on recovery. Also restarts the
-      // health timer chain if it was broken by tab suspension.
-      if (engine) {
-        // Background AbortErrors accumulated in _consecutiveTimeouts under the
-        // hidden-tab tolerance (limit=3). If we don't reset here, the first
-        // post-resume check uses the visible-tab limit (1), immediately exceeds
-        // it, and marks the server offline even though it's reachable.
-        engine.notifyVisible();
-
-        // force=true on every attempt: the retry gap (1.5s) is shorter than
-        // the 3s throttle in healthCheck(), so unforced retries silently
-        // return the cached "offline" value and waste a slot in the loop.
-        let ok = await engine.healthCheck(true);
-        // On mobile after long background, the first fetch often fails because
-        // Chrome reuses stale TCP sockets from before suspension. Retry with
-        // increasing delays to give the browser time to recycle the socket pool.
-        for (let i = 0; i < 3 && !ok; i++) {
-          await new Promise((r) => setTimeout(r, 1500 + i * 1500));
-          ok = await engine.healthCheck(true);
-        }
-        // Restart the health timer chain unconditionally — mobile browsers
-        // may have GC'd the previous setTimeout during background suspension.
-        engine.restartHealthTimer();
-
-        // Reconnect SSE if dead and server is reachable
-        if (ok && es && es.readyState === EventSource.CLOSED) {
-          connectSSE();
-        }
-      } else if (es && es.readyState === EventSource.CLOSED) {
-        // No engine but SSE dead — try to reconnect SSE anyway
-        try {
-          await api("/health", { token });
-          connectSSE();
-        } catch (error) {
-          if (error.status === 401) return;
-        }
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    // Handle online/offline events
-    const handleOnline = async () => {
-      netLog("browser online event");
-      // Browser detected network recovery — run health check first,
-      // then process queue and reconnect SSE only after confirming
-      // the server is reachable. Avoids racing SSE reconnect against
-      // the health check that sets _serverReachable = true.
-      const engine = syncEngineRef.current;
-      if (engine) {
-        // force=true: same reason as in visibilitychange — the 1.5s retry
-        // gap would otherwise trip the 3s throttle inside healthCheck().
-        let ok = await engine.healthCheck(true);
-        // On mobile, stale TCP sockets survive the offline→online transition.
-        // Retry with increasing delays so the browser can recycle them.
-        for (let i = 0; i < 3 && !ok; i++) {
-          await new Promise((r) => setTimeout(r, 1500 + i * 1500));
-          ok = await engine.healthCheck(true);
-        }
-        engine.restartHealthTimer();
-        if (ok) {
-          triggerSync();
-          // Reconnect SSE after confirmed server reachability
-          if (es && es.readyState === EventSource.CLOSED) {
-            reconnectAttempts = 0;
-            connectSSE();
-          }
-        }
-      } else if (es && es.readyState === EventSource.CLOSED) {
-        reconnectAttempts = 0;
-        connectSSE();
-      }
-    };
-
-    const handleOffline = () => {
-      netLog("browser offline event");
-      // Immediately tell the sync engine — don't wait for the next health check.
-      // The browser "offline" event is instant proof the network is down.
-      const engine = syncEngineRef.current;
-      if (engine) {
-        engine.notifySseDisconnected();
-        engine.notifyOffline();
-      }
-    };
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    return () => {
-      try { if (es) es.close(); } catch { /* close is best-effort */ }
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      if (patchBatchTimeout) clearTimeout(patchBatchTimeout);
-      if (pollTimeout) clearTimeout(pollTimeout);
-      if (pollInterval) clearInterval(pollInterval);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- the SSE connection must only be rebuilt when the token changes
-  }, [token]);
-
-  // Reconnect SSE and reload view when server recovers from offline
-  const prevSyncStateRef = useRef(syncStatus.syncState);
-  useEffect(() => {
-    const prev = prevSyncStateRef.current;
-    prevSyncStateRef.current = syncStatus.syncState;
-    if (prev === "offline" && syncStatus.syncState !== "offline" && syncStatus.syncState !== "checking") {
-      // Server just recovered — reconnect SSE immediately
-      reconnectSseRef.current?.();
-      // Reload the view to pick up changes from other devices, but WAIT for
-      // the local queue to drain first. Otherwise we fetch stale server data
-      // that overwrites local offline edits that haven't been pushed yet.
-      // Use beginPull()/endPull() so the status stays "syncing" (not green)
-      // until the view has been fully refreshed.
-      //
-      // After the initial reload, wait a settling period (3s) then reload
-      // again. This gives OTHER devices time to push their pending changes
-      // (e.g. PC reordered notes while offline — it needs a few seconds to
-      // push the reorder after it also detects recovery).
-      const waitThenReload = async () => {
-        const engine = syncEngineRef.current;
-        if (engine && engine._processing) {
-          setTimeout(waitThenReload, 500);
-          return;
-        }
-        // Signal that we're now pulling remote changes — keeps status "syncing"
-        if (engine) await engine.beginPull();
-        try {
-          // First reload: get whatever the server has right now
-          let ok = await reloadCurrentViewRef.current?.();
-          if (!ok) {
-            // Server fetch failed — retry a few times
-            for (let i = 1; i <= 4 && !ok; i++) {
-              await new Promise((r) => setTimeout(r, 2000 * i));
-              ok = await reloadCurrentViewRef.current?.();
-            }
-          }
-          if (ok) {
-            // Settling period: other devices may still be pushing changes.
-            // Wait 3s then reload once more to catch late arrivals.
-            await new Promise((r) => setTimeout(r, 3000));
-            await reloadCurrentViewRef.current?.();
-          }
-        } catch { /* reload is best-effort: the pull still ends below */ }
-        if (engine) await engine.endPull();
-      };
-      // Small delay to let processQueue start (healthCheck triggers it)
-      setTimeout(waitThenReload, 500);
-    }
-  }, [syncStatus.syncState]);
+  const { notesLoading, notesAreRegular, loadNotes } = useNotesLoader({
+    token,
+    userId: currentUser?.id,
+    sessionId,
+    tagFilter,
+    tagFilterRef,
+    setNotes,
+    syncEngineRef,
+    reloadCurrentViewRef,
+    leases,
+  });
+
+  // Live server events. Taken from the render that opens the connection.
+  useServerEvents({
+    token,
+    syncStatus,
+    syncEngineRef,
+    reloadCurrentViewRef,
+    triggerSync,
+    patchNotes: (ids) => patchNotes(ids, {
+      token,
+      userId: currentUser?.id,
+      sessionId,
+      viewFilter: () => tagFilterRef.current,
+      setNotes,
+      leases,
+    }),
+    onMessage: (msg, tools) => dispatchServerEvent(msg, tools, {
+      token,
+      userId: currentUser?.id,
+      sessionId,
+      isAdmin: () => currentUserRef.current?.is_admin,
+      viewFilter: () => tagFilterRef.current,
+      setNotes,
+      leases,
+      reloadCurrentView: () => reloadCurrentViewRef.current?.(),
+      onNoteGone: closeNoteIfOpen,
+      setLogoLibrary,
+      notify,
+      showShareToast: showShareNotificationToast,
+      showRevokeToast: showRevokeNotificationToast,
+      showPendingUserToast,
+      showUserDeletedToast,
+      clearServerBackedNotifications,
+      dismissByServerIds: dismissByServerIdsNotif,
+      removeByServerIds: removeByServerIdsNotif,
+      loadPendingUsers,
+      loadAllUsers,
+      loadAdminSettings,
+      refreshBranding,
+      applyRemoteUserSettings,
+      applyProfileUpdate,
+    }),
+  });
 
   // Live-sync checklist items in open modal when remote updates arrive
   useEffect(() => {
@@ -2602,6 +1067,7 @@ export default function App() {
     prevDrawingRef.current = drawingData;
     // Queue item exists — release this lease + prune older zombies for this note
     releaseLocalLeaseWithPrune(noteId, leaseId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the lease helpers only touch refs
   }, [currentUser?.id, sessionId, enqueueAndSync]);
 
   // Keep drawNoteBodyRef in sync with mBody for draw notes
@@ -2726,20 +1192,12 @@ export default function App() {
     if (purgeQueue && userId) {
       idbClearQueueForUser(userId).catch(() => {});
     }
-    // Clear all local leases, delete tombstones, pending reorder refs — no zombies between sessions
-    clearAllLocalLeases();
-    localDeleteTombstoneRef.current.clear();
-    pendingReorderLeasesRef.current.clear();
-    // Tear down sync engine
-    if (syncEngineRef.current) {
-      syncEngineRef.current.destroy();
-      syncEngineRef.current = null;
-    }
-    // Reset React state
+    // Leases, tombstones, reorder holds and the engine: nothing survives
+    // into the next session.
+    resetSync();
     setAuth(null);
     setSession(null);
     setNotes([]);
-    setSyncStatus(SYNC_STATUS_RESET);
     // NOTE: we intentionally do NOT call clearNotifications() here.
     // The provider lives above App so its state survives logout.
     // Dismissed entries (notification center history) must survive —
@@ -3142,7 +1600,7 @@ export default function App() {
       console.error("[logoLibrary] create failed", e);
       return null;
     }
-  }, [setLogoLibrary]);
+  }, []);
 
   const deleteLogoFromLibrary = useCallback(async (id) => {
     const token = getAuth()?.token;
@@ -3159,7 +1617,7 @@ export default function App() {
       console.error("[logoLibrary] delete failed", e);
       if (removed) setLogoLibrary((prev) => [...prev, removed]);
     }
-  }, [setLogoLibrary]);
+  }, []);
 
   // Note icon (logo badge) — PER-USER and never synced to collaborators.
   // It lives on note.icon and persists through its own endpoint, NOT in the
@@ -3768,6 +2226,7 @@ export default function App() {
     // hasPendingChanges() now returns true → SSE protection via queue takes over
     releaseLocalLeaseWithPrune(nId, lid);
     return true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the lease helpers only touch refs
   }, [enqueueAndSync, currentUser?.id, sessionId]);
 
   // Local-first auto-save for metadata (color, tags, images) — immediate, no debounce
@@ -3978,6 +2437,14 @@ export default function App() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only on server note changes, the edited fields must not re-run it on each keystroke
   }, [notes, open, activeId, hasNoteBeenModified]);
+
+  // The note no longer exists for this user (deleted elsewhere, access
+  // revoked): close it if it is the one open, without saving anything.
+  const closeNoteIfOpen = (noteId) => {
+    if (String(activeIdRef.current) === noteId) {
+      forceCloseModalForRemoteDelete(noteId);
+    }
+  };
 
   // Force-close modal without any save/flush — used when a remote session
   // permanently deletes the note that is currently open. Must not trigger
@@ -4639,8 +3106,7 @@ export default function App() {
     const pinnedIds = sorted.filter((n) => n.pinned).map((n) => String(n.id));
     const otherIds = sorted.filter((n) => !n.pinned).map((n) => String(n.id));
     // Hold leases until onSyncComplete confirms server-side
-    const reorderToken = `R${++reorderTokenSeqRef.current}`;
-    pendingReorderLeasesRef.current.set(reorderToken, noteLeases);
+    const reorderToken = leases.holdReorderLeases(noteLeases);
     try {
       await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds, otherIds, _reorderToken: reorderToken, client_reordered_at: new Date().toISOString() } });
     } catch {
@@ -4725,8 +3191,7 @@ export default function App() {
 
     // Enqueue reorder — leases are held until onSyncComplete confirms server-side.
     // Tag payload with token so onSyncComplete can find and release the leases.
-    const reorderToken = `R${++reorderTokenSeqRef.current}`;
-    pendingReorderLeasesRef.current.set(reorderToken, noteLeases);
+    const reorderToken = leases.holdReorderLeases(noteLeases);
     try {
       await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds: newPinned, otherIds: newOthers, _reorderToken: reorderToken, client_reordered_at: new Date().toISOString() } });
     } catch {
@@ -5005,8 +3470,10 @@ export default function App() {
   // so tags remain visible when navigating to archive/trash
   useEffect(() => {
     if (notesAreRegular.current) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors the regular list each time it changes, whatever loaded it
       setAllNotesForTags(notes);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- notesAreRegular is a ref
   }, [notes]);
 
   const tagsWithCounts = useMemo(() => {
