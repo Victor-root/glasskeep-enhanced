@@ -1,6 +1,6 @@
 import React from "react";
 import { t } from "../../i18n";
-import ConfirmDialogFrame, { ConfirmChoices } from "./ConfirmDialogFrame.jsx";
+import ConfirmDialogFrame from "./ConfirmDialogFrame.jsx";
 
 /**
  * Confirm-delete dialog shown inside the note modal.
@@ -32,27 +32,22 @@ export default function ConfirmDeleteDialog({
       : t("moveToTrashConfirm");
 
   return (
-    <ConfirmDialogFrame zClassName="z-50" title={title} message={body} onClose={onClose}>
-      {collabOwner ? (
-        <ConfirmChoices
-          mildLabel={t("removeForMe")}
-          onMild={() => onConfirm("remove_self")}
-          destructiveLabel={t("deleteForAll")}
-          onDestructive={() => onConfirm("delete_for_all")}
-          onCancel={onClose}
-        />
-      ) : (
-        <div className="mt-5 flex justify-end gap-3">
-          <button
-            className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
-            onClick={onClose}
-          >{t("cancel")}</button>
-          <button
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-            onClick={() => onConfirm()}
-          >{isTrashed ? t("permanentlyDelete") : t("moveToTrash")}</button>
-        </div>
-      )}
-    </ConfirmDialogFrame>
+    <ConfirmDialogFrame
+      zClassName="z-50"
+      title={title}
+      message={body}
+      onClose={onClose}
+      stacked={collabOwner}
+      actions={collabOwner
+        ? [
+          { kind: "outline", label: t("removeForMe"), onClick: () => onConfirm("remove_self") },
+          { kind: "danger", label: t("deleteForAll"), onClick: () => onConfirm("delete_for_all") },
+          { kind: "ghost", label: t("cancel"), onClick: onClose },
+        ]
+        : [
+          { kind: "outline", label: t("cancel"), onClick: onClose },
+          { kind: "danger", label: isTrashed ? t("permanentlyDelete") : t("moveToTrash"), onClick: () => onConfirm() },
+        ]}
+    />
   );
 }

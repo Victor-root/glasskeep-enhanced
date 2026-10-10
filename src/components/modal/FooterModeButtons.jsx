@@ -3,7 +3,9 @@ import { PencilIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
 
-const EyeIcon = () => (
+// A plain element rather than a component: the Reading mode button swaps
+// it in place of the Draw mode wave, and both stay the same <svg> node.
+const EYE_ICON = (
   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
     <circle cx="12" cy="12" r="3.2" fill="currentColor" />
@@ -22,7 +24,7 @@ function ViewModeToggle({ isDesktop, viewMode, onToggle }) {
       data-tooltip={!isDesktop ? (viewMode ? t("switchToEditMode") : t("switchToViewMode")) : undefined}
       aria-label={viewMode ? t("editMode") : t("viewMode")}
     >
-      {viewMode ? <PencilIcon /> : <EyeIcon />}
+      {viewMode ? <PencilIcon /> : EYE_ICON}
       {isDesktop && <span>{viewMode ? t("editMode") : t("viewMode")}</span>}
     </button>
   );
@@ -102,7 +104,7 @@ export default function FooterModeButtons({
               data-tooltip={!isDesktop ? t(readModeEnabled ? "readingMode" : "exitDrawMode") : undefined}
               aria-label={t(readModeEnabled ? "readingMode" : "exitDrawMode")}
             >
-              <EyeIcon />
+              {EYE_ICON}
               {isDesktop && <span>{t(readModeEnabled ? "readingMode" : "exitDrawMode")}</span>}
             </button>
           ) : (
