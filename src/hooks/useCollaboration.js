@@ -11,7 +11,6 @@ export default function useCollaboration(token, {
   currentUser,
   activeId,
   showToast,
-  invalidateNotesCache,
 }) {
   // ── Collaboration modal state (inside note modal) ──
   const [collaborationModalOpen, setCollaborationModalOpen] = useState(false);
@@ -139,7 +138,6 @@ export default function useCollaboration(token, {
       if (activeId) {
         await loadCollaboratorsForAddModal(activeId, { force: true });
       }
-      invalidateNotesCache();
     } catch (e) {
       showToast(localizeServerError(e.message, "failedRemoveCollaborator"), "error");
     } finally {
@@ -187,7 +185,6 @@ export default function useCollaboration(token, {
         token,
         body: { access },
       });
-      invalidateNotesCache();
     } catch (e) {
       showToast(localizeServerError(e.message, "genericError"), "error");
       await loadCollaboratorsForAddModal(targetNoteId, { force: true });
@@ -230,7 +227,6 @@ export default function useCollaboration(token, {
           undefined,
           "share",
         );
-        invalidateNotesCache();
         await loadCollaboratorsForAddModal(activeId, { force: true });
       }
     } finally {
