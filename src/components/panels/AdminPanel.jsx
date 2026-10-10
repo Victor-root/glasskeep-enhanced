@@ -15,6 +15,7 @@ import { localizeServerError } from "../../utils/serverErrors.js";
 import { SettingsSection } from "../common/SettingsAccordion.jsx";
 import useServerPowerActions from "./useServerPowerActions.js";
 import ServerPowerOverlay from "./ServerPowerOverlay.jsx";
+import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
 
 export default function AdminPanel({
   open,
@@ -150,7 +151,7 @@ export default function AdminPanel({
           </h3>
           <div className="flex items-center gap-2">
             {!serverOffline && <button
-              className="w-9 h-9 flex items-center justify-center rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
+              className={`w-9 h-9 flex items-center justify-center rounded-lg font-semibold transition-all duration-200 ${GRADIENT_BUTTON_CLASSES} disabled:opacity-50 disabled:pointer-events-none`}
               onClick={handleShutdown}
               disabled={isShuttingDown || isRestarting}
               data-tooltip={t("shutdownServer")}
@@ -159,7 +160,7 @@ export default function AdminPanel({
               <TI.Power className={`tabler-icon w-4 h-4${isShuttingDown ? " animate-spin" : ""}`} />
             </button>}
             {!serverOffline && <button
-              className="w-9 h-9 flex items-center justify-center rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
+              className={`w-9 h-9 flex items-center justify-center rounded-lg font-semibold transition-all duration-200 ${GRADIENT_BUTTON_CLASSES} disabled:opacity-50 disabled:pointer-events-none`}
               onClick={handleRestart}
               disabled={isRestarting || isShuttingDown}
               data-tooltip={t("restartServer")}

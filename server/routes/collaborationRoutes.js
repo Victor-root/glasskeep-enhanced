@@ -20,7 +20,7 @@ function attachCollaborationRoutes(app, deps) {
     getNote,
     getNoteWithCollaboration,
     runInsertNote,
-    updateNoteWithEditor,
+    markEditedBy,
     getUserTags,
     runUpsertUserTags,
     getUserIcon,
@@ -92,7 +92,7 @@ function attachCollaborationRoutes(app, deps) {
           // Same post-share housekeeping as the local path, so the owner's
           // open card/list refresh over SSE and pick up the new (avatar-
           // bearing) collaborator without a manual reload.
-          updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
+          markEditedBy(noteId, req.user);
           broadcastNoteUpdated(noteId);
           // Tell the OTHER peers about the new participant so their rosters
           // update too (the new peer already got the roster via the share).
@@ -149,7 +149,7 @@ function attachCollaborationRoutes(app, deps) {
       });
 
       // Update note with editor info
-      updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
+      markEditedBy(noteId, req.user);
       broadcastNoteUpdated(noteId);
       // Propagate the new local collaborator to any federated peers so their
       // displayed roster includes them.
@@ -518,7 +518,7 @@ function attachCollaborationRoutes(app, deps) {
     }
 
     // Update note with editor info and notify remaining participants
-    updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
+    markEditedBy(noteId, req.user);
     broadcastNoteUpdated(noteId);
     // Removing a participant shrinks the roster: push it so every peer prunes
     // the departed collaborator from their displayed list.

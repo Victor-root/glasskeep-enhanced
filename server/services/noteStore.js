@@ -5,6 +5,7 @@
 // handle ciphertext.
 
 const noteCipher = require("../encryption/noteCipher");
+const { nowISO } = require("../utils/timestamps");
 
 function createNoteStore(db) {
   // Notes statements
@@ -189,6 +190,11 @@ function createNoteStore(db) {
     WHERE id = ?
   `);
 
+  // Stamps a note as just edited by `user` (a request's req.user).
+  function markEditedBy(noteId, user) {
+    updateNoteWithEditor.run(nowISO(), user.name || user.email, nowISO(), noteId);
+  }
+
   return {
     decryptRows,
     listNotes,
@@ -202,6 +208,7 @@ function createNoteStore(db) {
     runPatchNoteSensitiveCollab,
     deleteNote,
     updateNoteWithEditor,
+    markEditedBy,
   };
 }
 

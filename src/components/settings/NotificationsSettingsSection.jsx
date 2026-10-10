@@ -4,6 +4,7 @@ import TI from "../../icons/editor/index.jsx";
 import Popover from "../common/Popover.jsx";
 import { RowIcon } from "../common/SettingsAccordion.jsx";
 import PushNotificationToggle from "./PushNotificationToggle.jsx";
+import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
 
 // Notifications section of the Settings panel: position, sound (with a
 // per-category sub-list), display filter, default duration and push.
@@ -91,7 +92,7 @@ export default function NotificationsSettingsSection({
                 ref={notifPosBtnRef}
                 type="button"
                 onClick={() => setNotifPosMenuOpen((v) => !v)}
-                className="shrink-0 inline-flex items-center justify-between gap-2 min-w-[9rem] px-3 py-1.5 text-sm rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                className={`shrink-0 inline-flex items-center justify-between gap-2 min-w-[9rem] px-3 py-1.5 text-sm rounded-lg font-semibold transition-all duration-200 ${GRADIENT_BUTTON_CLASSES}`}
                 aria-haspopup="listbox"
                 aria-expanded={notifPosMenuOpen}
               >
@@ -353,7 +354,7 @@ export default function NotificationsSettingsSection({
             ref={notifDurBtnRef}
             type="button"
             onClick={() => setNotifDurMenuOpen((v) => !v)}
-            className="shrink-0 inline-flex items-center justify-between gap-2 min-w-[7rem] px-3 py-1.5 text-sm rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+            className={`shrink-0 inline-flex items-center justify-between gap-2 min-w-[7rem] px-3 py-1.5 text-sm rounded-lg font-semibold transition-all duration-200 ${GRADIENT_BUTTON_CLASSES}`}
             aria-haspopup="listbox"
             aria-expanded={notifDurMenuOpen}
           >

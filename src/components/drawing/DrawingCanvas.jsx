@@ -7,6 +7,7 @@ import DrawingToolbar from './DrawingToolbar';
 import DrawingCursor from './DrawingCursor';
 import DrawingPageLines from './DrawingPageLines';
 import { convertThemeStrokes, drawSmoothPath, renderPaths } from '../../utils/drawingRender';
+import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
 
 /* ─── Hit-test: is a point within radius of any point on a path? ─── */
 function isPointNearPath(px, py, path, radius) {
@@ -624,7 +625,7 @@ function DrawingCanvas({
           <button
             data-tooltip={t('addPageTitle')}
             onClick={addPage}
-            className="px-4 py-2 rounded-xl font-semibold text-sm bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient transition-all duration-200"
+            className={`px-4 py-2 rounded-xl font-semibold text-sm ${GRADIENT_BUTTON_CLASSES} transition-all duration-200`}
           >
             {t("addPage")}
           </button>

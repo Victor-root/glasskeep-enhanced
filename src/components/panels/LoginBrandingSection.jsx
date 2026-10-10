@@ -6,6 +6,7 @@ import { fileToCompressedDataURL, makeSquarePngIcon, deriveBackgroundPlaceholder
 import { DEFAULT_APP_NAME } from "../../branding/BrandingContext.jsx";
 import DefaultBackdropPreview from "../common/DefaultBackdropPreview.jsx";
 import ShellThemeGrid from "../settings/ShellThemeGrid.jsx";
+import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
 
 // Admin controls for the login-page branding (custom app name, logo,
 // background image, background blur). Lives in its own file and is
@@ -21,7 +22,7 @@ const MAX_BLUR = 20;
 
 // Shared button styles, matching the rest of the admin panel.
 const PRIMARY_BTN =
-  "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none disabled:hover:scale-100";
+  `inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 ${GRADIENT_BUTTON_CLASSES} disabled:opacity-50 disabled:pointer-events-none disabled:hover:scale-100`;
 const SUBTLE_BTN =
   "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 transition-colors disabled:opacity-50 disabled:pointer-events-none";
 const DANGER_BTN =

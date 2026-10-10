@@ -18,6 +18,7 @@ const {
   base64UrlToBuf,
   transportsOf,
   verifyAssertion,
+  verifyOwnPasskeyAssertion,
   sessionUser,
 } = require("../services/passkeyCeremony");
 const {
@@ -90,25 +91,11 @@ function attachPasskeyPromoteRoutes(app, { db, auth, adminOnly, startFailed, log
     if (!response || !challengeId || !prfOutput) {
       return res.status(400).json({ error: "Missing fields (PRF output required)" });
     }
-    const entry = challengeStore.consume(challengeId);
-    if (!entry
-        || entry.kind !== "promote-unlock"
-        || entry.userId !== req.user.id
-        || entry.meta?.credentialId !== req.params.id) {
-      return res.status(400).json({ error: "Challenge expired or invalid" });
-    }
-
-    const passkey = passkeyVault.getPasskeyForUser(db, req.params.id, req.user.id);
-    if (!passkey) return res.status(404).json({ error: "Passkey not found" });
-
-    let verification;
-    try {
-      verification = await verifyAssertion(req, response, entry.challenge, passkey);
-    } catch (e) {
-      log.warn?.(`[passkey] promote verify failed: ${e.message}`);
-      return res.status(400).json({ error: "Verification failed" });
-    }
-    if (!verification.verified) return res.status(400).json({ error: "Verification failed" });
+    const verified = await verifyOwnPasskeyAssertion(req, res, {
+      db, response, challengeId, kind: "promote-unlock", label: "promote", log,
+    });
+    if (!verified) return;
+    const { passkey, verification } = verified;
 
     const dek = runtime.getDek();
     if (!dek) return res.status(423).json({ error: "Instance no longer unlocked" });

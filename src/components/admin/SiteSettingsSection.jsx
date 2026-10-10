@@ -11,6 +11,7 @@ import OidcAdminSection from "./OidcAdminSection.jsx";
 import LoginBrandingSection from "../panels/LoginBrandingSection.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import { RowIcon, SettingsSection } from "../common/SettingsAccordion.jsx";
+import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
 
 // Inline editor for the public login slogan. Keeps a draft state local
 // to the input so we can show an explicit Save button (instead of the
@@ -77,7 +78,7 @@ function LoginSloganRow({ value, onSave, showToast }) {
           type="button"
           onClick={save}
           disabled={!dirty || busy}
-          className="shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none disabled:hover:scale-100"
+          className={`shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 ${GRADIENT_BUTTON_CLASSES} disabled:opacity-50 disabled:pointer-events-none disabled:hover:scale-100`}
         >
           {busy ? t("saving") : savedFlash ? t("saved") : t("save")}
         </button>
@@ -197,7 +198,7 @@ function PasskeyDomainRow({ state, onSave, showToast, highlight, onHighlightDone
             type="button"
             onClick={save}
             disabled={!dirty || busy}
-            className="shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none disabled:hover:scale-100"
+            className={`shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 ${GRADIENT_BUTTON_CLASSES} disabled:opacity-50 disabled:pointer-events-none disabled:hover:scale-100`}
           >
             {/* Nothing declared yet means the field is showing a
                 suggestion, not a stored value: the admin is confirming

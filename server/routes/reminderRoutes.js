@@ -15,7 +15,7 @@ function attachReminderRoutes(app, deps) {
     adminOnly,
     getNoteById,
     getNoteWithCollaboration,
-    updateNoteWithEditor,
+    markEditedBy,
     serializeNote,
     broadcastNoteUpdated,
     getUserLanguage,
@@ -80,7 +80,7 @@ function attachReminderRoutes(app, deps) {
       return res.status(404).json({ error: "Note not found or access denied" });
     }
 
-    updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+    markEditedBy(id, req.user);
     broadcastNoteUpdated(id);
     const fresh = getNoteById.get(id);
     res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });
@@ -116,7 +116,7 @@ function attachReminderRoutes(app, deps) {
       setReminderForTest.run({ at: when.toISOString(), cua: nowISO(), id });
       // Mirror the real reminder route: stamp the editor + fan out the note
       // update so open sessions (and the APK's alarm scheduler) re-sync.
-      updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+      markEditedBy(id, req.user);
       broadcastNoteUpdated(id);
       const reminderScheduler = getReminderScheduler();
     if (inSeconds <= 0 && reminderScheduler?.sweepNow) {

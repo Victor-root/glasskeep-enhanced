@@ -4,6 +4,7 @@ import { CloseIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { modalBgFor, scrollColorsFor, solid, bgFor } from "../../utils/colors.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
+import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
 
 /**
  * Per-note AI chat panel — sits attached to the right side of NoteModal.
@@ -222,7 +223,7 @@ export default function NoteAiChatPanel({
                 <button
                   type="button"
                   onClick={() => sendQuick(t("noteAiChatQuickSummarizePrompt"))}
-                  className="flex flex-col items-center gap-1 py-1.5 px-2 rounded-lg font-semibold text-xs transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                  className={`flex flex-col items-center gap-1 py-1.5 px-2 rounded-lg font-semibold text-xs transition-all duration-200 ${GRADIENT_BUTTON_CLASSES}`}
                 >
                   <TI.FileTextAi className="tabler-icon" style={{ width: 20, height: 20 }} />
                   {t("noteAiChatQuickSummarize")}
@@ -230,7 +231,7 @@ export default function NoteAiChatPanel({
                 <button
                   type="button"
                   onClick={() => sendQuick(t("noteAiChatQuickExplainPrompt"))}
-                  className="flex flex-col items-center gap-1 py-1.5 px-2 rounded-lg font-semibold text-xs transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                  className={`flex flex-col items-center gap-1 py-1.5 px-2 rounded-lg font-semibold text-xs transition-all duration-200 ${GRADIENT_BUTTON_CLASSES}`}
                 >
                   <TI.FileTextSpark className="tabler-icon" style={{ width: 20, height: 20 }} />
                   {t("noteAiChatQuickExplain")}
@@ -351,7 +352,7 @@ export default function NoteAiChatPanel({
               onClick={onStop}
               aria-label={t("noteAiChatStop")}
               data-tooltip={t("noteAiChatStop")}
-              className="shrink-0 px-3 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient inline-flex items-center gap-1.5"
+              className={`shrink-0 px-3 py-2 rounded-lg font-semibold text-sm transition-all duration-200 ${GRADIENT_BUTTON_CLASSES} inline-flex items-center gap-1.5`}
             >
               <TI.PlayerStopFilled className="tabler-icon w-4 h-4" />
               {t("noteAiChatStop")}
@@ -361,7 +362,7 @@ export default function NoteAiChatPanel({
               type="button"
               onClick={submit}
               disabled={!draft.trim()}
-              className="shrink-0 px-3 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`shrink-0 px-3 py-2 rounded-lg font-semibold text-sm transition-all duration-200 ${GRADIENT_BUTTON_CLASSES} disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {t("noteAiChatSend")}
             </button>

@@ -17,6 +17,7 @@ import {
 import AudioPlayer from "./AudioPlayer.jsx";
 import ClipList from "./ClipList.jsx";
 import StorageGauge from "./StorageGauge.jsx";
+import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
 
 // AudioNoteEditor — body of an audio note inside the standard NoteModal.
 //
@@ -225,7 +226,7 @@ function EmptyState({ onStart, disabled = false }) {
         type="button"
         onClick={onStart}
         disabled={disabled}
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
+        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${GRADIENT_BUTTON_CLASSES} disabled:opacity-50 disabled:pointer-events-none`}
       >
         <MicIcon />
         <span>{t("audioStartRecording")}</span>
