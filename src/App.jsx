@@ -14,10 +14,8 @@ import {
   getNote as idbGetNote,
   putNote as idbPutNote,
   deleteNote as idbDeleteNote,
-  clearQueueForUser as idbClearQueueForUser,
-  clearNotesForSession as idbClearNotesForSession,
 } from "./sync/localDb.js";
-import { api, getAuth, setAuth } from "./utils/api.js";
+import { api, getAuth } from "./utils/api.js";
 import { localizeServerError } from "./utils/serverErrors.js";
 import { mdForDownload } from "./utils/markdown.jsx";
 import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, fileToCompressedDataURL } from "./utils/helpers.js";
@@ -35,7 +33,6 @@ import LoginView from "./components/auth/LoginView.jsx";
 import RegisterView from "./components/auth/RegisterView.jsx";
 import SecretLoginView from "./components/auth/SecretLoginView.jsx";
 import ChangePasswordModal from "./components/auth/ChangePasswordModal.jsx";
-import { exchangeOidcTicket, oidcErrorMessage, takeOidcRedirectResult } from "./auth/oidcClient.js";
 import TagSidebar from "./components/panels/TagSidebar.jsx";
 import SettingsPanel from "./components/panels/SettingsPanel.jsx";
 import AdminPanel from "./components/panels/AdminPanel.jsx";
@@ -73,6 +70,8 @@ import useDarkMode from "./hooks/useDarkMode.js";
 import useWindowSize from "./hooks/useWindowSize.js";
 import usePublicLoginInfo from "./hooks/usePublicLoginInfo.js";
 import useInstanceLock from "./hooks/useInstanceLock.js";
+import useSession from "./hooks/useSession.js";
+import useAuthActions from "./hooks/useAuthActions.js";
 import useLocalLeases from "./sync/useLocalLeases.js";
 import useNoteSync from "./sync/useNoteSync.js";
 import useNotesLoader from "./sync/useNotesLoader.js";
@@ -88,22 +87,13 @@ import LockedBanner from "./components/lock/LockedBanner.jsx";
 export default function App() {
   const { route, navigate } = useHashRoute();
 
-  // auth session { token, user }
-  const [session, setSession] = useState(getAuth());
-  const token = session?.token;
-  const currentUser = session?.user || null;
-  const sessionId = session?.sessionId || null;
+  const session = useSession({ navigate });
+  const {
+    token, currentUser, sessionId, currentUserRef,
+    mustChangePassword, setMustChangePassword,
+    applyProfileUpdate, completeLogin, applyPasswordChange,
+  } = session;
 
-  // Mirrors a profile field (avatar, name...) into the live session and
-  // the localStorage auth cache, from either this tab's own write or a
-  // user_profile_updated event relayed from another tab/device.
-  const applyProfileUpdate = useCallback((updates) => {
-    setSession((prev) => (prev ? { ...prev, user: { ...prev.user, ...updates } } : prev));
-    setAuth({ ...getAuth(), user: { ...getAuth()?.user, ...updates } });
-  }, []);
-
-  // Password change state
-  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const { windowWidth, windowHeight } = useWindowSize();
@@ -155,75 +145,6 @@ export default function App() {
       closeNoteIfOpen(nid);
     },
   });
-
-  const currentUserIdRef = useRef(currentUser?.id);
-  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
-  currentUserIdRef.current = currentUser?.id;
-  const currentUserRef = useRef(currentUser);
-  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
-  currentUserRef.current = currentUser;
-  const sessionIdRef = useRef(sessionId);
-  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by async callbacks, outside render
-  sessionIdRef.current = sessionId;
-
-  // Refresh the cached profile (avatar / name / language) from the server
-  // on boot and whenever the tab regains focus. The user object is
-  // otherwise only set at login and cached in localStorage, so a profile
-  // change made on ANOTHER device (e.g. a new avatar) never showed up here
-  // — not even after Ctrl+F5, which doesn't clear localStorage. Best
-  // effort: a failure (locked instance, offline) just keeps the cache.
-  useEffect(() => {
-    if (!token) return undefined;
-    let cancelled = false;
-    const refreshProfile = async () => {
-      try {
-        const me = await api("/user/me", { token });
-        if (cancelled || !me || !me.id) return;
-        setSession((prev) =>
-          prev ? { ...prev, user: { ...prev.user, ...me } } : prev,
-        );
-        try {
-          const cur = getAuth();
-          if (cur) setAuth({ ...cur, user: { ...cur.user, ...me } });
-        } catch { /* localStorage unavailable */ }
-      } catch { /* offline / locked — keep the cached profile */ }
-
-      // Proactively renew the JWT while it's still valid but aging, so an
-      // actively-used session never hits the expiry cliff. We decode the
-      // payload ONLY to skip the call when the token is still fresh (<24 h);
-      // if we can't read the age we renew anyway (fail-open).
-      //
-      // NB: JWT payloads are base64URL. A plain atob() throws on '-'/'_'
-      // (present in ~all tokens), which previously threw here and silently
-      // disabled renewal entirely — so tokens still died at their max age.
-      try {
-        let shouldRenew = true;
-        try {
-          const payloadB64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-          const claims = JSON.parse(atob(payloadB64));
-          if (claims?.iat && Date.now() - claims.iat * 1000 < 24 * 3600 * 1000) {
-            shouldRenew = false; // still fresh — nothing to do yet
-          }
-        } catch { /* couldn't read the age → renew anyway */ }
-        if (shouldRenew) {
-          const renewed = await api("/auth/renew", { token });
-          if (!cancelled && renewed?.token) {
-            setSession((prev) => (prev ? { ...prev, token: renewed.token } : prev));
-            try {
-              const cur = getAuth();
-              if (cur) setAuth({ ...cur, token: renewed.token });
-            } catch { /* localStorage unavailable */ }
-          }
-        }
-      } catch { /* renewal best-effort — existing token still valid */ }
-    };
-    refreshProfile();
-    window.addEventListener("focus", refreshProfile);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("focus", refreshProfile);
-    };
-  }, [token]);
 
   // Tag filter & sidebar
   const [tagFilter, setTagFilter] = useState(null); // null = all, ALL_IMAGES = only notes with images
@@ -830,7 +751,8 @@ export default function App() {
     setLockBannerDismissed,
     lockOverlayOpen,
     setLockOverlayOpen,
-  } = useInstanceLock();
+    lockInstanceNow,
+  } = useInstanceLock({ token, showToast });
 
   // Settings panel state
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
@@ -1173,153 +1095,14 @@ export default function App() {
 
   // No infinite scroll
 
-  /** -------- Auth actions -------- */
-
-  // Centralised cleanup for sign-out AND auth-expired — single source of truth.
-  // Uses refs so it's safe to call from stale closures (e.g. event listeners).
-  // Shared teardown: resets UI state, clears notes cache, tears down sync engine.
-  // Does NOT purge the sync queue — that is handled separately depending on context.
-  const cleanupClientSession = (purgeQueue = false) => {
-    const userId = currentUserIdRef.current;
-    const sid = sessionIdRef.current;
-    // Notes cache is session-scoped and disposable — always clear it.
-    if (userId && sid) {
-      idbClearNotesForSession(userId, sid).catch(() => {});
-    }
-    // Only purge the sync queue on explicit sign-out / user change.
-    // Token expiration must NOT purge the queue — pending offline mutations
-    // will be replayed after re-login with a fresh token.
-    if (purgeQueue && userId) {
-      idbClearQueueForUser(userId).catch(() => {});
-    }
-    // Leases, tombstones, reorder holds and the engine: nothing survives
-    // into the next session.
-    resetSync();
-    setAuth(null);
-    setSession(null);
-    setNotes([]);
-    // NOTE: we intentionally do NOT call clearNotifications() here.
-    // The provider lives above App so its state survives logout.
-    // Dismissed entries (notification center history) must survive —
-    // those rows are already acked server-side so /notifications/pending
-    // will not replay them, meaning clearing them would permanently
-    // destroy the user's history. Active entries (dismissed:false) are
-    // deduplicated by the ADD reducer (which blocks a re-ADD when a
-    // non-dismissed entry with the same serverNotificationId already
-    // exists), so no duplicates stack up on reconnect either.
-    // Clear session-scoped localStorage caches only (preserve UI prefs like dark mode)
-    const uid = userId || "anonymous";
-    const s = sid || "no-session";
-    try {
-      localStorage.removeItem(`glass-keep-notes-${uid}-${s}`);
-      localStorage.removeItem(`glass-keep-archived-${uid}-${s}`);
-      localStorage.removeItem(`glass-keep-trashed-${uid}-${s}`);
-      localStorage.removeItem(`glass-keep-cache-timestamp-${uid}-${s}`);
-      // Clean up legacy user-scoped fallback keys (pre-session-scope)
-      localStorage.removeItem(`glass-keep-notes-${uid}`);
-      localStorage.removeItem(`glass-keep-archived-${uid}`);
-      localStorage.removeItem(`glass-keep-trashed-${uid}`);
-      localStorage.removeItem(`glass-keep-cache-timestamp-${uid}`);
-    } catch { /* storage unavailable: nothing to clear */ }
-    navigate("#/login");
-  };
-
-  const signOut = () => {
-    cleanupClientSession(true); // explicit sign-out → purge queue
-  };
-
-  // Admin-only quick lock for the header: drop the at-rest-encryption DEK from
-  // the server's RAM so the instance returns to its locked state immediately.
-  // Same action as the Admin Panel's "Lock now"; the next non-allowlisted
-  // request would 423 anyway, but firing `instance-locked` now drops every
-  // tab to the unlock screen instantly. Only surfaced when encryption is on.
-  const lockInstanceNow = useCallback(async () => {
-    try {
-      await api("/instance/lock", { method: "POST", token });
-      window.dispatchEvent(new CustomEvent("instance-locked"));
-    } catch (e) {
-      showToast(localizeServerError(e?.message, "lockInstanceFailed"), "error");
-    }
-  }, [token, showToast]);
-  const completeLogin = (res) => {
-    const sessionId = crypto.randomUUID?.() ??
-      'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = Math.random() * 16 | 0;
-        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-      });
-    const sessionWithId = { ...res, sessionId };
-    setSession(sessionWithId);
-    setAuth(sessionWithId);
-    if (res.must_change_password) {
-      setMustChangePassword(true);
-    }
-    navigate("#/notes");
-    return { ok: true };
-  };
-  // Back from the single sign-on provider: the server left a one-time
-  // ticket to trade for a session, the outcome of linking an identity
-  // from the settings, or the reason it failed. Read once, at boot.
-  const [oidcLoginError, setOidcLoginError] = useState(null);
-  useEffect(() => {
-    const { ticket, error, linked } = takeOidcRedirectResult();
-    if (ticket) {
-      exchangeOidcTicket(ticket)
-        .then(completeLogin)
-        .catch((e) => setOidcLoginError(e || "oidc_failed"));
-    } else if (error && !token) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot read of the sign-in redirect result at boot
-      setOidcLoginError(error);
-    } else if (error) {
-      showToast(oidcErrorMessage(error), "error");
-    } else if (linked) {
-      showToast(t("oidcLinkedToast"), "success");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const signIn = async (email, password) => {
-    const res = await api("/login", {
-      method: "POST",
-      body: { email, password },
-    });
-    return completeLogin(res);
-  };
-  const signInById = async (userId, password) => {
-    const res = await api("/login", {
-      method: "POST",
-      body: { user_id: userId, password },
-    });
-    return completeLogin(res);
-  };
-  const signInWithSecret = async (key) => {
-    const res = await api("/login/secret", { method: "POST", body: { key } });
-    return completeLogin(res);
-  };
-  const register = async (name, email, password) => {
-    const res = await api("/register", {
-      method: "POST",
-      body: { name, email, password },
-    });
-    // New flow: registrations are held as pending until an admin approves them.
-    if (res?.pending) {
-      return { ok: true, pending: true };
-    }
-    // Fallback for legacy flows that might still return a token directly.
-    if (res?.token) {
-      return completeLogin(res);
-    }
-    return { ok: true, pending: true };
-  };
-
-  // Handle token expiration globally — same cleanup as signOut
-  useEffect(() => {
-    const handleAuthExpired = () => {
-      console.warn("[Auth] Token expired, cleaning up session...");
-      cleanupClientSession();
-    };
-    window.addEventListener("auth-expired", handleAuthExpired);
-    return () => window.removeEventListener("auth-expired", handleAuthExpired);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- listener registered once; cleanupClientSession is recreated each render
-  }, []);
+  const { signOut, signIn, signInById, signInWithSecret, register, oidcLoginError } = useAuthActions({
+    token,
+    session,
+    navigate,
+    showToast,
+    resetSync,
+    setNotes,
+  });
 
   // Pre-load pending registrations count when an admin is logged in
   useEffect(() => {
@@ -4289,10 +4072,7 @@ export default function App() {
           token={token}
           onSuccess={(res) => {
             setMustChangePassword(false);
-            if (res.token && res.user) {
-              setSession((prev) => ({ ...prev, token: res.token, user: res.user }));
-              setAuth({ ...getAuth(), token: res.token, user: res.user });
-            }
+            applyPasswordChange(res);
             showToast(t("passwordChangedSuccess"), "success", undefined, "key");
           }}
         />
@@ -4305,10 +4085,7 @@ export default function App() {
           onClose={() => setChangePasswordOpen(false)}
           onSuccess={(res) => {
             setChangePasswordOpen(false);
-            if (res.token && res.user) {
-              setSession((prev) => ({ ...prev, token: res.token, user: res.user }));
-              setAuth({ ...getAuth(), token: res.token, user: res.user });
-            }
+            applyPasswordChange(res);
             showToast(t("passwordChangedSuccess"), "success", undefined, "key");
           }}
         />
