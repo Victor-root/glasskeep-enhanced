@@ -7,10 +7,11 @@ import useDraftNote from "./useDraftNote.js";
 import { parseDrawingContent } from "../utils/drawingContent.js";
 
 /**
- * Local-first persistence of the note open in the primary modal:
+ * Local-first persistence of the note open in a note pane: loading it,
  * deferred creation of drafts, debounced autosave of every note type
- * (text, checklist, drawing, audio, and the metadata of all), live sync
- * of remote changes into the editor while the user hasn't edited.
+ * (text, checklist, drawing, audio, and the metadata of all), flush on
+ * close, live sync of remote changes into the editor while the user
+ * hasn't edited.
  *
  * Every save writes IndexedDB then queues a sync action, under a lease
  * that keeps remote updates from overwriting the edit meanwhile.
@@ -20,6 +21,16 @@ import { parseDrawingContent } from "../utils/drawingContent.js";
  *  - committedBaselineRef only advances once a save succeeded, so a
  *    failed autosave still shows up as a difference on close and is
  *    retried there.
+ *
+ * Both panes run it: the primary modal and the side-by-side right pane,
+ * each on its own modal state. The right pane never opens a draft, and
+ * the last three options keep the points where it has always behaved
+ * differently:
+ *  - audioNotes: audio notes are autosaved and flushed on close like text;
+ *  - followRemoteEdits: a server change to the open note is taken into
+ *    the editor while the user hasn't edited (needs isNoteLocallyProtected);
+ *  - autosaveRerunsOnAppRender: the autosave effects also re-run on every
+ *    App render, restarting their pending debounces.
  */
 export default function useNoteEditor({
   modal,
@@ -27,6 +38,7 @@ export default function useNoteEditor({
   setNotes,
   currentUser,
   sessionId,
+  readModeEnabled,
   setSidebarOpen,
   getInitialTags,
   acquireLocalLease,
@@ -35,6 +47,9 @@ export default function useNoteEditor({
   isNoteLocallyProtected,
   enqueueAndSync,
   enqueueWithLease,
+  audioNotes = true,
+  followRemoteEdits = true,
+  autosaveRerunsOnAppRender = false,
 }) {
   const {
     open, activeId, setActiveId, setOpen, setViewMode, setTagInput,
@@ -60,6 +75,10 @@ export default function useNoteEditor({
 
   // Initial draw mode for the modal (null = default "view", "draw" = open in edit mode)
   const [initialDrawMode, setInitialDrawMode] = useState(null);
+
+  // The lease helpers are recreated on every App render: in the effect
+  // dependencies, they re-run the autosave effects on each of them.
+  const appRenderKey = autosaveRerunsOnAppRender ? acquireLocalLease : null;
 
   // Baseline of the open note, to detect whether the user actually edited it.
   const initialModalStateRef = useRef(null);
@@ -96,6 +115,62 @@ export default function useNoteEditor({
     idbPutNote,
     getInitialTags,
   });
+
+  // Load a persisted note into the editor and open it, baselines aligned
+  // with its stored state.
+  const loadNote = (n) => {
+    // Clear any stale pending-draft state: we're opening a real, persisted
+    // note, so the deferred-create path must not fire for it.
+    pendingDraftRef.current = null;
+    setActiveId(String(n.id));
+    setMType(n.type || "text");
+    setMTitle(n.title || "");
+    let drawNoteText = "";
+    if (n.type === "draw") {
+      try {
+        const { drawing: cleanDrawingData, text } = parseDrawingContent(n.content);
+        drawNoteText = text;
+        setMDrawingData(cleanDrawingData);
+        prevDrawingRef.current = cleanDrawingData;
+        setMBody(drawNoteText);
+      } catch {
+        setMDrawingData({ paths: [], dimensions: null });
+        prevDrawingRef.current = { paths: [], dimensions: null };
+        setMBody("");
+      }
+      skipNextDrawingAutosaveRef.current = true;
+    } else {
+      setMBody(n.content || "");
+      setMDrawingData({ paths: [], dimensions: null });
+      prevDrawingRef.current = { paths: [], dimensions: null };
+    }
+    skipNextItemsAutosaveRef.current = true;
+    setMItems(Array.isArray(n.items) ? n.items : []);
+    prevItemsRef.current = Array.isArray(n.items) ? n.items : [];
+    setMTagList(Array.isArray(n.tags) ? n.tags : []);
+    setMImages(Array.isArray(n.images) ? n.images : []);
+    setTagInput("");
+    setMColor(n.color || "default");
+
+    // Store initial state to detect if user actually edited
+    // For draw notes, baseline.content holds the text body (extracted from drawing JSON)
+    const baselineState = {
+      title: n.title || "",
+      content: n.type === "draw" ? drawNoteText : (n.content || ""),
+      tags: Array.isArray(n.tags) ? n.tags : [],
+      images: Array.isArray(n.images) ? n.images : [],
+      color: n.color || "default",
+    };
+    initialModalStateRef.current = baselineState;
+    committedBaselineRef.current = { ...baselineState };
+
+    // Audio notes have no read/edit distinction: the AudioNoteEditor always
+    // shows the player + recorder controls regardless of viewMode. Open in
+    // edit mode so the experience is identical to creating a new audio note.
+    // Users who disabled the read-mode setting always open in edit mode.
+    setViewMode(n.type !== "audio" && readModeEnabled);
+    setOpen(true);
+  };
 
   // Live-sync checklist items in open modal when remote updates arrive
   useEffect(() => {
@@ -242,14 +317,14 @@ export default function useNoteEditor({
       drawingDebounceTimerRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on drawing edits
-  }, [mDrawingData, open, activeId, mType, flushPendingDrawingSave]);
+  }, [mDrawingData, open, activeId, mType, flushPendingDrawingSave, appRenderKey]);
 
   // Flush pending drawing save when modal closes or active note changes
   useEffect(() => {
     if (!open || !activeId || mType !== "draw") {
       flushPendingDrawingSave();
     }
-  }, [open, activeId, mType, flushPendingDrawingSave]);
+  }, [open, activeId, mType, flushPendingDrawingSave, appRenderKey]);
 
   // Live-sync drawing data in open modal when remote updates arrive
   useEffect(() => {
@@ -381,7 +456,7 @@ export default function useNoteEditor({
       }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
-  }, [mColor, mTagList, mImages, open, activeId, mType, autoSaveTextNote]);
+  }, [mColor, mTagList, mImages, open, activeId, mType, autoSaveTextNote, appRenderKey]);
 
   // Auto-save text content (title + body): debounced local-first persist + patch sync.
   // Checklists share this effect for title changes (their body is always "").
@@ -391,7 +466,7 @@ export default function useNoteEditor({
   // concern: the underlying mBody/mTitle state is equally dirty either way.
   useEffect(() => {
     if (!open || !activeId) return;
-    if (mType !== "text" && mType !== "checklist" && mType !== "audio") return;
+    if (mType !== "text" && mType !== "checklist" && !(audioNotes && mType === "audio")) return;
     const initial = initialModalStateRef.current;
     if (!initial) return;
 
@@ -443,7 +518,7 @@ export default function useNoteEditor({
       if (!transferred) releaseLocalLease(nId, leaseId);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
-  }, [mBody, mTitle, open, activeId, mType, autoSaveTextNote]);
+  }, [mBody, mTitle, open, activeId, mType, autoSaveTextNote, audioNotes, appRenderKey]);
 
   // Auto-save draw note title + text body: debounced local-first persist + patch sync.
   // Drawing data changes are handled by the drawing autosave effect above.
@@ -502,13 +577,13 @@ export default function useNoteEditor({
       if (!transferred) releaseLocalLease(nId, leaseId);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
-  }, [mBody, mTitle, open, activeId, mType, mDrawingData, autoSaveTextNote]);
+  }, [mBody, mTitle, open, activeId, mType, mDrawingData, autoSaveTextNote, appRenderKey]);
 
   // Update initial state reference when note is updated from server (for collaborative notes)
   // This prevents overwriting server changes when user hasn't edited locally
   // Must be after hasNoteBeenModified is defined
   useEffect(() => {
-    if (!open || !activeId || !initialModalStateRef.current) return;
+    if (!followRemoteEdits || !open || !activeId || !initialModalStateRef.current) return;
     const n = notes.find((x) => String(x.id) === String(activeId));
     if (!n || n.type === "draw") return;
 
@@ -548,7 +623,7 @@ export default function useNoteEditor({
       if (serverState.color !== mColor) setMColor(serverState.color);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only on server note changes, the edited fields must not re-run it on each keystroke
-  }, [notes, open, activeId, hasNoteBeenModified]);
+  }, [notes, open, activeId, hasNoteBeenModified, followRemoteEdits]);
 
   // Local-first helper: persist checklist changes to IndexedDB + sync queue
   const syncChecklistItems = async (newItems) => {
@@ -604,10 +679,94 @@ export default function useNoteEditor({
     releaseLocalLeaseWithPrune(noteId, leaseId);
   };
 
+  // Save right away what the debounced autosaves haven't yet, when the
+  // note closes. Each flow owns its own lease, released only after a
+  // successful enqueue.
+  const flushOpenNote = () => {
+    // Flush any pending drawing debounce before closing.
+    // flushPendingDrawingSave restores pendingDrawingSaveRef on failure,
+    // so a second close attempt can retry.
+    if (activeId && mType === "draw") {
+      flushPendingDrawingSave();
+    }
+
+    // Flush title/text/metadata changes for draw notes on close.
+    // flushPendingDrawingSave only covers drawing data changes (paths/dimensions).
+    // Title, text body, color, tags, images need a separate flush.
+    if (activeId && mType === "draw") {
+      const baseline = committedBaselineRef.current;
+      if (baseline) {
+        const patch = {};
+        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
+        if (baseline.color !== mColor) patch.color = mColor;
+        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
+        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
+        // For text body changes, re-serialize full drawing content
+        const textChanged = baseline.content !== mBody;
+        if (textChanged) {
+          patch.content = JSON.stringify({ ...(mDrawingData || { paths: [], dimensions: null }), text: mBody || "" });
+        }
+        if (Object.keys(patch).length > 0) {
+          autoSaveTextNote(activeId, patch, null, "draw");
+        }
+      }
+    }
+
+    // Retry checklist if the last autosave failed (prevItemsRef wasn't advanced).
+    if (activeId && mType === "checklist" && mItems) {
+      const prevJson = JSON.stringify(prevItemsRef.current || []);
+      const currentJson = JSON.stringify(mItems);
+      if (prevJson !== currentJson) {
+        syncChecklistItems(mItems);
+      }
+    }
+
+    // Flush pending title/metadata changes for checklists on close.
+    // syncChecklistItems only covers the items array; title, color, tags
+    // and images go through autoSaveTextNote with the debounced effect,
+    // so closing within the debounce window could otherwise lose them.
+    if (activeId && mType === "checklist") {
+      const baseline = committedBaselineRef.current;
+      if (baseline) {
+        const patch = {};
+        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
+        if (baseline.color !== mColor) patch.color = mColor;
+        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
+        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
+        if (Object.keys(patch).length > 0) {
+          autoSaveTextNote(activeId, patch, null, "checklist");
+        }
+      }
+    }
+
+    // Flush any pending text changes immediately before closing (local-first).
+    // Use committedBaselineRef (not initialModalStateRef) so that a failed
+    // autosave still produces a diff here and gets retried.
+    // Runs for both view and edit mode: a user may edit, toggle to view
+    // to preview before the 1s debounce fires, then close: the change is
+    // still dirty in mBody/mTitle and must be flushed.
+    // Audio shares this path: its mBody is the {clips, text} JSON, so a
+    // freshly-recorded clip whose autosave hasn't fired yet still gets
+    // flushed here on close.
+    if (activeId && (mType === "text" || (audioNotes && mType === "audio"))) {
+      const baseline = committedBaselineRef.current;
+      if (baseline) {
+        const patch = {};
+        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
+        if (baseline.content !== mBody) patch.content = mBody;
+        if (baseline.color !== mColor) patch.color = mColor;
+        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
+        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
+        if (Object.keys(patch).length > 0) {
+          autoSaveTextNote(activeId, patch, undefined, mType);
+        }
+      }
+    }
+  };
+
   return {
     skipNextItemsAutosaveRef,
     prevItemsRef,
-    skipNextDrawingAutosaveRef,
     prevDrawingRef,
     pendingDrawingSaveRef,
     drawingDebounceTimerRef,
@@ -622,8 +781,10 @@ export default function useNoteEditor({
     handleDirectChecklist,
     handleDirectDraw,
     handleDirectAudio,
+    loadNote,
     flushPendingDrawingSave,
     autoSaveTextNote,
     syncChecklistItems,
+    flushOpenNote,
   };
 }
