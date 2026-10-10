@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
-import { installStyleGuard } from "../../utils/safeStyle.js";
-import changelogRaw from "../../../CHANGELOG.md?raw";
-import { t, locale } from "../../i18n";
+import React, { useEffect, useState } from "react";
+import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
-import { api, getAuth, API_BASE } from "../../utils/api.js";
+import { resolveChangelogHref, openExternalUrl } from "./changelogContent.js";
+import useChangelogTranslation from "./useChangelogTranslation.js";
+import ChangelogStarCta from "./ChangelogStarCta.jsx";
+import { readStarDismissed, dismissStarCta } from "./changelogFlags.js";
 
 // =============================================================================
 //  ChangelogModal
@@ -21,159 +20,8 @@ import { api, getAuth, API_BASE } from "../../utils/api.js";
 //  injected via dangerouslySetInnerHTML is sanitized.
 // =============================================================================
 
-const SHOW_FLAG_KEY = "glass-keep-show-changelog-next-mount";
-
-// Set once the user clicks "Already done" on the GitHub star footer, so
-// the prompt is hidden for good on every future changelog view.
-const STAR_DISMISS_KEY = "glass-keep-star-cta-dismissed";
-
-function readStarDismissed() {
-    try {
-        return localStorage.getItem(STAR_DISMISS_KEY) === "1";
-    } catch {
-        return false;
-    }
-}
-
-function dismissStarCta() {
-    try {
-        localStorage.setItem(STAR_DISMISS_KEY, "1");
-    } catch {
-        /* ignore — at worst the prompt shows once more next time */
-    }
-}
-
-function readShowFlag() {
-    try {
-        return localStorage.getItem(SHOW_FLAG_KEY) === "1";
-    } catch {
-        return false;
-    }
-}
-
-function clearShowFlag() {
-    try {
-        localStorage.removeItem(SHOW_FLAG_KEY);
-    } catch {
-        /* ignore — at worst the modal shows once more on next visit */
-    }
-}
-
-// Public helper: SelfUpdateProgress calls this just before reloading
-// the page so the post-reload mount knows it should pop the modal.
-// eslint-disable-next-line react-refresh/only-export-components -- flag helper shares SHOW_FLAG_KEY with consumeChangelogShowFlag, which App.jsx imports from here
-export function markChangelogToShow() {
-    try {
-        localStorage.setItem(SHOW_FLAG_KEY, "1");
-    } catch {
-        /* ignore */
-    }
-}
-
-// Public helper: opens the modal on demand (used by the "View
-// changelog" link in the admin panel, so admins can re-read the
-// release notes even outside of an update flow).
-const OPEN_EVENT = "glass-keep:open-changelog";
-// eslint-disable-next-line react-refresh/only-export-components -- event helper shares OPEN_EVENT with onOpenChangelogRequest, which App.jsx imports from here
-export function openChangelog() {
-    try {
-        window.dispatchEvent(new CustomEvent(OPEN_EVENT));
-    } catch {
-        /* ignore — best-effort */
-    }
-}
-
-// Read-and-clear the "show after update" flag. Called by App.jsx on
-// mount so the modal's open state can be lifted out of this file
-// (required for the Android back-button stack to know about it).
-// eslint-disable-next-line react-refresh/only-export-components -- imported from this module by App.jsx
-export function consumeChangelogShowFlag() {
-    const flag = readShowFlag();
-    if (flag) clearShowFlag();
-    return flag;
-}
-
-// Subscribe to OPEN_EVENT requests. Returns an unsubscribe fn so
-// useEffect's cleanup can detach the listener.
-// eslint-disable-next-line react-refresh/only-export-components -- imported from this module by App.jsx
-export function onOpenChangelogRequest(cb) {
-    const handler = () => { try { cb(); } catch { /* ignore */ } };
-    window.addEventListener(OPEN_EVENT, handler);
-    return () => window.removeEventListener(OPEN_EVENT, handler);
-}
-
-// One filter for every sanitizing path in the app. See safeStyle.js.
-installStyleGuard(DOMPurify);
-
-function compileMarkdown(md) {
-    try {
-        const html = marked.parse(String(md || ""), {
-            breaks: false,
-            gfm: true,
-        });
-        return DOMPurify.sanitize(html);
-    } catch {
-        return "";
-    }
-}
-
-// Compile the bundled changelog once at module load — it is identical
-// for every render and parsing 5 KB of changelog on every mount would
-// be silly. AI-translated variants are compiled on the fly when the
-// user clicks "Translate with AI".
-const compiledChangelog = compileMarkdown(changelogRaw);
-
-// Where relative changelog links (e.g. `./PASSKEYS.md`) live online.
-// The changelog is markdown checked into the repo, so any in-repo
-// reference makes sense once resolved against the GitHub view URL.
-const REPO_BLOB_BASE =
-    "https://github.com/Victor-root/glasskeep-enhanced/blob/main/";
-
-function resolveChangelogHref(href) {
-    if (!href) return null;
-    // Already absolute (http(s):, mailto:, tel:, etc.) — pass through.
-    if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return href;
-    // Strip a leading `./` so URL doesn't fold it into the basename, then
-    // build against the GitHub blob root. Anchors and query strings are
-    // preserved because URL handles them natively.
-    try {
-        return new URL(href.replace(/^\.\//, ""), REPO_BLOB_BASE).toString();
-    } catch {
-        return null;
-    }
-}
-
-function openExternalUrl(url) {
-    if (!url) return;
-    // The native Android shell exposes a bridge that hands the URL to
-    // the system browser. Using window.open here would silently fail
-    // (the WebView has multi-window support disabled), so the bridge
-    // path is preferred whenever it's available.
-    try {
-        if (window.AndroidTheme && typeof window.AndroidTheme.openExternalUrl === "function") {
-            window.AndroidTheme.openExternalUrl(url);
-            return;
-        }
-    } catch { /* ignore — fall through to window.open */ }
-    try { window.open(url, "_blank", "noopener,noreferrer"); }
-    catch { /* nothing else we can do */ }
-}
-
-// True when the requesting user has a usable AI config (either the
-// shared "server" provider opted-in by the admin, or their own custom
-// endpoint). The "Translate with AI" button stays visible but disabled
-// when this is false, so the feature is always discoverable.
-async function fetchAiAvailable(token) {
-    try {
-        const cfg = await api("/user/ai/settings", { token, timeoutMs: 4000 });
-        if (!cfg || !cfg.enabled || !cfg.adminAiEnabled) return false;
-        if (cfg.mode === "server") return !!cfg.serverAiAvailable;
-        if (cfg.mode === "custom") return !!cfg.baseUrl && !!cfg.model;
-        return false;
-    } catch {
-        return false;
-    }
-}
+// eslint-disable-next-line react-refresh/only-export-components -- App.jsx imports these flag helpers from here
+export { consumeChangelogShowFlag, onOpenChangelogRequest } from "./changelogFlags.js";
 
 // Controlled component: `open` / `onClose` are owned by App.jsx so the
 // modal can be registered with the central Android-back-button stack
@@ -181,154 +29,18 @@ async function fetchAiAvailable(token) {
 // update" flag and the OPEN_EVENT custom-event listener have been
 // hoisted to App.jsx alongside.
 export default function ChangelogModal({ open, onClose }) {
-    const [aiAvailable, setAiAvailable] = useState(false);
-    const [translating, setTranslating] = useState(false);
-    const [translatedRaw, setTranslatedRaw] = useState(null);
-    const [translateError, setTranslateError] = useState(null);
-    const [showOriginal, setShowOriginal] = useState(false);
+    const {
+        aiAvailable,
+        translating,
+        translatedRaw,
+        translateError,
+        showOriginal,
+        setShowOriginal,
+        onTranslate,
+        displayHtml,
+    } = useChangelogTranslation(open);
     // Whether the user has permanently dismissed the GitHub star footer.
     const [starDismissed, setStarDismissed] = useState(readStarDismissed);
-    // Holds the AbortController of an in-flight translation stream so
-    // closing the modal mid-stream tears the upstream request down
-    // (no more tokens wasted after the admin walks away).
-    const translateAbortRef = useRef(null);
-
-    // Pull the AI availability flag once the modal opens so the
-    // translate button starts in the right enabled / disabled state.
-    // Only the bundled `en` text can be skipped here — but we still
-    // probe because the user may want to translate EN → other (and
-    // a future locale could ship with EN bundled by default).
-    useEffect(() => {
-        if (!open) return;
-        let cancelled = false;
-        const token = getAuth()?.token || null;
-        (async () => {
-            const ok = await fetchAiAvailable(token);
-            if (!cancelled) setAiAvailable(ok);
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [open]);
-
-    // Whenever the modal closes (or re-opens), drop the local
-    // translation state so the next session starts fresh. Keeping
-    // the cache on the server means re-translating is instant.
-    // An in-flight stream is aborted so we don't keep spending
-    // tokens after the admin walked away.
-    useEffect(() => {
-        if (!open) {
-            if (translateAbortRef.current) {
-                try { translateAbortRef.current.abort(); } catch { /* ignore */ }
-                translateAbortRef.current = null;
-            }
-            // eslint-disable-next-line react-hooks/set-state-in-effect -- reset translation state when the modal closes, together with aborting the stream
-            setTranslatedRaw(null);
-            setTranslateError(null);
-            setShowOriginal(false);
-            setTranslating(false);
-        }
-    }, [open]);
-
-    const onTranslate = async () => {
-        if (translating || !aiAvailable) return;
-        setTranslateError(null);
-        setTranslating(true);
-        setShowOriginal(false);
-        setTranslatedRaw("");
-
-        const controller = new AbortController();
-        translateAbortRef.current = controller;
-        const token = getAuth()?.token || null;
-        let buf = "";
-        let accumulated = "";
-
-        try {
-            const res = await fetch(`${API_BASE}/ai/translate-changelog`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Accept: "text/event-stream",
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({
-                    content: String(changelogRaw || ""),
-                    lang: locale,
-                }),
-                signal: controller.signal,
-            });
-            if (!res.ok || !res.body) {
-                // Best-effort attempt to read a JSON error body — the
-                // server only switches to SSE once it has validated the
-                // request, so early failures still come back as JSON.
-                let msg = `HTTP ${res.status}`;
-                try {
-                    const j = await res.json();
-                    if (j?.error) msg = j.error;
-                } catch {
-                    /* ignore — keep the HTTP status */
-                }
-                throw new Error(msg);
-            }
-
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder("utf-8");
-
-            // Drain the SSE stream. Events are separated by a blank line
-            // ("\n\n"); within an event each line is `<field>: <value>`.
-            // We only care about `event:` (delta | done | error) and the
-            // first `data:` line, which is JSON.
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                buf += decoder.decode(value, { stream: true });
-
-                let sep;
-                while ((sep = buf.indexOf("\n\n")) !== -1) {
-                    const frame = buf.slice(0, sep);
-                    buf = buf.slice(sep + 2);
-                    let evtName = "message";
-                    let dataLine = "";
-                    for (const rawLine of frame.split("\n")) {
-                        const line = rawLine.replace(/\r$/, "");
-                        if (line.startsWith("event:")) {
-                            evtName = line.slice(6).trim();
-                        } else if (line.startsWith("data:")) {
-                            // SSE allows multi-line data; we only emit
-                            // single-line payloads, so the first hit wins.
-                            if (!dataLine) dataLine = line.slice(5).trim();
-                        }
-                    }
-                    if (!dataLine) continue;
-                    let payload;
-                    try {
-                        payload = JSON.parse(dataLine);
-                    } catch {
-                        continue;
-                    }
-                    if (evtName === "delta") {
-                        if (typeof payload.delta === "string") {
-                            accumulated += payload.delta;
-                            setTranslatedRaw(accumulated);
-                        }
-                    } else if (evtName === "error") {
-                        throw new Error(payload.error || "stream error");
-                    }
-                    // "done" needs no action; the loop ends when the
-                    // server closes the stream after emitting it.
-                }
-            }
-            if (!accumulated) throw new Error("empty");
-        } catch (e) {
-            if (e?.name !== "AbortError") {
-                setTranslateError(e?.message || t("changelogTranslateFailed"));
-                setTranslatedRaw(null);
-            }
-        } finally {
-            translateAbortRef.current = null;
-            setTranslating(false);
-        }
-    };
 
     // Lock body scroll while the changelog is open so the underlying
     // admin panel can't drift behind a fullscreen modal on mobile.
@@ -340,16 +52,6 @@ export default function ChangelogModal({ open, onClose }) {
             document.body.style.overflow = prev;
         };
     }, [open]);
-
-    // Translated markdown is compiled on the fly; the original is
-    // pre-compiled once at module load. The "Show original" toggle
-    // flips between the two without re-parsing the source.
-    const translatedHtml = useMemo(
-        () => (translatedRaw ? compileMarkdown(translatedRaw) : ""),
-        [translatedRaw],
-    );
-    const displayHtml =
-        translatedRaw && !showOriginal ? translatedHtml : compiledChangelog;
 
     if (!open) return null;
 
@@ -559,26 +261,7 @@ export default function ChangelogModal({ open, onClose }) {
                     }}
                 />
                 {!starDismissed && (
-                    <div className="shrink-0 flex items-center justify-center gap-2 px-5 py-2 border-t border-[var(--border-light)] bg-white/40 dark:bg-white/5">
-                        <span className="text-xs text-gray-400 dark:text-gray-500">
-                            {t("changelogStarUs")}{" "}
-                            <button
-                                type="button"
-                                onClick={() => openExternalUrl("https://github.com/Victor-root/glasskeep-enhanced")}
-                                className="underline underline-offset-2 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                            >
-                                {t("changelogStarUsLink")}
-                            </button>
-                        </span>
-                        <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
-                        <button
-                            type="button"
-                            onClick={() => { dismissStarCta(); setStarDismissed(true); }}
-                            className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                        >
-                            {t("changelogStarUsDone")}
-                        </button>
-                    </div>
+                    <ChangelogStarCta onDismiss={() => { dismissStarCta(); setStarDismissed(true); }} />
                 )}
             </div>
         </div>
