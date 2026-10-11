@@ -47,7 +47,7 @@ html.dark {
   --gk-chrome-3: rgba(231, 215, 252, 0.90);  /* light violet  */
   --gk-chrome-solid: #edf1fa;                /* opaque header base — kills see-through */
   /* Flat chrome colour for the Android status bar AND the mobile header (they
-     read as one block). MUST match STATUS_BAR_LIGHT/DARK in src/utils/helpers.js. */
+     read as one block). MUST match STATUS_BAR_LIGHT/DARK in src/utils/systemBars.js. */
   --gk-statusbar: #dce1fb;
   --gk-chrome-border: rgba(120, 134, 196, 0.28);
   --gk-chrome-shadow: rgba(54, 64, 122, 0.10);
