@@ -46,6 +46,7 @@ export default function SecondaryNoteInstance({
   syncState,
   // Persistence
   acquireLocalLease, releaseLocalLease, releaseLocalLeaseWithPrune,
+  isNoteLocallyProtected,
   enqueueAndSync, enqueueWithLease,
   addDeleteTombstone,
   // UI helpers
@@ -131,9 +132,9 @@ export default function SecondaryNoteInstance({
     acquireLocalLease,
     releaseLocalLease,
     releaseLocalLeaseWithPrune,
+    isNoteLocallyProtected,
     enqueueAndSync,
     enqueueWithLease,
-    followRemoteEdits: false,
     autosaveRerunsOnAppRender: true,
   });
   const { initialDrawMode, setInitialDrawMode, loadNote, syncChecklistItems } = editor;

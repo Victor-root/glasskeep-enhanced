@@ -1359,6 +1359,7 @@ export default function App() {
           acquireLocalLease={acquireLocalLease}
           releaseLocalLease={releaseLocalLease}
           releaseLocalLeaseWithPrune={releaseLocalLeaseWithPrune}
+          isNoteLocallyProtected={isNoteLocallyProtected}
           enqueueAndSync={enqueueAndSync}
           enqueueWithLease={enqueueWithLease}
           addDeleteTombstone={addDeleteTombstone}
