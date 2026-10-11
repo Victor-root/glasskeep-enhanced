@@ -39,7 +39,7 @@ export default function SecondaryNoteInstance({
   notes, setNotes,
   currentUser, sessionId, token,
   dark, windowWidth, isLandscapeMobile, isWebView, edgeToEdgeLandscape,
-  tagFilter, tagsWithCounts,
+  tagFilter, setTagFilter, tagsWithCounts,
   logoLibrary, addLogoToLibrary, deleteLogoFromLibrary, applyNoteIcon,
   editorToolbarMode, pasteMode, checklistInsertPosition, checklistRemoveSectionBehavior,
   aiAssistantEnabled,
@@ -169,6 +169,7 @@ export default function SecondaryNoteInstance({
     currentUser,
     sessionId,
     tagFilter,
+    setTagFilter,
     acquireLocalLease,
     releaseLocalLeaseWithPrune,
     addDeleteTombstone,
@@ -177,7 +178,6 @@ export default function SecondaryNoteInstance({
     showToast,
     showGenericConfirm,
     finishClose: onRequestClosing,
-    leaveArchiveViewOnUnarchive: false,
     duplicateKeepsIcon: false,
   });
   // eslint-disable-next-line react-hooks/refs -- keeps the ref given to useModalState pointing at the latest closeModal

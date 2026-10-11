@@ -1345,6 +1345,7 @@ export default function App() {
           isWebView={isWebView}
           edgeToEdgeLandscape={edgeToEdgeLandscape}
           tagFilter={tagFilter}
+          setTagFilter={setTagFilter}
           tagsWithCounts={tagsWithCounts}
           logoLibrary={logoLibrary}
           addLogoToLibrary={addLogoToLibrary}
