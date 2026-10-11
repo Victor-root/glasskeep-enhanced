@@ -24,10 +24,8 @@ import { parseDrawingContent } from "../utils/drawingContent.js";
  *
  * Both panes run it: the primary modal and the side-by-side right pane,
  * each on its own modal state. The right pane never opens a draft, and
- * the last two options keep the points where it has always behaved
+ * the last option keeps the point where it has always behaved
  * differently:
- *  - followRemoteEdits: a server change to the open note is taken into
- *    the editor while the user hasn't edited (needs isNoteLocallyProtected);
  *  - autosaveRerunsOnAppRender: the autosave effects also re-run on every
  *    App render, restarting their pending debounces.
  */
@@ -46,7 +44,6 @@ export default function useNoteEditor({
   isNoteLocallyProtected,
   enqueueAndSync,
   enqueueWithLease,
-  followRemoteEdits = true,
   autosaveRerunsOnAppRender = false,
 }) {
   const {
@@ -576,7 +573,7 @@ export default function useNoteEditor({
   // This prevents overwriting server changes when user hasn't edited locally
   // Must be after hasNoteBeenModified is defined
   useEffect(() => {
-    if (!followRemoteEdits || !open || !activeId || !initialModalStateRef.current) return;
+    if (!open || !activeId || !initialModalStateRef.current) return;
     const n = notes.find((x) => String(x.id) === String(activeId));
     if (!n || n.type === "draw") return;
 
@@ -616,7 +613,7 @@ export default function useNoteEditor({
       if (serverState.color !== mColor) setMColor(serverState.color);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only on server note changes, the edited fields must not re-run it on each keystroke
-  }, [notes, open, activeId, hasNoteBeenModified, followRemoteEdits]);
+  }, [notes, open, activeId, hasNoteBeenModified]);
 
   // Local-first helper: persist checklist changes to IndexedDB + sync queue
   const syncChecklistItems = async (newItems) => {
