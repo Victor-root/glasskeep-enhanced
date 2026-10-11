@@ -6,10 +6,13 @@ import { localizeServerError } from "../utils/serverErrors.js";
 /**
  * Hook encapsulating collaboration state and actions for the "add
  * collaborator modal" (inside the note modal).
+ *
+ * Sharing first sends the note's queued actions (`flushNoteSync`).
  */
 export default function useCollaboration(token, {
   currentUser,
   activeId,
+  flushNoteSync,
   showToast,
 }) {
   // ── Collaboration modal state (inside note modal) ──
@@ -199,6 +202,9 @@ export default function useCollaboration(token, {
   // is [{ username, access }].
   const addCollaboratorsBatch = async (items) => {
     if (!activeId || !Array.isArray(items) || items.length === 0) return;
+    // The server refuses to share a note it doesn't have yet: send the
+    // note's queued actions, its create among them, first.
+    await flushNoteSync(activeId);
     participantsMutationRef.current++;
     pendingMutationsRef.current++;
     let added = 0;

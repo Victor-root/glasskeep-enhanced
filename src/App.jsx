@@ -114,7 +114,7 @@ export default function App() {
   } = leases;
   const {
     syncStatus, syncEngineRef, reloadCurrentViewRef,
-    triggerSync, handleSyncNow, enqueueAndSync, enqueueWithLease, resetSync,
+    triggerSync, flushNoteSync, handleSyncNow, enqueueAndSync, enqueueWithLease, resetSync,
   } = useNoteSync({
     token,
     userId: currentUser?.id,
@@ -553,6 +553,7 @@ export default function App() {
     availableLoading,
   } = useCollaboration(token, {
     currentUser, activeId,
+    flushNoteSync,
     showToast,
   });
 
@@ -1359,6 +1360,7 @@ export default function App() {
           onReminderTimeChipsChange={handleReminderTimeChipsChange}
           aiAssistantEnabled={aiAssistantEnabled}
           syncState={syncStatus.syncState}
+          flushNoteSync={flushNoteSync}
           acquireLocalLease={acquireLocalLease}
           releaseLocalLease={releaseLocalLease}
           releaseLocalLeaseWithPrune={releaseLocalLeaseWithPrune}

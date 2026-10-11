@@ -47,6 +47,7 @@ export class SyncEngine {
     this.onSyncError = onSyncError || (() => {});
     this.onNoteInaccessible = onNoteInaccessible || (() => {});
     this._processing = false;
+    this._runDone = null; // settles when the current processQueue run ends
     this._pulling = false; // true while view is being refreshed from server (remote pull)
     this._isChecking = false; // true while forceSync health-checks (immediate UI feedback)
     this._healthTimer = null;
@@ -154,6 +155,8 @@ export class SyncEngine {
     }
 
     this._processing = true;
+    let endRun;
+    this._runDone = new Promise((r) => { endRun = r; });
 
     try {
       await collapseQueue(this._userId);
@@ -345,8 +348,31 @@ export class SyncEngine {
       console.error("[SyncEngine] processQueue error:", err);
     } finally {
       this._processing = false;
+      endRun();
       await this._emitStatus();
     }
+  }
+
+  /**
+   * Send a note's queued actions now, past their retry backoff, for a
+   * server call that needs the server to know the note first (sharing a
+   * note whose create is still queued). Resolves once a run has gone over
+   * them; whatever could not be sent stays queued as usual.
+   */
+  async flushNote(noteId) {
+    if (this._destroyed) return;
+    // A run already going may have read the queue before these items.
+    while (this._processing) await this._runDone;
+    const { items } = await getQueueStats(this._userId);
+    const mine = items.filter((i) => String(i.noteId) === String(noteId));
+    if (mine.length === 0) return;
+    for (const item of mine) {
+      if (item.status === "failed" || item.status === "retry") {
+        await updateQueueItem(item.queueId, { status: "pending", lastAttemptAt: 0, attempts: 0 });
+      }
+    }
+    while (this._processing) await this._runDone;
+    await this.processQueue();
   }
 
   /**
