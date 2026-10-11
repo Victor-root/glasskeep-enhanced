@@ -40,7 +40,7 @@ App shell:
 - `useSession` (session, profile refresh, token renewal, login completion), `useAuthActions` (sign-in, register, sign-out, expired session, SSO return)
 - `useHashRoute`, `useDarkMode`, `useWindowSize`
 - `useUserPreferences`: every preference synced with `/api/user/settings`; the per-preference rules are in `utils/userPreferences.js`
-- `useAppNotifications` (preferences applied to the notification provider, `showToast`), `useShareNotifications`, `useServerUpdate`, `usePublicLoginInfo`, `useInstanceLock`
+- `useAppNotifications` (preferences applied to the notification provider, `showToast`, `dismissNoteReminders` when a note opens), `useShareNotifications`, `useServerUpdate`, `usePublicLoginInfo`, `useInstanceLock`
 - `useOverlayBackStack`: the Android back button over every overlay
 - `useLaunchShortcuts`, `useNoteDeepLinks`, `useAndroidReminderBridge`: entry points from outside the app
 - `useAdminActions`, `useImportExport`, `useCollaboration`
@@ -52,7 +52,7 @@ Notes:
 - `usePrimaryNoteModal`: the primary modal's open, animated close and forced close
 - `useLogoLibrary` (logo library, `applyNoteIcon`) and `useNoteIconActions` (the open note's icon)
 - `useNoteFilters`, `useNoteReorder`, `useMultiSelect`, `useBulkActions`, `useAiSearch`, `useNoteAiChat`
-- `useSideBySide`: two notes side by side. The right pane is `components/modal/SecondaryNoteInstance`, which runs `useModalState`, `useNoteEditor` and `useNoteActions` on its own state. Their options (`audioNotes`, `followRemoteEdits`, `autosaveRerunsOnAppRender`, ...) keep where the two panes differ.
+- `useSideBySide`: two notes side by side. The right pane is `components/modal/SecondaryNoteInstance`, which runs `useModalState`, `useNoteEditor` and `useNoteActions` on its own state, so it behaves like the primary modal. What differs: it never opens a new-note draft, and closing it hands over to the side-by-side shell's animation.
 
 ### Data flow (local-first)
 
