@@ -275,7 +275,7 @@ export default function App() {
   const {
     notify,
     showToast,
-    allNotifications,
+    dismissNoteReminders,
     dismissNotification,
     removeNotification,
     dismissByServerIds: dismissByServerIdsNotif,
@@ -603,8 +603,7 @@ export default function App() {
     notes,
     setSidebarOpen,
     setSbsSuppressOpenReplay,
-    allNotifications,
-    dismissNotification,
+    dismissNoteReminders,
   });
 
   // The side-by-side right pane keeps its own closeNoteIfOpen here.
@@ -1368,6 +1367,7 @@ export default function App() {
           addDeleteTombstone={addDeleteTombstone}
           showToast={showToast}
           showGenericConfirm={showGenericConfirm}
+          dismissNoteReminders={dismissNoteReminders}
           isCollaborativeNote={isCollaborativeNote}
           readModeEnabled={readModeEnabled}
         />

@@ -55,6 +55,7 @@ export default function SecondaryNoteInstance({
   // UI helpers
   showToast,
   showGenericConfirm,
+  dismissNoteReminders,
   isCollaborativeNote,
   readModeEnabled = true,
 }) {
@@ -149,6 +150,7 @@ export default function SecondaryNoteInstance({
     if (noteId && (!open || String(activeId) !== String(noteId))) {
       const n = notes.find((x) => String(x.id) === String(noteId));
       if (!n) return;
+      dismissNoteReminders(noteId);
       loadNote(n);
       restoreSavedNoteAi(noteId);
     } else if (!noteId && open) {

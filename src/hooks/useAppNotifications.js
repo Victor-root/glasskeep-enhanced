@@ -44,6 +44,29 @@ export default function useAppNotifications({
     api("/notifications/clear", { method: "POST", token: tk }).catch(() => {});
   }, [clearNotifications, token]);
 
+  // Opening a note acknowledges any pending reminder for it: clear the
+  // in-app reminder notification(s) for this note so they don't linger
+  // after you've opened it (e.g. by tapping the system/push notification,
+  // which deep-links to the note without going through the card's own
+  // button). dismiss() acks "delivered", which also clears the card on the
+  // user's other devices, so desktop ↔ mobile stay in sync.
+  const dismissNoteReminders = useCallback((noteId) => {
+    try {
+      const sid = String(noteId);
+      (allNotifications || []).forEach((notif) => {
+        if (
+          notif &&
+          notif.type === "reminder" &&
+          (String(notif.metadata?.noteId) === sid || String(notif.action?.noteId) === sid)
+        ) {
+          dismissNotification(notif.id);
+        }
+      });
+    } catch {
+      /* best-effort: never block opening the note */
+    }
+  }, [allNotifications, dismissNotification]);
+
   // Default duration of every notify() call that doesn't pass one.
   useEffect(() => {
     setDefaultDuration(notificationsDuration);
@@ -111,7 +134,7 @@ export default function useAppNotifications({
   return {
     notify,
     showToast,
-    allNotifications,
+    dismissNoteReminders,
     dismissNotification,
     removeNotification,
     dismissByServerIds,
