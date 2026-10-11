@@ -121,7 +121,6 @@ export default function SecondaryNoteInstance({
   const { restoreSavedNoteAi } = noteAi;
 
   // ─── Persistence of the open note (own instance) ───────────────────────
-  // The options keep where this pane has always differed from the primary.
   const editor = useNoteEditor({
     modal,
     notes,
@@ -135,7 +134,6 @@ export default function SecondaryNoteInstance({
     isNoteLocallyProtected,
     enqueueAndSync,
     enqueueWithLease,
-    autosaveRerunsOnAppRender: true,
   });
   const { initialDrawMode, setInitialDrawMode, loadNote, syncChecklistItems } = editor;
 
