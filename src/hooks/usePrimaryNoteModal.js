@@ -14,8 +14,7 @@ export default function usePrimaryNoteModal({
   notes,
   setSidebarOpen,
   setSbsSuppressOpenReplay,
-  allNotifications,
-  dismissNotification,
+  dismissNoteReminders,
 }) {
   const {
     setActiveId, activeIdRef, setOpen, setViewMode, setConfirmDeleteOpen,
@@ -27,26 +26,7 @@ export default function usePrimaryNoteModal({
   const openModal = (id) => {
     const n = notes.find((x) => String(x.id) === String(id));
     if (!n) return;
-    // Opening a note acknowledges any pending reminder for it: clear the
-    // in-app reminder notification(s) for this note so they don't linger
-    // after you've opened it (e.g. by tapping the system/push notification,
-    // which deep-links here without going through the card's own button).
-    // dismiss() acks "delivered", which also clears the card on the user's
-    // other devices, so desktop ↔ mobile stay in sync.
-    try {
-      const sid = String(id);
-      (allNotifications || []).forEach((notif) => {
-        if (
-          notif &&
-          notif.type === "reminder" &&
-          (String(notif.metadata?.noteId) === sid || String(notif.action?.noteId) === sid)
-        ) {
-          dismissNotification(notif.id);
-        }
-      });
-    } catch {
-      /* best-effort: never block opening the note */
-    }
+    dismissNoteReminders(id);
     setSidebarOpen(false);
     setSbsSuppressOpenReplay(false);
     loadNote(n);
