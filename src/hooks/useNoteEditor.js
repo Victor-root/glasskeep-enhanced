@@ -23,11 +23,7 @@ import { parseDrawingContent } from "../utils/drawingContent.js";
  *    retried there.
  *
  * Both panes run it: the primary modal and the side-by-side right pane,
- * each on its own modal state. The right pane never opens a draft, and
- * the last option keeps the point where it has always behaved
- * differently:
- *  - autosaveRerunsOnAppRender: the autosave effects also re-run on every
- *    App render, restarting their pending debounces.
+ * each on its own modal state. The right pane never opens a draft.
  */
 export default function useNoteEditor({
   modal,
@@ -44,7 +40,6 @@ export default function useNoteEditor({
   isNoteLocallyProtected,
   enqueueAndSync,
   enqueueWithLease,
-  autosaveRerunsOnAppRender = false,
 }) {
   const {
     open, activeId, setActiveId, setOpen, setViewMode, setTagInput,
@@ -70,11 +65,6 @@ export default function useNoteEditor({
 
   // Initial draw mode for the modal (null = default "view", "draw" = open in edit mode)
   const [initialDrawMode, setInitialDrawMode] = useState(null);
-
-  // With autosaveRerunsOnAppRender, a lease helper (recreated on every App
-  // render) joins the autosave effects' dependencies, so they re-run on
-  // each App render.
-  const appRenderKey = autosaveRerunsOnAppRender ? acquireLocalLease : null;
 
   // Baseline of the open note, to detect whether the user actually edited it.
   const initialModalStateRef = useRef(null);
@@ -310,14 +300,14 @@ export default function useNoteEditor({
       drawingDebounceTimerRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on drawing edits
-  }, [mDrawingData, open, activeId, mType, flushPendingDrawingSave, appRenderKey]);
+  }, [mDrawingData, open, activeId, mType, flushPendingDrawingSave]);
 
   // Flush pending drawing save when modal closes or active note changes
   useEffect(() => {
     if (!open || !activeId || mType !== "draw") {
       flushPendingDrawingSave();
     }
-  }, [open, activeId, mType, flushPendingDrawingSave, appRenderKey]);
+  }, [open, activeId, mType, flushPendingDrawingSave]);
 
   // Live-sync drawing data in open modal when remote updates arrive
   useEffect(() => {
@@ -446,7 +436,7 @@ export default function useNoteEditor({
       }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
-  }, [mColor, mTagList, mImages, open, activeId, mType, autoSaveTextNote, appRenderKey]);
+  }, [mColor, mTagList, mImages, open, activeId, mType, autoSaveTextNote]);
 
   // Auto-save text content (title + body): debounced local-first persist + patch sync.
   // Checklists share this effect for title changes (their body is always "").
@@ -508,7 +498,7 @@ export default function useNoteEditor({
       if (!transferred) releaseLocalLease(nId, leaseId);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
-  }, [mBody, mTitle, open, activeId, mType, autoSaveTextNote, appRenderKey]);
+  }, [mBody, mTitle, open, activeId, mType, autoSaveTextNote]);
 
   // Auto-save draw note title + text body: debounced local-first persist + patch sync.
   // Drawing data changes are handled by the drawing autosave effect above.
@@ -567,7 +557,7 @@ export default function useNoteEditor({
       if (!transferred) releaseLocalLease(nId, leaseId);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
-  }, [mBody, mTitle, open, activeId, mType, mDrawingData, autoSaveTextNote, appRenderKey]);
+  }, [mBody, mTitle, open, activeId, mType, mDrawingData, autoSaveTextNote]);
 
   // Update initial state reference when note is updated from server (for collaborative notes)
   // This prevents overwriting server changes when user hasn't edited locally
