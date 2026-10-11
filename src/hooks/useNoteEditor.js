@@ -235,6 +235,19 @@ export default function useNoteEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the lease helpers only touch refs
   }, [currentUser?.id, sessionId, enqueueAndSync]);
 
+  // Drop the pending drawing save of a note that no longer exists: its
+  // debounce never fires and its lease is released.
+  const discardPendingDrawingSave = (noteId) => {
+    const pending = pendingDrawingSaveRef.current;
+    if (!pending || String(pending.noteId) !== noteId) return;
+    if (drawingDebounceTimerRef.current) {
+      clearTimeout(drawingDebounceTimerRef.current);
+      drawingDebounceTimerRef.current = null;
+    }
+    if (pending.leaseId) releaseLocalLease(noteId, pending.leaseId);
+    pendingDrawingSaveRef.current = null;
+  };
+
   // Keep drawNoteBodyRef in sync with mBody for draw notes
   useEffect(() => { drawNoteBodyRef.current = mBody; }, [mBody]);
 
@@ -745,8 +758,6 @@ export default function useNoteEditor({
     skipNextItemsAutosaveRef,
     prevItemsRef,
     prevDrawingRef,
-    pendingDrawingSaveRef,
-    drawingDebounceTimerRef,
     initialModalStateRef,
     committedBaselineRef,
     initialDrawMode,
@@ -760,6 +771,7 @@ export default function useNoteEditor({
     handleDirectAudio,
     loadNote,
     flushPendingDrawingSave,
+    discardPendingDrawingSave,
     autoSaveTextNote,
     syncChecklistItems,
     flushOpenNote,

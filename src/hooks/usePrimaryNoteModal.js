@@ -16,13 +16,12 @@ export default function usePrimaryNoteModal({
   setSbsSuppressOpenReplay,
   allNotifications,
   dismissNotification,
-  releaseLocalLease,
 }) {
   const {
     setActiveId, activeIdRef, setOpen, setViewMode, setConfirmDeleteOpen,
     setIsModalClosing, modalClosingTimerRef, setShowModalFmt, setImgViewOpen,
   } = modal;
-  const { loadNote, pendingDrawingSaveRef, drawingDebounceTimerRef } = editor;
+  const { loadNote, discardPendingDrawingSave } = editor;
   const { noteAiOpen, setNoteAiOpen } = noteAi;
 
   const openModal = (id) => {
@@ -71,19 +70,8 @@ export default function usePrimaryNoteModal({
   // permanently deletes the note that is currently open. Must not trigger
   // autoSaveTextNote, flushPendingDrawingSave, or any enqueueAndSync.
   const forceCloseModalForRemoteDelete = (noteId) => {
-    const nid = String(noteId);
-
     // Cancel any pending drawing debounce so flush never fires.
-    // Release the lease since the note no longer exists.
-    const pending = pendingDrawingSaveRef.current;
-    if (pending && String(pending.noteId) === nid) {
-      if (drawingDebounceTimerRef.current) {
-        clearTimeout(drawingDebounceTimerRef.current);
-        drawingDebounceTimerRef.current = null;
-      }
-      if (pending.leaseId) releaseLocalLease(nid, pending.leaseId);
-      pendingDrawingSaveRef.current = null;
-    }
+    discardPendingDrawingSave(String(noteId));
 
     // Cancel in-flight close animation (if any)
     if (modalClosingTimerRef.current) {
