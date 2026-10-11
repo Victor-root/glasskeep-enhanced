@@ -27,6 +27,8 @@ export default function SecondaryNoteInstance({
   forceClosing = false,         // shell-driven close-both signal: OR-s into NoteModal's isModalClosing
   // shell callback: close requested (edits flushed), the shell drives the animation
   onRequestClosing,
+  // ref the pane keeps pointing at its closeNoteIfOpen, for App's note-gone path
+  closeNoteIfOpenRef,
   // SBS AI coordination: shell passes the side ("left" for the right pane in
   // SBS, mirroring the active note) and a flag that hides this pane while the
   // OPPOSITE pane's AI panel takes over its slot. AI open/close callbacks let
@@ -61,6 +63,7 @@ export default function SecondaryNoteInstance({
   const {
     open, setOpen,
     activeId, setActiveId,
+    activeIdRef,
     mType,
     mTitle, setMTitle,
     mBody, setMBody,
@@ -135,7 +138,9 @@ export default function SecondaryNoteInstance({
     enqueueAndSync,
     enqueueWithLease,
   });
-  const { initialDrawMode, setInitialDrawMode, loadNote, syncChecklistItems } = editor;
+  const {
+    initialDrawMode, setInitialDrawMode, loadNote, syncChecklistItems, discardPendingDrawingSave,
+  } = editor;
 
   // Open whenever the controlled noteId prop changes
   useEffect(() => {
@@ -180,6 +185,20 @@ export default function SecondaryNoteInstance({
   });
   // eslint-disable-next-line react-hooks/refs -- keeps the ref given to useModalState pointing at the latest closeModal
   closeModalRef.current = closeModal;
+
+  // The note no longer exists for this user (deleted elsewhere, access
+  // revoked): like the primary modal, the pane drops it at once without
+  // saving anything, then the shell recenters the left pane.
+  useEffect(() => {
+    closeNoteIfOpenRef.current = (noteId) => {
+      if (String(activeIdRef.current) !== noteId) return;
+      discardPendingDrawingSave(noteId);
+      setOpen(false);
+      setActiveId(null);
+      onRequestClosing();
+    };
+    return () => { closeNoteIfOpenRef.current = null; };
+  });
 
   // ─── Note icon (PER-USER, never synced) ────────────────────────────────
   const { setNoteIconFromFile, removeNoteIcon, pickNoteIcon } = useNoteIconActions({ noteId: activeId, applyNoteIcon, addLogoToLibrary });

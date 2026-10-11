@@ -126,7 +126,7 @@ export default function App() {
       viewFilter: () => tagFilterRef.current,
       setNotes,
       leases,
-      onNoteGone: closeNoteIfOpen,
+      onNoteGone: closeGoneNote,
       reloadCurrentView: () => reloadCurrentViewRef.current?.(),
     }),
     // 403 on a mutation: access was revoked while offline (the live event
@@ -137,7 +137,7 @@ export default function App() {
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
       leases.forgetNote(nid);
-      closeNoteIfOpen(nid);
+      closeGoneNote(nid);
     },
   });
 
@@ -484,7 +484,7 @@ export default function App() {
       setNotes,
       leases,
       reloadCurrentView: () => reloadCurrentViewRef.current?.(),
-      onNoteGone: closeNoteIfOpen,
+      onNoteGone: closeGoneNote,
       setLogoLibrary,
       notify,
       showShareToast: showShareNotificationToast,
@@ -613,8 +613,15 @@ export default function App() {
     setSbsSuppressOpenReplay,
     allNotifications,
     dismissNotification,
-    releaseLocalLease,
   });
+
+  // The side-by-side right pane keeps its own closeNoteIfOpen here.
+  const secondaryCloseNoteIfOpenRef = useRef(null);
+  // The note no longer exists for this user: close the pane showing it.
+  const closeGoneNote = (noteId) => {
+    closeNoteIfOpen(noteId);
+    secondaryCloseNoteIfOpenRef.current?.(noteId);
+  };
 
   const {
     closeModal, saveModal, deleteModal, restoreFromTrash,
@@ -1330,6 +1337,7 @@ export default function App() {
           splitClosing={sbsClosingSide === "right"}
           forceClosing={sbsBothClosing}
           onRequestClosing={onSbsRightClosing}
+          closeNoteIfOpenRef={secondaryCloseNoteIfOpenRef}
           aiPanelSide="left"
           sbsOppositeHidden={sbsAiActiveSide === "left"}
           onAiOpen={onSecondaryAiOpen}
