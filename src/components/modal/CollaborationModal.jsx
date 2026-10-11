@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import Sheet from "../common/Sheet.jsx";
 import ConfirmRemoveCollaboratorDialog from "./ConfirmRemoveCollaboratorDialog.jsx";
 import CurrentCollaboratorsList from "./CurrentCollaboratorsList.jsx";
@@ -278,7 +279,9 @@ export default function CollaborationModal({
           {body}
           {footer}
         </Sheet>
-        {confirmRemoveDialog}
+        {/* The sheet sits on <body>, above the note's stacking context: its
+            confirmation goes there too so it stacks over the sheet. */}
+        {createPortal(confirmRemoveDialog, document.body)}
       </>
     );
   }
