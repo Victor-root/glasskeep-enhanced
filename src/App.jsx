@@ -207,6 +207,7 @@ export default function App() {
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
     modalKebabOpen, setModalKebabOpen,
+    reminderPopOpen, setReminderPopOpen,
     imageMenuOpen, setImageMenuOpen,
     logoPickerOpen, setLogoPickerOpen,
     imgViewOpen, setImgViewOpen, imgViewIndex,
@@ -244,15 +245,6 @@ export default function App() {
     },
   });
   const { noteAiOpen, setNoteAiOpen } = noteAi;
-
-  // Reminder picker open state: lifted here (not in ModalFooter) so it joins
-  // the central overlay stack: the Android back button closes it and the
-  // mobile full-screen panel pushes/pops a history entry like every other
-  // overlay.
-  const [reminderPopOpen, setReminderPopOpen] = useState(false);
-  // Never leave the reminder picker "open" behind a closed note modal.
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- close the reminder picker whenever the note modal closes, whatever closed it
-  useEffect(() => { if (!open) setReminderPopOpen(false); }, [open]);
 
   // Generic confirmation dialog
   const [genericConfirmOpen, setGenericConfirmOpen] = useState(false);
@@ -1363,6 +1355,8 @@ export default function App() {
           pasteMode={pasteMode}
           checklistInsertPosition={checklistInsertPosition}
           checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
+          reminderTimeChips={reminderTimeChips}
+          onReminderTimeChipsChange={handleReminderTimeChipsChange}
           aiAssistantEnabled={aiAssistantEnabled}
           syncState={syncStatus.syncState}
           acquireLocalLease={acquireLocalLease}

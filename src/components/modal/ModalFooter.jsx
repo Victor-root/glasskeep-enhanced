@@ -100,8 +100,9 @@ export default function ModalFooter({
   onOpenConfirmDelete,
   // reminders — onSetReminder(noteId, isoStringOrNull)
   onSetReminder,
-  // reminder picker open state (lifted to App so the Android back button
-  // and the mobile full-screen panel hook into the central overlay stack)
+  // reminder picker open state (kept in useModalState so the Android back
+  // button and the mobile full-screen panel hook into the central overlay
+  // stack)
   reminderPopOpen,
   setReminderPopOpen,
   reminderTimeChips,
