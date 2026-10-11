@@ -30,7 +30,6 @@ import { dataUrlToBlob } from "../utils/audioConvert.js";
  * primary modal animates out, the side-by-side right pane hands over to
  * the shell. The last options keep the points where the right pane has
  * always behaved differently:
- *  - trashEmptyNoteOnClose: a note left empty is trashed on close;
  *  - restoreAtChronologicalPosition: a restored note gets a position
  *    among the active notes by its creation date;
  *  - leaveArchiveViewOnUnarchive: unarchiving from the Archive view goes
@@ -56,7 +55,6 @@ export default function useNoteActions({
   showGenericConfirm,
   applyNoteIcon,
   finishClose,
-  trashEmptyNoteOnClose = true,
   restoreAtChronologicalPosition = true,
   leaveArchiveViewOnUnarchive = true,
   duplicateKeepsIcon = true,
@@ -202,7 +200,7 @@ export default function useNoteActions({
     // DO count as content though: a note that only carries pictures
     // (typical of Google Keep imports) is just as valid as a text-only
     // one and must NOT be auto-deleted on close.
-    if (trashEmptyNoteOnClose && activeId) {
+    if (activeId) {
       const drawPaths = mType === "draw"
         ? (mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []))
         : [];
