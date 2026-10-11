@@ -30,8 +30,6 @@ import { dataUrlToBlob } from "../utils/audioConvert.js";
  * primary modal animates out, the side-by-side right pane hands over to
  * the shell. The last options keep the points where the right pane has
  * always behaved differently:
- *  - leaveArchiveViewOnUnarchive: unarchiving from the Archive view goes
- *    back to all notes (needs setTagFilter);
  *  - duplicateKeepsIcon: a duplicate gets the note icon too (needs
  *    applyNoteIcon).
  */
@@ -53,7 +51,6 @@ export default function useNoteActions({
   showGenericConfirm,
   applyNoteIcon,
   finishClose,
-  leaveArchiveViewOnUnarchive = true,
   duplicateKeepsIcon = true,
 }) {
   const {
@@ -122,7 +119,7 @@ export default function useNoteActions({
     if (tagFilter === "ARCHIVED") {
       if (!archived) {
         setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-        if (leaveArchiveViewOnUnarchive) setTagFilter(null);
+        setTagFilter(null);
       }
     } else {
       if (archived) {
