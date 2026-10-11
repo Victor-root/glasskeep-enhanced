@@ -111,7 +111,7 @@ export default function SecondaryNoteInstance({
     availableUsers,
     availableLoading,
   } = useCollaboration(token, {
-    currentUser, activeId,
+    currentUser, activeId, note: activeNoteObj, offline: syncState === "offline",
     flushNoteSync,
     showToast,
   });

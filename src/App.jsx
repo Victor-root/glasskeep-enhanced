@@ -552,7 +552,7 @@ export default function App() {
     availableUsers,
     availableLoading,
   } = useCollaboration(token, {
-    currentUser, activeId,
+    currentUser, activeId, note: activeNoteObj, offline: syncStatus.syncState === "offline",
     flushNoteSync,
     showToast,
   });

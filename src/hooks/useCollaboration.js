@@ -2,22 +2,39 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { api } from "../utils/api.js";
 import { t } from "../i18n";
 import { localizeServerError } from "../utils/serverErrors.js";
+import { hasQueuedCreate } from "../sync/localDb.js";
+
+// The open note's participants as the local copy of the note knows them,
+// in the shape of /collaborators (owner flagged), for when the server can't
+// be asked.
+function localParticipants(note) {
+  const list = Array.isArray(note?.collaborators) ? note.collaborators : [];
+  return list.map((c) => (c.id === note.user_id ? { ...c, isOwner: true } : c));
+}
 
 /**
  * Hook encapsulating collaboration state and actions for the "add
  * collaborator modal" (inside the note modal).
  *
- * Sharing first sends the note's queued actions (`flushNoteSync`).
+ * Every call here goes straight to the server. So nothing is asked about a
+ * note the server doesn't know yet (`note` missing: a draft; or its create
+ * still queued) nor while `offline`; the list then shows what the local
+ * copy of the note knows. Sharing first sends the note's queued actions
+ * (`flushNoteSync`).
  */
 export default function useCollaboration(token, {
   currentUser,
   activeId,
+  note,
+  offline,
   flushNoteSync,
   showToast,
 }) {
   // ── Collaboration modal state (inside note modal) ──
   const [collaborationModalOpen, setCollaborationModalOpen] = useState(false);
   const [addModalCollaborators, setAddModalCollaborators] = useState([]);
+  // The note the list above was loaded for.
+  const [collaboratorsNoteId, setCollaboratorsNoteId] = useState(null);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [availableLoading, setAvailableLoading] = useState(false);
 
@@ -49,11 +66,18 @@ export default function useCollaboration(token, {
   // keeps that window wide open, which is when it was still showing.
   const pendingMutationsRef = useRef(0);
 
+  const canAskServer = !!note && !offline;
+  const userId = currentUser?.id;
+
   // `force` is for the reloads a change fires for itself once the server
   // has confirmed it: those are asking for the truth on purpose and must
   // not be filtered by the guards below.
   const loadCollaboratorsForAddModal = useCallback(
     async (noteId, { force = false } = {}) => {
+      if (!canAskServer) return;
+      // A note just created may not have reached the server: it has no
+      // collaborators yet, and asking would only get "note not found".
+      if (await hasQueuedCreate(String(noteId), userId)) return;
       const seq = participantsMutationRef.current;
       try {
         const collaborators = await api(`/notes/${noteId}/collaborators`, {
@@ -64,13 +88,15 @@ export default function useCollaboration(token, {
           if (pendingMutationsRef.current > 0) return; // change still travelling
         }
         setAddModalCollaborators(collaborators || []);
+        setCollaboratorsNoteId(String(noteId));
       } catch (e) {
         if (!force && participantsMutationRef.current !== seq) return;
         console.error("Failed to load collaborators:", e);
         setAddModalCollaborators([]);
+        setCollaboratorsNoteId(String(noteId));
       }
     },
-    [token],
+    [token, canAskServer, userId],
   );
 
   // Load EVERY shareable person (local users + real users on paired peers)
@@ -79,6 +105,7 @@ export default function useCollaboration(token, {
   // route understands (a bare name/email locally, ref@host for a peer) and
   // is NEVER shown in the UI.
   const loadAvailableUsers = useCallback(async () => {
+    if (offline) return;
     setAvailableLoading(true);
     // Local users first — instant, so the picker is usable immediately.
     try {
@@ -121,7 +148,7 @@ export default function useCollaboration(token, {
     } catch {
       /* peers unreachable — local list stands on its own */
     }
-  }, [token, currentUser]);
+  }, [token, currentUser, offline]);
 
 
   const removeCollaborator = async (collaboratorId, noteId = null, mode = null) => {
@@ -255,9 +282,17 @@ export default function useCollaboration(token, {
     if (collaborationModalOpen && activeId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches collaborators from the server when the modal opens
       loadCollaboratorsForAddModal(activeId);
+    }
+  }, [collaborationModalOpen, activeId, loadCollaboratorsForAddModal]);
+
+  // Its own effect, so that only what the people depend on (going back
+  // online) loads them again.
+  useEffect(() => {
+    if (collaborationModalOpen && activeId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches the shareable people from the server when the modal opens
       loadAvailableUsers();
     }
-  }, [collaborationModalOpen, activeId, loadCollaboratorsForAddModal, loadAvailableUsers]);
+  }, [collaborationModalOpen, activeId, loadAvailableUsers]);
 
   // Keep the open note's participant list live. Until now it was only
   // loaded when the note or the modal opened, and after actions taken on
@@ -286,7 +321,9 @@ export default function useCollaboration(token, {
   return {
     // Modal state
     collaborationModalOpen, setCollaborationModalOpen,
-    addModalCollaborators,
+    // The server's list once loaded for this note, the local copy until then.
+    addModalCollaborators:
+      collaboratorsNoteId === String(activeId) ? addModalCollaborators : localParticipants(note),
     availableUsers,
     availableLoading,
     // Actions

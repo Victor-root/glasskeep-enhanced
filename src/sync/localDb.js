@@ -356,6 +356,21 @@ export async function hasPendingChanges(noteId, userId) {
 }
 
 /**
+ * Check if the note's create is still queued for a given user: until it is
+ * sent, the server doesn't know the note.
+ */
+export async function hasQueuedCreate(noteId, userId) {
+  const store = await tx(QUEUE_STORE);
+  return new Promise((resolve, reject) => {
+    const req = store.index("noteId").getAll(noteId);
+    req.onsuccess = () => {
+      resolve((req.result || []).some((i) => i.userId === userId && i.type === "create"));
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/**
  * Remove all queue entries for a specific note for a given user.
  * Scoped by userId only (not sessionId) so that orphaned entries from
  * previous sessions are also cleaned up.
