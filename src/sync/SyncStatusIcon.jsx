@@ -146,6 +146,7 @@ function actionTypeLabel(type) {
     update: t("syncActionUpdate"),
     patch: t("syncActionPatch"),
     archive: t("syncActionArchive"),
+    icon: t("syncActionIcon"),
     trash: t("syncActionTrash"),
     restore: t("syncActionRestore"),
     permanentDelete: t("syncActionDelete"),
