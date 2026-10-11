@@ -43,7 +43,7 @@ export default function FooterColorButton({
         />
       ) : (
         <Sheet open={showModalColorPop} onClose={() => setShowModalColorPop(false)} title={t("color")} background={sheetBg}>
-          <div className="px-1 pt-1 pb-3">
+          <div className="px-1 pt-1.5 pb-3">
             <ColorSwatchGrid
               labeled
               colors={NOTE_COLORS}
