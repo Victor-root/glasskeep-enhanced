@@ -30,8 +30,6 @@ import { dataUrlToBlob } from "../utils/audioConvert.js";
  * primary modal animates out, the side-by-side right pane hands over to
  * the shell. The last options keep the points where the right pane has
  * always behaved differently:
- *  - restoreAtChronologicalPosition: a restored note gets a position
- *    among the active notes by its creation date;
  *  - leaveArchiveViewOnUnarchive: unarchiving from the Archive view goes
  *    back to all notes (needs setTagFilter);
  *  - duplicateKeepsIcon: a duplicate gets the note icon too (needs
@@ -55,7 +53,6 @@ export default function useNoteActions({
   showGenericConfirm,
   applyNoteIcon,
   finishClose,
-  restoreAtChronologicalPosition = true,
   leaveArchiveViewOnUnarchive = true,
   duplicateKeepsIcon = true,
 }) {
@@ -462,13 +459,10 @@ export default function useNoteActions({
     try {
       const existing = await idbGetNote(nid, currentUser?.id, sessionId);
       if (existing) {
-        let placement = {};
-        if (restoreAtChronologicalPosition) {
-          const activeNotes = await idbGetAllNotes(currentUser?.id, sessionId, "active");
-          const sorted = sortByPositionDesc(activeNotes.filter((n) => String(n.id) !== nid));
-          placement = { position: computeRestoredPosition(existing, sorted) };
-        }
-        await idbPutNote({ ...existing, trashed: false, ...placement, client_updated_at: nowIso }, currentUser?.id, sessionId);
+        const activeNotes = await idbGetAllNotes(currentUser?.id, sessionId, "active");
+        const sorted = sortByPositionDesc(activeNotes.filter((n) => String(n.id) !== nid));
+        const restoredPosition = computeRestoredPosition(existing, sorted);
+        await idbPutNote({ ...existing, trashed: false, position: restoredPosition, client_updated_at: nowIso }, currentUser?.id, sessionId);
       }
     } catch (e) { console.error(e); }
     setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
