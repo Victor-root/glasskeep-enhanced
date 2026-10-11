@@ -813,6 +813,7 @@ export default function NoteModal({
             notes={notes}
             currentUser={currentUser}
             addModalCollaborators={addModalCollaborators}
+            offline={syncState === "offline"}
             onClose={() => setCollaborationModalOpen(false)}
             onAddCollaborators={addCollaboratorsBatch}
             availableUsers={availableUsers}

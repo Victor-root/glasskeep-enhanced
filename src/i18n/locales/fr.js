@@ -210,6 +210,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   workspaceThemeDesc: "Recolore le header, la sidebar et le fond. Les notes ne changent pas.",
   workspaceThemeSaveError: "Impossible d'enregistrer le thème sur le serveur, il s'applique sur cet appareil.",
   offlineCollabWarning: "Vous êtes hors ligne, les modifications sur cette note partagée risquent d'être écrasées à la reconnexion.",
+  offlineShareUnavailable: "Vous êtes hors ligne. Le partage passe par le serveur, vous pourrez de nouveau ajouter des personnes au retour de la connexion.",
   downloadZip: "Télécharger (.zip)",
   downloadMd: "Télécharger .md",
   convertToChecklist: "Convertir en liste de tâches",

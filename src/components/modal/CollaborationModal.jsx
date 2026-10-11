@@ -20,6 +20,9 @@ import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
  *
  * A centred card on desktop; a bottom sheet on the note's own colour
  * (`asSheet`, mobile layout).
+ *
+ * Every change here needs the server: while `offline` the dialog says so
+ * and only shows who the note is shared with.
  */
 export default function CollaborationModal({
   open,
@@ -28,6 +31,7 @@ export default function CollaborationModal({
   notes,
   currentUser,
   addModalCollaborators,
+  offline,
   availableUsers = [],
   availableLoading = false,
   onClose,
@@ -167,6 +171,7 @@ export default function CollaborationModal({
         <CurrentCollaboratorsList
           collaborators={addModalCollaborators}
           isOwner={isOwner}
+          offline={offline}
           currentUser={currentUser}
           activeId={activeId}
           dark={dark}
@@ -189,6 +194,7 @@ export default function CollaborationModal({
           selected={selected}
           onToggleSelect={toggleSelect}
           onSetAccessFor={setAccessFor}
+          offline={offline}
           dark={dark}
           asSheet={asSheet}
         />
@@ -232,7 +238,7 @@ export default function CollaborationModal({
               </button>
             )}
             <button
-              disabled={selectedUsers.length === 0 || adding}
+              disabled={selectedUsers.length === 0 || adding || offline}
               className={`${asSheet ? "flex-1 py-3 rounded-xl text-base" : "px-4 py-2 rounded-lg"} font-semibold transition-all duration-200 ${GRADIENT_BUTTON_CLASSES} disabled:opacity-50 disabled:pointer-events-none`}
               onClick={onConfirm}
             >
