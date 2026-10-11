@@ -151,13 +151,13 @@ export default function useNoteActions({
     if (results.length) setter((prev) => [...prev, ...results]);
   };
 
-  const closeModal = () => {
-    // Prevent double-triggering while exit animation is running
-    if (modalClosingTimerRef.current) return;
-
+  // What closing the note saves, before its pane animates out: shared by
+  // closeModal and the side-by-side close-both (backdrop click), which
+  // animates both panes itself.
+  const saveOnClose = () => {
     // Unmaterialised draft: the user opened a blank note via the creation
-    // buttons and never touched it, so nothing was ever persisted. Just run
-    // the exit animation and drop the pending state: no IDB/queue work.
+    // buttons and never touched it, so nothing was ever persisted. Just drop
+    // the pending state: no IDB/queue work.
     // Defensive: also remove the draft id from `notes` in case some path
     // accidentally added it before closeModal fired (this should be a no-op
     // in the normal flow, but it covers any reproducer where the user
@@ -176,7 +176,6 @@ export default function useNoteActions({
       if (draftType === "draw") {
         showToast(t("emptyNoteDeleted"), "info", 3000, "trash");
       }
-      finishClose();
       return;
     }
 
@@ -255,14 +254,18 @@ export default function useNoteActions({
             purgeLease,
           );
         })();
-
-        finishClose();
         return;
       }
     }
     freshlyCreatedNoteRef.current = null;
 
     flushOpenNote();
+  };
+
+  const closeModal = () => {
+    // Prevent double-triggering while exit animation is running
+    if (modalClosingTimerRef.current) return;
+    saveOnClose();
     finishClose();
   };
 
@@ -755,6 +758,7 @@ export default function useNoteActions({
 
   return {
     closeModal,
+    saveOnClose,
     saveModal,
     deleteModal,
     restoreFromTrash,

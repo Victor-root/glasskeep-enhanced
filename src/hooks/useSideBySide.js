@@ -20,8 +20,7 @@ export default function useSideBySide({
   setMultiMode,
   setSelectedIds,
   setSidebarOpen,
-  mType,
-  flushPendingDrawingSave,
+  savePrimaryOnClose,
   setOpen,
   setActiveId,
   setViewMode,
@@ -160,10 +159,11 @@ export default function useSideBySide({
   // noteModalOut composes with it and plays from each pane's own anchor
   // position (left from -50%-12px, right from +50%+12px). The secondary
   // is forced into closing via the forceClosing prop, which OR-s into its
-  // NoteModal's isModalClosing.
+  // NoteModal's isModalClosing. Each pane first saves like its own close
+  // does: the primary here, the secondary on that same prop.
   const closeBothSBS = useCallback(() => {
     if (sbsBothClosing) return;
-    if (mType === "draw") flushPendingDrawingSave();
+    savePrimaryOnClose();
     setSbsBothClosing(true);
     setIsModalClosing(true);
     setTimeout(() => {
@@ -178,7 +178,7 @@ export default function useSideBySide({
       setShowModalFmt(false);
       setIsModalClosing(false);
     }, MODAL_FADE_DURATION_SBS);
-  }, [sbsBothClosing, mType, flushPendingDrawingSave, setActiveId, setConfirmDeleteOpen, setIsModalClosing, setOpen, setShowModalFmt, setViewMode]);
+  }, [sbsBothClosing, savePrimaryOnClose, setActiveId, setConfirmDeleteOpen, setIsModalClosing, setOpen, setShowModalFmt, setViewMode]);
 
   // Active whenever a secondary note is set. Both panes render under a
   // shared scrim (the .sbs-active body class drives the split-mode CSS).
