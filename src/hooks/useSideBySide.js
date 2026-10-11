@@ -93,9 +93,11 @@ export default function useSideBySide({
   // A → B and unmount the secondary. Because primary's `open` state
   // never flips, there's no close-then-reopen flicker. The survivor
   // smoothly takes over the centre slot with full single-note features.
+  // The closing note is saved first, like any close.
   const requestCloseLeftPaneSBS = useCallback(() => {
     if (!sbsSecondaryId || sbsClosingSide) return;
     const remaining = sbsSecondaryId;
+    savePrimaryOnClose();
     cancelAndClearSbsAi();
     setSbsClosingSide("left");
     setTimeout(() => {
@@ -115,7 +117,7 @@ export default function useSideBySide({
         });
       });
     }, SBS_ANIM_MS);
-  }, [sbsSecondaryId, sbsClosingSide, cancelAndClearSbsAi]); // eslint-disable-line react-hooks/exhaustive-deps -- openModal is recreated on every render
+  }, [sbsSecondaryId, sbsClosingSide, savePrimaryOnClose, cancelAndClearSbsAi]); // eslint-disable-line react-hooks/exhaustive-deps -- openModal is recreated on every render
 
   // Closing the RIGHT pane: the secondary instance only signals start
   // (via onRequestClosing) and then sits still while the shell drives
