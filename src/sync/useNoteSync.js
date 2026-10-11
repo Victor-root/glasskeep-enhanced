@@ -19,6 +19,7 @@ const SYNC_STATUS_RESET = Object.freeze({
  *   Retry:          processQueue reschedules itself on retryable failures
  *   Recovery:       adaptive health check resets transient failures → processQueue
  *   Manual:         handleSyncNow → forceSync → reload of the current view
+ *   One note:       flushNoteSync → flushNote, before a server call on that note
  *
  * Ownership: syncStatus is only written by the engine and the reset
  * points; the IndexedDB queue only by idbEnqueue and the engine.
@@ -76,6 +77,11 @@ export default function useNoteSync({ token, userId, sessionId, leases, onSyncCo
 
   const triggerSync = useCallback(() => {
     syncEngineRef.current?.processQueue();
+  }, []);
+
+  // Sends one note's queued actions now; see SyncEngine.flushNote.
+  const flushNoteSync = useCallback(async (noteId) => {
+    await syncEngineRef.current?.flushNote(noteId);
   }, []);
 
   // Sync the queue, then pull the current view to pick up the other
@@ -152,6 +158,7 @@ export default function useNoteSync({ token, userId, sessionId, leases, onSyncCo
     syncEngineRef,
     reloadCurrentViewRef,
     triggerSync,
+    flushNoteSync,
     handleSyncNow,
     enqueueAndSync,
     enqueueWithLease,

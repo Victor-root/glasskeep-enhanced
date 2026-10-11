@@ -47,6 +47,7 @@ export default function SecondaryNoteInstance({
   reminderTimeChips, onReminderTimeChipsChange,
   aiAssistantEnabled,
   syncState,
+  flushNoteSync,
   // Persistence
   acquireLocalLease, releaseLocalLease, releaseLocalLeaseWithPrune,
   isNoteLocallyProtected,
@@ -111,6 +112,7 @@ export default function SecondaryNoteInstance({
     availableLoading,
   } = useCollaboration(token, {
     currentUser, activeId,
+    flushNoteSync,
     showToast,
   });
 
