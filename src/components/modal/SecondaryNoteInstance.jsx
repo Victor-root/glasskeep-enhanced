@@ -177,8 +177,8 @@ export default function SecondaryNoteInstance({
     enqueueWithLease,
     showToast,
     showGenericConfirm,
+    applyNoteIcon,
     finishClose: onRequestClosing,
-    duplicateKeepsIcon: false,
   });
   // eslint-disable-next-line react-hooks/refs -- keeps the ref given to useModalState pointing at the latest closeModal
   closeModalRef.current = closeModal;

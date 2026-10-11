@@ -28,10 +28,7 @@ import { dataUrlToBlob } from "../utils/audioConvert.js";
  * Both panes run it, each with its own modal state and editor.
  * finishClose ends every closeModal once the edits are flushed: the
  * primary modal animates out, the side-by-side right pane hands over to
- * the shell. The last options keep the points where the right pane has
- * always behaved differently:
- *  - duplicateKeepsIcon: a duplicate gets the note icon too (needs
- *    applyNoteIcon).
+ * the shell.
  */
 export default function useNoteActions({
   modal,
@@ -51,7 +48,6 @@ export default function useNoteActions({
   showGenericConfirm,
   applyNoteIcon,
   finishClose,
-  duplicateKeepsIcon = true,
 }) {
   const {
     activeId,
@@ -748,7 +744,7 @@ export default function useNoteActions({
     // The icon (logo badge) is per-user and lives outside the note payload
     // (its own table + endpoint: see applyNoteIcon), so it isn't carried by
     // the "create" enqueue above and must be copied over explicitly.
-    if (duplicateKeepsIcon && activeNoteObj?.icon) {
+    if (activeNoteObj?.icon) {
       applyNoteIcon(newId, activeNoteObj.icon);
     }
     showToast(t("noteDuplicated"), "success", undefined, "copy");
