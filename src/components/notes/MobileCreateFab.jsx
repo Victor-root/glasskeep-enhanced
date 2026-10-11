@@ -83,8 +83,8 @@ export default function MobileCreateFab({
           // env() inset in any browser / PWA context. Necessary because
           // the Android 15 WebView on stock Pixel images returns 0 for
           // the bottom inset and the FAB ended up partly hidden behind
-          // the navigation bar.
-          bottom: "max(1.5rem, calc(var(--safe-bottom) + 1rem))",
+          // the navigation bar. --gk-fab-bottom is set in index.css.
+          bottom: "var(--gk-fab-bottom)",
           right: "max(1.5rem, calc(var(--safe-right) + 1rem))",
         }}
       >
