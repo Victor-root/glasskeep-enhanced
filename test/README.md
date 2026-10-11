@@ -21,6 +21,7 @@ réseau, pas de base de données, rien à nettoyer après. Assez rapide pour
 | Adresses IA autorisées, certificat exigé par les scripts, domaine des passkeys, filtre de style, sceau du chiffrement, freinage de la connexion | `unit/t18-pure-rules.mjs` |
 | Un refus 401 sur une route sans jeton ne détruit pas la session ouverte | `unit/t19-unauthenticated-401.mjs` |
 | Une copie du serveur n'écrase pas une modification locale commencée pendant qu'on l'appliquait | `unit/t20-local-edit-race.mjs` |
+| L'écran TV garde un seul écouteur de retour au premier plan et le retire en se fermant | `unit/t21-tv-refresh-listeners.mjs` |
 
 Le premier mérite un mot: ce n'est pas le test d'une fonction, c'est le
 test d'une règle. Il recense chaque endroit où l'interface affiche du

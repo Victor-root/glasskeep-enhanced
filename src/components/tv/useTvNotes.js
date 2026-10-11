@@ -56,11 +56,15 @@ export default function useTvNotes(token, clearSession) {
   // hours of standby; pull the latest notes so they're current.
   useEffect(() => {
     const refresh = () => { if (token) loadNotes(); };
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", () => {
+    const onVisibility = () => {
       if (document.visibilityState === "visible") refresh();
-    });
-    return () => window.removeEventListener("focus", refresh);
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [token, loadNotes]);
 
   return { notes, setNotes, loadError };
