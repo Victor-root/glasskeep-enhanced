@@ -560,7 +560,7 @@ export default function App() {
     logoLibrary, setLogoLibrary,
     addLogoToLibrary, deleteLogoFromLibrary,
     applyNoteIcon, setNoteIconFromFile, removeNoteIcon, pickNoteIcon,
-  } = useLogoLibrary({ token, currentUser, sessionId, setNotes, activeId });
+  } = useLogoLibrary({ currentUser, sessionId, setNotes, activeId, enqueueAndSync });
 
   const {
     onBulkDelete, onEmptyTrash, onBulkPin, onBulkRestore, onBulkArchive,

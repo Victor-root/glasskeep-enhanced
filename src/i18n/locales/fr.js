@@ -647,6 +647,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   syncActionUpdate: "Mise à jour",
   syncActionPatch: "Modification",
   syncActionArchive: "Archivage",
+  syncActionIcon: "Icône",
   syncActionTrash: "Corbeille",
   syncActionRestore: "Restauration",
   syncActionDelete: "Suppression",

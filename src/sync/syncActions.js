@@ -98,6 +98,14 @@ export async function sendQueuedAction(item, token) {
         body: JSON.stringify(item.payload),
       });
 
+    case "icon":
+      return item.payload.icon
+        ? doFetch(`/notes/${item.noteId}/icon`, {
+            method: "PUT",
+            body: JSON.stringify(item.payload),
+          })
+        : doFetch(`/notes/${item.noteId}/icon`, { method: "DELETE" });
+
     case "trash":
       return doFetch(`/notes/${item.noteId}/trash`, {
         method: "POST",

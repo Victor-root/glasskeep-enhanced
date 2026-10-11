@@ -187,6 +187,7 @@ export function clearNotesForSession(userId, sessionId) {
  * - update: PUT /api/notes/:id
  * - patch: PATCH /api/notes/:id  (partial update like pin)
  * - archive: POST /api/notes/:id/archive
+ * - icon: PUT /api/notes/:id/icon (DELETE when the icon is removed)
  * - trash: POST /api/notes/:id/trash
  * - restore: POST /api/notes/:id/restore
  * - permanentDelete: DELETE /api/notes/:id/permanent

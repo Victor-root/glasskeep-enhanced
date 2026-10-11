@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, getAuth } from "../utils/api.js";
+import { getAuth } from "../utils/api.js";
 import { patchNote as idbPatchNote } from "../sync/localDb.js";
 import { fetchLogoLibrary, createLogo, deleteLogo as apiDeleteLogo } from "../utils/logoLibrary.js";
 import useNoteIconActions from "./useNoteIconActions.js";
@@ -12,7 +12,7 @@ import useNoteIconActions from "./useNoteIconActions.js";
  * one removes it from the library only, notes that use it keep their
  * embedded copy.
  */
-export default function useLogoLibrary({ token, currentUser, sessionId, setNotes, activeId }) {
+export default function useLogoLibrary({ currentUser, sessionId, setNotes, activeId, enqueueAndSync }) {
   const [logoLibrary, setLogoLibrary] = useState([]);
   useEffect(() => {
     const token = getAuth()?.token;
@@ -71,7 +71,9 @@ export default function useLogoLibrary({ token, currentUser, sessionId, setNotes
   // Note icon (logo badge): PER-USER and never synced to collaborators.
   // It lives on note.icon and persists through its own endpoint, NOT in the
   // shared images_json. applyNoteIcon updates local state optimistically,
-  // mirrors to IndexedDB, then saves to the per-user endpoint (best-effort).
+  // mirrors to IndexedDB, then queues the per-user endpoint's write like
+  // any note change: offline it waits for the server, and on a note just
+  // created (a duplicate, a fresh note) it plays after the note's create.
   const applyNoteIcon = useCallback(async (noteId, icon) => {
     if (!noteId) return;
     const nid = String(noteId);
@@ -80,15 +82,11 @@ export default function useLogoLibrary({ token, currentUser, sessionId, setNotes
       await idbPatchNote(nid, { icon: icon || null }, currentUser?.id, sessionId);
     } catch { /* IDB best-effort */ }
     try {
-      if (icon) {
-        await api(`/notes/${nid}/icon`, { method: "PUT", token, body: { icon } });
-      } else {
-        await api(`/notes/${nid}/icon`, { method: "DELETE", token });
-      }
+      await enqueueAndSync({ type: "icon", noteId: nid, payload: { icon: icon || null } });
     } catch (e) {
       console.error("Note icon save failed", e);
     }
-  }, [token, currentUser, sessionId, setNotes]);
+  }, [currentUser, sessionId, setNotes, enqueueAndSync]);
 
   const { setNoteIconFromFile, removeNoteIcon, pickNoteIcon } = useNoteIconActions({
     noteId: activeId, applyNoteIcon, addLogoToLibrary,
