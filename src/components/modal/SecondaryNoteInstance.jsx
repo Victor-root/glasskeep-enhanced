@@ -133,7 +133,6 @@ export default function SecondaryNoteInstance({
     releaseLocalLeaseWithPrune,
     enqueueAndSync,
     enqueueWithLease,
-    audioNotes: false,
     followRemoteEdits: false,
     autosaveRerunsOnAppRender: true,
   });
@@ -177,7 +176,6 @@ export default function SecondaryNoteInstance({
     showToast,
     showGenericConfirm,
     finishClose: onRequestClosing,
-    audioNotes: false,
     trashEmptyNoteOnClose: false,
     restoreAtChronologicalPosition: false,
     leaveArchiveViewOnUnarchive: false,
