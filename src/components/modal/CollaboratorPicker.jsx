@@ -2,6 +2,7 @@ import React from "react";
 import UserAvatar from "../common/UserAvatar.jsx";
 import ServerBadge from "./ServerBadge.jsx";
 import AccessToggle from "./AccessToggle.jsx";
+import OfflineCollabBanner from "./OfflineCollabBanner.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
 
@@ -29,7 +30,9 @@ const chipCls = (active, disabled) =>
 // Owner's picker of the collaboration modal: everyone the note can still be
 // shared with, filtered by a search box or an alphabet index, each row
 // selectable with its own access level. The selection is owned by
-// CollaborationModal, which applies it on confirm.
+// CollaborationModal, which applies it on confirm. Finding people needs the
+// server: offline, a notice replaces the hint and the list, and search is
+// disabled.
 export default function CollaboratorPicker({
   candidates,
   availableLoading,
@@ -40,6 +43,7 @@ export default function CollaboratorPicker({
   selected,
   onToggleSelect,
   onSetAccessFor,
+  offline,
   dark,
   asSheet,
 }) {
@@ -53,9 +57,13 @@ export default function CollaboratorPicker({
 
   return (
     <>
-      <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-        {t("selectCollaboratorsHint")}
-      </p>
+      {offline ? (
+        <OfflineCollabBanner visible text={t("offlineShareUnavailable")} className="mb-3" />
+      ) : (
+        <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+          {t("selectCollaboratorsHint")}
+        </p>
+      )}
 
       {/* Search */}
       <div className={asSheet ? "gk-sheet-field relative mb-3" : "relative mb-2"}>
@@ -70,16 +78,17 @@ export default function CollaboratorPicker({
         <input
           type="text"
           value={search}
+          disabled={offline}
           onChange={(e) => { setSearch(e.target.value); setLetter(null); }}
           placeholder={t("searchByUsernameOrEmail")}
-          className={asSheet
+          className={`${asSheet
             ? "w-full h-12 pl-10 pr-4 text-base bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none"
-            : "w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-white dark:bg-black/30 border border-[var(--border-light)] text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"}
+            : "w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-white dark:bg-black/30 border border-[var(--border-light)] text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"}${offline ? " opacity-50" : ""}`}
         />
       </div>
 
       {/* Alphabet index, only meaningful when not searching */}
-      {candidates.length >= LETTER_INDEX_MIN && !q && (
+      {!offline && candidates.length >= LETTER_INDEX_MIN && !q && (
         <div className="flex flex-wrap items-center gap-0.5 mb-2">
           <button type="button" onClick={() => setLetter(null)} className={chipCls(letter === null, false)}>
             {t("letterAll")}
@@ -107,78 +116,80 @@ export default function CollaboratorPicker({
       )}
 
       {/* People list */}
-      <div className={asSheet ? "min-h-[6rem] space-y-1" : "min-h-[6rem] space-y-1 rounded-lg border border-[var(--border-light)] p-1.5 bg-gray-50/50 dark:bg-black/20"}>
-        {availableLoading ? (
-          <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            {t("searching")}
-          </div>
-        ) : candidates.length === 0 ? (
-          <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            {t("noUsersAvailable")}
-          </div>
-        ) : visible.length === 0 ? (
-          <div className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">{t("noUsersFound")}</div>
-        ) : (
-          visible.map((u) => {
-            const sel = selected.has(u.key);
-            const access = selected.get(u.key);
-            return (
-              <div
-                key={u.key}
-                role="button"
-                tabIndex={0}
-                onClick={() => onToggleSelect(u.key)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onToggleSelect(u.key);
-                  }
-                }}
-                className={`w-full flex items-center gap-2 p-2 rounded-lg text-left cursor-pointer transition-colors border ${
-                  sel
-                    ? "bg-[var(--gk-accent-soft-bg)] border-[var(--gk-accent-soft-border)]"
-                    : "border-transparent hover:bg-black/5 dark:hover:bg-white/10"
-                }`}
-              >
-                <UserAvatar
-                  name={u.name}
-                  email={u.email || u.ref || ""}
-                  avatarUrl={u.avatar}
-                  size="w-8 h-8"
-                  textSize="text-xs"
-                  dark={dark}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium text-sm flex items-center gap-2">
-                    <span className="truncate">{u.name}</span>
-                    {u.federated && <ServerBadge label={u.serverLabel} />}
-                  </div>
-                  {!u.federated && u.email && (
-                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {u.email}
-                    </div>
-                  )}
-                </div>
-                {sel && (
-                  <AccessToggle
-                    canWrite={access === "write" ? 1 : 0}
-                    onChange={(a) => onSetAccessFor(u.key, a)}
-                  />
-                )}
-                <span
-                  className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
+      {!offline && (
+        <div className={asSheet ? "min-h-[6rem] space-y-1" : "min-h-[6rem] space-y-1 rounded-lg border border-[var(--border-light)] p-1.5 bg-gray-50/50 dark:bg-black/20"}>
+          {availableLoading ? (
+            <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              {t("searching")}
+            </div>
+          ) : candidates.length === 0 ? (
+            <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              {t("noUsersAvailable")}
+            </div>
+          ) : visible.length === 0 ? (
+            <div className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">{t("noUsersFound")}</div>
+          ) : (
+            visible.map((u) => {
+              const sel = selected.has(u.key);
+              const access = selected.get(u.key);
+              return (
+                <div
+                  key={u.key}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onToggleSelect(u.key)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onToggleSelect(u.key);
+                    }
+                  }}
+                  className={`w-full flex items-center gap-2 p-2 rounded-lg text-left cursor-pointer transition-colors border ${
                     sel
-                      ? "bg-[var(--gk-chrome-accent)] border-[var(--gk-chrome-accent)] text-white"
-                      : "border-gray-300 dark:border-gray-600"
+                      ? "bg-[var(--gk-accent-soft-bg)] border-[var(--gk-accent-soft-border)]"
+                      : "border-transparent hover:bg-black/5 dark:hover:bg-white/10"
                   }`}
                 >
-                  {sel && <TI.Check className="tabler-icon w-3.5 h-3.5" />}
-                </span>
-              </div>
-            );
-          })
-        )}
-      </div>
+                  <UserAvatar
+                    name={u.name}
+                    email={u.email || u.ref || ""}
+                    avatarUrl={u.avatar}
+                    size="w-8 h-8"
+                    textSize="text-xs"
+                    dark={dark}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm flex items-center gap-2">
+                      <span className="truncate">{u.name}</span>
+                      {u.federated && <ServerBadge label={u.serverLabel} />}
+                    </div>
+                    {!u.federated && u.email && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {u.email}
+                      </div>
+                    )}
+                  </div>
+                  {sel && (
+                    <AccessToggle
+                      canWrite={access === "write" ? 1 : 0}
+                      onChange={(a) => onSetAccessFor(u.key, a)}
+                    />
+                  )}
+                  <span
+                    className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
+                      sel
+                        ? "bg-[var(--gk-chrome-accent)] border-[var(--gk-chrome-accent)] text-white"
+                        : "border-gray-300 dark:border-gray-600"
+                    }`}
+                  >
+                    {sel && <TI.Check className="tabler-icon w-3.5 h-3.5" />}
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </>
   );
 }

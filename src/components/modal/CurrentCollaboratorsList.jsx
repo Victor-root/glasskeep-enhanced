@@ -5,11 +5,12 @@ import AccessToggle from "./AccessToggle.jsx";
 import { t } from "../../i18n";
 
 // People a note is already shared with, in the collaboration modal: the
-// owner changes each one's access and removes them; a collaborator only
-// sees the list.
+// owner changes each one's access and removes them, unless offline; a
+// collaborator only sees the list.
 export default function CurrentCollaboratorsList({
   collaborators,
   isOwner,
+  offline,
   currentUser,
   activeId,
   dark,
@@ -33,9 +34,9 @@ export default function CurrentCollaboratorsList({
             const isSelf = collab.id === currentUser?.id;
             // Owner removes collaborators; a non-owner can't remove
             // anyone (their own row is display-only).
-            const canRemove = isOwner && !collab.isOwner;
+            const canRemove = isOwner && !offline && !collab.isOwner;
             const showAccess =
-              isOwner && !collab.isOwner &&
+              isOwner && !offline && !collab.isOwner &&
               typeof onSetCollaboratorAccess === "function";
 
             return (
