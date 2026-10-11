@@ -48,19 +48,14 @@
 
   /* How far the notes header reaches up behind the status bar (see below). */
   --gk-header-bleed: 0px;
-
-  /* Bottom offset of the notes create button (see below). */
-  --gk-fab-bottom: max(1.5rem, calc(var(--safe-bottom) + 1rem));
 }
 
 /* Portrait edge-to-edge in the Android app: WebViewActivity sets
    data-gk-edge-to-edge on <html> while the system bars are transparent, so
    the page scrolls behind them. The notes header extends its own background
-   up behind the status bar, and slides that much further when it hides. The
-   create button sits a little lower, since the bar behind it is see-through. */
+   up behind the status bar, and slides that much further when it hides. */
 html[data-gk-edge-to-edge] {
   --gk-header-bleed: var(--safe-top);
-  --gk-fab-bottom: max(1.5rem, calc(var(--safe-bottom) + 0.5rem));
 }
 html[data-gk-edge-to-edge] header.glass-card::before {
   content: "";
