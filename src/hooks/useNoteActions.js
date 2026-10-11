@@ -30,7 +30,6 @@ import { dataUrlToBlob } from "../utils/audioConvert.js";
  * primary modal animates out, the side-by-side right pane hands over to
  * the shell. The last options keep the points where the right pane has
  * always behaved differently:
- *  - audioNotes: save and download know audio notes;
  *  - trashEmptyNoteOnClose: a note left empty is trashed on close;
  *  - restoreAtChronologicalPosition: a restored note gets a position
  *    among the active notes by its creation date;
@@ -57,7 +56,6 @@ export default function useNoteActions({
   showGenericConfirm,
   applyNoteIcon,
   finishClose,
-  audioNotes = true,
   trashEmptyNoteOnClose = true,
   restoreAtChronologicalPosition = true,
   leaveArchiveViewOnUnarchive = true,
@@ -80,7 +78,7 @@ export default function useNoteActions({
 
   /** -------- Download single note .md (or audio file for audio notes) -------- */
   const handleDownloadNote = async (note) => {
-    if (audioNotes && note?.type === "audio") {
+    if (note?.type === "audio") {
       const parsed = parseAudioContent(note.content);
       // Multi-clip notes still download from the kebab as a single file:
       // the first clip. The themed player offers per-clip downloads with
@@ -299,7 +297,7 @@ export default function useNoteActions({
     const noteId = String(activeId);
     const nowIso = new Date().toISOString();
 
-    if (mType === "text" || (audioNotes && mType === "audio")) {
+    if (mType === "text" || mType === "audio") {
       // Text + audio notes: use targeted patch with only changed fields.
       // Use committedBaselineRef so a failed autosave is retried here.
       // Audio's mBody is the serialised {clips, text} JSON; same diff logic

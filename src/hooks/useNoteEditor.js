@@ -24,9 +24,8 @@ import { parseDrawingContent } from "../utils/drawingContent.js";
  *
  * Both panes run it: the primary modal and the side-by-side right pane,
  * each on its own modal state. The right pane never opens a draft, and
- * the last three options keep the points where it has always behaved
+ * the last two options keep the points where it has always behaved
  * differently:
- *  - audioNotes: audio notes are autosaved and flushed on close like text;
  *  - followRemoteEdits: a server change to the open note is taken into
  *    the editor while the user hasn't edited (needs isNoteLocallyProtected);
  *  - autosaveRerunsOnAppRender: the autosave effects also re-run on every
@@ -47,7 +46,6 @@ export default function useNoteEditor({
   isNoteLocallyProtected,
   enqueueAndSync,
   enqueueWithLease,
-  audioNotes = true,
   followRemoteEdits = true,
   autosaveRerunsOnAppRender = false,
 }) {
@@ -461,7 +459,7 @@ export default function useNoteEditor({
   // concern: the underlying mBody/mTitle state is equally dirty either way.
   useEffect(() => {
     if (!open || !activeId) return;
-    if (mType !== "text" && mType !== "checklist" && !(audioNotes && mType === "audio")) return;
+    if (mType !== "text" && mType !== "checklist" && mType !== "audio") return;
     const initial = initialModalStateRef.current;
     if (!initial) return;
 
@@ -513,7 +511,7 @@ export default function useNoteEditor({
       if (!transferred) releaseLocalLease(nId, leaseId);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- materializeDraftIfNeeded is recreated each render; autosave runs only on edits
-  }, [mBody, mTitle, open, activeId, mType, autoSaveTextNote, audioNotes, appRenderKey]);
+  }, [mBody, mTitle, open, activeId, mType, autoSaveTextNote, appRenderKey]);
 
   // Auto-save draw note title + text body: debounced local-first persist + patch sync.
   // Drawing data changes are handled by the drawing autosave effect above.
@@ -740,7 +738,7 @@ export default function useNoteEditor({
     // Audio shares this path: its mBody is the {clips, text} JSON, so a
     // freshly-recorded clip whose autosave hasn't fired yet still gets
     // flushed here on close.
-    if (activeId && (mType === "text" || (audioNotes && mType === "audio"))) {
+    if (activeId && (mType === "text" || mType === "audio")) {
       const baseline = committedBaselineRef.current;
       if (baseline) {
         const patch = {};
