@@ -390,6 +390,8 @@ export default function useModalState({ notes, currentUser, closeModalRef }) {
     if (!(open && viewMode && mType === "text")) return;
     const root = noteViewRef.current;
     if (!root) return;
+    // Scroll followers of the copy buttons, detached when the effect ends.
+    const followers = new Map();
 
     const attach = () => {
       // Wrap code blocks so the copy button can stay fixed even on horizontal scroll
@@ -402,26 +404,29 @@ export default function useModalState({ notes, currentUser, closeModalRef }) {
           pre.parentNode?.insertBefore(wrapper, pre);
           wrapper.appendChild(pre);
         }
-        if (wrapper.querySelector(".code-copy-btn")) return;
-        const btn = document.createElement("button");
-        btn.className = "code-copy-btn";
-        btn.textContent = t("copy");
-        btn.setAttribute("data-copy-btn", "1");
-        btn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const codeEl = pre.querySelector("code");
-          const text = codeEl ? codeEl.textContent : pre.textContent;
-          navigator.clipboard?.writeText(text || "");
-          btn.textContent = t("copied");
-          setTimeout(() => (btn.textContent = t("copy")), 1200);
-        });
-        wrapper.appendChild(btn);
+        let btn = wrapper.querySelector(".code-copy-btn");
+        if (!btn) {
+          btn = document.createElement("button");
+          btn.className = "code-copy-btn";
+          btn.textContent = t("copy");
+          btn.setAttribute("data-copy-btn", "1");
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const codeEl = pre.querySelector("code");
+            const text = codeEl ? codeEl.textContent : pre.textContent;
+            navigator.clipboard?.writeText(text || "");
+            btn.textContent = t("copied");
+            setTimeout(() => (btn.textContent = t("copy")), 1200);
+          });
+          wrapper.appendChild(btn);
+        }
+        if (followers.has(wrapper)) return;
 
         // Keep the copy button visible when a tall code block scrolls past
         // the modal header. attachStickyCopyButton does this without
         // layout-thrashing (rAF coalescing + skips off-screen blocks), so a
         // note with many code blocks no longer janks on scroll.
-        attachStickyCopyButton(wrapper.closest(".modal-scroll-themed"), wrapper, btn);
+        followers.set(wrapper, attachStickyCopyButton(wrapper.closest(".modal-scroll-themed"), wrapper, btn));
       });
 
       // Inline code: handled by the shared floating overlay (see
@@ -459,6 +464,7 @@ export default function useModalState({ notes, currentUser, closeModalRef }) {
       mo.disconnect();
       detachCodeCopy();
       detachInlineCopy();
+      followers.forEach((detach) => detach());
     };
   }, [open, viewMode, mType, mBody, activeId]);
 
