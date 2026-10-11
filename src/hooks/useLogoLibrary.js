@@ -12,7 +12,9 @@ import useNoteIconActions from "./useNoteIconActions.js";
  * one removes it from the library only, notes that use it keep their
  * embedded copy.
  */
-export default function useLogoLibrary({ currentUser, sessionId, setNotes, activeId, enqueueAndSync }) {
+export default function useLogoLibrary({
+  currentUser, sessionId, setNotes, activeId, enqueueAndSync, materializeDraftIfNeeded,
+}) {
   const [logoLibrary, setLogoLibrary] = useState([]);
   useEffect(() => {
     const token = getAuth()?.token;
@@ -89,7 +91,7 @@ export default function useLogoLibrary({ currentUser, sessionId, setNotes, activ
   }, [currentUser, sessionId, setNotes, enqueueAndSync]);
 
   const { setNoteIconFromFile, removeNoteIcon, pickNoteIcon } = useNoteIconActions({
-    noteId: activeId, applyNoteIcon, addLogoToLibrary,
+    noteId: activeId, applyNoteIcon, addLogoToLibrary, materializeDraftIfNeeded,
   });
 
   return {
