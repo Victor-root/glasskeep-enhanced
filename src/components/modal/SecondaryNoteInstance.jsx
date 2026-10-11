@@ -44,6 +44,7 @@ export default function SecondaryNoteInstance({
   tagFilter, setTagFilter, tagsWithCounts,
   logoLibrary, addLogoToLibrary, deleteLogoFromLibrary, applyNoteIcon,
   editorToolbarMode, pasteMode, checklistInsertPosition, checklistRemoveSectionBehavior,
+  reminderTimeChips, onReminderTimeChipsChange,
   aiAssistantEnabled,
   syncState,
   // Persistence
@@ -81,6 +82,7 @@ export default function SecondaryNoteInstance({
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
     modalKebabOpen, setModalKebabOpen,
+    reminderPopOpen, setReminderPopOpen,
     imageMenuOpen, setImageMenuOpen,
     logoPickerOpen, setLogoPickerOpen,
     imgViewOpen, imgViewIndex,
@@ -162,7 +164,7 @@ export default function SecondaryNoteInstance({
   // (the splitClosing CSS rule on the scrim drives the visible fade-out).
   const {
     closeModal, saveModal, deleteModal, restoreFromTrash,
-    handleArchiveNote, togglePin, convertNoteType, duplicateActiveNote,
+    handleArchiveNote, togglePin, setNoteReminder, convertNoteType, duplicateActiveNote,
     handleDownloadNote, addImagesToState,
   } = useNoteActions({
     modal,
@@ -255,6 +257,7 @@ export default function SecondaryNoteInstance({
       scrimClickStartRef={scrimClickStartRef}
       savedModalScrollRatioRef={savedModalScrollRatioRef}
       activeNoteObj={activeNoteObj}
+      onSetReminder={setNoteReminder}
       editedStamp={editedStamp}
       modalHasChanges={modalHasChanges}
       modalScrollable={modalScrollable}
@@ -267,6 +270,10 @@ export default function SecondaryNoteInstance({
       setShowModalFmt={setShowModalFmt}
       showModalColorPop={showModalColorPop}
       setShowModalColorPop={setShowModalColorPop}
+      reminderPopOpen={reminderPopOpen}
+      setReminderPopOpen={setReminderPopOpen}
+      reminderTimeChips={reminderTimeChips}
+      onReminderTimeChipsChange={onReminderTimeChipsChange}
       modalKebabOpen={modalKebabOpen}
       setModalKebabOpen={setModalKebabOpen}
       imageMenuOpen={imageMenuOpen}

@@ -56,6 +56,14 @@ export default function useModalState({ notes, currentUser, closeModalRef }) {
 
   // Modal footer kebab menu
   const [modalKebabOpen, setModalKebabOpen] = useState(false);
+  // Reminder picker, opened from the kebab. Kept here (not in ModalFooter)
+  // so App can register the primary modal's one in the central overlay
+  // stack: the Android back button closes it and the mobile full-screen
+  // panel pushes/pops a history entry like every other overlay.
+  const [reminderPopOpen, setReminderPopOpen] = useState(false);
+  // Never leave the reminder picker "open" behind a closed note modal.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- close the reminder picker whenever the note modal closes, whatever closed it
+  useEffect(() => { if (!open) setReminderPopOpen(false); }, [open]);
   // Modal footer image menu, and the logo picker it leads to
   const [imageMenuOpen, setImageMenuOpen] = useState(false);
   const [logoPickerOpen, setLogoPickerOpen] = useState(false);
@@ -491,6 +499,7 @@ export default function useModalState({ notes, currentUser, closeModalRef }) {
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
     modalKebabOpen, setModalKebabOpen,
+    reminderPopOpen, setReminderPopOpen,
     imageMenuOpen, setImageMenuOpen,
     logoPickerOpen, setLogoPickerOpen,
     imgViewOpen, setImgViewOpen, imgViewIndex,
