@@ -177,7 +177,6 @@ export default function SecondaryNoteInstance({
     showToast,
     showGenericConfirm,
     finishClose: onRequestClosing,
-    restoreAtChronologicalPosition: false,
     leaveArchiveViewOnUnarchive: false,
     duplicateKeepsIcon: false,
   });
