@@ -514,7 +514,7 @@ export default function App() {
   const {
     initialDrawMode, setInitialDrawMode,
     handleDirectText, handleDirectChecklist, handleDirectDraw, handleDirectAudio,
-    flushPendingDrawingSave, syncChecklistItems,
+    syncChecklistItems,
   } = editor;
 
   const { signOut, signIn, signInById, signInWithSecret, register, oidcLoginError } = useAuthActions({
@@ -615,7 +615,7 @@ export default function App() {
   };
 
   const {
-    closeModal, saveModal, deleteModal, restoreFromTrash,
+    closeModal, saveOnClose, saveModal, deleteModal, restoreFromTrash,
     handleArchiveNote, togglePin, setNoteReminder, convertNoteType, duplicateActiveNote,
     handleDownloadNote, addImagesToState,
   } = useNoteActions({
@@ -665,8 +665,7 @@ export default function App() {
     setMultiMode,
     setSelectedIds,
     setSidebarOpen,
-    mType,
-    flushPendingDrawingSave,
+    savePrimaryOnClose: saveOnClose,
     setOpen,
     setActiveId,
     setViewMode,

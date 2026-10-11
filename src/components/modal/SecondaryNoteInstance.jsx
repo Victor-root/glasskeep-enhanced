@@ -165,7 +165,7 @@ export default function SecondaryNoteInstance({
   // the LEFT pane's recenter animation and unmounts this pane when done
   // (the splitClosing CSS rule on the scrim drives the visible fade-out).
   const {
-    closeModal, saveModal, deleteModal, restoreFromTrash,
+    closeModal, saveOnClose, saveModal, deleteModal, restoreFromTrash,
     handleArchiveNote, togglePin, setNoteReminder, convertNoteType, duplicateActiveNote,
     handleDownloadNote, addImagesToState,
   } = useNoteActions({
@@ -189,6 +189,12 @@ export default function SecondaryNoteInstance({
   });
   // eslint-disable-next-line react-hooks/refs -- keeps the ref given to useModalState pointing at the latest closeModal
   closeModalRef.current = closeModal;
+
+  // Close-both (backdrop click): the shell animates both panes out, this
+  // pane saves like its own close does.
+  useEffect(() => {
+    if (forceClosing) saveOnClose();
+  }, [forceClosing]); // eslint-disable-line react-hooks/exhaustive-deps -- runs once per close-both signal, on the edits of that render
 
   // The note no longer exists for this user (deleted elsewhere, access
   // revoked): like the primary modal, the pane drops it at once without
