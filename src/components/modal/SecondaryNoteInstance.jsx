@@ -143,6 +143,7 @@ export default function SecondaryNoteInstance({
   });
   const {
     initialDrawMode, setInitialDrawMode, loadNote, syncChecklistItems, discardPendingDrawingSave,
+    materializeDraftIfNeeded,
   } = editor;
 
   // Open whenever the controlled noteId prop changes
@@ -211,7 +212,9 @@ export default function SecondaryNoteInstance({
   });
 
   // ─── Note icon (PER-USER, never synced) ────────────────────────────────
-  const { setNoteIconFromFile, removeNoteIcon, pickNoteIcon } = useNoteIconActions({ noteId: activeId, applyNoteIcon, addLogoToLibrary });
+  const { setNoteIconFromFile, removeNoteIcon, pickNoteIcon } = useNoteIconActions({
+    noteId: activeId, applyNoteIcon, addLogoToLibrary, materializeDraftIfNeeded,
+  });
 
   if (!noteId) return null;
 

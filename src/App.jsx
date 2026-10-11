@@ -514,7 +514,7 @@ export default function App() {
   const {
     initialDrawMode, setInitialDrawMode,
     handleDirectText, handleDirectChecklist, handleDirectDraw, handleDirectAudio,
-    syncChecklistItems,
+    syncChecklistItems, materializeDraftIfNeeded,
   } = editor;
 
   const { signOut, signIn, signInById, signInWithSecret, register, oidcLoginError } = useAuthActions({
@@ -560,7 +560,9 @@ export default function App() {
     logoLibrary, setLogoLibrary,
     addLogoToLibrary, deleteLogoFromLibrary,
     applyNoteIcon, setNoteIconFromFile, removeNoteIcon, pickNoteIcon,
-  } = useLogoLibrary({ currentUser, sessionId, setNotes, activeId, enqueueAndSync });
+  } = useLogoLibrary({
+    currentUser, sessionId, setNotes, activeId, enqueueAndSync, materializeDraftIfNeeded,
+  });
 
   const {
     onBulkDelete, onEmptyTrash, onBulkPin, onBulkRestore, onBulkArchive,
