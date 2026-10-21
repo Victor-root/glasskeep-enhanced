@@ -92,6 +92,40 @@ async function requestInit(cfg, { body, signal, headers, deadlineMs = REQUEST_TI
   };
 }
 
+// Parameters a model refuses, learnt from the provider's own answer and
+// kept per endpoint and model, so later requests go out right the first
+// time. OpenAI's newer models (gpt-5, the o-series) want the reply length
+// as max_completion_tokens rather than max_tokens, and only their default
+// temperature; their 400 names the parameter in `error.param`. Bounded:
+// the oldest entry goes once there are too many.
+const MAX_LEARNT_MODELS = 200;
+const learnt = new Map();
+const learntKey = (cfg) => `${cfg.baseUrl}\n${cfg.model}`;
+
+// What a refusal teaches, or null when it is not one of those.
+function refusedParameter(status, payload) {
+  const err = payload?.error;
+  if (status !== 400 || !err) return null;
+  if (err.param === "max_tokens" && err.code === "unsupported_parameter") return "completionTokens";
+  if (err.param === "temperature" && ["unsupported_parameter", "unsupported_value"].includes(err.code)) {
+    return "noTemperature";
+  }
+  return null;
+}
+
+// Records what a refusal teaches. False when there is nothing new to
+// learn, which leaves the refusal to be reported as is.
+function learnRefusal(cfg, status, payload) {
+  const lesson = refusedParameter(status, payload);
+  const key = learntKey(cfg);
+  const known = learnt.get(key) || {};
+  if (!lesson || known[lesson]) return false;
+  learnt.delete(key);
+  learnt.set(key, { ...known, [lesson]: true });
+  if (learnt.size > MAX_LEARNT_MODELS) learnt.delete(learnt.keys().next().value);
+  return true;
+}
+
 // The /chat/completions request both paths send, once the configuration
 // and the messages have been checked.
 function chatRequest(cfg, { messages, temperature, maxTokens }, stream) {
@@ -101,18 +135,44 @@ function chatRequest(cfg, { messages, temperature, maxTokens }, stream) {
     throw new AIProviderError("Messages array is required.", { status: 400 });
   }
 
+  const quirks = learnt.get(learntKey(cfg)) || {};
   return {
     url: joinUrl(cfg.baseUrl, "/chat/completions"),
     body: {
       model: cfg.model,
       messages,
-      temperature:
-        typeof temperature === "number" ? temperature : cfg.temperature ?? 0.3,
-      max_tokens:
+      ...(quirks.noTemperature ? {} : {
+        temperature: typeof temperature === "number" ? temperature : cfg.temperature ?? 0.3,
+      }),
+      [quirks.completionTokens ? "max_completion_tokens" : "max_tokens"]:
         typeof maxTokens === "number" ? maxTokens : cfg.maxTokens ?? 800,
       stream,
     },
   };
+}
+
+// Sends the chat request, and sends it again while the provider refuses a
+// parameter this model does not take (see learnRefusal): each round learns
+// one more, so this ends. Any other failure is thrown as the provider put
+// it; a success is returned with `done`, which ends its deadline.
+async function sendChat(cfg, args, stream, { signal, headers, deadlineMs, dbg }) {
+  for (;;) {
+    const { url, body } = chatRequest(cfg, args, stream);
+    const { init, done } = await requestInit(cfg, { body, signal, headers, deadlineMs });
+    let res;
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      done();
+      throw unreachableError(err, dbg);
+    }
+    if (res.ok) return { url, res, done };
+    let payload = null;
+    try { payload = await res.json(); } catch { /* body is not JSON: fall back to the status text */ }
+    done();
+    if (!learnRefusal(cfg, res.status, payload)) throw upstreamError(res.status, payload, dbg);
+    dbg(`model refuses ${payload.error.param}: sending again without it`);
+  }
 }
 
 // The error for a request that never got an answer (DNS, connection
@@ -159,29 +219,17 @@ function buildHeaders(cfg) {
 // the assistant text content. Throws AIProviderError on misconfig or
 // upstream failure — never logs the API key or full prompts.
 async function chatCompletion(cfg, { messages, temperature, maxTokens, signal } = {}) {
-  const { url, body } = chatRequest(cfg, { messages, temperature, maxTokens }, false);
-
-  let res;
   // The deadline covers the body as well as the connection, so it is only
   // cleared once the payload has been read.
-  const { init, done } = await requestInit(cfg, { body, signal });
+  const { res, done } = await sendChat(cfg, { messages, temperature, maxTokens }, false, { signal, dbg: noDebug });
   let payload;
   try {
-    try {
-      res = await fetch(url, init);
-    } catch (err) {
-      throw unreachableError(err, noDebug);
-    }
-    try {
-      payload = await res.json();
-    } catch {
-      payload = null;
-    }
+    payload = await res.json();
+  } catch {
+    payload = null;
   } finally {
     done();
   }
-
-  if (!res.ok) throw upstreamError(res.status, payload, noDebug);
 
   const choice = Array.isArray(payload?.choices) ? payload.choices[0] : null;
   const content = choice?.message?.content ?? choice?.text ?? "";
@@ -204,26 +252,13 @@ async function* chatCompletionStream(
   cfg,
   { messages, temperature, maxTokens, signal, onDebug } = {},
 ) {
-  const { url, body } = chatRequest(cfg, { messages, temperature, maxTokens }, true);
   const dbg = typeof onDebug === "function" ? onDebug : noDebug;
 
-  dbg(`fetch start url=${url} model=${cfg.model}`);
-  let res;
-  const { init } = await requestInit(cfg, {
-    body, signal, headers: { Accept: "text/event-stream" }, deadlineMs: 0,
+  dbg(`fetch start model=${cfg.model}`);
+  const { url, res } = await sendChat(cfg, { messages, temperature, maxTokens }, true, {
+    signal, headers: { Accept: "text/event-stream" }, deadlineMs: 0, dbg,
   });
-  try {
-    res = await fetch(url, init);
-  } catch (err) {
-    throw unreachableError(err, dbg);
-  }
-  dbg(`fetch resolved status=${res.status} content-type=${res.headers.get("content-type") || "?"}`);
-
-  if (!res.ok) {
-    let payload = null;
-    try { payload = await res.json(); } catch { /* body is not JSON: fall back to the status text */ }
-    throw upstreamError(res.status, payload, dbg);
-  }
+  dbg(`fetch resolved url=${url} status=${res.status} content-type=${res.headers.get("content-type") || "?"}`);
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder("utf-8");
@@ -273,7 +308,7 @@ async function* chatCompletionStream(
 
 // Probe the provider with a tiny prompt to validate the configuration.
 // Used by the admin "Test connection" button. Keeps the request small
-// (max_tokens=16) so it stays cheap on remote providers.
+// (a 16-token reply) so it stays cheap on remote providers.
 async function testConnection(cfg) {
   return chatCompletion(cfg, {
     messages: [

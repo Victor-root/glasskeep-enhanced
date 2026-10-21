@@ -28,6 +28,7 @@ run "un 401 sans jeton ne déconnecte pas" "$HERE/unit/t19-unauthenticated-401.m
 run "une copie du serveur n'écrase pas une modification locale" "$HERE/unit/t20-local-edit-race.mjs"
 run "l'écran TV n'empile pas ses écouteurs de retour au premier plan" "$HERE/unit/t21-tv-refresh-listeners.mjs"
 run "les suggestions des listes à cocher" "$HERE/unit/t22-checklist-suggestions.mjs"
+run "l'IA s'adapte aux paramètres qu'un modèle refuse" "$HERE/unit/t23-ai-refused-parameters.mjs"
 
 if [ $fail -eq 0 ]; then
   echo "Tout passe."
