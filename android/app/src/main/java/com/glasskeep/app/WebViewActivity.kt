@@ -516,9 +516,6 @@ class WebViewActivity : AppCompatActivity() {
                     )
                     // Page start can run before the new document exists, so the
                     // system-bar insets are pushed again now that the page has loaded.
-                    if (BuildConfig.DEBUG) view.evaluateJavascript(
-                        "document.documentElement.style.getPropertyValue('--android-inset-top')"
-                    ) { NetDebug.log("inset top on page finished, before the push: $it") }
                     injectSafeAreaInsets()
                     // Watch <meta name="theme-color"> for status/nav bar sync
                     view.evaluateJavascript("""
