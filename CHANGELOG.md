@@ -37,6 +37,7 @@ Headline feature: **single sign-on** with any OpenID Connect provider (Pocket ID
 - Sharing a note created offline could fail; the share dialog now says sharing needs the connection.
 - Android edge-to-edge: the header could sit under the status bar after a cold start.
 - The selected colour's ring was cut off in the phone's colour sheet.
+- The installed web app (PWA) on Android had a lavender navigation bar; it now matches the status bar (reinstall the app to see it).
 - Pasting a link then typing kept the new text inside the link (fixed by the editor library update).
 
 ### 🔒 Security
