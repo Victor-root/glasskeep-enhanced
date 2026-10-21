@@ -23,6 +23,8 @@ export default function ChecklistItemRow({
   onIndent,
   onOutdent,
   onRemove,
+  suggest,
+  onPickSuggestion,
 }) {
   return (
     <div
@@ -69,6 +71,8 @@ export default function ChecklistItemRow({
             onBackspaceEmpty={() => onBackspaceEmpty(it.id)}
             onIndent={() => onIndent(it.id)}
             onOutdent={() => onOutdent(it.id)}
+            suggest={suggest}
+            onPickSuggestion={(checkedId) => onPickSuggestion(it.id, checkedId)}
           />
         </div>
       </div>

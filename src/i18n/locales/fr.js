@@ -233,6 +233,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   leaveEmptyKeepCurrentPassword: "Laisser vide pour conserver le mot de passe actuel",
   listItem: "Élément de liste",
   listItemEllipsis: "Élément de liste…",
+  checklistSuggestions: "Éléments cochés",
   addSection: "Ajouter une section",
   addToSectionEllipsis: "Ajouter dans la section…",
   removeSection: "Supprimer la section",

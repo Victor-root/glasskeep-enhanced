@@ -79,6 +79,24 @@ export const richTextPopoversCSS = `
 .rt-menu-item-icon .tabler-icon svg { width: 18px; height: 18px; }
 .rt-menu-item--action .rt-menu-item-label { flex: 1; font-weight: 500; font-size: 0.85rem; }
 
+/* Checklist suggestions: checked items offered back while typing. */
+.rt-pop--checklist-suggest {
+  min-width: 220px;
+  max-width: min(360px, calc(100vw - 16px));
+  padding: 4px;
+}
+.rt-pop--checklist-suggest [role="listbox"] { display: flex; flex-direction: column; gap: 1px; }
+.rt-pop--checklist-suggest .rt-menu-item { width: 100%; }
+.rt-pop--checklist-suggest .rt-menu-item-icon { width: 20px; opacity: 0.6; }
+.rt-pop--checklist-suggest .rt-menu-item-label {
+  min-width: 0;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rt-pop--checklist-suggest strong { font-weight: 700; }
+
 /* Menu rows (block types, fonts) */
 .rt-menu-item, .rt-font-row, .rt-size-row {
   display: flex;

@@ -27,6 +27,7 @@ run "règles pures (adresses IA, TLS des scripts, style, chiffrement, connexion,
 run "un 401 sans jeton ne déconnecte pas" "$HERE/unit/t19-unauthenticated-401.mjs"
 run "une copie du serveur n'écrase pas une modification locale" "$HERE/unit/t20-local-edit-race.mjs"
 run "l'écran TV n'empile pas ses écouteurs de retour au premier plan" "$HERE/unit/t21-tv-refresh-listeners.mjs"
+run "les suggestions des listes à cocher" "$HERE/unit/t22-checklist-suggestions.mjs"
 
 if [ $fail -eq 0 ]; then
   echo "Tout passe."

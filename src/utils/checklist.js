@@ -228,6 +228,79 @@ export function orderCheckedForDisplay(sectionItems) {
   return out;
 }
 
+const MAX_CHECKED_SUGGESTIONS = 5;
+const COMBINING_MARKS = /[̀-ͯ]/g;
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+
+// Case- and accent-folded copy of `text`, with the index in `text` each
+// folded character comes from, so a match found in the folded copy can
+// be highlighted in the original.
+function foldWithOrigins(text) {
+  let folded = "";
+  const origins = [];
+  let i = 0;
+  for (const ch of text) {
+    const f = ch.normalize("NFD").replace(COMBINING_MARKS, "").toLowerCase();
+    folded += f;
+    for (let k = 0; k < f.length; k++) origins.push(i);
+    i += ch.length;
+  }
+  origins.push(i);
+  return { folded, origins };
+}
+
+// Where `query` starts a word of `folded`, or -1.
+function wordStartIndex(folded, query) {
+  for (let at = folded.indexOf(query); at !== -1; at = folded.indexOf(query, at + 1)) {
+    if (at === 0 || !WORD_CHAR.test(folded[at - 1])) return at;
+  }
+  return -1;
+}
+
+/**
+ * Checked items to offer back while `query` is typed into an unchecked
+ * item, Google-Keep style: those with a word starting with what is
+ * typed (case and accents ignored), the ones starting with it first,
+ * one per distinct text. `match` is the [start, end) range of `text`
+ * that matched, for highlighting.
+ */
+export function suggestCheckedItems(entries, query) {
+  const q = foldWithOrigins(String(query || "").trim()).folded;
+  if (!q) return [];
+  const arr = Array.isArray(entries) ? entries : [];
+  const seen = new Set();
+  const starting = [];
+  const inside = [];
+  for (const e of arr) {
+    if (!isItem(e) || !e.done) continue;
+    const text = String(e.text || "").trim();
+    const { folded, origins } = foldWithOrigins(text);
+    if (!text || seen.has(folded)) continue;
+    const at = wordStartIndex(folded, q);
+    if (at === -1) continue;
+    seen.add(folded);
+    (at === 0 ? starting : inside).push({ id: e.id, text, match: [origins[at], origins[at + q.length]] });
+  }
+  return [...starting, ...inside].slice(0, MAX_CHECKED_SUGGESTIONS);
+}
+
+/**
+ * Brings checked item `checkedId` back, unchecked, in place of the item
+ * `targetId` the user was typing into, instead of adding a duplicate.
+ * Its indented children come along, unchecked too, like unchecking it
+ * would; the restored item takes the indent of the line it replaces.
+ */
+export function restoreCheckedItem(entries, targetId, checkedId) {
+  const arr = Array.isArray(entries) ? entries : [];
+  const target = arr.find((e) => e.id === targetId);
+  const item = arr.find((e) => e.id === checkedId);
+  if (!isItem(target) || !isItem(item) || !item.done || targetId === checkedId) return arr;
+  const family = [item, ...getIndentedChildren(arr, checkedId).filter((e) => e.id !== targetId)];
+  const moving = new Set(family.map((e) => e.id));
+  const restored = family.map((e, i) => ({ ...e, done: false, ...(i === 0 ? { indent: target.indent ? 1 : 0 } : {}) }));
+  return arr.flatMap((e) => (e.id === targetId ? restored : moving.has(e.id) ? [] : [e]));
+}
+
 /** Insert a new item right after the entry with id=afterId. */
 export function insertAfter(entries, afterId, newEntry) {
   const arr = entries.slice();

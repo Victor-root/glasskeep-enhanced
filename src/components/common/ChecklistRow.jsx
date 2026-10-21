@@ -3,6 +3,7 @@ import { t } from "../../i18n";
 import { linkifyContacts } from "../../utils/markdown.jsx";
 import { INDENT_STEP_PX } from "../../utils/checklist.js";
 import useBlurOnKeyboardClose from "../../hooks/useBlurOnKeyboardClose.js";
+import ChecklistSuggestions from "../checklist/ChecklistSuggestions.jsx";
 
 export default function ChecklistRow({
   item,
@@ -33,6 +34,8 @@ export default function ChecklistRow({
   onBackspaceEmpty,  // () => void : Backspace on empty content — delete + focus prev
   onIndent,          // () => void : Ctrl+] — indent this item
   onOutdent,         // () => void : Ctrl+[ — outdent this item
+  suggest,           // (text) => suggestions : checked items matching what is typed
+  onPickSuggestion,  // (checkedId) => void : bring that checked item back here
   // Imperative focus requests from parent. When focusToken changes and
   // focusItemId matches this item's id, focus this row and place the
   // caret at focusCaret ("start" | "end", default "end").
@@ -63,6 +66,19 @@ export default function ChecklistRow({
       clickOffsetRef.current = null;
     }
   }, [editing]);
+
+  // Checked items matching the text, offered while editing. The
+  // highlighted one and a dismissal (Escape) hold for the text they were
+  // made on only: typing on starts over.
+  const suggestions = React.useMemo(
+    () => (editing && suggest ? suggest(item.text) : []),
+    [editing, suggest, item.text],
+  );
+  const [pick, setPick] = React.useState({ text: null, index: -1, dismissed: false });
+  const current = pick.text === item.text ? pick : { index: -1, dismissed: false };
+  const suggesting = suggestions.length > 0 && !current.dismissed;
+  const highlight = (index) => setPick({ text: item.text, index, dismissed: false });
+  const dismissSuggestions = () => setPick({ text: item.text, index: -1, dismissed: true });
 
   // Exit edit mode when the soft keyboard is dismissed.
   useBlurOnKeyboardClose(editing, textareaRef);
@@ -103,6 +119,32 @@ export default function ChecklistRow({
       if (e.key === "]") onIndent?.();
       else onOutdent?.();
       return;
+    }
+
+    // Arrows walk the suggestions, Enter brings the highlighted one back,
+    // Escape closes them. Past their ends, the keys keep their usual role.
+    if (suggesting && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (e.key === "ArrowDown" && current.index < suggestions.length - 1) {
+        e.preventDefault();
+        highlight(current.index + 1);
+        return;
+      }
+      if (e.key === "ArrowUp" && current.index >= 0) {
+        e.preventDefault();
+        highlight(current.index - 1);
+        return;
+      }
+      if (e.key === "Enter" && current.index >= 0) {
+        e.preventDefault();
+        onPickSuggestion?.(suggestions[current.index].id);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        dismissSuggestions();
+        return;
+      }
     }
 
     // Enter without modifiers — create a new item. If the caret is at the
@@ -193,6 +235,15 @@ export default function ChecklistRow({
           }}
           ref={textareaRef}
           placeholder={t("listItem")}
+        />
+      )}
+      {suggesting && (
+        <ChecklistSuggestions
+          anchorRef={textareaRef}
+          suggestions={suggestions}
+          activeIndex={current.index}
+          onPick={onPickSuggestion}
+          onClose={dismissSuggestions}
         />
       )}
 

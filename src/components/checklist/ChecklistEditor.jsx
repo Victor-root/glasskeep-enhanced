@@ -26,6 +26,8 @@ import {
   removeEntry,
   removeSectionKeepItems,
   removeSectionWithItems,
+  restoreCheckedItem,
+  suggestCheckedItems,
   updateEntry,
 } from "../../utils/checklist.js";
 
@@ -186,6 +188,16 @@ export default function ChecklistEditor({
     requestFocus(newItem.id, "end");
   };
 
+  // Typing an item a checked one already matches offers it back
+  // (Google Keep style): picking it unchecks that item in place of the
+  // line being typed, so the list gains no duplicate.
+  const suggestChecked = React.useCallback((text) => suggestCheckedItems(items, text), [items]);
+  const pickSuggestion = (targetId, checkedId) => {
+    if (readOnly) return;
+    commit(restoreCheckedItem(items, targetId, checkedId));
+    requestFocus(checkedId, "end");
+  };
+
   const removeAndFocusPrev = (id) => {
     if (readOnly) return;
     const prevId = findPrevItemId(items, id);
@@ -266,6 +278,8 @@ export default function ChecklistEditor({
       onIndent={indentItem}
       onOutdent={outdentItem}
       onRemove={removeItem}
+      suggest={suggestChecked}
+      onPickSuggestion={pickSuggestion}
     />
   );
 
