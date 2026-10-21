@@ -15,11 +15,14 @@
 // proof that the identity is theirs; nothing is ever joined on a matching
 // email. An account holds one linked identity at most.
 //
-// Signing in is identifier first. The login screen sends the account's
-// username or email (or the profile picked on screen), the server looks
-// up the provider that account linked, and the whole flow runs on the
-// server; the browser only follows redirects and never sees the client
-// secret or a provider token:
+// Signing in is identifier first while personal providers are allowed.
+// The login screen sends the account's username or email (or the profile
+// picked on screen), and the server looks up the provider that account
+// linked. Under the "admin" policy there is only the instance's provider,
+// so the login screen may send nothing: the identity coming back from the
+// provider says whose account it is. Either way the whole flow runs on
+// the server; the browser only follows redirects and never sees the
+// client secret or a provider token:
 //
 //   1. POST /api/auth/oidc/login     state, nonce and PKCE verifier are
 //      kept in memory, the answer is the provider URL to navigate to, and
@@ -182,16 +185,19 @@ a{padding:14px 28px;border-radius:999px;background:#4f46e5;color:#fff;font-weigh
     }
   }
 
-  // The identity the provider vouched for must be the very one this
-  // account linked through this provider. Linking records it; signing in
-  // only checks it.
+  // The identity the provider vouched for must be one linked through this
+  // provider, and the very one of the account named at the start when one
+  // was. Linking records it; signing in only checks it.
   function settleSignIn(flow, provider, identity) {
     const linked = store.getIdentity(identity.issuer, identity.subject);
-    if (!linked || linked.provider_id !== provider.id || linked.user_id !== flow.userId) {
+    const viaProvider = !!linked && linked.provider_id === provider.id;
+    if (flow.userId == null) {
+      if (!viaProvider) return { error: "oidc_identity_unknown" };
+    } else if (!viaProvider || linked.user_id !== flow.userId) {
       return { error: "oidc_identity_mismatch" };
     }
     store.touchIdentity(linked.id, identity.email);
-    return {};
+    return { userId: linked.user_id };
   }
 
   function settleLink(flow, provider, identity) {
@@ -202,19 +208,34 @@ a{padding:14px 28px;border-radius:999px;background:#4f46e5;color:#fff;font-weigh
   }
 
   // ── Public: what the login screen offers ───────────────────────────
+  // The instance's provider, when it is the only one the policy allows:
+  // signing in through it needs no identifier.
+  const directProvider = () => (personalAllowed() ? null : store.getOwnedProvider(null));
+
+  // `direct`: the button goes straight to the provider, without asking
+  // whose account it is.
   app.get("/api/auth/oidc/status", (_req, res) => {
-    res.json({ available: ssoSettings().allowed && store.anyUsableIdentity({ personal: personalAllowed() }) });
+    const available = ssoSettings().allowed && store.anyUsableIdentity({ personal: personalAllowed() });
+    res.json({ available, direct: available && !!directProvider() });
   });
 
-  // Identifier first. Every miss answers the same thing and costs the
-  // same throttle as a wrong password, so the button cannot be used to
-  // sort accounts with a provider from the rest at speed.
+  // Identifier first, unless there is a direct provider and no identifier
+  // was given. Every miss answers the same thing and costs the same
+  // throttle as a wrong password, so the button cannot be used to sort
+  // accounts with a provider from the rest at speed.
   app.post("/api/auth/oidc/login", safely((req, res) => {
     if (!ssoSettings().allowed) return res.status(404).json({ error: "oidc_unavailable" });
     const { email, userId } = req.body || {};
+    const identifier = typeof email === "string" ? email.trim() : "";
+    if (!Number.isInteger(userId) && !identifier) {
+      if (signInOnHold(req, res)) return;
+      const provider = directProvider();
+      if (!usableBy(provider, null)) return denySignIn(req, res, { error: "oidc_not_configured" });
+      return startFlow(req, res, provider, "login", null);
+    }
     const user = Number.isInteger(userId)
       ? getUserById.get(userId)
-      : (typeof email === "string" && email.trim() ? getUserByEmail.get(email.trim()) : null);
+      : getUserByEmail.get(identifier);
     const candidate = user && !user.federated_origin ? user : null;
     if (signInOnHold(req, res, candidate?.id)) return;
     const identity = candidate ? store.getIdentityForUser(candidate.id) : null;
@@ -261,8 +282,8 @@ a{padding:14px 28px;border-radius:999px;background:#4f46e5;color:#fff;font-weigh
       return back({ oidc_linked: "1" });
     }
     const ticket = crypto.randomBytes(32).toString("base64url");
-    tickets.put(ticket, { userId: flow.userId, providerId: provider.id, binding: flow.binding, appBinding: flow.appBinding });
-    log.info?.(`[oidc] sign-in user=${flow.userId}`);
+    tickets.put(ticket, { userId: outcome.userId, providerId: provider.id, binding: flow.binding, appBinding: flow.appBinding });
+    log.info?.(`[oidc] sign-in user=${outcome.userId}`);
     return back({ oidc_ticket: ticket });
   }, (res) => (res.locals.oidcReturn ?? backToApp)(res, { oidc_error: "oidc_failed" })));
 

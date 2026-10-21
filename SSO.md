@@ -40,10 +40,11 @@ follows the standard. Nothing in GlassKeep is specific to one of them.
 - Each **user** then **links** their GlassKeep account by signing in at
   the provider once. An account is linked to one provider at a time:
   linking another one replaces the previous link.
-- On the login screen, **"Sign in with my provider"** asks for the
-  GlassKeep username or email, sends you to that account's provider, and brings you
-  back signed in. From then on GlassKeep works exactly as with a
-  password.
+- On the login screen, **"Sign in with my provider"** sends you to the
+  provider and brings you back signed in. With the instance's provider
+  only, it goes straight there; when personal providers are allowed, it
+  first asks for the GlassKeep username or email to know whose provider
+  to use. From then on GlassKeep works exactly as with a password.
 
 Your provider's secret never reaches a browser. A provider never creates
 a GlassKeep account and never grants any right: it only opens the
@@ -181,9 +182,12 @@ alone cannot do it), you sign in at the provider once and come back with
 
 ## 🔑 Signing in
 
-On the login screen, **Sign in with my provider**, type your GlassKeep
-username or email, **Continue**. From the profile picker, choosing your profile is
-enough: the button then asks for nothing.
+On the login screen, **Sign in with my provider**. With the instance's
+provider only, the button goes straight to it, and the identity you sign
+in with there says which account to open. When personal providers are
+allowed, type your GlassKeep username or email, **Continue**. From the
+profile picker, choosing your profile is enough: the button then asks
+for nothing.
 
 GlassKeep only opens your account if your provider vouches for **the
 identity you linked** (issuer + subject). Signing in at the provider as
@@ -212,6 +216,7 @@ app, where passkeys are not available.
 |---|---|
 | No "Sign in with my provider" button | The admin has not allowed SSO, or no account has linked a provider the current policy allows yet. |
 | *"No provider is linked to this account"* | Wrong username or email, the account has no linked provider, or it is linked to a personal provider while only the instance's is allowed: sign in another way and link it in Settings → Security. |
+| *"This identity is not linked to any GlassKeep account"* | With the instance's provider only: the identity you signed in with at the provider was never linked. Sign in another way and link it in Settings → Security, or sign out at the provider and use the account you linked. |
 | *"The administrator does not allow personal providers"* | The policy is *Instance provider only*: link your account to the instance's provider. |
 | *"This provider is on a local network address"* | A user's own provider may only be on the LAN once the admin turns on *Allow providers on the local network*. Expose it at a public address, or use the instance's provider. |
 | *"The provider publishes a different issuer"* | Use exactly the issuer the provider publishes (the test offers it). |
@@ -245,6 +250,9 @@ It never logs tokens or secrets.
   one minute, traded for the usual GlassKeep session.
 - An unknown identifier and an account without a provider get the same
   answer, and both count towards the usual sign-in throttle.
+- Without an identifier (instance's provider only), the account is the
+  one that linked the identity the provider vouches for, looked up by
+  issuer + subject; an identity no account linked opens nothing.
 - Every answer from a provider is size-capped and time-limited, so a
   provider cannot exhaust the server's memory or hold it waiting.
 - Storage: `oidc_providers` (one row per account's own provider, plus

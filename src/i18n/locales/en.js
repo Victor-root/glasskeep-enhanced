@@ -1549,6 +1549,8 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
     "Open GlassKeep at the address your provider was set up from to sign in with it.",
   oidcErrIdentityMismatch:
     "You signed in at your provider with another identity than the one linked to this GlassKeep account.",
+  oidcErrIdentityUnknown:
+    "This identity is not linked to any GlassKeep account. Sign in another way, then link it in Settings > Security.",
   oidcErrIdentityInUse: "This identity is already linked to another GlassKeep account.",
   oidcErrPersonalNotAllowed: "The administrator does not allow personal providers.",
   oidcErrIssuerInvalid: "The issuer must be an http(s) address, with no query or fragment.",

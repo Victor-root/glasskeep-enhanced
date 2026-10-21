@@ -7,7 +7,7 @@ import PasskeyLoginButton from "./PasskeyLoginButton.jsx";
 import QrLoginButton from "./QrLoginButton.jsx";
 import QrLoginPanel from "./QrLoginPanel.jsx";
 import OidcLoginButton from "./OidcLoginButton.jsx";
-import { fetchOidcAvailable, oidcErrorMessage } from "../../auth/oidcClient.js";
+import { fetchOidcStatus, oidcErrorMessage } from "../../auth/oidcClient.js";
 import { AUTH_INPUT_CLASSES, WIDE_SUBMIT_CLASSES } from "../common/fieldClasses.js";
 
 export default function LoginView({
@@ -51,18 +51,19 @@ export default function LoginView({
   // offered once the admin allows it and some account has linked one. A
   // failure reported by the provider's redirect arrives through
   // `oidcError`, possibly after this screen mounted.
-  const [oidcAvailable, setOidcAvailable] = useState(false);
+  const [oidcStatus, setOidcStatus] = useState({ available: false, direct: false });
   const [oidcErr, setOidcErr] = useState("");
   useEffect(() => {
-    fetchOidcAvailable().then(setOidcAvailable).catch(() => setOidcAvailable(false));
+    fetchOidcStatus().then(setOidcStatus).catch(() => setOidcStatus({ available: false, direct: false }));
   }, []);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- show a provider error that arrives after mount; the user can clear it locally
     if (oidcError) setOidcErr(oidcErrorMessage(oidcError));
   }, [oidcError]);
-  const oidcButton = (oidcAvailable || oidcErr) && (
+  const oidcButton = (oidcStatus.available || oidcErr) && (
     <OidcLoginButton
       userId={mode === "password" ? selectedProfile?.id : undefined}
+      direct={oidcStatus.direct}
       defaultEmail={email}
       error={oidcErr}
       onError={setOidcErr}

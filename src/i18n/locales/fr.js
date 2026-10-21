@@ -1550,6 +1550,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
     "Ouvrez GlassKeep à l'adresse depuis laquelle votre fournisseur a été configuré pour vous connecter avec.",
   oidcErrIdentityMismatch:
     "Vous vous êtes connecté chez votre fournisseur avec une autre identité que celle associée à ce compte GlassKeep.",
+  oidcErrIdentityUnknown:
+    "Cette identité n'est associée à aucun compte GlassKeep. Connectez-vous autrement, puis associez-la dans Paramètres > Sécurité.",
   oidcErrIdentityInUse: "Cette identité est déjà associée à un autre compte GlassKeep.",
   oidcErrPersonalNotAllowed: "L'administrateur n'autorise pas les fournisseurs personnels.",
   oidcErrIssuerInvalid: "L'issuer doit être une adresse http(s), sans paramètres ni fragment.",

@@ -13,7 +13,8 @@
 // pour lui-même et son secret qui ne ressort jamais, l'adresse privée
 // refusée à un compte ordinaire tant que l'administrateur n'a pas ouvert
 // le réseau local, l'association qui seule fait le lien, la connexion par
-// identifiant jusqu'à une session GlassKeep ordinaire, l'identité tenue
+// identifiant jusqu'à une session GlassKeep ordinaire, la connexion sans
+// identifiant quand seul le fournisseur de l'instance est permis, l'identité tenue
 // par issuer + sub, chaque refus (autre identité, autre navigateur,
 // ticket ou état rejoué, jeton falsifié, nonce faux, politique changée en
 // cours de route) et la mise à jour d'une base qui ne connaissait que les
@@ -305,6 +306,19 @@ try {
   t.check("chez le fournisseur de l'instance, l'identité d'un autre n'ouvre pas le compte",
     usurpe.params.oidc_error === "oidc_identity_mismatch" && !usurpe.params.oidc_ticket, usurpe.location);
 
+  const statutDirect = await inst.call("GET", "/api/auth/oidc/status");
+  idp.personne = { sub: "u-simple", email: "simple@authentik.test", name: "Simple" };
+  const direct = await parcours(inst, navSimple);
+  const sessionDirecte = await echanger(inst, navSimple, direct.params.oidc_ticket);
+  t.check("avec le seul fournisseur de l'instance, le bouton y va sans identifiant et l'identité dit quel compte ouvrir",
+    statutDirect.json?.direct === true && sessionDirecte.json?.user?.id === simple.id,
+    `${statutDirect.text} ${j(sessionDirecte.json?.user)}`);
+
+  idp.personne = { sub: "u-inconnu", email: "simple@glasskeep.test", name: "Inconnu" };
+  const inconnuDirect = await parcours(inst, navSimple);
+  t.check("sans identifiant, une identité associée à aucun compte n'ouvre rien, même avec l'email d'un compte",
+    inconnuDirect.params.oidc_error === "oidc_identity_unknown" && !inconnuDirect.params.oidc_ticket, inconnuDirect.location);
+
   // ───────────────────────────────────────────────────────────────────
   // 3. Les fournisseurs personnels, quand l'administrateur les autorise.
   // ───────────────────────────────────────────────────────────────────
@@ -313,6 +327,11 @@ try {
   t.check("l'administrateur autorise les fournisseurs personnels, une politique inconnue ne change rien",
     personnel.json?.ssoPolicy === "personal" && politiqueInconnue.json?.ssoPolicy === "personal",
     `${personnel.text.slice(0, 120)} ${politiqueInconnue.text.slice(0, 120)}`);
+  const statutPerso = await inst.call("GET", "/api/auth/oidc/status");
+  const sansIdentifiant = await inst.call("POST", "/api/auth/oidc/login", { body: {} });
+  t.check("avec les fournisseurs personnels, la connexion redemande qui l'on est",
+    statutPerso.json?.available === true && statutPerso.json.direct === false
+      && sansIdentifiant.json?.error === "oidc_not_configured", `${statutPerso.text} ${sansIdentifiant.text}`);
   const prive = await inst.call("POST", "/api/auth/oidc/me/test", {
     token: simple.token, body: { issuer: ISSUER, clientId: CLIENT_ID },
   });

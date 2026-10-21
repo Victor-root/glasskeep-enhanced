@@ -35,7 +35,7 @@
     "sso.flow2.t": "Declare the provider",
     "sso.flow2.b": "The administrator enters the instance's provider in the admin panel; when personal providers are allowed, a user may enter their own in Settings, Security. Each user then links their account by signing in at the provider once.",
     "sso.flow3.t": "Sign in",
-    "sso.flow3.b": "On the login screen, choose Sign in with my provider, give your GlassKeep username or email and authenticate at the provider.",
+    "sso.flow3.b": "On the login screen, choose Sign in with my provider and authenticate at the provider. When personal providers are allowed, give your GlassKeep username or email first.",
 
     "sso.before.eyebrow": "Before you start",
     "sso.before.title": "Four things to have in place",
@@ -173,7 +173,7 @@
     "sso.g4.alt": "The Single sign-on card showing the account linked to the instance's provider, with Unlink",
 
     "sso.s4.title": "Sign in",
-    "sso.s4.lead": "On the login screen, choose Sign in with my provider and type your GlassKeep username or email. From the profile picker, selecting your profile is enough.",
+    "sso.s4.lead": "On the login screen, choose Sign in with my provider. With the instance's provider only, the button goes straight to it: the identity you sign in with there says which account to open. When personal providers are allowed, type your GlassKeep username or email first; from the profile picker, selecting your profile is enough.",
     "sso.s4.b": "GlassKeep then sends you to your provider and signs you in only if the identity it returns is the one linked to that account. Any other identity is refused, even with the same e-mail address.",
     "sso.s4.alt": "The login screen with the Sign in with my provider button opened on its identifier field",
     "sso.s4.prov": "At the provider, the page is the provider's own",
@@ -201,6 +201,8 @@
     "sso.q7.a": "The redirect URI declared at the provider must equal the one shown in GlassKeep: same scheme, host, port and path.",
     "sso.q8.q": "“You signed in at your provider with another identity”",
     "sso.q8.a": "The account authenticated at the provider is not the one linked to this GlassKeep account. Sign out at the provider and sign in with the account you linked.",
+    "sso.q12.q": "“This identity is not linked to any GlassKeep account”",
+    "sso.q12.a": "With the instance's provider only, the button opens the account of whoever the provider vouches for, provided that identity was linked. Sign in another way, then link it in Settings, Security, Single sign-on. Signed in at the provider with another account? Sign out there first.",
     "sso.q9.q": "“This sign-in attempt expired or was started in another browser”",
     "sso.q9.a": "More than ten minutes passed, the server restarted in between, or the browser blocks cookies for GlassKeep: the attempt is tied to the browser that started it. In the Android app, it is tied to the app instead, and a newer attempt started from the app replaces an older one.",
     "sso.q10.q": "On the Android app",
@@ -252,7 +254,7 @@
     "sso.flow2.t": "Déclarer le fournisseur",
     "sso.flow2.b": "L'administrateur saisit le fournisseur de l'instance dans le panneau d'administration ; quand les fournisseurs personnels sont autorisés, un utilisateur peut saisir le sien dans Paramètres, Sécurité. Chaque utilisateur associe ensuite son compte en se connectant une fois chez le fournisseur.",
     "sso.flow3.t": "Se connecter",
-    "sso.flow3.b": "Sur l'écran de connexion, choisissez Se connecter avec mon fournisseur, indiquez votre pseudo ou e-mail GlassKeep et authentifiez-vous chez le fournisseur.",
+    "sso.flow3.b": "Sur l'écran de connexion, choisissez Se connecter avec mon fournisseur et authentifiez-vous chez le fournisseur. Quand les fournisseurs personnels sont autorisés, indiquez d'abord votre pseudo ou e-mail GlassKeep.",
 
     "sso.before.eyebrow": "Avant de commencer",
     "sso.before.title": "Quatre prérequis",
@@ -390,7 +392,7 @@
     "sso.g4.alt": "La carte Connexion unique avec le compte associé au fournisseur de l'instance et l'action Dissocier",
 
     "sso.s4.title": "Se connecter",
-    "sso.s4.lead": "Sur l'écran de connexion, choisissez Se connecter avec mon fournisseur et saisissez votre pseudo ou e-mail GlassKeep. Depuis le sélecteur de profils, choisir votre profil suffit.",
+    "sso.s4.lead": "Sur l'écran de connexion, choisissez Se connecter avec mon fournisseur. Avec le seul fournisseur de l'instance, le bouton y mène directement : l'identité avec laquelle vous vous y connectez indique quel compte ouvrir. Quand les fournisseurs personnels sont autorisés, saisissez d'abord votre pseudo ou e-mail GlassKeep ; depuis le sélecteur de profils, choisir votre profil suffit.",
     "sso.s4.b": "GlassKeep vous envoie alors chez votre fournisseur et ne vous connecte que si l'identité renvoyée est celle associée à ce compte. Toute autre identité est refusée, même avec la même adresse e-mail.",
     "sso.s4.alt": "L'écran de connexion avec le bouton Se connecter avec mon fournisseur déplié sur son champ d'identifiant",
     "sso.s4.prov": "Chez le fournisseur, la page est celle du fournisseur",
@@ -418,6 +420,8 @@
     "sso.q7.a": "L'URI de redirection déclarée chez le fournisseur doit être identique à celle affichée dans GlassKeep : même schéma, même hôte, même port, même chemin.",
     "sso.q8.q": "« Vous vous êtes connecté chez votre fournisseur avec une autre identité »",
     "sso.q8.a": "Le compte authentifié chez le fournisseur n'est pas celui associé à ce compte GlassKeep. Déconnectez-vous chez le fournisseur et reconnectez-vous avec le compte que vous avez associé.",
+    "sso.q12.q": "« Cette identité n'est associée à aucun compte GlassKeep »",
+    "sso.q12.a": "Avec le seul fournisseur de l'instance, le bouton ouvre le compte de l'identité que le fournisseur confirme, à condition qu'elle ait été associée. Connectez-vous autrement, puis associez-la dans Paramètres, Sécurité, Connexion unique. Connecté chez le fournisseur avec un autre compte ? Déconnectez-vous-y d'abord.",
     "sso.q9.q": "« Cette tentative de connexion a expiré ou a été lancée dans un autre navigateur »",
     "sso.q9.a": "Plus de dix minutes se sont écoulées, le serveur a redémarré entre-temps, ou le navigateur bloque les cookies de GlassKeep : la tentative est liée au navigateur qui l'a lancée. Dans l'application Android, elle est liée à l'application, et une tentative plus récente lancée depuis l'application remplace la précédente.",
     "sso.q10.q": "Dans l'application Android",

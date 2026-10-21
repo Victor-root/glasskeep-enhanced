@@ -4,7 +4,9 @@
 // its own provider, so the server needs to know whose it is first: from
 // the profile picked on screen (`userId`), or from the username or email
 // typed in the small field this button opens, the same identifier the
-// password form takes. Then it leaves for the provider. The
+// password form takes. When the instance's provider is the only one
+// (`direct`), there is nothing to ask: the provider says whose account it
+// is. Then it leaves for the provider. The
 // error line belongs to LoginView, so a failure reported on the way back
 // survives switching login modes.
 
@@ -16,7 +18,7 @@ import { oidcErrorMessage, startOidcSignIn } from "../../auth/oidcClient.js";
 const BUTTON_CLASSES =
   "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-[var(--border-light)] text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors disabled:opacity-60";
 
-export default function OidcLoginButton({ userId, defaultEmail = "", error, onError }) {
+export default function OidcLoginButton({ userId, direct, defaultEmail = "", error, onError }) {
   const [asking, setAsking] = useState(false);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,6 +44,7 @@ export default function OidcLoginButton({ userId, defaultEmail = "", error, onEr
 
   const onButton = () => {
     if (userId) return start({ userId });
+    if (direct) return start({});
     setEmail(defaultEmail);
     setAsking(true);
   };

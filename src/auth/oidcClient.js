@@ -14,10 +14,12 @@ import { localizeServerError } from "../utils/serverErrors.js";
 const REDIRECT_PARAMS = ["oidc_ticket", "oidc_error", "oidc_linked"];
 const APP_SECRET_KEY = "glass-keep-oidc-app-secret";
 
-// Whether the login screen should offer the button at all.
-export async function fetchOidcAvailable() {
+// Whether the login screen should offer the button at all, and whether
+// it goes straight to the instance's provider without asking who is
+// signing in.
+export async function fetchOidcStatus() {
   const data = await api("/auth/oidc/status");
-  return !!data?.available;
+  return { available: !!data?.available, direct: !!data?.direct };
 }
 
 // The Android app opens the provider in the phone's browser, which does
@@ -46,8 +48,8 @@ function goToProvider(authorizationUrl) {
   return false;
 }
 
-// `who` is { email } typed on the login screen, or { userId } of the
-// profile picked there.
+// `who` is { email } typed on the login screen, { userId } of the profile
+// picked there, or nothing when the instance's provider is the only one.
 export async function startOidcSignIn(who) {
   const { authorizationUrl } = await api("/auth/oidc/login", { method: "POST", body: { ...who, ...appBinding() } });
   return goToProvider(authorizationUrl);
@@ -129,6 +131,7 @@ const ERROR_KEYS = {
   oidc_not_configured: "oidcErrNotConfigured",
   oidc_wrong_origin: "oidcErrWrongOrigin",
   oidc_identity_mismatch: "oidcErrIdentityMismatch",
+  oidc_identity_unknown: "oidcErrIdentityUnknown",
   oidc_identity_in_use: "oidcErrIdentityInUse",
   oidc_issuer_invalid: "oidcErrIssuerInvalid",
   oidc_origin_invalid: "oidcErrOriginInvalid",
