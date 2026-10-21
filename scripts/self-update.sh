@@ -49,17 +49,32 @@ TO_VERSION=""
 TARGET_VERSION=""
 ROLLED_BACK=0
 
+# The script that starts an update is the installed release's. Once it
+# has downloaded the new release, it hands over to that release's own
+# script (step 1 below), which knows what the new release needs (a newer
+# Node.js, say). The handed-over run inherits the log, the lock and the
+# snapshot, and carries on from step 2 with the state passed here.
+HANDOFF="${GK_UPDATE_HANDOFF:-}"
+if [[ -n "$HANDOFF" ]]; then
+    STARTED_AT="${GK_UPDATE_STARTED_AT:-$STARTED_AT}"
+    PREV_COMMIT="${GK_UPDATE_PREV_COMMIT:-}"
+    FROM_VERSION="${GK_UPDATE_FROM_VERSION:-}"
+    TARGET_VERSION="${GK_UPDATE_TARGET_VERSION:-}"
+fi
+
 mkdir -p "$DATA_DIR"
-: > "$LOG_FILE"
+if [[ -z "$HANDOFF" ]]; then
+    : > "$LOG_FILE"
 
-# Tee everything from now on into the log file.
-exec > >(tee -a "$LOG_FILE") 2>&1
+    # Tee everything from now on into the log file.
+    exec > >(tee -a "$LOG_FILE") 2>&1
 
-# ── Lock ─────────────────────────────────────────────────────────────────────
-exec 9>"$LOCK_FILE" || { echo "[self-update] cannot open lock file $LOCK_FILE"; exit 1; }
-if ! flock -n 9; then
-    echo "[self-update] another update is already running — abort."
-    exit 2
+    # ── Lock ─────────────────────────────────────────────────────────────────
+    exec 9>"$LOCK_FILE" || { echo "[self-update] cannot open lock file $LOCK_FILE"; exit 1; }
+    if ! flock -n 9; then
+        echo "[self-update] another update is already running — abort."
+        exit 2
+    fi
 fi
 
 # ── Scheduling courtesy ──────────────────────────────────────────────────────
@@ -280,74 +295,78 @@ trap on_error ERR
 CURRENT_STEP=0
 CURRENT_ACTION="initializing"
 
-# ── Preflight ────────────────────────────────────────────────────────────────
-FROM_VERSION="$(read_version_from_pkg "$INSTALL_DIR/package.json")"
+# A handed-over run starts at step 2: the run that handed over already
+# prepared, snapshotted and downloaded.
+if [[ -z "$HANDOFF" ]]; then
+    # ── Preflight ────────────────────────────────────────────────────────────
+    FROM_VERSION="$(read_version_from_pkg "$INSTALL_DIR/package.json")"
 
-# Consumed once: a stale leftover from an aborted run must never be
-# picked up by a later, unrelated invocation (e.g. someone running
-# `systemctl start` by hand for support).
-if [[ -f "$TARGET_VERSION_FILE" ]]; then
-    TARGET_VERSION="$(tr -d '[:space:]' < "$TARGET_VERSION_FILE" 2>/dev/null || true)"
-    rm -f "$TARGET_VERSION_FILE"
-fi
-
-write_status "preparing" 0 "Preparing update..." ""
-
-if [[ ! -d "$INSTALL_DIR/.git" ]]; then
-    echo "[self-update] $INSTALL_DIR is not a git checkout — refusing to update."
-    write_status "error" 0 "Install directory is not a git checkout." "missing .git"
-    exit 1
-fi
-
-PREV_COMMIT="$(cd "$INSTALL_DIR" && git rev-parse HEAD 2>/dev/null || true)"
-echo "[self-update] previous commit: $PREV_COMMIT"
-
-# Snapshot the current built artifacts so a failed update can be
-# undone without rebuilding (the rebuild would just re-hit OOM /
-# whatever caused the original failure). Cheap thanks to hardlinks
-# when the install dir + data dir share a filesystem.
-take_snapshot
-
-# Step order rationale: we do all the "heavy" work (git pull, npm
-# install, npm build) BEFORE stopping the service. The frontend is
-# polling /api/admin/self-update/status, so as long as glass-keep is
-# up the user sees real-time progress. We only cut the service for
-# the final restart, which is brief (~2 s). Running git/npm in place
-# is safe because the live Node process keeps its modules in memory —
-# it doesn't re-read source files at runtime, so we can update them
-# under its feet without breaking anything.
-
-# ── Step 1: pull the latest code ─────────────────────────────────────────────
-CURRENT_STEP=1
-CURRENT_ACTION="downloading the latest version"
-write_status "fetching" "$CURRENT_STEP" "Downloading the latest version..." ""
-(
-    cd "$INSTALL_DIR"
-    # Guard against local edits leaking into the rebuild.
-    if [[ -n "$TARGET_VERSION" && "$TARGET_VERSION" == "$FROM_VERSION" ]]; then
-        # Started by the running release for itself (its Node.js
-        # catch-up): its code is already here, wherever it came from.
-        echo "[self-update] already on v${TARGET_VERSION}: nothing to download"
-    elif [[ -n "$TARGET_VERSION" ]]; then
-        # The exact release the admin was offered: fetch and check out
-        # its tag, never the tracked branch's current tip, which may
-        # already be ahead of the last tagged release.
-        echo "[self-update] target release: v${TARGET_VERSION}"
-        # Forced (+): a local tag ref of the same name left over from an
-        # earlier attempt must not silently win over what origin actually
-        # has for that tag today. Without the +, git rejects the update
-        # instead of failing loudly, and the reset below would then run
-        # against stale data.
-        git fetch --depth=1 origin "+refs/tags/v${TARGET_VERSION}:refs/tags/v${TARGET_VERSION}"
-        git reset --hard "refs/tags/v${TARGET_VERSION}"
-    else
-        # No release recorded — a manual `systemctl start`, outside the
-        # admin panel. Fall back to the tracked branch, as before.
-        echo "[self-update] no target release recorded — falling back to branch: $TARGET_BRANCH"
-        git fetch --depth=1 origin "$TARGET_BRANCH"
-        git reset --hard "origin/$TARGET_BRANCH"
+    # Consumed once: a stale leftover from an aborted run must never be
+    # picked up by a later, unrelated invocation (e.g. someone running
+    # `systemctl start` by hand for support).
+    if [[ -f "$TARGET_VERSION_FILE" ]]; then
+        TARGET_VERSION="$(tr -d '[:space:]' < "$TARGET_VERSION_FILE" 2>/dev/null || true)"
+        rm -f "$TARGET_VERSION_FILE"
     fi
-)
+
+    write_status "preparing" 0 "Preparing update..." ""
+
+    if [[ ! -d "$INSTALL_DIR/.git" ]]; then
+        echo "[self-update] $INSTALL_DIR is not a git checkout — refusing to update."
+        write_status "error" 0 "Install directory is not a git checkout." "missing .git"
+        exit 1
+    fi
+
+    PREV_COMMIT="$(cd "$INSTALL_DIR" && git rev-parse HEAD 2>/dev/null || true)"
+    echo "[self-update] previous commit: $PREV_COMMIT"
+
+    # Snapshot the current built artifacts so a failed update can be
+    # undone without rebuilding (the rebuild would just re-hit OOM /
+    # whatever caused the original failure). Cheap thanks to hardlinks
+    # when the install dir + data dir share a filesystem.
+    take_snapshot
+
+    # Step order rationale: we do all the "heavy" work (git pull, npm
+    # install, npm build) BEFORE stopping the service. The frontend is
+    # polling /api/admin/self-update/status, so as long as glass-keep is
+    # up the user sees real-time progress. We only cut the service for
+    # the final restart, which is brief (~2 s). Running git/npm in place
+    # is safe because the live Node process keeps its modules in memory —
+    # it doesn't re-read source files at runtime, so we can update them
+    # under its feet without breaking anything.
+
+    # ── Step 1: pull the latest code ─────────────────────────────────────────
+    CURRENT_STEP=1
+    CURRENT_ACTION="downloading the latest version"
+    write_status "fetching" "$CURRENT_STEP" "Downloading the latest version..." ""
+    (
+        cd "$INSTALL_DIR"
+        # Guard against local edits leaking into the rebuild.
+        if [[ -n "$TARGET_VERSION" && "$TARGET_VERSION" == "$FROM_VERSION" ]]; then
+            # Started by the running release for itself (its Node.js
+            # catch-up): its code is already here, wherever it came from.
+            echo "[self-update] already on v${TARGET_VERSION}: nothing to download"
+        elif [[ -n "$TARGET_VERSION" ]]; then
+            # The exact release the admin was offered: fetch and check out
+            # its tag, never the tracked branch's current tip, which may
+            # already be ahead of the last tagged release.
+            echo "[self-update] target release: v${TARGET_VERSION}"
+            # Forced (+): a local tag ref of the same name left over from an
+            # earlier attempt must not silently win over what origin actually
+            # has for that tag today. Without the +, git rejects the update
+            # instead of failing loudly, and the reset below would then run
+            # against stale data.
+            git fetch --depth=1 origin "+refs/tags/v${TARGET_VERSION}:refs/tags/v${TARGET_VERSION}"
+            git reset --hard "refs/tags/v${TARGET_VERSION}"
+        else
+            # No release recorded — a manual `systemctl start`, outside the
+            # admin panel. Fall back to the tracked branch, as before.
+            echo "[self-update] no target release recorded — falling back to branch: $TARGET_BRANCH"
+            git fetch --depth=1 origin "$TARGET_BRANCH"
+            git reset --hard "origin/$TARGET_BRANCH"
+        fi
+    )
+fi
 
 TO_VERSION="$(read_version_from_pkg "$INSTALL_DIR/package.json")"
 echo "[self-update] new package.json version: ${TO_VERSION:-unknown}"
@@ -355,6 +374,23 @@ echo "[self-update] new package.json version: ${TO_VERSION:-unknown}"
 if [[ -n "$TARGET_VERSION" && "$TO_VERSION" != "$TARGET_VERSION" ]]; then
     CURRENT_ACTION="tag v${TARGET_VERSION} reports version ${TO_VERSION:-unknown}, not ${TARGET_VERSION}"
     false
+fi
+
+# ── Hand over to the new release's script ────────────────────────────────────
+# Only to a script that knows how to take over (one older than this
+# mechanism would start a whole new update). execfail: a failed exec
+# goes through the error trap and rolls back instead of exiting.
+NEW_SCRIPT="$INSTALL_DIR/scripts/self-update.sh"
+if [[ -z "$HANDOFF" ]] && grep -q "GK_UPDATE_HANDOFF" "$NEW_SCRIPT" 2>/dev/null; then
+    CURRENT_ACTION="handing over to the new version's update script"
+    echo "[self-update] handing over to the update script of v${TO_VERSION:-unknown}"
+    shopt -s execfail
+    GK_UPDATE_HANDOFF=1 \
+    GK_UPDATE_STARTED_AT="$STARTED_AT" \
+    GK_UPDATE_PREV_COMMIT="$PREV_COMMIT" \
+    GK_UPDATE_FROM_VERSION="$FROM_VERSION" \
+    GK_UPDATE_TARGET_VERSION="$TARGET_VERSION" \
+    exec bash "$NEW_SCRIPT"
 fi
 
 # ── Step 2: Node.js runtime ──────────────────────────────────────────────────

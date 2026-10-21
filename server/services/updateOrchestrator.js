@@ -269,9 +269,9 @@ function installedNodeMajor() {
 }
 
 // ── Node.js runtime catch-up ─────────────────────────────────────────────────
-// An update runs the self-update.sh of the version being replaced, which
-// may predate its Node.js step: the new release then starts on the old
-// Node. Once that run has finished, run the updater again for this same
+// An update starts with the self-update.sh of the version being replaced.
+// One that predates the hand-over to the new release's script, and its
+// Node.js step, leaves the new release starting on the old Node. Once that run has finished, run the updater again for this same
 // release, whose script upgrades Node. The marker keeps a failed attempt
 // from looping on every start; the admin panel shows its outcome.
 function completeRuntimeUpgrade(log = console) {
