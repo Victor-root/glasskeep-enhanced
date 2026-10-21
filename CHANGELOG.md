@@ -1,6 +1,6 @@
 # 📋 Changelog
 
-## 🚀 v2.7.0 (2026-10-08)
+## 🚀 v2.7.0 (2026-10-21)
 
 Headline feature: **single sign-on** with any OpenID Connect provider (Pocket ID, Authentik, Keycloak, Authelia, …), passkeys included, on the web and in the Android app. Also in this release: GlassKeep now runs on **Node.js 26**, installed for you by the updater, every library moves to its latest version, and the phone interface gets a large round of polish.
 
