@@ -32,6 +32,12 @@ Headline feature: **single sign-on** with any OpenID Connect provider (Pocket ID
 - Phones showed the keyboard shortcut in the Undo and Redo labels.
 - With 3-button navigation, Android laid a white veil over the transparent navigation bar in portrait edge-to-edge.
 - `install.sh` stopped before showing the access details behind a reverse proxy.
+- **Side-by-side view**: the right pane now saves, follows remote edits, offers reminders and behaves like a normal note (trash, archive, restore, duplicate); closing both panes at once no longer loses what was just typed.
+- A duplicated note lost its icon, and so did a note given an icon before its first save.
+- Sharing a note created offline could fail; the share dialog now says sharing needs the connection.
+- Android edge-to-edge: the header could sit under the status bar after a cold start.
+- The selected colour's ring was cut off in the phone's colour sheet.
+- Pasting a link then typing kept the new text inside the link (fixed by the editor library update).
 
 ### 🔒 Security
 - Single sign-on runs on the server (Authorization Code with PKCE, state and nonce, ID token verified against the provider's keys); the client secret never reaches a browser.
