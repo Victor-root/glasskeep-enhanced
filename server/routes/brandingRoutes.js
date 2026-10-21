@@ -92,8 +92,10 @@ function attachBrandingRoutes(app, deps) {
       name,
       short_name: name,
       description: "A lightweight notes app with Markdown, images, and offline support.",
-      theme_color: "#f0e8ff",
-      background_color: "#f0e8ff",
+      // Light --gk-statusbar: Chrome paints the installed app's navigation bar
+      // with background_color, so it matches the status bar.
+      theme_color: "#dce1fb",
+      background_color: "#dce1fb",
       display: "standalone",
       display_override: ["standalone"],
       scope: "/",
