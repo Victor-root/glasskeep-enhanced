@@ -19,7 +19,7 @@ import java.net.URL
  * changes, the page's own sync log (through the [JS_INTERFACE_NAME] bridge)
  * and, when the page loses the server, a probe of the server from outside the
  * WebView, which tells a network or server problem from one inside the
- * WebView. In release builds BuildConfig.DEBUG is a constant false: nothing
+ * WebView. In release builds BuildConfig.DEBUG_TOOLS is a constant false: nothing
  * here runs and R8 drops it.
  */
 class NetDebug(private val context: Context, private val serverOrigin: String) {
@@ -32,7 +32,7 @@ class NetDebug(private val context: Context, private val serverOrigin: String) {
     private var pausedAt = 0L
 
     fun start() {
-        if (!BuildConfig.DEBUG || callback != null) return
+        if (!BuildConfig.DEBUG_TOOLS || callback != null) return
         val webViewPackage = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             WebView.getCurrentWebViewPackage()?.let { "${it.packageName} ${it.versionName}" }
         else null
@@ -70,13 +70,13 @@ class NetDebug(private val context: Context, private val serverOrigin: String) {
     }
 
     fun onPause() {
-        if (!BuildConfig.DEBUG) return
+        if (!BuildConfig.DEBUG_TOOLS) return
         pausedAt = SystemClock.elapsedRealtime()
         log("activity paused")
     }
 
     fun onResume() {
-        if (!BuildConfig.DEBUG) return
+        if (!BuildConfig.DEBUG_TOOLS) return
         val away = if (pausedAt == 0L) "first resume" else "back after ${(SystemClock.elapsedRealtime() - pausedAt) / 1000}s in background"
         log("activity resumed ($away), network: ${describeActiveNetwork()}")
     }
@@ -97,7 +97,7 @@ class NetDebug(private val context: Context, private val serverOrigin: String) {
          *  WebView and its service worker, and logs the outcome. */
         @JavascriptInterface
         fun probe(reason: String?) {
-            if (!BuildConfig.DEBUG) return
+            if (!BuildConfig.DEBUG_TOOLS) return
             Thread {
                 val network = describeActiveNetwork()
                 val started = SystemClock.elapsedRealtime()
@@ -163,7 +163,7 @@ class NetDebug(private val context: Context, private val serverOrigin: String) {
         const val JS_INTERFACE_NAME = "AndroidNetDebug"
 
         fun log(message: String) {
-            if (BuildConfig.DEBUG) Log.d(TAG, message)
+            if (BuildConfig.DEBUG_TOOLS) Log.d(TAG, message)
         }
     }
 }

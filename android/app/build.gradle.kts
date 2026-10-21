@@ -46,21 +46,6 @@ android {
     }
 
     buildTypes {
-        debug {
-            // Sign debug builds with the release key when available — this
-            // is what makes the green Run triangle in Android Studio
-            // install a passkey-capable APK without going through the
-            // "Generate Signed Bundle / APK" wizard. The fingerprint
-            // matches /.well-known/assetlinks.json, so Credential Manager
-            // accepts the WebView's WebAuthn calls.
-            //
-            // When keystore.properties is missing, Gradle falls back to
-            // its auto-generated debug key — useful for forks who haven't
-            // set up signing yet, but passkeys won't work in that build.
-            if (hasReleaseSigning) {
-                signingConfig = signingConfigs.getByName("release")
-            }
-        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -71,6 +56,26 @@ android {
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            buildConfigField("boolean", "DEBUG_TOOLS", "false")
+        }
+        debug {
+            // Built exactly like release (R8, not debuggable) so it runs as
+            // smoothly; only the debug tools (logs, NetDebug, WebView
+            // inspection) stay on, through BuildConfig.DEBUG_TOOLS. The
+            // Android Studio debugger can't attach to it.
+            initWith(getByName("release"))
+            buildConfigField("boolean", "DEBUG_TOOLS", "true")
+            // Sign debug builds with the release key when available — this
+            // is what makes the green Run triangle in Android Studio
+            // install a passkey-capable APK without going through the
+            // "Generate Signed Bundle / APK" wizard. The fingerprint
+            // matches /.well-known/assetlinks.json, so Credential Manager
+            // accepts the WebView's WebAuthn calls.
+            //
+            // When keystore.properties is missing, Gradle falls back to
+            // its auto-generated debug key — useful for forks who haven't
+            // set up signing yet, but passkeys won't work in that build.
+            signingConfig = signingConfigs.getByName(if (hasReleaseSigning) "release" else "debug")
         }
     }
 

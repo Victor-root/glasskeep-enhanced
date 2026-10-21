@@ -70,14 +70,14 @@ fun OnboardingPager(
     var tvPage by remember { mutableIntStateOf(if (startAtSetup) 1 else 0) }
     val currentPage = if (tv) tvPage else pagerState.currentPage
     val goTo: (Int) -> Unit = { page ->
-        if (BuildConfig.DEBUG) Log.d("GKOnboarding", "goTo($page) from page $currentPage")
+        if (BuildConfig.DEBUG_TOOLS) Log.d("GKOnboarding", "goTo($page) from page $currentPage")
         if (tv) tvPage = page else scope.launch { pagerState.animateScrollToPage(page) }
     }
     BackHandler(enabled = tv && tvPage == 1) {
-        if (BuildConfig.DEBUG) Log.d("GKOnboarding", "Back key on the setup page")
+        if (BuildConfig.DEBUG_TOOLS) Log.d("GKOnboarding", "Back key on the setup page")
         tvPage = 0
     }
-    if (BuildConfig.DEBUG) {
+    if (BuildConfig.DEBUG_TOOLS) {
         DisposableEffect(Unit) {
             Log.d("GKOnboarding", "onboarding composed, tv=$tv, page=$currentPage")
             onDispose { Log.d("GKOnboarding", "onboarding disposed") }

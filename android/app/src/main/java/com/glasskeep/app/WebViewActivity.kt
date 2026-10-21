@@ -337,7 +337,9 @@ class WebViewActivity : AppCompatActivity() {
             // WebView). The web app calls schedule/cancel when a reminder
             // changes and syncAll on load. See ReminderScheduler.
             addJavascriptInterface(remindersBridge, "AndroidReminders")
-            if (BuildConfig.DEBUG) {
+            if (BuildConfig.DEBUG_TOOLS) {
+                // Not automatic: the debug build is not debuggable.
+                WebView.setWebContentsDebuggingEnabled(true)
                 val origin = Uri.parse(url).let { "${it.scheme}://${it.encodedAuthority}" }
                 netDebug = NetDebug(this@WebViewActivity, origin).also {
                     it.start()
@@ -488,7 +490,7 @@ class WebViewActivity : AppCompatActivity() {
                     error: android.webkit.WebResourceError,
                 ) {
                     super.onReceivedError(view, request, error)
-                    if (BuildConfig.DEBUG) NetDebug.log("load error ${error.errorCode} ${error.description} on ${request.method} ${request.url.path} (main frame: ${request.isForMainFrame})")
+                    if (BuildConfig.DEBUG_TOOLS) NetDebug.log("load error ${error.errorCode} ${error.description} on ${request.method} ${request.url.path} (main frame: ${request.isForMainFrame})")
                 }
 
                 override fun onReceivedHttpError(
@@ -497,12 +499,12 @@ class WebViewActivity : AppCompatActivity() {
                     errorResponse: WebResourceResponse,
                 ) {
                     super.onReceivedHttpError(view, request, errorResponse)
-                    if (BuildConfig.DEBUG) NetDebug.log("HTTP ${errorResponse.statusCode} on ${request.method} ${request.url.path}")
+                    if (BuildConfig.DEBUG_TOOLS) NetDebug.log("HTTP ${errorResponse.statusCode} on ${request.method} ${request.url.path}")
                 }
 
                 override fun onPageFinished(view: WebView, pageUrl: String?) {
                     super.onPageFinished(view, pageUrl)
-                    if (BuildConfig.DEBUG) NetDebug.log("page finished: $pageUrl")
+                    if (BuildConfig.DEBUG_TOOLS) NetDebug.log("page finished: $pageUrl")
                     swipeRefresh.isRefreshing = false
                     // Re-assert the TV flag in case the page navigated
                     // (login → notes) and reset the global.
