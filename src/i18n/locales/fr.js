@@ -1138,7 +1138,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   betaBadge: "Bêta",
   enterBetaTitle: "Passer au canal bêta ?",
   enterBetaMessage:
-    "Vous recevrez les nouveautés avant leur sortie officielle, et elles peuvent contenir des bugs. Vos données sont d'abord sauvegardées, et vous pourrez revenir au canal stable à tout moment.",
+    "Vous recevrez les nouveautés avant leur sortie officielle, et elles peuvent contenir des bugs. Vos données sont d'abord sauvegardées. Vous pourrez repasser sur le canal stable quand vous le voulez, mais si une bêta modifie la façon dont vos données sont enregistrées, il faudra soit attendre la prochaine version stable, soit revenir à la sauvegarde faite avant la bêta et perdre ce que vous avez fait entre-temps.",
   enterBetaConfirm: "Passer en bêta",
   leaveBetaTitle: "Revenir au canal stable",
   leaveBetaIntro: "Cette instance tourne sur la bêta v{version}. Comment voulez-vous la quitter ?",

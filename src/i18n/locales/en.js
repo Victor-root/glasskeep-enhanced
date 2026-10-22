@@ -1137,7 +1137,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   betaBadge: "Beta",
   enterBetaTitle: "Switch to the beta channel?",
   enterBetaMessage:
-    "You will get new features before their official release, and they may contain bugs. Your data is backed up first, and you can come back to the stable channel at any time.",
+    "You will get new features before their official release, and they may contain bugs. Your data is backed up first. You can go back to the stable channel whenever you like, but if a beta changes how your data is stored, you will have to either wait for the next stable release, or go back to the backup taken before the beta and lose what you did in the meantime.",
   enterBetaConfirm: "Switch to beta",
   leaveBetaTitle: "Back to the stable channel",
   leaveBetaIntro: "This instance runs the beta v{version}. How do you want to leave it?",
