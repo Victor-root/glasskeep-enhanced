@@ -7,7 +7,7 @@ import SelfUpdateSystemMonitor from "./SelfUpdateSystemMonitor.jsx";
 import SelfUpdateTechnicalLog from "./SelfUpdateTechnicalLog.jsx";
 import SelfUpdateDetails from "./SelfUpdateDetails.jsx";
 import { SelfUpdateProgressBar, SelfUpdateStateIcon } from "./SelfUpdateIndicators.jsx";
-import { detectFailureHint, stepLabel } from "./selfUpdateHelpers.js";
+import { detectFailureHint, isBetaVersion, stepLabel } from "./selfUpdateHelpers.js";
 
 // =============================================================================
 //  SelfUpdateProgress
@@ -194,8 +194,11 @@ export default function SelfUpdateProgress({
         // from a successful in-app update, so the ChangelogModal can
         // pop on first mount. The flag is keyed in localStorage and
         // cleared as soon as the modal reads it, so a CLI update or
-        // a manual refresh later never re-triggers it.
-        try { markChangelogToShow(); } catch { /* ignore */ }
+        // a manual refresh later never re-triggers it. Releases only:
+        // betas come too often for their notes to pop every time.
+        if (!isBetaVersion(status?.toVersion)) {
+            try { markChangelogToShow(); } catch { /* ignore */ }
+        }
         // Hard refresh: tear down the PWA service worker and CacheStorage
         // before reloading so the browser actually fetches the new
         // bundle from the network rather than serving the freshly-

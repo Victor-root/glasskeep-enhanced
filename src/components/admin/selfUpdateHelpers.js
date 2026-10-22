@@ -22,6 +22,11 @@ const STEP_LABEL_KEYS = {
     cancelled: "selfUpdateStepCancelled",
 };
 
+// A beta's version is a pre-release (2.8.0-beta+abc1234).
+export function isBetaVersion(version) {
+    return /^v?\d+\.\d+\.\d+-/.test(String(version || ""));
+}
+
 export function stepLabel(state) {
     const key = STEP_LABEL_KEYS[state];
     return key ? t(key) : state || "";
