@@ -7,8 +7,12 @@
 const path = require("path");
 const fs = require("fs");
 const Database = require("better-sqlite3");
+const { applyPendingRestore, guardDatabase, markDatabase } = require("./dbSafety");
 
-function openDatabase(dbFile) {
+// `build` is the running build (services/buildInfo.js): a database left
+// in a newer format is refused, and a copy is taken whenever a different
+// build opens it (see dbSafety.js).
+function openDatabase(dbFile, build) {
   // Ensure the directory for the DB exists
   try {
     fs.mkdirSync(path.dirname(dbFile), { recursive: true });
@@ -16,9 +20,16 @@ function openDatabase(dbFile) {
     console.error("Failed to ensure DB directory:", e);
   }
 
+  applyPendingRestore(dbFile, build);
   const db = new Database(dbFile);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
+  try {
+    guardDatabase(db, dbFile, build);
+  } catch (e) {
+    db.close();
+    throw e;
+  }
 
   createTables(db);
   ensureColumns(db);
@@ -29,6 +40,7 @@ function openDatabase(dbFile) {
   ensureNotificationColumns(db);
   ensureAppSettingsColumns(db);
   migrateTagsToPerUser(db);
+  markDatabase(db, build);
   return db;
 }
 

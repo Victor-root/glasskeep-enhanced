@@ -30,6 +30,7 @@ run "l'écran TV n'empile pas ses écouteurs de retour au premier plan" "$HERE/u
 run "les suggestions des listes à cocher" "$HERE/unit/t22-checklist-suggestions.mjs"
 run "l'IA s'adapte aux paramètres qu'un modèle refuse" "$HERE/unit/t23-ai-refused-parameters.mjs"
 run "les numéros de version du canal bêta" "$HERE/unit/t24-update-versions.mjs"
+run "la base de données face aux changements de version" "$HERE/unit/t25-db-safety.mjs"
 
 if [ $fail -eq 0 ]; then
   echo "Tout passe."

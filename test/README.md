@@ -25,6 +25,7 @@ réseau, pas de base de données, rien à nettoyer après. Assez rapide pour
 | Une liste à cocher propose de reprendre un élément coché plutôt que d'en créer un doublon | `unit/t22-checklist-suggestions.mjs` |
 | L'IA renvoie une demande sans le paramètre qu'un modèle refuse (max_tokens, température) et s'en souvient | `unit/t23-ai-refused-parameters.mjs` |
 | Les versions bêta se rangent comme le veut semver et une bêta est étiquetée avec son commit | `unit/t24-update-versions.mjs` |
+| La base est copiée à chaque changement de version, refusée par une version trop ancienne, et la sauvegarde d'avant la bêta n'est restaurée que par la version visée | `unit/t25-db-safety.mjs` |
 
 Le premier mérite un mot: ce n'est pas le test d'une fonction, c'est le
 test d'une règle. Il recense chaque endroit où l'interface affiche du

@@ -17,6 +17,8 @@ const { configureTrustProxy } = require("./middleware/trustProxy");
 const { attachSecurityHeaders } = require("./middleware/securityHeaders");
 const { attachLockGate } = require("./middleware/lockGate");
 const { openDatabase } = require("./db/schema");
+const { DatabaseTooNewError } = require("./db/dbSafety");
+const { getBuildInfo } = require("./services/buildInfo");
 const { uid } = require("./utils/ids");
 const { nowISO, isNewerOrEqual, parseIsoTimestamp } = require("./utils/timestamps");
 
@@ -93,7 +95,17 @@ if (NODE_ENV !== "production") {
 }
 
 // ---------- SQLite ----------
-const db = openDatabase(dbFile);
+// A database left in a newer format than this release reads stops the
+// start here, with what to do, rather than with a stack trace.
+const db = (() => {
+  try {
+    return openDatabase(dbFile, getBuildInfo());
+  } catch (e) {
+    if (!(e instanceof DatabaseTooNewError)) throw e;
+    console.error(`[db] ${e.message}`);
+    process.exit(1);
+  }
+})();
 
 // ---------- At-rest encryption (server-side, app-level unlock) ----------
 // Sensitive fields of every note can be stored encrypted on disk. The
