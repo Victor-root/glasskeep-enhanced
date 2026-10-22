@@ -386,7 +386,6 @@ module.exports = {
     readStatus,
     readLog,
     isUpdateInProgress,
-    releaseTarget,
     startUpdate,
     cancelUpdate,
     completeRuntimeUpgrade,
