@@ -78,7 +78,7 @@ if [[ -z "$HANDOFF" ]]; then
     # ── Lock ─────────────────────────────────────────────────────────────────
     exec 9>"$LOCK_FILE" || { echo "[self-update] cannot open lock file $LOCK_FILE"; exit 1; }
     if ! flock -n 9; then
-        echo "[self-update] another update is already running — abort."
+        echo "[self-update] another update is already running: abort."
         exit 2
     fi
 fi
@@ -197,6 +197,9 @@ read_version_from_pkg() {
 take_snapshot() {
     rm -rf "$BACKUP_DIR"
     mkdir -p "$BACKUP_DIR"
+    # When this run started: a database copy newer than this was taken
+    # by the version this run installed (see restore_database).
+    touch "$BACKUP_DIR/STARTED"
     for sub in dist node_modules; do
         if [[ -d "$INSTALL_DIR/$sub" ]]; then
             if cp -al "$INSTALL_DIR/$sub" "$BACKUP_DIR/$sub" 2>/dev/null; then
@@ -249,6 +252,27 @@ restore_from_snapshot() {
     fi
 }
 
+# The database as it was before this run. The version it installed copies
+# the database before migrating it, whenever it opens one last opened by
+# another build (db/dbSafety.js), naming the copy after that build: a copy
+# named after the build this run replaces, taken since it started, is
+# that one. A database the new version upgraded could otherwise be one
+# the restored version refuses to open. Untouched when there is none.
+restore_database() {
+    local db_file="${DB_FILE:-${DATA_DIR}/notes.db}"
+    local dir from_safe copy
+    dir="$(dirname "$db_file")/backups"
+    from_safe="${FROM_VERSION//[^0-9A-Za-z.+-]/_}"
+    [[ -f "$BACKUP_DIR/STARTED" && -d "$dir" ]] || return 0
+    copy="$(find "$dir" -maxdepth 1 -name "auto-*-from-${from_safe}.db" -newer "$BACKUP_DIR/STARTED" | sort | tail -n1)"
+    [[ -n "$copy" ]] || return 0
+    echo "[self-update] restoring the database from $copy"
+    systemctl stop "$SERVICE_NAME" || true
+    cp "$copy" "${db_file}.rollback-tmp" \
+        && rm -f "${db_file}-wal" "${db_file}-shm" \
+        && mv "${db_file}.rollback-tmp" "$db_file"
+}
+
 # ── Rollback ─────────────────────────────────────────────────────────────────
 # Restores the install dir from the pre-update snapshot, restarts the
 # service. Crucially we DO NOT re-run npm install or npm run build —
@@ -278,6 +302,7 @@ rollback() {
         cp "$BACKUP_DIR/package-lock.json" "$INSTALL_DIR/package-lock.json"
     fi
     rebuild_if_node_changed
+    restore_database || true
     # Snapshot served its purpose — wipe whatever's left so we don't
     # leak disk usage onto the data dir between updates.
     rm -rf "$BACKUP_DIR"
@@ -328,7 +353,7 @@ if [[ -z "$HANDOFF" ]]; then
     write_status "preparing" 0 "Preparing update..." ""
 
     if [[ ! -d "$INSTALL_DIR/.git" ]]; then
-        echo "[self-update] $INSTALL_DIR is not a git checkout — refusing to update."
+        echo "[self-update] $INSTALL_DIR is not a git checkout: refusing to update."
         write_status "error" 0 "Install directory is not a git checkout." "missing .git"
         exit 1
     fi
@@ -354,7 +379,7 @@ if [[ -z "$HANDOFF" ]]; then
     # polling /api/admin/self-update/status, so as long as glass-keep is
     # up the user sees real-time progress. We only cut the service for
     # the final restart, which is brief (~2 s). Running git/npm in place
-    # is safe because the live Node process keeps its modules in memory —
+    # is safe because the live Node process keeps its modules in memory:
     # it doesn't re-read source files at runtime, so we can update them
     # under its feet without breaking anything.
 
@@ -391,9 +416,9 @@ if [[ -z "$HANDOFF" ]]; then
             git fetch --depth=1 origin "+refs/tags/v${TARGET_VERSION}:refs/tags/v${TARGET_VERSION}"
             git reset --hard "refs/tags/v${TARGET_VERSION}"
         else
-            # No release recorded — a manual `systemctl start`, outside the
+            # No release recorded: a manual `systemctl start`, outside the
             # admin panel. Fall back to the tracked branch, as before.
-            echo "[self-update] no target release recorded — falling back to branch: $TARGET_BRANCH"
+            echo "[self-update] no target release recorded, falling back to branch: $TARGET_BRANCH"
             git fetch --depth=1 origin "$TARGET_BRANCH"
             git reset --hard "origin/$TARGET_BRANCH"
         fi

@@ -28,6 +28,7 @@ réseau, pas de base de données, rien à nettoyer après. Assez rapide pour
 | Les versions bêta se rangent comme le veut semver et une bêta est étiquetée avec son commit | `unit/t24-update-versions.mjs` |
 | La base est copiée à chaque changement de version, refusée par une version trop ancienne, et la sauvegarde d'avant la bêta n'est restaurée que par la version visée | `unit/t25-db-safety.mjs` |
 | Le canal stable ou bêta propose la bonne version, n'installe que ce qu'il propose, et quitter une bêta respecte la compatibilité de la base | `unit/t26-update-channel.mjs` |
+| Une mise à jour Docker qui échoue remet la base copiée par la nouvelle version avant de la migrer, et seulement celle-là | `unit/t27-update-rollback-db.mjs` |
 
 Le premier mérite un mot: ce n'est pas le test d'une fonction, c'est le
 test d'une règle. Il recense chaque endroit où l'interface affiche du
@@ -57,7 +58,7 @@ donc l'ordre d'exécution n'a aucune importance et un scénario qui
 | Profil, avatar, réglages et leur synchronisation entre onglets, rappels, notifications, changement de mot de passe | `functional/f4-compte-reglages-rappels.mjs` | 9514 |
 | Panneau d'administration: inscriptions en attente, comptes, garde-fous, réglages d'instance, logos, domaine des passkeys | `functional/f5-administration.mjs` | 9515 à 9518 |
 | Connexion OpenID Connect avec un faux fournisseur: interrupteur de l'administrateur et ses deux politiques, fournisseur de l'instance associé par plusieurs comptes, fournisseur déclaré par chaque compte et secret qui ne ressort jamais, adresse privée refusée à un compte ordinaire tant que le réseau local n'est pas ouvert, association (une par compte), connexion par identifiant, identité tenue par issuer + sub, refus (autre identité, autre adresse, autre navigateur, ticket ou état rejoué, jeton falsifié, nonce faux, politique changée en cours de route), mise à jour d'une base antérieure aux politiques | `functional/f6-sso.mjs` | 9519, 9520, 9521 |
-| Le script de mise à jour native dans un bac à sable: bêta installée par son commit (même à numéro égal) et étiquetée avec lui, bêta déjà en place non retéléchargée, retour d'une bêta vers une version publiée, commit invalide, introuvable ou au mauvais numéro sans dégât | `functional/f7-mise-a-jour-native.mjs` | aucun |
+| Le script de mise à jour native dans un bac à sable: bêta installée par son commit (même à numéro égal) et étiquetée avec lui, bêta déjà en place non retéléchargée, retour d'une bêta vers une version publiée, commit invalide, introuvable ou au mauvais numéro sans dégât, base d'avant remise quand la nouvelle version l'a convertie puis échoue | `functional/f7-mise-a-jour-native.mjs` | aucun |
 
 ### Éprouvés par mutation
 

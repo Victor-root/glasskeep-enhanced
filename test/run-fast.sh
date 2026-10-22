@@ -32,6 +32,7 @@ run "l'IA s'adapte aux paramètres qu'un modèle refuse" "$HERE/unit/t23-ai-refu
 run "les numéros de version du canal bêta" "$HERE/unit/t24-update-versions.mjs"
 run "la base de données face aux changements de version" "$HERE/unit/t25-db-safety.mjs"
 run "le canal de mise à jour" "$HERE/unit/t26-update-channel.mjs"
+run "la base remise en état quand une mise à jour Docker échoue" "$HERE/unit/t27-update-rollback-db.mjs"
 
 if [ $fail -eq 0 ]; then
   echo "Tout passe."

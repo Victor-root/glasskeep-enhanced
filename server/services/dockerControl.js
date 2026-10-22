@@ -134,6 +134,7 @@ async function startDockerUpdate({ fromVersion, toVersion, imageTag = "latest" }
             `TARGET_IMAGE=${targetImage}`,
             `STATUS_FILE=${path.join(DOCKER_DEFAULTS.dataDir, ".update-status.json")}`,
             `DOCKER_SOCKET=${DOCKER_DEFAULTS.socket}`,
+            `DB_FILE=${process.env.DB_FILE || path.join(DOCKER_DEFAULTS.dataDir, "notes.db")}`,
             `FROM_VERSION=${fromVersion || ""}`,
             `TO_VERSION=${toVersion || ""}`,
             `STARTED_AT=${new Date().toISOString()}`,

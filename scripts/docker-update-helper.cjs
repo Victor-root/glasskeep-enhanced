@@ -18,6 +18,7 @@
 const fs = require("fs");
 const http = require("http");
 const path = require("path");
+const { restoreUpdateDatabase } = require("./lib/updateDatabaseRestore.cjs");
 
 const DOCKER_SOCK = process.env.DOCKER_SOCKET || "/var/run/docker.sock";
 const MAIN_CONTAINER = process.env.MAIN_CONTAINER;
@@ -25,6 +26,7 @@ const TARGET_IMAGE = process.env.TARGET_IMAGE;
 const STATUS_FILE = process.env.STATUS_FILE || "/data/.update-status.json";
 const LOG_FILE =
     process.env.LOG_FILE || path.join(path.dirname(STATUS_FILE), ".update.log");
+const DB_FILE = process.env.DB_FILE || "/data/notes.db";
 const FROM_VERSION = process.env.FROM_VERSION || null;
 const TO_VERSION = process.env.TO_VERSION || null;
 const STARTED_AT = process.env.STARTED_AT || new Date().toISOString();
@@ -287,6 +289,13 @@ async function rollback() {
             await dockerRequest("DELETE", `/containers/${encodeURIComponent(MAIN_CONTAINER)}?force=true`);
         } catch {
             /* ignore — may not exist */
+        }
+        // The new container is gone: nothing holds the database now.
+        try {
+            const copy = restoreUpdateDatabase({ dbFile: DB_FILE, fromLabel: FROM_VERSION, since: Date.parse(STARTED_AT) });
+            if (copy) console.log(`[docker-update-helper] database restored from ${copy}`);
+        } catch (e) {
+            console.error("[docker-update-helper] database restore failed:", e.message);
         }
         // Rename the old container back to its original name.
         await dockerRequest(

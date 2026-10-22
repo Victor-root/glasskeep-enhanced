@@ -324,6 +324,18 @@ cd ~/glasskeep && docker compose pull && docker compose up -d
 
 ---
 
+## 🧪 Beta channel
+
+Want new features before their release? In the admin panel, under **Server version → Update channel**, pick **Beta**. GlassKeep backs your database up, then installs the latest beta with the usual one-click update (native install, or Docker with the socket mounted). New betas are then offered like any update.
+
+* **Safe by design**: every beta is published only once it has passed the test suites and a rollback test proving the latest stable release can still open the data it leaves behind.
+* **Backups**: whenever a different version opens the database, a copy is taken first in `data/backups/` (the last five are kept), plus `before-beta.db` when you enter the beta.
+* **Going back** to **Stable** at any time: right away when the stable release reads the beta's data (the usual case, nothing lost), otherwise by restoring the backup taken before the beta, or by keeping the beta until the next stable release replaces it.
+
+> 📘 How betas are published and how data formats are kept safe across versions: [`BETA.md`](./BETA.md)
+
+---
+
 ## 🤖 AI assistant
 
 GlassKeep no longer ships an embedded local model, it was too small to be genuinely useful. Instead, it connects to any **OpenAI-compatible** chat endpoint, so each instance picks what fits its hardware, privacy needs and budget, fully local with [Ollama](https://ollama.com/) / [Open WebUI](https://github.com/open-webui/open-webui), or remote via OpenAI, OpenRouter, …
@@ -349,7 +361,7 @@ ollama pull qwen3:4b-instruct-2507-q4_K_M
 
 ## 🔐 Single sign-on (OpenID Connect)
 
-Users can sign in through an **OpenID Connect provider**: Authentik, Keycloak, Authelia, Zitadel, Pocket ID, … The admin turns on **Allow single sign-on** in the admin panel and picks a policy: **the instance's provider only**, set up once by the admin, or **personal providers allowed**, where each user may also bring their own. Everyone links their account in **Settings → Security** by signing in at the provider once. The login screen's **Sign in with my provider** asks for the GlassKeep username or email and does the rest.
+Users can sign in through an **OpenID Connect provider**: Authentik, Keycloak, Authelia, Zitadel, Pocket ID, … The admin turns on **Allow single sign-on** in the admin panel and picks a policy: **the instance's provider only**, set up once by the admin, or **personal providers allowed**, where each user may also bring their own. Everyone links their account in **Settings → Security** by signing in at the provider once. The login screen's **Sign in with my provider** goes straight to the instance's provider; when personal providers are allowed, it first asks for the GlassKeep username or email to know whose provider to use.
 
 * The flow runs entirely on the server (Authorization Code + PKCE), the client secret never reaches a browser.
 * An account is opened only by the identity it linked (issuer + subject), never by a matching email, and a provider never creates accounts or grants rights.
