@@ -1,0 +1,122 @@
+name: Validate and publish a beta
+
+# Every push to the `beta` branch is checked before any instance can
+# install it: its version must be a pre-release (2.8.0-beta), the test
+# suites must pass, and the latest stable release must still open the
+# database the beta leaves behind (test/rollback/rollback.mjs). Only then
+# is the Docker image published (ghcr.io/...:beta-<commit>, and :beta)
+# and `beta-validated` moved to the commit. Instances on the beta channel
+# read `beta-validated`, never `beta`, so nothing untested reaches them.
+on:
+  push:
+    branches: [beta]
+  workflow_dispatch:
+
+# A newer push makes an older run pointless: only the latest is published.
+concurrency:
+  group: beta
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # The release tags, to find the latest stable release.
+          fetch-depth: 0
+
+      - name: Check the beta's version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          case "$version" in
+            *-*) echo "beta version: $version" ;;
+            *) echo "::error::package.json on the beta branch must carry a pre-release version, such as 2.8.0-beta (found $version)"; exit 1 ;;
+          esac
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Fast checks
+        run: npm test
+
+      - name: Functional scenarios
+        run: npm run test:functional
+
+      - name: Check out the latest stable release
+        run: |
+          tag="$(git tag --list 'v*' --sort=-v:refname | grep -v -- '-' | head -n1 || true)"
+          if [ -z "$tag" ]; then echo "::error::no stable release tag found"; exit 1; fi
+          echo "latest stable release: $tag"
+          git worktree add --detach ../stable "$tag"
+          cd ../stable && npm ci --no-audit --no-fund
+
+      - name: Rollback test
+        run: node test/rollback/rollback.mjs ../stable
+
+  docker:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # GHCR requires lowercase image paths; normalise the repo owner once.
+      - name: Compute image name
+        id: img
+        run: echo "name=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      # beta-<commit> is the image the one-click update installs; :beta
+      # follows the latest validated beta for anyone pulling by hand.
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+          tags: |
+            ${{ steps.img.outputs.name }}:beta-${{ github.sha }}
+            ${{ steps.img.outputs.name }}:beta
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+  publish:
+    needs: docker
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Native installs fetch this exact commit; Docker installs pull the
+      # image tagged with it, published by the job above.
+      - name: Move beta-validated to this commit
+        run: git push --force origin "${GITHUB_SHA}:refs/heads/beta-validated"

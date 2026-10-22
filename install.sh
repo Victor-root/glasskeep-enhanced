@@ -597,8 +597,9 @@ is_installed() {
 # admin-panel one-click update.
 latest_release_tag() {
     local tag
+    # Releases only: a pre-release tag (v2.8.0-beta.1) is not for this.
     tag=$(git ls-remote --tags --refs --sort=-v:refname "$REPO_URL" 'v*' 2>/dev/null \
-        | head -n1 | sed 's#.*refs/tags/##')
+        | sed 's#.*refs/tags/##' | grep -v -- '-' | head -n1 || true)
     if [[ -z "$tag" ]]; then
         die "$MSG_NO_RELEASE_TAG"
     fi

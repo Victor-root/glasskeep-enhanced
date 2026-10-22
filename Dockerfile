@@ -41,6 +41,11 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends tini gosu ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
+# The commit the image is built from (services/buildInfo.js tells betas
+# apart by it). Set by the GitHub workflows; empty in a local build.
+ARG GIT_COMMIT=""
+ENV GLASSKEEP_COMMIT=${GIT_COMMIT}
+
 # Copy only what's needed to run.
 COPY --from=builder /app/dist           ./dist
 COPY --from=builder /app/server         ./server

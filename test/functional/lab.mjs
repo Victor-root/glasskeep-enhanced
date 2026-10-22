@@ -33,13 +33,18 @@ const bcrypt = require(path.join(ROOT, "node_modules", "bcryptjs"));
 // `dbFile` sert aux scénarios qui vérifient qu'un réglage survit à un
 // redémarrage: deux instances successives sur le même fichier. Ce
 // fichier-là appartient à l'appelant, `stop()` n'y touche pas.
-export async function startInstance({ port, env = {}, dbFile: dbPartagee, timeoutMs = 20000 } = {}) {
+//
+// `root` lance le serveur d'une autre copie de GlassKeep (une autre
+// version, pour le test de retour en arrière). Une instance qui s'arrête
+// avant d'être prête fait échouer le démarrage tout de suite, avec son
+// journal.
+export async function startInstance({ port, env = {}, dbFile: dbPartagee, root = ROOT, timeoutMs = 20000 } = {}) {
   if (!port) throw new Error("startInstance: port requis");
   const dir = mkdtempSync(path.join(tmpdir(), "gk-fonc-"));
   const dbFile = dbPartagee || path.join(dir, "data.sqlite");
   const base = `http://127.0.0.1:${port}`;
 
-  const child = spawn(process.execPath, [path.join(ROOT, "server", "index.js")], {
+  const child = spawn(process.execPath, [path.join(root, "server", "index.js")], {
     env: {
       ...process.env,
       DB_FILE: dbFile,
@@ -55,10 +60,12 @@ export async function startInstance({ port, env = {}, dbFile: dbPartagee, timeou
   let log = "";
   child.stdout.on("data", (d) => { log += d; });
   child.stderr.on("data", (d) => { log += d; });
+  let exited = false;
+  child.on("close", () => { exited = true; });
 
   const until = Date.now() + timeoutMs;
   let up = false;
-  while (Date.now() < until && !up) {
+  while (Date.now() < until && !up && !exited) {
     try { up = (await fetch(base + "/api/health")).ok; } catch { /* pas encore là */ }
     if (!up) await sleep(300);
   }

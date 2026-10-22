@@ -6,6 +6,7 @@ Trois commandes, selon ce qu'on veut savoir.
 npm test                   # une demi-seconde, aucun serveur, aucun port
 npm run test:functional    # une minute, une instance par scénario
 npm run test:integration   # quelques minutes, tout, y compris la fédération
+npm run test:rollback -- <dossier de la version stable>   # une bêta, puis la stable sur la même base
 ```
 
 ## `npm test`
@@ -94,6 +95,29 @@ si aucun Chromium n'est trouvé; on peut en désigner un avec
 Le détail des scénarios, la façon de les jouer un par un, et le mode
 « vulnérable / corrigé » qui sert à vérifier qu'un test détecte
 réellement une faille: voir [`federation/README.md`](./federation/README.md).
+
+## `npm run test:rollback`
+
+Le test de retour en arrière, que le workflow `beta.yml` joue avant de
+publier chaque bêta. Une bêta remplit une base (texte riche, liste avec
+sections et retraits, étiquettes, images, icône, archive, corbeille,
+rappel, partage, réglages), la dernière version stable la rouvre et doit
+tout rendre à l'identique, ce qu'elle modifie se retrouve ensuite dans la
+bêta, et la base de la bêta doit garder toutes les tables et colonnes
+d'une base stable neuve. Le cache du navigateur ne doit pas changer de
+format.
+
+Quand la bêta déclare un format de base plus récent
+(`glasskeep.dbCompat` dans `package.json`), le retour en arrière est
+annoncé comme impossible: le test vérifie seulement que la version stable
+refuse la base au lieu de l'abîmer.
+
+Il demande une copie de la version stable, dépendances installées:
+
+```sh
+git worktree add --detach ../stable v2.7.0 && (cd ../stable && npm ci)
+npm run test:rollback -- ../stable
+```
 
 ## Côté Android
 
