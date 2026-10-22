@@ -97,7 +97,8 @@ function getOwnContainerId() {
 }
 
 // ── Docker trigger ───────────────────────────────────────────────────────────
-async function startDockerUpdate({ fromVersion, toVersion }) {
+// `imageTag` is "latest" for a release, "beta-<commit>" for a beta.
+async function startDockerUpdate({ fromVersion, toVersion, imageTag = "latest" }) {
     // 1. Find our own container by hostname.
     const ownId = getOwnContainerId();
     if (!ownId) throw new Error("cannot determine own container id");
@@ -105,11 +106,11 @@ async function startDockerUpdate({ fromVersion, toVersion }) {
     const ownName = (own.Name || "").replace(/^\//, "");
     if (!ownName) throw new Error("cannot determine own container name");
 
-    // 2. Compute target image: always pull the same repo at ":latest"
-    //    so the admin gets whatever GitHub Actions published last.
+    // 2. Compute target image: the same repo, at ":latest" for a release
+    //    (whatever GitHub Actions published last) or at the beta's own tag.
     const currentImageRef = (own.Config && own.Config.Image) || "";
     const [repo] = splitImageRef(currentImageRef);
-    const targetImage = `${repo}:latest`;
+    const targetImage = `${repo}:${imageTag}`;
 
     // 3. Spawn helper container using the SAME image (it ships the
     //    helper script in /app/scripts/). The helper mounts the data

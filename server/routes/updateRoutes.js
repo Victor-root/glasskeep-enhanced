@@ -1,51 +1,10 @@
 // server/routes/updateRoutes.js
 //
-// The "a new version is available" check for admins: the latest GitHub
-// release, cached for a few hours, and how many times each admin has
-// been shown the notification for it.
+// The "a new version is available" check for admins: what the update
+// channel offers (services/updateChannel.js), and how many times each
+// admin has been shown the notification for it.
 
-const pkg = require("../../package.json");
-const { isStrictlyNewer } = require("../services/semver");
-
-const GITHUB_URL =
-  "https://api.github.com/repos/Victor-root/glasskeep-enhanced/releases/latest";
-const DEFAULT_TTL_MS = 6 * 60 * 60 * 1000;
-const FETCH_TIMEOUT_MS = 5000;
-
-function getTtlMs() {
-  const raw = parseInt(process.env.UPDATE_CHECK_TTL_MS, 10);
-  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_TTL_MS;
-}
-
-let cache = null; // { data, fetchedAt }
-
-async function fetchLatest() {
-  if (typeof fetch !== "function") {
-    throw new Error("global fetch unavailable (Node 18+ required)");
-  }
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const res = await fetch(GITHUB_URL, {
-      signal: ctrl.signal,
-      headers: {
-        "User-Agent": "glasskeep-enhanced-update-check",
-        Accept: "application/vnd.github+json",
-      },
-    });
-    if (!res.ok) throw new Error("github status " + res.status);
-    const j = await res.json();
-    return {
-      tag: j.tag_name || null,
-      url: j.html_url || null,
-      publishedAt: j.published_at || null,
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function attachUpdateRoutes(app, { db, auth, adminOnly, log = console } = {}) {
+function attachUpdateRoutes(app, { db, auth, adminOnly, updateChannel, build, log = console } = {}) {
   // Per-admin view counter for the "new version available" notification.
   // Keyed by (user_id, version) so a freshly published version starts
   // every admin's counter back at zero. Stored server-side so the cap
@@ -82,66 +41,40 @@ function attachUpdateRoutes(app, { db, auth, adminOnly, log = console } = {}) {
     }
   };
 
+  // `latestVersion` is what would be installed (a beta's label carries
+  // its commit), else the latest stable release.
   app.get("/api/update-check", auth, adminOnly, async (req, res) => {
-    const currentVersion = pkg.version;
-    const now = Date.now();
-    const ttl = getTtlMs();
-
-    const buildPayload = (data, fetchedAt, stale) => {
-      const latestVersion = data.latestVersion;
-      const userId = req.user && req.user.id;
-      const notificationShownCount =
-        latestVersion && data.updateAvailable
-          ? getViewCount(userId, latestVersion)
-          : 0;
-      return {
-        ...data,
-        currentVersion,
-        notificationShownCount,
-        checkedAt: new Date(fetchedAt).toISOString(),
-        stale,
-      };
-    };
-
-    if (cache && now - cache.fetchedAt < ttl) {
-      return res.json(buildPayload(cache.data, cache.fetchedAt, false));
-    }
-
+    const currentVersion = build.label;
+    let result;
     try {
-      const r = await fetchLatest();
-      const latestVersion = r.tag ? r.tag.replace(/^v/i, "") : null;
-      const data = {
+      result = await updateChannel.check();
+    } catch {
+      return res.json({
         currentVersion,
-        latestVersion,
-        updateAvailable: latestVersion
-          ? isStrictlyNewer(latestVersion, currentVersion)
-          : false,
-        releaseUrl: r.url || null,
-        publishedAt: r.publishedAt || null,
-      };
-      cache = { data, fetchedAt: now };
-      return res.json(buildPayload(data, now, false));
-    } catch (err) {
-      if (log && typeof log.warn === "function") {
-        log.warn("update-check failed:", err.message);
-      }
-      if (cache) {
-        return res.json(buildPayload(cache.data, cache.fetchedAt, true));
-      }
-      return res.json(
-        buildPayload(
-          {
-            currentVersion,
-            latestVersion: null,
-            updateAvailable: false,
-            releaseUrl: null,
-            publishedAt: null,
-          },
-          now,
-          true,
-        ),
-      );
+        latestVersion: null,
+        updateAvailable: false,
+        releaseUrl: null,
+        publishedAt: null,
+        channel: updateChannel.getChannel(),
+        notificationShownCount: 0,
+        checkedAt: new Date().toISOString(),
+        stale: true,
+      });
     }
+    const offer = result.target || result.stable;
+    const latestVersion = offer?.label || null;
+    return res.json({
+      currentVersion,
+      latestVersion,
+      updateAvailable: !!result.target,
+      targetKind: result.target?.kind || null,
+      releaseUrl: offer?.url || null,
+      publishedAt: offer?.publishedAt || null,
+      channel: result.channel,
+      notificationShownCount: result.target ? getViewCount(req.user && req.user.id, latestVersion) : 0,
+      checkedAt: new Date(result.checkedAt).toISOString(),
+      stale: result.stale,
+    });
   });
 
   // Increment the per-admin "I have shown the update notification for

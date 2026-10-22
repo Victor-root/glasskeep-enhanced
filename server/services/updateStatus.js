@@ -95,6 +95,15 @@ function getTargetVersionFilePath() {
     );
 }
 
+// The commit a beta update lands on, beside the version above: betas
+// share one version, so only the commit names the build to check out.
+function getTargetCommitFilePath() {
+    return (
+        process.env.UPDATE_TARGET_COMMIT_FILE ||
+        path.join(getDataDir(), ".update-target-commit")
+    );
+}
+
 // ── Status I/O ───────────────────────────────────────────────────────────────
 function readStatus() {
     try {
@@ -228,6 +237,7 @@ module.exports = {
     getStatusFilePath,
     getLockFilePath,
     getTargetVersionFilePath,
+    getTargetCommitFilePath,
     readStatus,
     writeStatus,
     isUpdateInProgress,

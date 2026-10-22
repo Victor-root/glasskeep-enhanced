@@ -11,11 +11,9 @@
 // =============================================================================
 
 const orchestrator = require("../services/updateOrchestrator");
-const pkg = require("../../package.json");
-const { isStrictlyNewer } = require("../services/semver");
 const { readSystemSnapshot } = require("../services/systemMetrics");
 
-function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
+function attachSelfUpdateRoutes(app, { auth, adminOnly, updateChannel, build, log = console } = {}) {
     // Mode + capability check. Cheap; safe to call on every panel mount.
     app.get("/api/admin/self-update/mode", auth, adminOnly, async (_req, res) => {
         try {
@@ -47,14 +45,14 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
         return res.json({
             ...s,
             inProgress: orchestrator.isUpdateInProgress(),
-            // Server's own current package.json version. The frontend
+            // Server's own current build (a beta's carries its commit). The frontend
             // uses this (NOT the bundle's __APP_VERSION__) to decide
             // whether a "success" record is still relevant — the
             // bundle in the browser is stale until the user reloads,
             // so comparing the recorded toVersion against the bundle
             // would suppress the success modal of a completed in-app
             // update.
-            runningVersion: pkg.version,
+            runningVersion: build.label,
         });
     });
 
@@ -123,9 +121,10 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
         return res.json({ acknowledged: true });
     });
 
-    // Trigger the update. Body: { latestVersion: "x.y.z" }. We re-check
-    // server-side that the target is strictly newer than the running
-    // version so a stale browser cannot trigger a pointless rebuild.
+    // Trigger the update. Body: { latestVersion: "x.y.z" }, what the panel
+    // offered. The build to install is what the update channel offers
+    // now, never what the browser says: they must match, so a stale
+    // browser can neither trigger a pointless rebuild nor pick a build.
     app.post("/api/admin/self-update/start", auth, adminOnly, async (req, res) => {
         const latest = req.body && req.body.latestVersion;
         if (!latest || typeof latest !== "string") {
@@ -133,11 +132,18 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
                 .status(400)
                 .json({ error: "missing latestVersion in request body" });
         }
-        if (!isStrictlyNewer(latest, pkg.version)) {
+        let target;
+        try {
+            target = (await updateChannel.check()).target;
+        } catch {
+            return res.status(502).json({ error: "the update check could not reach GitHub" });
+        }
+        if (!target || target.label !== latest.replace(/^v/i, "")) {
             return res.status(400).json({
-                error: "target version is not newer than the running version",
-                running: pkg.version,
+                error: "target version is not the one on offer",
+                running: build.label,
                 target: latest,
+                offered: target ? target.label : null,
             });
         }
         if (orchestrator.isUpdateInProgress()) {
@@ -154,10 +160,7 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
                     reason: modeInfo.reason,
                 });
             }
-            const r = await orchestrator.startUpdate({
-                fromVersion: pkg.version,
-                toVersion: String(latest).replace(/^v/i, ""),
-            });
+            const r = await orchestrator.startUpdate({ fromVersion: build.label, target });
             return res.json({ started: true, mode: r.mode });
         } catch (e) {
             if (log && log.warn) log.warn("self-update/start failed:", e.message);

@@ -20,6 +20,7 @@ const path = require("path");
 const { spawn, spawnSync, execFile } = require("child_process");
 
 const pkg = require("../../package.json");
+const { getBuildInfo } = require("./buildInfo");
 const {
     NATIVE_DEFAULTS,
     detectMode,
@@ -28,6 +29,7 @@ const {
     getStatusFilePath,
     getLockFilePath,
     getTargetVersionFilePath,
+    getTargetCommitFilePath,
     readStatus,
     writeStatus,
     isUpdateInProgress,
@@ -62,17 +64,35 @@ async function getMode({ verifyDocker = true } = {}) {
     return { mode, oneClickAvailable: false, reason: "unknown-environment" };
 }
 
+// The build an update lands on: a release (its version) or a beta (its
+// version and commit). `label` is what the status and the panel show.
+function releaseTarget(version) {
+    const v = String(version || "").replace(/^v/i, "");
+    return { kind: "release", version: v, commit: null, label: v };
+}
+
 // ── Native trigger (systemd) ─────────────────────────────────────────────────
-function startNativeUpdate(toVersion) {
+function startNativeUpdate(target) {
     const updaterUnit = process.env.UPDATER_UNIT || NATIVE_DEFAULTS.updaterService;
-    // Record which release this run is supposed to land on, for
-    // self-update.sh to pick up (see getTargetVersionFilePath above).
-    // Best-effort: if the write fails, the script falls back to
-    // whatever sits on the tracked branch, same as before this existed.
-    if (toVersion) {
+    // Record which build this run is supposed to land on, for
+    // self-update.sh to pick up (see getTargetVersionFilePath). The
+    // version is best-effort: without it, the script falls back to the
+    // tracked branch, same as before this existed. A beta's commit is
+    // not: without it the script would land on the wrong build.
+    const forget = () => {
+        for (const f of [getTargetVersionFilePath(), getTargetCommitFilePath()]) {
+            try { fs.unlinkSync(f); } catch { /* noop */ }
+        }
+    };
+    if (target.version) {
         try {
-            fs.writeFileSync(getTargetVersionFilePath(), String(toVersion).replace(/^v/i, ""));
+            fs.writeFileSync(getTargetVersionFilePath(), target.version);
         } catch { /* self-update.sh falls back to the tracked branch */ }
+    }
+    if (target.commit) {
+        fs.writeFileSync(getTargetCommitFilePath(), target.commit);
+    } else {
+        try { fs.unlinkSync(getTargetCommitFilePath()); } catch { /* no beta target left over */ }
     }
     return new Promise((resolve, reject) => {
         const child = spawn(
@@ -86,14 +106,14 @@ function startNativeUpdate(toVersion) {
             resolved = true;
             if (code === 0) resolve();
             else {
-                try { fs.unlinkSync(getTargetVersionFilePath()); } catch { /* noop */ }
+                forget();
                 reject(new Error(`systemctl start exited with code ${code}`));
             }
         };
         child.on("error", (err) => {
             if (resolved) return;
             resolved = true;
-            try { fs.unlinkSync(getTargetVersionFilePath()); } catch { /* noop */ }
+            forget();
             reject(err);
         });
         child.on("exit", onExit);
@@ -109,23 +129,27 @@ function startNativeUpdate(toVersion) {
 }
 
 // ── Public: start an update ─────────────────────────────────────────────────
-async function startUpdate({ fromVersion, toVersion }) {
+// `target` is the build to land on; a bare `toVersion` names a release.
+// A Docker beta is the image the beta workflow published for its commit.
+async function startUpdate({ fromVersion, toVersion, target = releaseTarget(toVersion) }) {
     if (isUpdateInProgress()) {
         const err = new Error("an update is already in progress");
         err.code = "in_progress";
         throw err;
     }
     const mode = detectMode();
-    writeInitialStatus({ fromVersion: fromVersion || pkg.version, toVersion });
+    const from = fromVersion || getBuildInfo().label;
+    writeInitialStatus({ fromVersion: from, toVersion: target.label });
 
     if (mode === "native") {
-        await startNativeUpdate(toVersion);
+        await startNativeUpdate(target);
         return { mode };
     }
     if (mode === "docker") {
         await startDockerUpdate({
-            fromVersion: fromVersion || pkg.version,
-            toVersion,
+            fromVersion: from,
+            toVersion: target.label,
+            imageTag: target.commit ? `beta-${target.commit}` : "latest",
         });
         return { mode };
     }
@@ -277,6 +301,7 @@ function installedNodeMajor() {
 function completeRuntimeUpgrade(log = console) {
     if (detectMode() !== "native") return;
     const required = Number((pkg.engines?.node || "").match(/\d+/)?.[0]);
+    const build = getBuildInfo();
     const running = Number(process.versions.node.split(".")[0]);
     if (!required || running >= required) return;
     const updaterUnit = process.env.UPDATER_UNIT || NATIVE_DEFAULTS.updaterService;
@@ -295,18 +320,21 @@ function completeRuntimeUpgrade(log = console) {
             if (Date.now() < deadline) setTimeout(attempt, 5000).unref();
             return;
         }
-        if (readFile(marker).trim() === pkg.version) {
-            log.warn(`[self-update] still on Node.js ${process.version}, v${required} is required; the automatic upgrade already ran for ${pkg.version}`);
+        if (readFile(marker).trim() === build.label) {
+            log.warn(`[self-update] still on Node.js ${process.version}, v${required} is required; the automatic upgrade already ran for ${build.label}`);
             return;
         }
         try {
-            fs.writeFileSync(marker, pkg.version);
+            fs.writeFileSync(marker, build.label);
         } catch (e) {
             log.warn(`[self-update] cannot record the Node.js upgrade attempt: ${e.message}`);
             return;
         }
         log.log(`[self-update] Node.js ${process.version} is older than v${required}: upgrading it`);
-        startUpdate({ fromVersion: pkg.version, toVersion: pkg.version }).catch((e) => {
+        const target = build.beta
+            ? { kind: "beta", version: build.version, commit: build.commit, label: build.label }
+            : releaseTarget(build.version);
+        startUpdate({ fromVersion: build.label, target }).catch((e) => {
             log.warn(`[self-update] Node.js upgrade failed to start: ${e.message}`);
         });
     };
@@ -358,6 +386,7 @@ module.exports = {
     readStatus,
     readLog,
     isUpdateInProgress,
+    releaseTarget,
     startUpdate,
     cancelUpdate,
     completeRuntimeUpgrade,

@@ -34,6 +34,8 @@ const { attachUnlockRoutes } = require("./routes/unlockRoutes");
 const { attachPasskeyRoutes } = require("./routes/passkeyRoutes");
 const { attachUpdateRoutes } = require("./routes/updateRoutes");
 const { attachSelfUpdateRoutes } = require("./routes/selfUpdateRoutes");
+const { createUpdateChannel } = require("./services/updateChannel");
+const { attachUpdateChannelRoutes } = require("./routes/updateChannelRoutes");
 const { attachAssetLinksRoutes } = require("./routes/assetLinksRoutes");
 const { attachDeviceLinkRoutes } = require("./routes/deviceLinkRoutes");
 const { attachFederationRoutes } = require("./routes/federationRoutes");
@@ -175,8 +177,10 @@ attachUnlockRoutes(app, {
 // below alongside /api/instance/*).
 passkeyVaultModule.ensureSchema(db);
 attachPasskeyRoutes(app, { db, auth, adminOnly, signToken, getUserById, log: console });
-attachUpdateRoutes(app, { db, auth, adminOnly, log: console });
-attachSelfUpdateRoutes(app, { auth, adminOnly, log: console });
+const updateChannel = createUpdateChannel({ db, build: getBuildInfo(), log: console });
+attachUpdateRoutes(app, { db, auth, adminOnly, updateChannel, build: getBuildInfo(), log: console });
+attachSelfUpdateRoutes(app, { auth, adminOnly, updateChannel, build: getBuildInfo(), log: console });
+attachUpdateChannelRoutes(app, { db, dbFile, auth, adminOnly, updateChannel, build: getBuildInfo(), log: console });
 completeRuntimeUpgrade(console);
 
 // Digital Asset Links — must answer at /.well-known/assetlinks.json

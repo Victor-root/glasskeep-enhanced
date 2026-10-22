@@ -31,6 +31,7 @@ run "les suggestions des listes à cocher" "$HERE/unit/t22-checklist-suggestions
 run "l'IA s'adapte aux paramètres qu'un modèle refuse" "$HERE/unit/t23-ai-refused-parameters.mjs"
 run "les numéros de version du canal bêta" "$HERE/unit/t24-update-versions.mjs"
 run "la base de données face aux changements de version" "$HERE/unit/t25-db-safety.mjs"
+run "le canal de mise à jour" "$HERE/unit/t26-update-channel.mjs"
 
 if [ $fail -eq 0 ]; then
   echo "Tout passe."
