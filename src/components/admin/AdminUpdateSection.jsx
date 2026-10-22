@@ -4,6 +4,7 @@ import TI from "../../icons/editor/index.jsx";
 import { openChangelog } from "./changelogFlags.js";
 import UpdateCommandRow from "./UpdateCommandRow.jsx";
 import { DockerSocketHint, DockerNoticeHint } from "./DockerUpdateHints.jsx";
+import { isBetaVersion } from "./selfUpdateHelpers.js";
 import UpdateChannelControl from "./UpdateChannelControl.jsx";
 
 const REPO_URL = "https://github.com/Victor-root/glasskeep-enhanced";
@@ -22,8 +23,7 @@ export default function AdminUpdateSection({
   const fallback =
     typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "";
   const currentVersion = updateInfo?.currentVersion || fallback;
-  // A beta's version is a pre-release (2.8.0-beta+abc1234).
-  const runningBeta = /^\d+\.\d+\.\d+-/.test(currentVersion);
+  const runningBeta = isBetaVersion(currentVersion);
   const updateAvailable =
     !!updateInfo?.updateAvailable && !!updateInfo?.latestVersion;
   const latestVersion = updateInfo?.latestVersion;
