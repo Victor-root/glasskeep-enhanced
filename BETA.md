@@ -78,4 +78,6 @@ When it fails on purpose (an intended format change), raise `dbCompat`: the test
 * `data/backups/auto-<date>-from-<version>.db`: a copy taken before any migration, whenever a different version opens the database. The last five are kept.
 * `data/backups/before-beta.db`: taken when entering the beta, kept until the next time.
 
+When an update fails and rolls back, the database is put back too, from the copy the new version took before migrating it: the previous version never restarts on data it may not read.
+
 They are complete SQLite databases (encrypted notes stay encrypted). To restore one by hand: stop GlassKeep, copy it over `data/notes.db`, delete `data/notes.db-wal` and `data/notes.db-shm` if present, start GlassKeep again. Each copy takes as much space as the database itself.
