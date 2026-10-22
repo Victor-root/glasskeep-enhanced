@@ -32,6 +32,10 @@ TARGET_BRANCH="${UPDATE_BRANCH:-main}"
 # sits on the tip of the tracked branch — which could be ahead of the
 # last tagged release.
 TARGET_VERSION_FILE="${UPDATE_TARGET_VERSION_FILE:-${DATA_DIR}/.update-target-version}"
+# A beta's commit, written beside the version when the admin installs a
+# beta (getTargetCommitFilePath in updateStatus.js): betas share their
+# version across pushes, so only the commit names the build to check out.
+TARGET_COMMIT_FILE="${UPDATE_TARGET_COMMIT_FILE:-${DATA_DIR}/.update-target-commit}"
 STATUS_FILE="${UPDATE_STATUS_FILE:-${DATA_DIR}/.update-status.json}"
 LOG_FILE="${UPDATE_LOG_FILE:-${DATA_DIR}/.update.log}"
 LOCK_FILE="${UPDATE_LOCK_FILE:-${DATA_DIR}/.update.lock}"
@@ -47,6 +51,7 @@ PREV_COMMIT=""
 FROM_VERSION=""
 TO_VERSION=""
 TARGET_VERSION=""
+TARGET_COMMIT=""
 ROLLED_BACK=0
 
 # The script that starts an update is the installed release's. Once it
@@ -60,6 +65,7 @@ if [[ -n "$HANDOFF" ]]; then
     PREV_COMMIT="${GK_UPDATE_PREV_COMMIT:-}"
     FROM_VERSION="${GK_UPDATE_FROM_VERSION:-}"
     TARGET_VERSION="${GK_UPDATE_TARGET_VERSION:-}"
+    TARGET_COMMIT="${GK_UPDATE_TARGET_COMMIT:-}"
 fi
 
 mkdir -p "$DATA_DIR"
@@ -163,6 +169,12 @@ write_status() {
 
 node_major() {
     node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0
+}
+
+# What the panel shows for a build: a beta's version carries its commit,
+# since betas share their version (buildLabel in services/buildInfo.js).
+build_label() {
+    if [[ "$1" == *-* && -n "$2" ]]; then echo "$1+${2:0:7}"; else echo "$1"; fi
 }
 
 read_version_from_pkg() {
@@ -308,6 +320,10 @@ if [[ -z "$HANDOFF" ]]; then
         TARGET_VERSION="$(tr -d '[:space:]' < "$TARGET_VERSION_FILE" 2>/dev/null || true)"
         rm -f "$TARGET_VERSION_FILE"
     fi
+    if [[ -f "$TARGET_COMMIT_FILE" ]]; then
+        TARGET_COMMIT="$(tr -d '[:space:]' < "$TARGET_COMMIT_FILE" 2>/dev/null || true)"
+        rm -f "$TARGET_COMMIT_FILE"
+    fi
 
     write_status "preparing" 0 "Preparing update..." ""
 
@@ -319,6 +335,13 @@ if [[ -z "$HANDOFF" ]]; then
 
     PREV_COMMIT="$(cd "$INSTALL_DIR" && git rev-parse HEAD 2>/dev/null || true)"
     echo "[self-update] previous commit: $PREV_COMMIT"
+    FROM_VERSION="$(build_label "$FROM_VERSION" "$PREV_COMMIT")"
+
+    if [[ -n "$TARGET_COMMIT" && ! "$TARGET_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+        echo "[self-update] invalid target commit: $TARGET_COMMIT"
+        write_status "error" 0 "Update failed." "invalid target commit"
+        exit 1
+    fi
 
     # Snapshot the current built artifacts so a failed update can be
     # undone without rebuilding (the rebuild would just re-hit OOM /
@@ -342,7 +365,16 @@ if [[ -z "$HANDOFF" ]]; then
     (
         cd "$INSTALL_DIR"
         # Guard against local edits leaking into the rebuild.
-        if [[ -n "$TARGET_VERSION" && "$TARGET_VERSION" == "$FROM_VERSION" ]]; then
+        if [[ -n "$TARGET_COMMIT" && "$TARGET_COMMIT" == "$PREV_COMMIT" ]]; then
+            # A beta already checked out (its Node.js catch-up).
+            echo "[self-update] already on ${TARGET_COMMIT}: nothing to download"
+        elif [[ -n "$TARGET_COMMIT" ]]; then
+            # A beta: the exact commit the beta workflow validated,
+            # wherever its branch has moved since.
+            echo "[self-update] target beta: v${TARGET_VERSION} at ${TARGET_COMMIT}"
+            git fetch --depth=1 origin "$TARGET_COMMIT"
+            git reset --hard "$TARGET_COMMIT"
+        elif [[ -n "$TARGET_VERSION" && "$TARGET_VERSION" == "$FROM_VERSION" ]]; then
             # Started by the running release for itself (its Node.js
             # catch-up): its code is already here, wherever it came from.
             echo "[self-update] already on v${TARGET_VERSION}: nothing to download"
@@ -372,9 +404,10 @@ TO_VERSION="$(read_version_from_pkg "$INSTALL_DIR/package.json")"
 echo "[self-update] new package.json version: ${TO_VERSION:-unknown}"
 
 if [[ -n "$TARGET_VERSION" && "$TO_VERSION" != "$TARGET_VERSION" ]]; then
-    CURRENT_ACTION="tag v${TARGET_VERSION} reports version ${TO_VERSION:-unknown}, not ${TARGET_VERSION}"
+    CURRENT_ACTION="v${TARGET_VERSION} reports version ${TO_VERSION:-unknown}, not ${TARGET_VERSION}"
     false
 fi
+TO_VERSION="$(build_label "$TO_VERSION" "$TARGET_COMMIT")"
 
 # ── Hand over to the new release's script ────────────────────────────────────
 # Only to a script that knows how to take over (one older than this
@@ -390,6 +423,7 @@ if [[ -z "$HANDOFF" ]] && grep -q "GK_UPDATE_HANDOFF" "$NEW_SCRIPT" 2>/dev/null;
     GK_UPDATE_PREV_COMMIT="$PREV_COMMIT" \
     GK_UPDATE_FROM_VERSION="$FROM_VERSION" \
     GK_UPDATE_TARGET_VERSION="$TARGET_VERSION" \
+    GK_UPDATE_TARGET_COMMIT="$TARGET_COMMIT" \
     exec bash "$NEW_SCRIPT"
 fi
 
