@@ -7,6 +7,9 @@
   "engines": {
     "node": ">=26 <27"
   },
+  "glasskeep": {
+    "dbCompat": 1
+  },
   "scripts": {
     "dev": "concurrently -k -n WEB,API -c auto \"vite\" \"npm:api\"",
     "api": "cross-env NODE_ENV=development API_PORT=8080 node --watch server/index.js",

@@ -29,6 +29,7 @@ run "une copie du serveur n'écrase pas une modification locale" "$HERE/unit/t20
 run "l'écran TV n'empile pas ses écouteurs de retour au premier plan" "$HERE/unit/t21-tv-refresh-listeners.mjs"
 run "les suggestions des listes à cocher" "$HERE/unit/t22-checklist-suggestions.mjs"
 run "l'IA s'adapte aux paramètres qu'un modèle refuse" "$HERE/unit/t23-ai-refused-parameters.mjs"
+run "les numéros de version du canal bêta" "$HERE/unit/t24-update-versions.mjs"
 
 if [ $fail -eq 0 ]; then
   echo "Tout passe."

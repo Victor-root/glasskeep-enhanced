@@ -24,6 +24,7 @@ réseau, pas de base de données, rien à nettoyer après. Assez rapide pour
 | L'écran TV garde un seul écouteur de retour au premier plan et le retire en se fermant | `unit/t21-tv-refresh-listeners.mjs` |
 | Une liste à cocher propose de reprendre un élément coché plutôt que d'en créer un doublon | `unit/t22-checklist-suggestions.mjs` |
 | L'IA renvoie une demande sans le paramètre qu'un modèle refuse (max_tokens, température) et s'en souvient | `unit/t23-ai-refused-parameters.mjs` |
+| Les versions bêta se rangent comme le veut semver et une bêta est étiquetée avec son commit | `unit/t24-update-versions.mjs` |
 
 Le premier mérite un mot: ce n'est pas le test d'une fonction, c'est le
 test d'une règle. Il recense chaque endroit où l'interface affiche du
