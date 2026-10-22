@@ -316,13 +316,10 @@ export function useSelfUpdate({ token, isAdmin }) {
         };
     }, [phase, token, isAdmin, pollLoop]);
 
-    const startUpdate = useCallback(
-        async ({ latestVersion }) => {
+    // Shows the progress modal for an update the server is starting.
+    const trackUpdate = useCallback(
+        ({ toVersion }) => {
             setStartError(null);
-            if (!latestVersion) {
-                setStartError("missing latestVersion");
-                return;
-            }
             setPhase("starting");
             setStatus({
                 state: "queued",
@@ -331,8 +328,20 @@ export function useSelfUpdate({ token, isAdmin }) {
                 message: "",
                 mode,
                 fromVersion: null,
-                toVersion: latestVersion,
+                toVersion,
             });
+        },
+        [mode]
+    );
+
+    const startUpdate = useCallback(
+        async ({ latestVersion }) => {
+            setStartError(null);
+            if (!latestVersion) {
+                setStartError("missing latestVersion");
+                return;
+            }
+            trackUpdate({ toVersion: latestVersion });
             try {
                 await api("/admin/self-update/start", {
                     method: "POST",
@@ -347,7 +356,7 @@ export function useSelfUpdate({ token, isAdmin }) {
             }
             // Polling starts via the effect above.
         },
-        [mode, token]
+        [trackUpdate, token]
     );
 
     const acknowledge = useCallback(async () => {
@@ -381,6 +390,7 @@ export function useSelfUpdate({ token, isAdmin }) {
         phase,
         startError,
         startUpdate,
+        trackUpdate,
         dismiss,
         acknowledge,
         slowResponse,

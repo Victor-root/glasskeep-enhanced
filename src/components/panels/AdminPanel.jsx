@@ -183,6 +183,7 @@ export default function AdminPanel({
             updateInfo={updateInfo}
             selfUpdate={selfUpdate}
             showGenericConfirm={showGenericConfirm}
+            authToken={authToken}
           />
 
           {/* Pending Registrations — rendered first so admins see the

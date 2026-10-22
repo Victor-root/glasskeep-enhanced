@@ -1119,6 +1119,41 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
     "Une nouvelle version du serveur GlassKeep est disponible (v{version}). Mettez à jour quand vous le souhaitez, vos données ne seront pas affectées.",
   appVersionSectionTitle: "Version du serveur",
   updateUpToDateDescription: "Vous êtes à jour.",
+  updateChannelTitle: "Canal de mise à jour",
+  updateChannelStable: "Stable",
+  updateChannelStableDesc: "Les versions publiées, testées avant leur sortie.",
+  updateChannelBeta: "Bêta",
+  updateChannelBetaDesc: "Les nouveautés avant leur sortie. Peut contenir des bugs.",
+  updateChannelWaiting:
+    "Canal stable : cette bêta reste en place jusqu'à ce qu'une version stable plus récente la remplace, comme une mise à jour normale.",
+  updateChannelNoBeta: "Aucune bêta n'est disponible pour le moment : elle sera proposée ici dès sa publication.",
+  updateChannelNeedsOneClick:
+    "Les bêtas s'installent avec la mise à jour automatique, qui n'est pas disponible sur cette instance.",
+  updateChannelErrIncompatible: "La version stable ne sait pas lire les données de cette bêta.",
+  updateChannelErrNoBackup: "Aucune sauvegarde d'avant la bêta n'a été trouvée.",
+  updateChannelErrInProgress: "Une mise à jour est déjà en cours.",
+  updateChannelErrNoOneClick: "L'installation automatique n'est pas disponible sur cette instance.",
+  updateChannelErrGithub: "GitHub est injoignable. Réessayez dans un instant.",
+  updateChannelErr: "Le canal de mise à jour n'a pas pu être changé.",
+  betaBadge: "Bêta",
+  enterBetaTitle: "Passer au canal bêta ?",
+  enterBetaMessage:
+    "Vous recevrez les nouveautés avant leur sortie officielle, et elles peuvent contenir des bugs. Vos données sont d'abord sauvegardées, et vous pourrez revenir au canal stable à tout moment.",
+  enterBetaConfirm: "Passer en bêta",
+  leaveBetaTitle: "Revenir au canal stable",
+  leaveBetaIntro: "Cette instance tourne sur la bêta v{version}. Comment voulez-vous la quitter ?",
+  leaveBetaNow: "Revenir maintenant",
+  leaveBetaNowDesc: "Installe la version stable v{version}. Tout ce que vous avez fait pendant la bêta est conservé.",
+  leaveBetaRestore: "Revenir maintenant et restaurer mes données",
+  leaveBetaRestoreDesc:
+    "Cette bêta a changé la façon dont les données sont rangées et la version stable v{version} ne sait pas les lire. Installe v{version} et restaure la sauvegarde du {date} : ce qui a été créé ou modifié depuis est perdu (une copie est gardée dans le dossier des sauvegardes).",
+  leaveBetaWait: "Attendre la prochaine version stable",
+  leaveBetaWaitDesc:
+    "Garde cette bêta jusqu'à ce qu'une version stable plus récente la remplace, comme une mise à jour normale. Rien n'est perdu.",
+  leaveBetaNoBackup:
+    "La version stable v{version} ne sait pas lire les données de cette bêta et il n'existe pas de sauvegarde d'avant la bêta : attendre est le seul retour sans risque.",
+  leaveBetaNoGithub: "GitHub est injoignable, seule l'attente est possible pour le moment.",
+  leaveBetaConfirm: "Continuer",
   updateAvailableDescription:
     "Une nouvelle version est disponible (v{version}). Mettez à jour quand vous le souhaitez, vos données ne seront pas affectées.",
   updateMethodTerminal: "Installation standard",

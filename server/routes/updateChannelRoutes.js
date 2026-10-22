@@ -112,7 +112,9 @@ function attachUpdateChannelRoutes(app, { db, dbFile, auth, adminOnly, updateCha
       return res.status(409).json({ error: "no_backup" });
     }
     const ready = await readiness();
-    if (!ready.ok) return res.status(409).json({ error: ready.reason });
+    if (!ready.ok) {
+      return res.status(409).json({ error: ready.reason === "in_progress" ? "in_progress" : "one_click_unavailable" });
+    }
 
     if (action === "restore") safety.requestRestore(dbFile, stable.version);
     updateChannel.setChannel("stable");

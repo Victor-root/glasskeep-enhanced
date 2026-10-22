@@ -4,6 +4,7 @@ import TI from "../../icons/editor/index.jsx";
 import { openChangelog } from "./changelogFlags.js";
 import UpdateCommandRow from "./UpdateCommandRow.jsx";
 import { DockerSocketHint, DockerNoticeHint } from "./DockerUpdateHints.jsx";
+import UpdateChannelControl from "./UpdateChannelControl.jsx";
 
 const REPO_URL = "https://github.com/Victor-root/glasskeep-enhanced";
 
@@ -16,13 +17,18 @@ export default function AdminUpdateSection({
   updateInfo,
   selfUpdate,
   showGenericConfirm,
+  authToken,
 }) {
   const fallback =
     typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "";
   const currentVersion = updateInfo?.currentVersion || fallback;
+  // A beta's version is a pre-release (2.8.0-beta+abc1234).
+  const runningBeta = /^\d+\.\d+\.\d+-/.test(currentVersion);
   const updateAvailable =
     !!updateInfo?.updateAvailable && !!updateInfo?.latestVersion;
   const latestVersion = updateInfo?.latestVersion;
+  // The manual commands install the latest release, never a beta.
+  const offersBeta = updateInfo?.targetKind === "beta";
 
   const mode = selfUpdate?.mode || null;
   const oneClickAvailable = !!selfUpdate?.oneClickAvailable;
@@ -88,6 +94,11 @@ export default function AdminUpdateSection({
           <span className="text-sm tabular-nums text-gray-500 dark:text-gray-400 shrink-0">
             v{currentVersion}
           </span>
+          {runningBeta && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 shrink-0">
+              {t("betaBadge")}
+            </span>
+          )}
           {updateAvailable && (
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 shrink-0">
               {t("updateAvailable")} · v{latestVersion}
@@ -122,7 +133,7 @@ export default function AdminUpdateSection({
                   : t("selfUpdateButton")}
               </button>
             )}
-            <button
+            {!offersBeta && <button
               type="button"
               onClick={() => setShowManualCommands((v) => !v)}
               aria-expanded={showManualCommands}
@@ -135,7 +146,7 @@ export default function AdminUpdateSection({
                   showManualCommands ? "rotate-180" : ""
                 }`}
               />
-            </button>
+            </button>}
           </div>
           {oneClickAvailable && (
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 -mt-1.5">
@@ -170,7 +181,7 @@ export default function AdminUpdateSection({
             )}
 
           {/* Manual commands stay around as a fallback for either mode. */}
-          {showManualCommands && (
+          {showManualCommands && !offersBeta && (
             <div className="space-y-3 mb-3">
               <UpdateCommandRow
                 icon={TI.Terminal2}
@@ -188,6 +199,13 @@ export default function AdminUpdateSection({
           )}
         </>
       )}
+
+      <UpdateChannelControl
+        token={authToken}
+        selfUpdate={selfUpdate}
+        updateInfo={updateInfo}
+        showGenericConfirm={showGenericConfirm}
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <a
