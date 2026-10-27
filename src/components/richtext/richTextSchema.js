@@ -17,6 +17,7 @@ import Indent from "./extensions/Indent.js";
 import SmartCodeBlock from "./extensions/SmartCodeBlock.js";
 import CodeBlockCopy from "./extensions/CodeBlockCopy.js";
 import EditExtras from "./extensions/EditExtras.js";
+import JoinAdjacentLists from "./extensions/JoinAdjacentLists.js";
 
 // Factory so the editor instance and the (stateless) render helpers can share
 // the same configured extensions but the editor can still override
@@ -66,6 +67,7 @@ export function buildRichTextExtensions({ placeholder = "" } = {}) {
       alignments: ["left", "center", "right", "justify"],
     }),
     Indent,
+    JoinAdjacentLists,
     SmartCodeBlock,
     // Inline-code hover + link tooltip / ctrl-click / middle-click /
     // mobile-tap-popover. Gated at runtime by the `data-edit-extras`

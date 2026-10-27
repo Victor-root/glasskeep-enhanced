@@ -29,6 +29,7 @@ réseau, pas de base de données, rien à nettoyer après. Assez rapide pour
 | La base est copiée à chaque changement de version, refusée par une version trop ancienne, et la sauvegarde d'avant la bêta n'est restaurée que par la version visée | `unit/t25-db-safety.mjs` |
 | Le canal stable ou bêta propose la bonne version, n'installe que ce qu'il propose, et quitter une bêta respecte la compatibilité de la base | `unit/t26-update-channel.mjs` |
 | Une mise à jour Docker qui échoue remet la base copiée par la nouvelle version avant de la migrer, et seulement celle-là | `unit/t27-update-rollback-db.mjs` |
+| Deux listes du même type qui se touchent dans une note n'en font plus qu'une, des types différents restent séparés (issue #35) | `unit/t28-join-adjacent-lists.mjs` |
 
 Le premier mérite un mot: ce n'est pas le test d'une fonction, c'est le
 test d'une règle. Il recense chaque endroit où l'interface affiche du
