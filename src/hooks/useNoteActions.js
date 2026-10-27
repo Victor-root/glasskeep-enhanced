@@ -11,8 +11,8 @@ import { uid } from "../utils/ids.js";
 import { sanitizeFilename, downloadText, triggerBlobDownload } from "../utils/files.js";
 import { fileToCompressedDataURL } from "../utils/images.js";
 import { sortNotesByRecency, computeRestoredPosition, sortByPositionDesc } from "../utils/noteList.js";
-import { textToChecklistItems, checklistItemsToText } from "../utils/noteConversion.js";
-import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "../utils/richText.js";
+import { textToChecklistItems, richDocToChecklistItems, checklistItemsToRichDoc } from "../utils/noteConversion.js";
+import { contentToPlain, serializeRichContent, parseRichDoc } from "../utils/richText.js";
 import { parseAudioContent, isAudioContentEmpty, extensionForMime } from "../utils/audioNote.js";
 import { dataUrlToBlob } from "../utils/audioConvert.js";
 
@@ -591,19 +591,14 @@ export default function useNoteActions({
     const targetType = mType === "text" ? "checklist" : "text";
     const toastKey = targetType === "checklist" ? "convertedToChecklist" : "convertedToText";
 
-    // Text → checklist: flatten rich JSON (or legacy Markdown) to plain lines
-    // so textToChecklistItems can parse bullets / tasks / headings.
-    // Checklist → text: wrap the generated Markdown in our rich envelope so
-    // the resulting text note opens directly in rich mode (no second-edit
-    // upgrade needed).
-    const textForConversion =
-      mType === "text" && isRichContent(mBody)
-        ? contentToPlain(mBody)
-        : mBody || "";
-    const newItems = targetType === "checklist" ? textToChecklistItems(textForConversion) : [];
-    const newBody = targetType === "text"
-      ? serializeRichContent(legacyMarkdownToRichDoc(checklistItemsToText(mItems)))
-      : "";
+    // Both ways go through the note's structure, so ticks, sections and
+    // indented items survive. Legacy Markdown bodies are parsed as text.
+    let newItems = [];
+    if (targetType === "checklist") {
+      const richDoc = parseRichDoc(mBody);
+      newItems = richDoc ? richDocToChecklistItems(richDoc) : textToChecklistItems(mBody || "");
+    }
+    const newBody = targetType === "text" ? serializeRichContent(checklistItemsToRichDoc(mItems)) : "";
 
     // Local state first: keep the UI responsive even if the sync call lags.
     skipNextItemsAutosaveRef.current = true;
