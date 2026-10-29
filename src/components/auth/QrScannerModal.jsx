@@ -67,6 +67,13 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
   // steady and the same QR is decoded twice.
   const submittedRef = useRef(null);
 
+  // Read at scan time: the session token is renewed shortly after a cold
+  // start, and restarting the camera for it left the stream off.
+  const tokenRef = useRef(token);
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+
   const stopScanner = useCallback(() => {
     const s = scannerRef.current;
     if (!s) return;
@@ -103,7 +110,7 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
       stopScanner();
 
       try {
-        const data = await getDeviceLinkInfo(parsed.token, token);
+        const data = await getDeviceLinkInfo(parsed.token, tokenRef.current);
         setInfo(data);
         setPhase(PHASES.confirm);
       } catch (e) {
@@ -113,7 +120,7 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
         setPhase(PHASES.error);
       }
     },
-    [token, stopScanner],
+    [stopScanner],
   );
 
   // Boot / tear down the camera lifecycle with the modal's open prop.
@@ -140,12 +147,12 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
         });
         scannerRef.current = scanner;
         await scanner.start();
-        if (cancelled) {
-          stopScanner();
-          return;
-        }
+        // Closed meanwhile: the cleanup already stopped this scanner, and
+        // scannerRef may hold the one of a later opening.
+        if (cancelled) return;
         setPhase(PHASES.scanning);
       } catch (e) {
+        if (cancelled) return;
         setErrorText(
           (e && e.message) ||
             (typeof DOMException !== "undefined" && e instanceof DOMException
