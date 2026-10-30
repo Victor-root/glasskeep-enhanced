@@ -324,6 +324,70 @@ export function plainTextToPasteSlice(text, schema) {
   return new Slice(Fragment.from(nodes), 1, 1);
 }
 
+/* -------------------- editor props -------------------- */
+
+// The clipboard props of the rich-text editor. `getPasteMode` returns the
+// user's Ctrl+V preference ("rich" or "plain") at paste time.
+export function clipboardEditorProps(getPasteMode) {
+  return {
+    // Outbound-only clipboard hook: when the user presses Ctrl+C in
+    // the editor, PM serialises the selection to `text/plain` via
+    // this function. Our walker emits one line per block + proper
+    // list-prefix indentation so a paste into Notepad / any
+    // unstructured target stops producing huge gaps between blocks.
+    // The HTML side of the clipboard is left to PM's default so a
+    // paste into another rich-text target still gets full fidelity.
+    clipboardTextSerializer: (slice) => sliceToCleanPlainText(slice),
+    // Inbound plain-text pastes: PM's default parser collapses
+    // sources whose only line separator is `\r\n` / `\n` (typical
+    // for Windows Notepad, terminal output, …) into a single
+    // paragraph with hard breaks the schema then drops. Build one
+    // paragraph per line ourselves so multi-line plain-text pastes
+    // keep the layout the user copied. Only fires when PM has no
+    // `text/html` to work with, so rich pastes (Word, web pages) are
+    // untouched.
+    clipboardTextParser: (text, _context, _plain, view) =>
+      plainTextToPasteSlice(text, view.state.schema),
+    // The "plain" mode makes Ctrl+V behave like Ctrl+Shift+V:
+    // we read `text/plain` directly and drop any HTML payload the
+    // source may have included. Returning `false` in "rich" mode
+    // hands the event back to PM so the default rich-paste flow (and
+    // the `clipboardTextParser` fallback above) keeps working.
+    //
+    // We mirror PM's own `doPaste` carefully: run `transformPastedText`
+    // and `transformPasted`, then stamp the dispatched transaction
+    // with `paste: true` + `uiEvent: "paste"`. Tiptap's paste rules
+    // (notably Link's `linkOnPaste` URL auto-detection) gate on that
+    // `uiEvent` meta inside an `appendTransaction`, so without it
+    // pasted URLs would stay inert text until the user typed a
+    // trailing space and the autolink input rule kicked in.
+    handlePaste: (view, event) => {
+      if (getPasteMode() !== "plain") return false;
+      const cb = event.clipboardData;
+      if (!cb) return false;
+      let text = cb.getData("text/plain");
+      if (!text) return false;
+      view.someProp("transformPastedText", (f) => {
+        text = f(text, true, view);
+      });
+      let slice = plainTextToPasteSlice(text, view.state.schema);
+      if (!slice) return false;
+      view.someProp("transformPasted", (f) => {
+        slice = f(slice, view);
+      });
+      event.preventDefault();
+      view.dispatch(
+        view.state.tr
+          .replaceSelection(slice)
+          .scrollIntoView()
+          .setMeta("paste", true)
+          .setMeta("uiEvent", "paste"),
+      );
+      return true;
+    },
+  };
+}
+
 /* -------------------- shared -------------------- */
 
 function joinLines(lines) {

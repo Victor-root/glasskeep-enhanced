@@ -4,7 +4,7 @@
 // (generateJSON) all agree on which marks and nodes are legal.
 
 import StarterKit from "@tiptap/starter-kit";
-import { Color, FontFamily, FontSize } from "@tiptap/extension-text-style";
+import { Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style";
 import Highlight from "@tiptap/extension-highlight";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
@@ -12,11 +12,11 @@ import { TaskList, TaskItem } from "@tiptap/extension-list";
 import TextAlign from "@tiptap/extension-text-align";
 import Placeholder from "@tiptap/extension-placeholder";
 import UnderlineVariant from "./extensions/UnderlineVariant.js";
-import TextStyle from "./extensions/TextStyle.js";
 import Indent from "./extensions/Indent.js";
 import SmartCodeBlock from "./extensions/SmartCodeBlock.js";
 import CodeBlockCopy from "./extensions/CodeBlockCopy.js";
 import EditExtras from "./extensions/EditExtras.js";
+import JoinAdjacentLists from "./extensions/JoinAdjacentLists.js";
 
 // Factory so the editor instance and the (stateless) render helpers can share
 // the same configured extensions but the editor can still override
@@ -66,6 +66,7 @@ export function buildRichTextExtensions({ placeholder = "" } = {}) {
       alignments: ["left", "center", "right", "justify"],
     }),
     Indent,
+    JoinAdjacentLists,
     SmartCodeBlock,
     // Inline-code hover + link tooltip / ctrl-click / middle-click /
     // mobile-tap-popover. Gated at runtime by the `data-edit-extras`

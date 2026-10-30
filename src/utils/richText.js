@@ -16,10 +16,12 @@
 
 import { getSchema, getHTMLFromFragment } from "@tiptap/core";
 import { DOMParser as ProseMirrorDOMParser, Node as ProseMirrorNode } from "@tiptap/pm/model";
+import { Transform } from "@tiptap/pm/transform";
 import DOMPurify from "dompurify";
 import { installStyleGuard } from "./safeStyle.js";
 import { marked as markedParser } from "marked";
 import { RENDER_EXTENSIONS } from "../components/richtext/richTextSchema.js";
+import { joinAdjacentLists } from "../components/richtext/extensions/JoinAdjacentLists.js";
 
 const marked =
   typeof markedParser === "function" ? { parse: markedParser } : markedParser;
@@ -140,9 +142,11 @@ export function richDocToHTML(doc) {
   try {
     // A line break ending a block collapses in static HTML, where the
     // editor shows the empty line it opens (ProseMirror's trailing
-    // break): add the same break so read mode keeps that line.
+    // break): add the same break so read mode keeps that line. Touching
+    // lists of a kind are shown as one, as the editor makes them.
     const schema = getRenderSchema();
-    const raw = getHTMLFromFragment(ProseMirrorNode.fromJSON(schema, doc).content, schema).replace(/<br\s*\/?>(<\/(?:p|h[1-6])>)/g, "<br><br>$1");
+    const node = joinAdjacentLists(new Transform(ProseMirrorNode.fromJSON(schema, doc))).doc;
+    const raw = getHTMLFromFragment(node.content, schema).replace(/<br\s*\/?>(<\/(?:p|h[1-6])>)/g, "<br><br>$1");
     return DOMPurify.sanitize(raw, SANITIZE_CONFIG);
   } catch {
     return "";
