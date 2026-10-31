@@ -16,6 +16,8 @@ In the admin panel, **Server version → Update channel**:
 
 Betas install through the one-click update: a native install under systemd, or Docker with the Docker socket mounted (as in the provided `docker-compose.yml`). The manual update commands only ever install the latest release.
 
+With Docker, a test instance can also start straight on the latest validated beta: use the image `ghcr.io/victor-root/glasskeep-enhanced:beta` in `docker-compose.yml`, then pick **Beta** in the panel so later betas are offered. The one-click update replaces the container with the image it installs and leaves the file alone: a later `docker compose up -d` brings back the image the file names (`:latest` in the provided one), so recreate the container from the file only to change channel on purpose.
+
 ---
 
 ## 🧑‍💻 Publishing a beta
