@@ -27,6 +27,10 @@ const CHANNELS = new Set(["stable", "beta"]);
 const VALIDATED_BETA_BRANCH = "beta-validated";
 const DEFAULT_REPO = "Victor-root/glasskeep-enhanced";
 const DEFAULT_TTL_MS = 6 * 60 * 60 * 1000;
+// "Check now" from the panel. GitHub answers 60 unauthenticated requests
+// an hour per address and a check makes up to three: this floor keeps a
+// clicking admin far from that limit.
+const MANUAL_CHECK_MIN_AGE_MS = 60 * 1000;
 const FETCH_TIMEOUT_MS = 5000;
 
 function ttlMs() {
@@ -138,10 +142,13 @@ function createUpdateChannel({ db, build, log = console }) {
   // The latest stable release and, on the beta channel, the latest
   // validated beta, with what to offer. Cached; a failed check answers
   // the last good one, marked stale, or throws when there is none.
-  async function check({ force = false } = {}) {
+  // `manual` asks GitHub again unless the last answer is under a minute
+  // old; `force` always does.
+  async function check({ force = false, manual = false } = {}) {
     const channel = getChannel();
     const now = Date.now();
-    if (!force && cache && cache.channel === channel && now - cache.fetchedAt < ttlMs()) {
+    const maxAge = manual ? MANUAL_CHECK_MIN_AGE_MS : ttlMs();
+    if (!force && cache && cache.channel === channel && now - cache.fetchedAt < maxAge) {
       return { ...cache.data, checkedAt: cache.fetchedAt, stale: false };
     }
     try {

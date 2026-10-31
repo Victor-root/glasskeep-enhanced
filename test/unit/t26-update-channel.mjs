@@ -12,7 +12,9 @@
 //   - entrer en bêta sauvegarde la base et installe la bêta;
 //   - quitter une bêta: tout de suite seulement si la version stable lit
 //     ses données, avec restauration de la sauvegarde, ou en attendant;
-//     un échec au lancement laisse tout comme avant.
+//     un échec au lancement laisse tout comme avant;
+//   - « Vérifier maintenant » voit une bêta publiée depuis la dernière
+//     vérification, sans interroger GitHub à chaque clic.
 import http from "node:http";
 import path from "node:path";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
@@ -29,8 +31,9 @@ const t = runner("Le canal de mise à jour");
 
 // ── Le faux GitHub ───────────────────────────────────────────────────
 const REPO = "test/glasskeep";
-const gh = { release: "2.7.0", releaseCompat: 1, beta: null }; // beta: { sha, version, dbCompat }
+const gh = { release: "2.7.0", releaseCompat: 1, beta: null, hits: 0 }; // beta: { sha, version, dbCompat }
 const github = http.createServer((req, res) => {
+  gh.hits += 1;
   const json = (code, body) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(body)); };
   const url = new URL(req.url, "http://x");
   if (url.pathname === `/repos/${REPO}/releases/latest`) {
@@ -244,6 +247,30 @@ try {
   t.check("revenir tout de suite installe la version stable quand elle lit ces données",
     r.json.started && installs.at(-1)?.target?.version === "2.8.0", JSON.stringify(r.json));
   b.close();
+
+  // ── Vérifier maintenant ────────────────────────────────────────────
+  process.env.UPDATE_CHECK_TTL_MS = String(6 * 3600 * 1000);
+  const v = await instance(beta, "verifier");
+  gh.release = "2.7.0";
+  gh.beta = { sha: SHA1, version: "2.8.0-beta", dbCompat: 2 };
+  await v.call("POST", "/admin/update-channel", { channel: "beta" });
+  check = await v.call("GET", "/update-check");
+  gh.beta = { sha: SHA2, version: "2.8.0-beta", dbCompat: 2 };
+  const enCache = await v.call("GET", "/update-check");
+  t.check("une bêta publiée après la dernière vérification attend la suivante",
+    !check.json.updateAvailable && !enCache.json.updateAvailable && enCache.json.checkedAt === check.json.checkedAt);
+  // Une minute plus tard: la dernière réponse de GitHub a une minute.
+  const vraiNow = Date.now;
+  Date.now = () => vraiNow() + 61 * 1000;
+  const maintenant = await v.call("GET", "/update-check?now=1");
+  t.check("une minute après, « Vérifier maintenant » la voit tout de suite",
+    maintenant.json.latestVersion === "2.8.0-beta+2222222" && maintenant.json.checkedAt > check.json.checkedAt,
+    JSON.stringify(maintenant.json));
+  const appels = gh.hits;
+  await v.call("GET", "/update-check?now=1");
+  Date.now = vraiNow;
+  t.check("cliquer encore dans la minute n'interroge pas GitHub une nouvelle fois", gh.hits === appels, `${gh.hits - appels} appel(s)`);
+  v.close();
 } finally {
   github.close();
   rmSync(dossier, { recursive: true, force: true });
