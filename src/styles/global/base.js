@@ -393,6 +393,13 @@ html[class*="gk-theme-"] :is(input, textarea, select):focus {
    transition-delay) so a button's hover glow or a focus ring on the last row
    isn't clipped at the section's bottom edge. Closing removes .is-open with
    no delay, restoring the clip immediately for a clean collapse. */
+/* The chosen card of a set of choices (themes, update channel, SSO policy).
+   A shadow and not a Tailwind ring: the mouse-focus reset in index.css
+   clears rings, which thinned the chosen card's frame while it had focus. */
+.gk-choice-selected {
+  border-color: var(--gk-chrome-accent);
+  box-shadow: 0 0 0 2px var(--gk-chrome-accent);
+}
 .gk-acc-body { overflow: hidden; transition: overflow 0s; }
 .gk-acc-body.is-open { overflow-x: clip; overflow-y: visible; transition: overflow 0s 300ms; }
 button, [role="button"] { cursor: pointer; }

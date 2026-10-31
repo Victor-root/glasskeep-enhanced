@@ -23,7 +23,7 @@ export default function ShellThemeGrid({ label, selected, onChoose }) {
             onClick={() => onChoose(theme.id)}
             className={`relative flex flex-col overflow-hidden rounded-xl border text-left transition-all active:scale-[0.99] ${
               isSel
-                ? "border-[var(--gk-chrome-accent)] ring-2 ring-[var(--gk-chrome-accent)]"
+                ? "gk-choice-selected"
                 : "border-[var(--border-light)] hover:border-[var(--gk-accent-soft-border)]"
             }`}
           >
