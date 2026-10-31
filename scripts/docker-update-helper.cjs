@@ -19,6 +19,7 @@ const fs = require("fs");
 const http = require("http");
 const path = require("path");
 const { restoreUpdateDatabase } = require("./lib/updateDatabaseRestore.cjs");
+const { buildCreateConfig } = require("./lib/dockerCreateConfig.cjs");
 
 const DOCKER_SOCK = process.env.DOCKER_SOCKET || "/var/run/docker.sock";
 const MAIN_CONTAINER = process.env.MAIN_CONTAINER;
@@ -213,40 +214,6 @@ function splitImageRef(ref) {
     return [ref, "latest"];
 }
 
-// Translate an "inspect" payload into a valid "create" payload. The
-// REST API uses slightly different field shapes between the two.
-function buildCreateConfig(inspect, newImage) {
-    const cfg = { ...(inspect.Config || {}) };
-    cfg.Image = newImage;
-    // Hostname / Domainname must NOT be inherited. Docker auto-fills
-    // Hostname with the container's short ID when left empty, but the
-    // inspect output captures the OLD container's ID — preserving it
-    // freezes the new container's /etc/hostname at a stale value and
-    // breaks the next self-update (the orchestrator can no longer find
-    // its own container by hostname).
-    delete cfg.Hostname;
-    delete cfg.Domainname;
-
-    const hostConfig = { ...(inspect.HostConfig || {}) };
-
-    // NetworkingConfig: rebuild from the live network attachments so
-    // the new container ends up on the same user-defined networks
-    // (the common docker-compose case). We strip per-instance fields
-    // (IPs, MAC, EndpointID) — Docker will re-assign them.
-    const networkingConfig = { EndpointsConfig: {} };
-    const nets = inspect.NetworkSettings && inspect.NetworkSettings.Networks;
-    if (nets && typeof nets === "object") {
-        for (const [name, net] of Object.entries(nets)) {
-            networkingConfig.EndpointsConfig[name] = {
-                Aliases: Array.isArray(net.Aliases) ? net.Aliases : undefined,
-                Links: Array.isArray(net.Links) ? net.Links : undefined,
-            };
-        }
-    }
-
-    return { ...cfg, HostConfig: hostConfig, NetworkingConfig: networkingConfig };
-}
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
 async function inspectContainer(nameOrId) {
     return dockerRequest("GET", `/containers/${encodeURIComponent(nameOrId)}/json`);
@@ -331,6 +298,9 @@ async function main() {
     CURRENT_STEP = 1;
     writeStatus("fetching", CURRENT_STEP, "Downloading the latest image...");
     const oldInspect = await inspectContainer(MAIN_CONTAINER);
+    // What the old image set itself, so the new container takes the new
+    // image's values instead (see lib/dockerCreateConfig.cjs).
+    const oldImage = await dockerRequest("GET", `/images/${encodeURIComponent(oldInspect.Image)}/json`);
     await dockerPullImage(TARGET_IMAGE);
 
     CURRENT_STEP = 2;
@@ -355,7 +325,7 @@ async function main() {
     );
 
     console.log("[docker-update-helper] creating new container with the new image");
-    const createCfg = buildCreateConfig(oldInspect, TARGET_IMAGE);
+    const createCfg = buildCreateConfig(oldInspect, TARGET_IMAGE, oldImage.Config);
     const created = await dockerRequest(
         "POST",
         `/containers/create?name=${encodeURIComponent(MAIN_CONTAINER)}`,

@@ -32,6 +32,7 @@ réseau, pas de base de données, rien à nettoyer après. Assez rapide pour
 | Deux listes du même type qui se touchent dans une note n'en font plus qu'une, des types différents restent séparés, et dans le vrai éditeur Retour arrière fusionne puis un seul Ctrl+Z défait (issue #35) | `unit/t28-join-adjacent-lists.mjs` |
 | Le texte d'une note hors de l'éditeur: import Google Keep, anciennes notes en Markdown, mode lecture, aperçu des cartes, note vide ou pas (mise à la corbeille en fermant), conversion en liste à cocher et retour sans perdre coches ni sections, copie vers le Bloc-notes et depuis le mode lecture | `unit/t29-rich-text-conversions.mjs` |
 | Les gestes du vrai éditeur: retirer une couleur sans toucher aux autres styles, indenter un élément de liste, bloc de code sur quelques mots ou plusieurs lignes, soulignements variés, cases cochées, collage depuis le Bloc-notes ou en « texte seul » (liens compris), copie d'une liste | `unit/t30-rich-text-editor.mjs` |
+| Une mise à jour Docker recrée le conteneur avec les réglages de la nouvelle image (son commit compris) et garde ceux de l'administrateur (variables du compose, dossiers, ports, réseau) | `unit/t31-docker-update-config.mjs` |
 
 Le premier mérite un mot: ce n'est pas le test d'une fonction, c'est le
 test d'une règle. Il recense chaque endroit où l'interface affiche du

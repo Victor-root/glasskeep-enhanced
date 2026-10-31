@@ -36,6 +36,7 @@ run "la base remise en état quand une mise à jour Docker échoue" "$HERE/unit/
 run "deux listes du même type qui se touchent n'en font plus qu'une" "$HERE/unit/t28-join-adjacent-lists.mjs"
 run "le texte d'une note hors de l'éditeur" "$HERE/unit/t29-rich-text-conversions.mjs"
 run "les gestes de l'éditeur de texte" "$HERE/unit/t30-rich-text-editor.mjs"
+run "la mise à jour Docker prend les réglages de la nouvelle image" "$HERE/unit/t31-docker-update-config.mjs"
 
 if [ $fail -eq 0 ]; then
   echo "Tout passe."
