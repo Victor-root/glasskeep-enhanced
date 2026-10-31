@@ -6,6 +6,7 @@ import UpdateCommandRow from "./UpdateCommandRow.jsx";
 import { DockerSocketHint, DockerNoticeHint } from "./DockerUpdateHints.jsx";
 import { isBetaVersion } from "./selfUpdateHelpers.js";
 import UpdateChannelControl from "./UpdateChannelControl.jsx";
+import { formatEditedStamp } from "../../utils/dates.js";
 
 const REPO_URL = "https://github.com/Victor-root/glasskeep-enhanced";
 
@@ -113,6 +114,28 @@ export default function AdminUpdateSection({
           ? t("updateAvailableDescription").replace("{version}", latestVersion)
           : t("updateUpToDateDescription")}
       </p>
+
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <button
+          type="button"
+          onClick={() => updateInfo?.checkNow?.()}
+          disabled={!!updateInfo?.checking}
+          className="inline-flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-60 disabled:pointer-events-none"
+        >
+          <TI.Refresh className={`tabler-icon w-4 h-4${updateInfo?.checking ? " animate-spin" : ""}`} />
+          {updateInfo?.checking ? t("updateChecking") : t("updateCheckNow")}
+        </button>
+        {(updateInfo?.checkedAt || updateInfo?.stale) && (
+          <span className={`text-xs ${updateInfo.stale ? "text-amber-700 dark:text-amber-300" : "text-gray-500 dark:text-gray-400"}`}>
+            {updateInfo.checkedAt
+              ? t(updateInfo.stale ? "updateCheckStale" : "updateLastChecked").replace(
+                "{time}",
+                formatEditedStamp(updateInfo.checkedAt),
+              )
+              : t("updateCheckUnreachable")}
+          </span>
+        )}
+      </div>
 
       {updateAvailable && (
         <>

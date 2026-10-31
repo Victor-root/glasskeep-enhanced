@@ -42,12 +42,13 @@ function attachUpdateRoutes(app, { db, auth, adminOnly, updateChannel, build, lo
   };
 
   // `latestVersion` is what would be installed (a beta's label carries
-  // its commit), else the latest stable release.
+  // its commit), else the latest stable release. `?now=1` is the panel's
+  // "Check now".
   app.get("/api/update-check", auth, adminOnly, async (req, res) => {
     const currentVersion = build.label;
     let result;
     try {
-      result = await updateChannel.check();
+      result = await updateChannel.check({ manual: req.query.now === "1" });
     } catch {
       return res.json({
         currentVersion,
@@ -57,7 +58,7 @@ function attachUpdateRoutes(app, { db, auth, adminOnly, updateChannel, build, lo
         publishedAt: null,
         channel: updateChannel.getChannel(),
         notificationShownCount: 0,
-        checkedAt: new Date().toISOString(),
+        checkedAt: null,
         stale: true,
       });
     }
