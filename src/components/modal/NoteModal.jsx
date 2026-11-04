@@ -14,6 +14,7 @@ import NoteModalBody from "./NoteModalBody.jsx";
 import NoteEditedStamp from "./NoteEditedStamp.jsx";
 import useModalHistory from "../../hooks/useModalHistory.js";
 import useNoteKeyboardLayout from "../../hooks/useNoteKeyboardLayout.js";
+import useVirtualKeyboardBridge from "../../hooks/useVirtualKeyboardBridge.js";
 import { getContentImages } from "../../utils/noteIcon.js";
 import { modalBgFor, scrollColorsFor, solid, bgFor, toHex, audioAccentColor, compositeOver } from "../../utils/colors.js";
 import { setThemeColor, currentStatusBarColor, setNavBarColor } from "../../utils/systemBars.js";
@@ -371,7 +372,9 @@ export default function NoteModal({
      theme colour once the note closes. */
   const footerRef = React.useRef(null);
   const cardRef = React.useRef(null);
-  useNoteKeyboardLayout(isWebView && !!open, cardRef, modalScrollRef, footerRef);
+  const keyboardManaged = isWebView || (mobileLayout && "virtualKeyboard" in navigator);
+  useVirtualKeyboardBridge(keyboardManaged && !isWebView && !!open);
+  useNoteKeyboardLayout(keyboardManaged && !!open, cardRef, modalScrollRef, footerRef);
   // Only the instance that coloured the bar hands it back, so a closed side
   // note never clears the colour the other one set.
   const navBarColoredRef = React.useRef(false);
@@ -495,7 +498,7 @@ export default function NoteModal({
         data-split-closing={splitClosing ? "true" : undefined}
         data-ai-panel-side={splitMode ? aiPanelSide : undefined}
         data-sbs-opposite-hidden={sbsOppositeHidden ? "true" : undefined}
-        style={mobileLayout && !isWebView
+        style={mobileLayout && !keyboardManaged
           ? { top: 'calc(-1 * var(--keyboard-pan))', bottom: 'var(--keyboard-pan)' }
           : undefined}
         onMouseDown={(e) => {
@@ -519,7 +522,7 @@ export default function NoteModal({
       >
         <div
           ref={cardRef}
-          data-keyboard-managed={isWebView ? "" : undefined}
+          data-keyboard-managed={keyboardManaged ? "" : undefined}
           className={`note-modal-anim${isModalClosing ? ' closing' : ''}${handoffNoTransition ? ' note-modal-anim--sbs-handoff' : ''}${suppressOpenReplay ? ' note-modal-anim--sbs-suppress-open-replay' : ''} glass-card rounded-none shadow-none w-full max-w-none ${
             mobileLayout ? ''
             : isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen sm:!rounded-none'
@@ -710,7 +713,7 @@ export default function NoteModal({
             // bar (its inset becomes the footer's bottom padding), so the bar
             // shows the footer's colour rather than the note's behind it.
             reserveNavBar={mobileLayout}
-            keyboardManaged={isWebView}
+            keyboardManaged={keyboardManaged}
             rootRef={footerRef}
             isDesktop={isDesktopLayout}
             // tags

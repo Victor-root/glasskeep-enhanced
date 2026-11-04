@@ -3,8 +3,8 @@ import { caretRect, focusedEditable } from "../utils/caret.js";
 
 const CARET_MARGIN = 16;
 
-const insetProperty = (name) =>
-  parseFloat(document.documentElement.style.getPropertyValue(name)) || 0;
+const restingKeyboard = () =>
+  parseFloat(document.documentElement.style.getPropertyValue("--android-keyboard-inset")) || 0;
 
 /** Keeps an open note laid out around the Android keyboard, the way a native
  *  screen is: the title stays put, the footer rides the top of the keyboard
@@ -17,8 +17,9 @@ const insetProperty = (name) =>
  *  a padding at the bottom of the scroller stands in for the scroll range the
  *  card does not have yet (or no longer has).
  *
- *  Inactive without `gk-keyboard-frame` events: browsers and Android 10 and
- *  below, where the keyboard resizes the page for real. */
+ *  Fed by the Android app, or by useVirtualKeyboardBridge in a browser. Inactive
+ *  without `gk-keyboard-frame` events: iOS, Firefox and Android 10 and below,
+ *  where the keyboard resizes the page or the visual viewport. */
 export default function useNoteKeyboardLayout(enabled, cardRef, scrollRef, footerRef) {
   useEffect(() => {
     if (!enabled) return undefined;
@@ -30,7 +31,11 @@ export default function useNoteKeyboardLayout(enabled, cardRef, scrollRef, foote
 
     // Heights above the bottom of the footer: the footer keeps its navigation
     // bar padding, which slides under the keyboard instead of above it.
-    const lift = (keyboard) => Math.max(0, keyboard - insetProperty("--android-inset-bottom"));
+    let navBar = 0;
+    const measureNavBar = () => {
+      navBar = parseFloat(getComputedStyle(footer).paddingBottom) || 0;
+    };
+    const lift = (keyboard) => Math.max(0, keyboard - navBar);
 
     let rest = 0; // what the card has been shortened by
     let target = 0; // the keyboard height being reached
@@ -49,8 +54,8 @@ export default function useNoteKeyboardLayout(enabled, cardRef, scrollRef, foote
     const setSpacer = (px) => {
       scroller.style.paddingBottom = px > 0 ? `${px}px` : "";
     };
-    const placeFooter = (running) => {
-      const offset = rest - lift(live);
+    const placeFooter = (running, at = live) => {
+      const offset = rest - lift(at);
       footer.style.willChange = running ? "transform" : "";
       // Not left on at rest: a transform would capture position: fixed menus.
       footer.style.transform = offset ? `translateY(${offset}px)` : "";
@@ -108,17 +113,20 @@ export default function useNoteKeyboardLayout(enabled, cardRef, scrollRef, foote
     const onFrame = (e) => {
       live = e.detail.live;
       if (e.detail.target !== target) {
+        measureNavBar();
         from = live;
         target = e.detail.target;
         if (lift(target) < rest) planClosing();
         else planOpening();
       }
-      placeFooter(true);
+      if (e.detail.clipped && rest < lift(target)) setRest(lift(target));
+      placeFooter(true, e.detail.clipped ? target : live);
       follow();
     };
 
     const onSettled = () => {
-      live = insetProperty("--android-keyboard-inset");
+      measureNavBar();
+      live = restingKeyboard();
       if (live !== target) {
         from = target = live;
         planOpening();
