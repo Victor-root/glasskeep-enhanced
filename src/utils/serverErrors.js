@@ -36,6 +36,15 @@ const PATTERNS = [
   ["New password must be at least",             "errNewPasswordTooShort"],
   ["Password must be at least",                 "errPasswordTooShort"],
 
+  // ── Attachments ──────────────────────────────────────────────────
+  ["This note is read-only",                    "attachmentReadOnly"],
+  ["This note is in the trash",                 "attachmentInTrash"],
+  ["Attachments are turned off",                "attachmentsDisabled"],
+  ["This note has too many attachments",        "attachmentTooMany"],
+  ["The server of this note can't be reached",  "attachmentPeerUnreachable"],
+  ["The server holding this file",              "attachmentPeerUnreachable"],
+  ["Try again in a moment",                     "attachmentTryAgain"],
+
   // ── Vault state ──────────────────────────────────────────────────
   ["Encryption is not enabled",                 "errEncryptionNotEnabled"],
   ["Encryption is already enabled",             "errEncryptionAlreadyEnabled"],

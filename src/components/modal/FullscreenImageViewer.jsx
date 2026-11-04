@@ -20,6 +20,7 @@ export default function FullscreenImageViewer({
   onResetMobileNav,
   canRemove,
   onRemoveImage,
+  onDownload,
 }) {
   return createPortal(
     <div
@@ -37,7 +38,9 @@ export default function FullscreenImageViewer({
           onClick={async (e) => {
             e.stopPropagation();
             const im = images[currentIndex];
-            if (im) {
+            if (im && onDownload) {
+              onDownload(im);
+            } else if (im) {
               const fname = normalizeImageFilename(
                 im.name,
                 im.src,

@@ -57,4 +57,7 @@
     <string name="welcome_install_desc">GlassKeep n\'est pas sur le Play Store, Android a donc besoin de votre autorisation pour installer le nouvel APK que nous téléchargeons pour vous.</string>
     <string name="welcome_battery_title">Optimisation de la batterie (optionnel)</string>
     <string name="welcome_battery_desc">Pour que vos rappels se déclenchent à l\'heure même quand l\'app est complètement fermée, autorisez GlassKeep à ignorer l\'optimisation de la batterie. Sans ça, Android peut retarder ou bloquer les rappels en arrière-plan. C\'est facultatif : vous pouvez refuser, les rappels fonctionneront quand même la plupart du temps.</string>
+    <string name="attachment_opening">Ouverture du fichier…</string>
+    <string name="attachment_open_failed">Impossible d\'ouvrir ce fichier.</string>
+    <string name="attachment_no_app">Aucune application de ce téléphone ne peut ouvrir ce fichier.</string>
 </resources>

@@ -65,7 +65,7 @@ export default function useDraftNote(ctx) {
     // reported "single dash" cards that survive). Skipping the materialise
     // here keeps the draft pending, so the closeModal pendingDraft branch
     // discards it cleanly with the empty-note toast.
-    if (isDraw) {
+    if (isDraw && !overrides.force) {
       const draftPaths = drawing?.paths || [];
       const meaningfulPaths = draftPaths.filter(
         (p) => Array.isArray(p?.points) && p.points.length >= 2,

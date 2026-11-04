@@ -6,6 +6,7 @@ import {
   patchNote as idbPatchNote,
   deleteNote as idbDeleteNote,
 } from "../sync/localDb.js";
+import { hasUploadsFor } from "../sync/attachmentUploads.js";
 import { mdForDownload } from "../utils/markdown.jsx";
 import { uid } from "../utils/ids.js";
 import { sanitizeFilename, downloadText, triggerBlobDownload } from "../utils/files.js";
@@ -223,7 +224,9 @@ export default function useNoteActions({
             : !contentToPlain(mBody).trim() && meaningfulPaths.length === 0;
       const titleEmpty = !mTitle?.trim();
       const noImages = !Array.isArray(mImages) || mImages.length === 0;
-      if (titleEmpty && bodyEmpty && noImages) {
+      const noFiles = !notes.find((n) => String(n.id) === String(activeId))?.attachments?.length
+        && !hasUploadsFor(activeId);
+      if (titleEmpty && bodyEmpty && noImages && noFiles) {
         const nid = String(activeId);
         const nowIso = new Date().toISOString();
         // Server contract: a note must be trashed before it can be

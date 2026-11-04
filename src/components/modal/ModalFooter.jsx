@@ -31,6 +31,7 @@ export default function ModalFooter({
   reserveNavBar = false,
   rootRef,
   keyboardManaged,
+  addAttachments,
   isDesktop,
   // tags
   mTagList,
@@ -191,6 +192,7 @@ export default function ModalFooter({
             btnClass={btnClass}
             sheetBg={sheetBg}
             modalFileRef={modalFileRef}
+            addAttachments={addAttachments}
             addImagesToState={addImagesToState}
             setMImages={setMImages}
             modalIconFileRef={modalIconFileRef}

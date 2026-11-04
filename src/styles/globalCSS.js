@@ -6,6 +6,7 @@ import { shellCSS } from "./global/shell.js";
 import { notesCSS } from "./global/notes.js";
 import { modalButtonsCSS } from "./global/modalButtons.js";
 import { modalFooterCSS } from "./global/modalFooter.js";
+import { attachmentsCSS } from "./global/attachments.js";
 import { codeAndLinksCSS } from "./global/codeAndLinks.js";
 import { scrollbarsCSS } from "./global/scrollbars.js";
 import { modalAnimationsCSS } from "./global/modalAnimations.js";
@@ -27,6 +28,7 @@ export const globalCSS = [
   notesCSS,
   modalButtonsCSS,
   modalFooterCSS,
+  attachmentsCSS,
   codeAndLinksCSS,
   scrollbarsCSS,
   modalAnimationsCSS,

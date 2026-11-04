@@ -56,6 +56,7 @@ export default function SecondaryNoteInstance({
   // UI helpers
   showToast,
   showGenericConfirm,
+  patchNoteAttachments,
   dismissNoteReminders,
   isCollaborativeNote,
   readModeEnabled = true,
@@ -316,6 +317,10 @@ export default function SecondaryNoteInstance({
       notes={notes}
       currentUser={currentUser}
       tagFilter={tagFilter}
+      materializeDraftIfNeeded={materializeDraftIfNeeded}
+      patchNoteAttachments={patchNoteAttachments}
+      showToast={showToast}
+      showGenericConfirm={showGenericConfirm}
       closeModal={closeModal}
       saveModal={saveModal}
       deleteModal={deleteModal}

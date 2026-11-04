@@ -31,6 +31,7 @@ function contentDisposition(kind, name) {
 function attachAttachmentRoutes(app, deps) {
   const {
     auth,
+    adminOnly,
     attachments,
     downloadLinks,
     getAdminSettings,
@@ -76,6 +77,10 @@ function attachAttachmentRoutes(app, deps) {
 
   app.get("/api/attachments/config", auth, (_req, res) => {
     res.json({ maxBytes: maxBytes(), maxPerNote: MAX_PER_NOTE });
+  });
+
+  app.get("/api/admin/attachments/usage", auth, adminOnly, (_req, res) => {
+    res.json(attachments.usage());
   });
 
   // The file is the raw request body, sent as application/octet-stream

@@ -1,6 +1,7 @@
 import React from "react";
 import { t } from "../../i18n";
 import UserAvatar from "../common/UserAvatar.jsx";
+import TI from "../../icons/editor/index.jsx";
 import NoteReminderChip from "./NoteReminderChip.jsx";
 
 /**
@@ -20,13 +21,16 @@ export default function NoteCardFooter({
   isCollab = false,
   dark = false,
   reminderAt = null,
+  attachmentCount = 0,
 }) {
   const safeTags = Array.isArray(tags) ? tags : [];
   const hasTags = safeTags.length > 0;
   const hasCollabs = isCollab;
   const hasReminder = !!reminderAt;
 
-  if (!hasTags && !hasCollabs && !hasReminder) return null;
+  const hasAttachments = attachmentCount > 0;
+
+  if (!hasTags && !hasCollabs && !hasReminder && !hasAttachments) return null;
 
   const visible = safeTags.slice(0, maxChips);
   const overflow = safeTags.length - visible.length;
@@ -42,6 +46,13 @@ export default function NoteCardFooter({
       {hasReminder && (
         <div className="flex flex-wrap">
           <NoteReminderChip reminderAt={reminderAt} />
+        </div>
+      )}
+
+      {hasAttachments && (
+        <div className="gk-card-attachments" title={t("noteAttachmentCount", { count: attachmentCount })}>
+          <TI.Paperclip className="tabler-icon" />
+          <span>{attachmentCount}</span>
         </div>
       )}
 

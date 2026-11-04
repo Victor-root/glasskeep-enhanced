@@ -35,6 +35,8 @@ export default function FooterImageButton({
   onPickIcon,
   logoLibrary,
   deleteLogoFromLibrary,
+  // attachments: null when this note takes none
+  addAttachments,
   // menus
   imageMenuOpen,
   setImageMenuOpen,
@@ -42,6 +44,7 @@ export default function FooterImageButton({
   setLogoPickerOpen,
 }) {
   const imageBtnRef = useRef(null);
+  const attachmentInputRef = useRef(null);
 
   const handlePickExistingLogo = (logo) => {
     if (!logo?.src) return;
@@ -87,6 +90,20 @@ export default function FooterImageButton({
           e.target.value = "";
         }}
       />
+      {addAttachments && (
+        <input
+          ref={attachmentInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          aria-hidden="true"
+          onChange={async (e) => {
+            const files = Array.from(e.target.files || []);
+            e.target.value = "";
+            await addAttachments(files);
+          }}
+        />
+      )}
       {logoOnly ? (
         <button
           ref={imageBtnRef}
@@ -125,6 +142,7 @@ export default function FooterImageButton({
             setLogoPickerOpen(true);
           }}
           onRemoveIcon={() => removeNoteIcon && removeNoteIcon()}
+          onAddFiles={addAttachments ? () => attachmentInputRef.current?.click() : null}
           asSheet={!isDesktop}
           sheetBackground={sheetBg}
         />

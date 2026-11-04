@@ -14,8 +14,11 @@ import NoteModalBody from "./NoteModalBody.jsx";
 import NoteEditedStamp from "./NoteEditedStamp.jsx";
 import useModalHistory from "../../hooks/useModalHistory.js";
 import useNoteKeyboardLayout from "../../hooks/useNoteKeyboardLayout.js";
+import useNoteAttachments from "../../hooks/useNoteAttachments.js";
+import ModalAttachments from "./ModalAttachments.jsx";
 import useVirtualKeyboardBridge from "../../hooks/useVirtualKeyboardBridge.js";
 import { getContentImages } from "../../utils/noteIcon.js";
+import TI from "../../icons/editor/index.jsx";
 import { modalBgFor, scrollColorsFor, solid, bgFor, toHex, audioAccentColor, compositeOver } from "../../utils/colors.js";
 import { setThemeColor, currentStatusBarColor, setNavBarColor } from "../../utils/systemBars.js";
 
@@ -148,6 +151,10 @@ export default function NoteModal({
   notes,
   currentUser,
   tagFilter,
+  materializeDraftIfNeeded,
+  patchNoteAttachments,
+  showToast,
+  showGenericConfirm,
   // handlers
   onScrimClose, // when set (SBS mode), called on backdrop click to close both panes
   closeModal,
@@ -214,6 +221,52 @@ export default function NoteModal({
   const accessReadOnly = activeNoteObj?.access === "read";
   const noteReadOnly = fedReadOnly || accessReadOnly;
   const effViewMode = viewMode || noteReadOnly;
+
+  // An attachment shown in the image viewer, in place of the note's images.
+  const [attachmentPreview, setAttachmentPreview] = React.useState(null);
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the viewer is closed from the app; this only forgets what it was showing
+    if (!imgViewOpen) setAttachmentPreview(null);
+  }, [imgViewOpen]);
+  const previewAttachment = React.useCallback((preview) => {
+    setAttachmentPreview(preview);
+    openImageViewer(0);
+  }, [openImageViewer]);
+  const noteAttachments = useNoteAttachments({
+    note: activeNoteObj,
+    noteId: activeId,
+    canEdit: !noteReadOnly && !activeNoteObj?.trashed && tagFilter !== "TRASHED" && mType !== "audio",
+    materializeDraftIfNeeded,
+    patchNoteAttachments,
+    showToast,
+    showGenericConfirm,
+    onPreviewImage: previewAttachment,
+  });
+
+  // Files dragged over the note. The events fire for every child crossed, so
+  // the overlay follows a count rather than the last one.
+  const [dragDepth, setDragDepth] = React.useState(0);
+  const carriesFiles = (e) => !!noteAttachments.addFiles && Array.from(e.dataTransfer?.types || []).includes("Files");
+  const fileDropHandlers = {
+    onDragEnter: (e) => {
+      if (!carriesFiles(e)) return;
+      e.preventDefault();
+      setDragDepth((d) => d + 1);
+    },
+    onDragOver: (e) => {
+      if (carriesFiles(e)) e.preventDefault();
+    },
+    onDragLeave: (e) => {
+      if (carriesFiles(e)) setDragDepth((d) => Math.max(0, d - 1));
+    },
+    onDrop: (e) => {
+      if (!carriesFiles(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setDragDepth(0);
+      noteAttachments.addFiles(e.dataTransfer.files);
+    },
+  };
 
   // Track draw mode transitions for animation
   const prevDrawEditRef = React.useRef(false);
@@ -538,7 +591,14 @@ export default function NoteModal({
           onMouseUp={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
           onKeyDown={handleModalKeyDown}
+          {...fileDropHandlers}
         >
+          {dragDepth > 0 && (
+            <div className="gk-attachment-drop">
+              <TI.Paperclip className="tabler-icon" />
+              {t("dropFilesToAttach")}
+            </div>
+          )}
           {/* Scroll container */}
           <div
             ref={modalScrollRef}
@@ -633,6 +693,17 @@ export default function NoteModal({
               />
             )}
 
+            {!isDrawEdit && (
+              <ModalAttachments
+                attachments={noteAttachments.attachments}
+                onOpen={noteAttachments.open}
+                onDownload={noteAttachments.download}
+                onRemove={noteAttachments.remove}
+                onCancel={noteAttachments.cancel}
+                onRetry={noteAttachments.retry}
+              />
+            )}
+
             <OfflineCollabBanner visible={isCollaborativeNote(activeId) && syncState === "offline"} />
             <FederationReadOnlyBanner info={fedInfo} />
 
@@ -712,6 +783,7 @@ export default function NoteModal({
             reserveNavBar={mobileLayout}
             keyboardManaged={keyboardManaged}
             rootRef={footerRef}
+            addAttachments={noteAttachments.addFiles}
             isDesktop={isDesktopLayout}
             // tags
             mTagList={mTagList}
@@ -886,7 +958,7 @@ export default function NoteModal({
       {/* Fullscreen Image Viewer — content images only; the icon is
           intentionally hidden from the viewer and never indexable. */}
       {(() => {
-        const viewerImages = getContentImages(mImages);
+        const viewerImages = attachmentPreview ? [attachmentPreview] : getContentImages(mImages);
         if (!imgViewOpen || viewerImages.length === 0) return null;
         return (
           <FullscreenImageViewer
@@ -898,8 +970,9 @@ export default function NoteModal({
             onPrev={prevImage}
             mobileNavVisible={mobileNavVisible}
             onResetMobileNav={resetMobileNav}
-            canRemove={mType === "checklist" || !viewMode}
+            canRemove={!attachmentPreview && (mType === "checklist" || !viewMode)}
             onRemoveImage={(id) => setMImages((prev) => prev.filter((x) => x.id !== id))}
+            onDownload={attachmentPreview ? () => noteAttachments.download(attachmentPreview.attachment) : undefined}
           />
         );
       })()}

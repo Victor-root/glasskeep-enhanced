@@ -30,6 +30,7 @@ import com.glasskeep.app.ui.ChangeServerDialog
 import com.glasskeep.app.ui.isDarkMode
 import com.glasskeep.app.ui.isTelevision
 import com.glasskeep.app.update.UpdatePrompts
+import com.glasskeep.app.webview.AttachmentOpener
 import com.glasskeep.app.webview.FileChooser
 import com.glasskeep.app.webview.MediaCapturePermissions
 import com.glasskeep.app.webview.SystemBars
@@ -72,6 +73,7 @@ class WebViewActivity : AppCompatActivity() {
     private val mediaCapturePermissions = MediaCapturePermissions(this)
 
     private val downloads = WebDownloads(this)
+    private val attachmentOpener = AttachmentOpener(this)
 
     /** Called from JavaScript for theme-color sync and server change */
     inner class ThemeBridge {
@@ -85,6 +87,12 @@ class WebViewActivity : AppCompatActivity() {
         @JavascriptInterface
         fun onNavBarColor(hexColor: String) {
             runOnUiThread { systemBars.setNavBarColor(hexColor) }
+        }
+
+        /** An attached file, opened in the phone's app for its type. */
+        @JavascriptInterface
+        fun openFile(url: String, name: String, mimeType: String) {
+            runOnUiThread { attachmentOpener.open(url, name, mimeType) }
         }
 
         /** Off while the page draws its own scrollbar, under its header,

@@ -49,6 +49,16 @@ export function dispatchServerEvent(msg, { queueNotePatch }, ctx) {
     try {
       window.dispatchEvent(new CustomEvent("note-updated", { detail: { noteId: msg.noteId } }));
     } catch { /* bus is best-effort */ }
+  } else if (msg && msg.type === "note_attachments" && msg.noteId) {
+    // Applied whatever the state of the note: the list only ever changes
+    // on the server, so it can't overwrite anything typed here.
+    const nid = String(msg.noteId);
+    ctx.setNotes((prev) => prev.map((n) => {
+      if (String(n.id) !== nid) return n;
+      const updated = { ...n, attachments: msg.attachments, lastEditedBy: msg.lastEditedBy, lastEditedAt: msg.lastEditedAt };
+      idbPutNote(updated, ctx.userId, ctx.sessionId).catch(() => {});
+      return updated;
+    }));
   } else if (msg && msg.type === "note_access_changed" && msg.noteId) {
     // The owner changed THIS user's read/write permission on a
     // shared note. Apply it immediately: even when the note is open

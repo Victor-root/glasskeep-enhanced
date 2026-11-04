@@ -80,7 +80,12 @@ export function filterNotes(notes, { query, tagFilter, activeTagFilters }) {
       .map((im) => im.name)
       .join(" ")
       .toLowerCase();
+    const attachments = (n.attachments || [])
+      .map((a) => a.name)
+      .join(" ")
+      .toLowerCase();
     return (
+      attachments.includes(q) ||
       title.includes(q) ||
       content.includes(q) ||
       tagsStr.includes(q) ||

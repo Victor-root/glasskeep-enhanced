@@ -60,6 +60,7 @@ import eyeSvg              from "./tabler/eye.svg?raw";
 import eyeOffSvg           from "./tabler/eye-off.svg?raw";
 import keySvg              from "./tabler/key.svg?raw";
 import downloadSvg         from "./tabler/download.svg?raw";
+import paperclipSvg        from "./tabler/paperclip.svg?raw";
 import uploadSvg           from "./tabler/upload.svg?raw";
 import brandGoogleSvg      from "./tabler/brand-google.svg?raw";
 import fileTextSvg         from "./tabler/file-text.svg?raw";
@@ -224,6 +225,7 @@ export const TI = {
   EyeOff:               (p) => <TablerIcon svg={eyeOffSvg} {...p} />,
   Key:                  (p) => <TablerIcon svg={keySvg} {...p} />,
   Download:             (p) => <TablerIcon svg={downloadSvg} {...p} />,
+  Paperclip:            (p) => <TablerIcon svg={paperclipSvg} {...p} />,
   Upload:               (p) => <TablerIcon svg={uploadSvg} {...p} />,
   BrandGoogle:          (p) => <TablerIcon svg={brandGoogleSvg} {...p} />,
   FileText:             (p) => <TablerIcon svg={fileTextSvg} {...p} />,

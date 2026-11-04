@@ -5,7 +5,8 @@ import React, {
   useCallback,
 } from "react";
 import { t } from "./i18n";
-import { deleteNote as idbDeleteNote } from "./sync/localDb.js";
+import { deleteNote as idbDeleteNote, patchNote as idbPatchNote } from "./sync/localDb.js";
+import { startUploads, stopUploads } from "./sync/attachmentUploads.js";
 import { normalizeTypographyPresets } from "./utils/typographyPresets.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES, REMINDERS } from "./utils/constants.js";
@@ -452,6 +453,29 @@ export default function App() {
     leases,
   });
 
+  // A note's attachment list, as the server now has it. Applied to the note
+  // straight away: the list is the server's alone, so no local edit can be
+  // waiting on it.
+  const patchNoteAttachments = useStableCallback((noteId, update) => {
+    const nid = String(noteId);
+    setNotes((prev) => prev.map((n) => {
+      if (String(n.id) !== nid) return n;
+      const attachments = update(n.attachments || []);
+      idbPatchNote(n.id, { attachments }, currentUser?.id, sessionId).catch(() => {});
+      return { ...n, attachments };
+    }));
+  });
+
+  useEffect(() => {
+    if (!currentUser?.id) return undefined;
+    startUploads(currentUser.id, (noteId, attachment) => patchNoteAttachments(noteId, (list) => (
+      list.some((a) => a.id === attachment.id)
+        ? list.map((a) => (a.id === attachment.id ? attachment : a))
+        : [...list, attachment]
+    )));
+    return stopUploads;
+  }, [currentUser?.id, patchNoteAttachments]);
+
   // Live server events. Taken from the render that opens the connection.
   useServerEvents({
     token,
@@ -865,6 +889,10 @@ export default function App() {
       handleDownloadNote={handleDownloadNote}
       togglePin={togglePin}
       addImagesToState={addImagesToState}
+      materializeDraftIfNeeded={materializeDraftIfNeeded}
+      patchNoteAttachments={patchNoteAttachments}
+      showToast={showToast}
+      showGenericConfirm={showGenericConfirm}
       setNoteIconFromFile={setNoteIconFromFile}
       removeNoteIcon={removeNoteIcon}
       noteIcon={activeNoteObj?.icon || null}
@@ -1326,6 +1354,7 @@ export default function App() {
       {sbsSecondaryId && (
         <SecondaryNoteInstance
           noteId={sbsSecondaryId}
+          patchNoteAttachments={patchNoteAttachments}
           splitSide="right"
           splitClosing={sbsClosingSide === "right"}
           forceClosing={sbsBothClosing}

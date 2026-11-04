@@ -3,6 +3,7 @@ import Popover from "../common/Popover.jsx";
 import Sheet, { SheetRow } from "../common/Sheet.jsx";
 import { t } from "../../i18n";
 import { LogoIcon } from "../../icons/index.jsx";
+import TI from "../../icons/editor/index.jsx";
 
 /**
  * Sub-menu opened when the user clicks the "Image" action in the modal
@@ -22,6 +23,7 @@ export default function AddImageMenu({
   onAddImage,
   onAddIcon,
   onRemoveIcon,
+  onAddFiles,
   asSheet = false,
   sheetBackground,
 }) {
@@ -44,6 +46,13 @@ export default function AddImageMenu({
       icon: <LogoIcon className="w-4 h-4 shrink-0" />,
       label: hasIcon ? t("replaceLogo") : t("addLogo"),
       run: onAddIcon,
+    },
+    onAddFiles && {
+      key: "file",
+      color: dark ? "#fbbf24" : "#b45309",
+      icon: <TI.Paperclip className="tabler-icon w-4 h-4 shrink-0" />,
+      label: t("attachFile"),
+      run: onAddFiles,
     },
     hasIcon && {
       key: "removeLogo",

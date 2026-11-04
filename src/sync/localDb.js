@@ -2,10 +2,11 @@
 // IndexedDB wrapper for local-first note storage and sync queue
 
 const DB_NAME = "glasskeep";
-const DB_VERSION = 4; // v4: session-scoped notes cache (sessionNotes store)
+const DB_VERSION = 5; // v5: files waiting to be uploaded (attachmentUploads store)
 const NOTES_STORE = "notes"; // legacy (v1-v3), kept for migration compatibility
 const SESSION_NOTES_STORE = "sessionNotes"; // v4+: session-scoped note cache
 const QUEUE_STORE = "syncQueue";
+const UPLOADS_STORE = "attachmentUploads";
 
 let dbPromise = null;
 
@@ -56,6 +57,12 @@ function openDb() {
           sns.createIndex("userSession", ["userId", "sessionId"], { unique: false });
         }
       }
+
+      // ─── v5: files waiting to be uploaded ───
+      if (oldVersion < 5) {
+        const us = db.createObjectStore(UPLOADS_STORE, { keyPath: "id" });
+        us.createIndex("userId", "userId", { unique: false });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -74,6 +81,37 @@ function tx(storeName, mode = "readonly") {
 
 function makeCacheKey(userId, sessionId, noteId) {
   return `${userId}:${sessionId}:${noteId}`;
+}
+
+// ─── Attachment uploads ───
+// A file picked while offline, or an upload the app did not get to finish,
+// keeps its bytes here until the server has them.
+
+export async function putUpload(upload) {
+  const store = await tx(UPLOADS_STORE, "readwrite");
+  return new Promise((resolve, reject) => {
+    const req = store.put(upload);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function deleteUpload(id) {
+  const store = await tx(UPLOADS_STORE, "readwrite");
+  return new Promise((resolve, reject) => {
+    const req = store.delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getUploads(userId) {
+  const store = await tx(UPLOADS_STORE);
+  return new Promise((resolve, reject) => {
+    const req = store.index("userId").getAll(userId);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
 }
 
 // ─── Notes Store (session-scoped) ───

@@ -400,6 +400,7 @@ function NoteCard({
             isCollab={isCollab}
             dark={dark}
             reminderAt={n.reminderAt}
+            attachmentCount={n.attachments?.length || 0}
           />
         );
       })()}
