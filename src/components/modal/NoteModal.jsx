@@ -371,10 +371,9 @@ export default function NoteModal({
      the note's background) rather than the note's; handed back to the
      theme colour once the note closes. */
   const footerRef = React.useRef(null);
-  const cardRef = React.useRef(null);
   const keyboardManaged = isWebView || (mobileLayout && "virtualKeyboard" in navigator);
   useVirtualKeyboardBridge(keyboardManaged && !isWebView && !!open);
-  useNoteKeyboardLayout(keyboardManaged && !!open, cardRef, modalScrollRef, footerRef);
+  useNoteKeyboardLayout(keyboardManaged && !!open, modalScrollRef, footerRef);
   // Only the instance that coloured the bar hands it back, so a closed side
   // note never clears the colour the other one set.
   const navBarColoredRef = React.useRef(false);
@@ -521,7 +520,6 @@ export default function NoteModal({
         }}
       >
         <div
-          ref={cardRef}
           data-keyboard-managed={keyboardManaged ? "" : undefined}
           className={`note-modal-anim${isModalClosing ? ' closing' : ''}${handoffNoTransition ? ' note-modal-anim--sbs-handoff' : ''}${suppressOpenReplay ? ' note-modal-anim--sbs-suppress-open-replay' : ''} glass-card rounded-none shadow-none w-full max-w-none ${
             mobileLayout ? ''
@@ -531,8 +529,7 @@ export default function NoteModal({
           }${drawTransition === 'entering' ? ' draw-expand' : drawTransition === 'leaving' ? ' draw-collapse' : ''} flex flex-col relative overflow-hidden`}
           style={{
             backgroundColor: modalBgFor(mColor, dark),
-            height: mobileLayout ? 'calc(100dvh - var(--note-keyboard-rest, 0px))' : undefined,
-            alignSelf: mobileLayout ? 'flex-start' : undefined,
+            height: mobileLayout ? '100dvh' : undefined,
             paddingTop: mobileLayout ? 'var(--safe-top)' : undefined,
             paddingLeft: mobileLayout && !edgeToEdgeLandscape ? 'var(--safe-left)' : undefined,
             paddingRight: mobileLayout ? 'var(--safe-right)' : undefined,

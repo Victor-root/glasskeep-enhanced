@@ -130,6 +130,18 @@ class SystemBars(
         webView.evaluateJavascript(js, null)
     }
 
+    /** The keyboard's slide as it starts, in CSS pixels. `startedAt` lets the
+     *  page catch up with the time this took to reach it. */
+    fun injectKeyboardSlide(webView: WebView, fromPx: Int, targetPx: Int, durationMs: Long, course: List<Float>) {
+        val density = activity.resources.displayMetrics.density.toDouble()
+        webView.evaluateJavascript(
+            "window.dispatchEvent(new CustomEvent('gk-keyboard-slide',{detail:" +
+                "{from:${fromPx / density},target:${targetPx / density},duration:$durationMs," +
+                "course:[${course.joinToString(",")}],startedAt:${System.currentTimeMillis()}}}))",
+            null,
+        )
+    }
+
     /** One frame of the keyboard's slide: where it is now and where it is
      *  heading, in CSS pixels. */
     fun injectKeyboardFrame(webView: WebView, livePx: Int, targetPx: Int) {

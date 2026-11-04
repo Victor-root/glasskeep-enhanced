@@ -58,10 +58,13 @@ export function updateDropTarget(ds, els) {
 // scroll container's top or bottom edge, 0 elsewhere.
 export function autoScrollSpeed(scrollEl, cursorY) {
   const scrollRect = scrollEl.getBoundingClientRect();
+  // Under an open keyboard the note runs on behind it (useNoteKeyboardLayout):
+  // its inline padding marks where it stops being visible.
+  const bottom = scrollRect.bottom - (parseFloat(scrollEl.style.paddingBottom) || 0);
   const edgeZone = 60;
   let speed = 0;
-  if (cursorY > scrollRect.bottom - edgeZone) {
-    speed = Math.min(12, ((cursorY - (scrollRect.bottom - edgeZone)) / edgeZone) * 12);
+  if (cursorY > bottom - edgeZone) {
+    speed = Math.min(12, ((cursorY - (bottom - edgeZone)) / edgeZone) * 12);
   } else if (cursorY < scrollRect.top + edgeZone) {
     speed = -Math.min(12, (((scrollRect.top + edgeZone) - cursorY) / edgeZone) * 12);
   }

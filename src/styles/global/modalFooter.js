@@ -200,9 +200,13 @@ html.dark .modal-footer-toolbar {
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.2);
 }
 .modal-footer-toolbar[data-keyboard-rider] {
+  position: relative;
+  z-index: 1;
   background-image: linear-gradient(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.04));
 }
 html.dark .modal-footer-toolbar[data-keyboard-rider] {
+  position: relative;
+  z-index: 1;
   background-image: linear-gradient(rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.15));
 }
 

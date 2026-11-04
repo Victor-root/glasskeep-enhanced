@@ -11,11 +11,11 @@ import { useEffect } from "react";
 export default function useBlurOnKeyboardClose(active, inputRef) {
   useEffect(() => {
     if (!active) return undefined;
-    const onFrame = (e) => {
+    const onSlide = (e) => {
       if (!e.detail.target) inputRef.current?.blur();
     };
-    window.addEventListener("gk-keyboard-frame", onFrame);
-    return () => window.removeEventListener("gk-keyboard-frame", onFrame);
+    window.addEventListener("gk-keyboard-slide", onSlide);
+    return () => window.removeEventListener("gk-keyboard-slide", onSlide);
   }, [active, inputRef]);
 
   useEffect(() => {

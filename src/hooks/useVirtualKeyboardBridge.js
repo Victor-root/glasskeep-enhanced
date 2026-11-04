@@ -6,10 +6,12 @@ const RISE_MS = 285;
 const FALL_MS = 200;
 const rise = (t) => 1 - (1 - t) ** 4;
 const fall = (t) => t * t;
+const COURSE_STEPS = 16;
 
 /** While `active`, gives a mobile browser or installed PWA the same keyboard
- *  hand-off as the Android app (see KeyboardFollower): `gk-keyboard-frame`
- *  during the slide, `--android-keyboard-inset` and `gk-android-insets` at rest.
+ *  hand-off as the Android app (see KeyboardFollower): `gk-keyboard-slide` and
+ *  `gk-keyboard-frame` during the slide, `--android-keyboard-inset` and
+ *  `gk-android-insets` at rest.
  *
  *  The VirtualKeyboard API lays the keyboard over the page instead of resizing
  *  it, which also stops the browser from re-centring the caret. It says only
@@ -37,6 +39,16 @@ export default function useVirtualKeyboardBridge(active) {
       const duration = rising ? RISE_MS : FALL_MS;
       const ease = rising ? rise : fall;
       const start = performance.now();
+      window.dispatchEvent(new CustomEvent("gk-keyboard-slide", {
+        detail: {
+          from,
+          target,
+          duration,
+          course: Array.from({ length: COURSE_STEPS + 1 }, (_, step) => ease(step / COURSE_STEPS)),
+          startedAt: Date.now(),
+          clipped: rising,
+        },
+      }));
       const step = (now) => {
         const t = Math.min((now - start) / duration, 1);
         if (t === 1) {
@@ -44,7 +56,7 @@ export default function useVirtualKeyboardBridge(active) {
           return;
         }
         live = from + (target - from) * ease(t);
-        window.dispatchEvent(new CustomEvent("gk-keyboard-frame", { detail: { live, target, clipped: rising } }));
+        window.dispatchEvent(new CustomEvent("gk-keyboard-frame", { detail: { live, target } }));
         raf = requestAnimationFrame(step);
       };
       raf = requestAnimationFrame(step);
