@@ -20,6 +20,7 @@ function attachCollaborationRoutes(app, deps) {
     getNote,
     getNoteWithCollaboration,
     runInsertNote,
+    attachments,
     markEditedBy,
     getUserTags,
     runUpsertUserTags,
@@ -341,6 +342,7 @@ function attachCollaborationRoutes(app, deps) {
         timestamp: note.timestamp,
         client_updated_at: nowISO(),
       });
+      attachments.copyToNote(noteId, copyNoteId, userIdToRemove);
       if (userTagsJson && userTagsJson !== "[]") {
         runUpsertUserTags(copyNoteId, userIdToRemove, userTagsJson);
       }

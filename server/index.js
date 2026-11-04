@@ -10,7 +10,7 @@ const path = require("path");
 const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
-const { PORT, NODE_ENV, dbFile } = require("./config");
+const { PORT, NODE_ENV, JWT_SECRET, dbFile } = require("./config");
 const { completeRuntimeUpgrade } = require("./services/updateOrchestrator");
 const { attachBodyParsing } = require("./middleware/bodyParsing");
 const { configureTrustProxy } = require("./middleware/trustProxy");
@@ -45,6 +45,7 @@ const { attachAuthRoutes } = require("./routes/authRoutes");
 const { attachAccountRoutes } = require("./routes/accountRoutes");
 const { attachProfileRoutes } = require("./routes/profileRoutes");
 const { attachNotesRoutes, attachNoteByIdRoutes } = require("./routes/notesRoutes");
+const { attachAttachmentRoutes } = require("./routes/attachmentRoutes");
 const {
   attachCollaborationRoutes,
   attachCollaboratedNotesRoutes,
@@ -67,6 +68,8 @@ const { attachStaticRoutes } = require("./routes/staticRoutes");
 const { promoteExistingAdmins } = require("./services/adminEmails");
 const { createUserStore } = require("./services/userStore");
 const { createSessions } = require("./services/sessions");
+const { createAttachmentStore } = require("./attachments/attachmentStore");
+const { createDownloadLinks } = require("./attachments/downloadLink");
 const { createNoteStore } = require("./services/noteStore");
 const { createNoteUserState } = require("./services/noteUserState");
 const { createNoteParticipants } = require("./services/noteParticipants");
@@ -139,8 +142,10 @@ const sessions = createSessions({ db, ...users });
 const notes = createNoteStore(db);
 const noteUserState = createNoteUserState({ db, ...notes });
 const participants = createNoteParticipants({ db, ...users, getNoteFederation });
-const { serializeNote } = createNoteSerializer({ ...noteUserState, ...participants, getNoteFederation });
-const realtime = createRealtime({ db, ...notes, ...participants, getNoteFederation });
+const attachments = createAttachmentStore({ db, dbFile, log: console });
+const listNoteAttachments = attachments.list;
+const { serializeNote } = createNoteSerializer({ ...noteUserState, ...participants, getNoteFederation, listNoteAttachments });
+const realtime = createRealtime({ db, ...notes, ...participants, getNoteFederation, listNoteAttachments });
 const notifications = createNotifications({ db, ...realtime });
 const services = {
   db,
@@ -150,6 +155,8 @@ const services = {
   ...noteUserState,
   ...participants,
   serializeNote,
+  attachments,
+  downloadLinks: createDownloadLinks(JWT_SECRET),
   ...realtime,
   ...notifications,
 };
@@ -166,7 +173,7 @@ const { sendEventToUser, broadcastToAdmins, broadcastToAll } = realtime;
 // unlock routes reach it through this ref to ping peers on lock/unlock.
 let federationNotifyPeersRef = null;
 attachUnlockRoutes(app, {
-  db, auth, adminOnly, log: console, broadcastToAll,
+  db, auth, adminOnly, log: console, broadcastToAll, attachments,
   onLockStateChanged: () => { try { federationNotifyPeersRef?.(); } catch { /* peer ping is best-effort */ } },
 });
 
@@ -221,6 +228,7 @@ const federation = attachFederationRoutes(app, {
     getUserTags: noteUserState.getUserTags,
     runInsertNote: notes.runInsertNote,
     runUpdateNoteFullCollab: notes.runUpdateNoteFullCollab,
+    attachments,
     addCollaborator: participants.addCollaborator,
     setCollaboratorCanWrite: participants.setCollaboratorCanWrite,
     removeCollaborator: participants.removeCollaboratorRow,
@@ -294,6 +302,8 @@ attachProfileRoutes(app, deps);
 
 // ---------- Notes ----------
 attachNotesRoutes(app, deps);
+attachAttachmentRoutes(app, deps);
+attachments.startSweeping();
 attachCollaborationRoutes(app, deps);
 attachNotificationRoutes(app, deps);
 attachCollaboratedNotesRoutes(app, deps);
@@ -346,6 +356,14 @@ const reminderScheduler = startReminderScheduler({
 });
 
 // ---------- Listen ----------
+// Node gives a whole request five minutes by default, which a large
+// attachment on a slow uplink can outlast. Headers keep their own, shorter
+// limit, so an idle connection still goes nowhere.
+const allowLongUploads = (server) => {
+  server.requestTimeout = 60 * 60 * 1000;
+  return server;
+};
+
 const SSL_CERT    = process.env.SSL_CERT;
 const SSL_KEY     = process.env.SSL_KEY;
 const HTTPS_ENABLED = process.env.HTTPS_ENABLED !== "false";
@@ -360,12 +378,12 @@ if (
     cert: fs.readFileSync(SSL_CERT),
     key:  fs.readFileSync(SSL_KEY),
   };
-  https.createServer(sslOptions, app).listen(PORT, "0.0.0.0", () => {
+  allowLongUploads(https.createServer(sslOptions, app).listen(PORT, "0.0.0.0", () => {
     console.log(`API listening on https://0.0.0.0:${PORT}  (env=${NODE_ENV})`);
-  });
+  }));
 } else {
-  app.listen(PORT, "0.0.0.0", (err) => {
+  allowLongUploads(app.listen(PORT, "0.0.0.0", (err) => {
     if (err) throw err;
     console.log(`API listening on http://0.0.0.0:${PORT}  (env=${NODE_ENV})`);
-  });
+  }));
 }

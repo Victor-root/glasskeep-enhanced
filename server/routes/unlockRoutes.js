@@ -36,7 +36,7 @@ const {
 } = require("../services/unlockGuard");
 
 function attachUnlockRoutes(app, deps) {
-  const { db, auth, adminOnly, log = console, broadcastToAll, onLockStateChanged } = deps;
+  const { db, auth, adminOnly, log = console, broadcastToAll, attachments, onLockStateChanged } = deps;
 
   // A secret was accepted: bring the DEK up, upgrade what an older
   // version left behind, and tell the clients and the federation peers.
@@ -48,6 +48,9 @@ function attachUnlockRoutes(app, deps) {
       runtime.recordAttempt(id, true);
       log.info?.(`[unlock] success via ${via} from ${id}`);
       runUpgradeMigrations(db, log);
+      // Files left over from an interrupted pass, or written while the
+      // instance was being activated.
+      attachments.encryptPendingFiles().catch((e) => log.warn?.(`[encrypt] attachments: ${e.message}`));
       // Symmetric with the lock route: tell every connected client the
       // instance is back so other sessions leave the unlock screen without
       // waiting for the next status poll.
@@ -215,7 +218,10 @@ function attachUnlockRoutes(app, deps) {
     runtime.unlockWithDek(init.dek);
 
     try {
-      encryptAllRows(db);
+      encryptAllRows(db, attachments);
+      // Rows are done in one transaction; files can be huge and follow in
+      // the background, each one atomically.
+      attachments.encryptPendingFiles().catch((e) => log.warn?.(`[encrypt] attachments: ${e.message}`));
 
       // Critical: when notes already existed, the migration above only
       // UPDATE-d the rows, and the old (plaintext) pages are still in the
@@ -264,7 +270,7 @@ function attachUnlockRoutes(app, deps) {
   // access at this point, so the passphrase isn't a privilege boundary,
   // but it forces the operator to acknowledge the destructive nature
   // of the action).
-  app.post("/api/instance/deactivate", auth, adminOnly, (req, res) => {
+  app.post("/api/instance/deactivate", auth, adminOnly, async (req, res) => {
     if (!runtime.isEnabled()) {
       return res.status(409).json({ error: "Encryption is not enabled" });
     }
@@ -289,11 +295,16 @@ function attachUnlockRoutes(app, deps) {
       try { probeDek && probeDek.fill(0); } catch { /* best-effort wipe */ }
     }
 
+    // Files first: they need the key, and a failure here leaves a fully
+    // working encrypted instance (the next unlock re-encrypts them).
     try {
-      decryptAllRows(db, log);
+      await attachments.decryptAllFiles();
+      decryptAllRows(db, log, attachments);
     } catch (e) {
       log.error?.(`[encrypt] deactivation failed mid-transaction: ${e.message}`);
       return res.status(500).json({ error: "Deactivation failed: " + e.message });
+    } finally {
+      attachments.releaseFiles();
     }
 
     // Drop the DEK from RAM and flip the runtime flag. Must come AFTER

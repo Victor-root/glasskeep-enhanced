@@ -17,6 +17,8 @@ function loginBgUrl(row) {
   return `/api/branding/login-bg?v=${encodeURIComponent(v)}`;
 }
 
+const DEFAULT_ATTACHMENT_MAX_MB = 100;
+
 function createAppSettings({ db }) {
   // Admin settings: persisted in the `app_settings` singleton row. Kept
   // mirrored in this in-memory object so the hot read paths (login slogan
@@ -43,6 +45,11 @@ function createAppSettings({ db }) {
   // Square PWA icon (PNG data URL) derived from the custom logo.
   const getPwaIconRow = db.prepare(`SELECT custom_logo_pwa FROM app_settings WHERE id = 1`);
   const setPwaIconStmt = db.prepare(`UPDATE app_settings SET custom_logo_pwa = ? WHERE id = 1`);
+
+  // Largest attachment accepted, in MB (0 turns attachments off). On its own
+  // statement: the singleton's upsert is long enough already.
+  const getAttachmentMaxMb = db.prepare(`SELECT attachment_max_mb FROM app_settings WHERE id = 1`);
+  const setAttachmentMaxMbStmt = db.prepare(`UPDATE app_settings SET attachment_max_mb = ? WHERE id = 1`);
 
   const adminSettings = (function loadAdminSettings() {
     const row = getAppSettingsRow.get();
@@ -75,6 +82,8 @@ function createAppSettings({ db }) {
     upsertAppSettings.run(seed.allowNewAccounts ? 1 : 0, seed.loginSlogan, seed.appName, seed.loginBackgroundBlur, seed.loginTheme, seed.passkeyDomain, 0, seed.ssoPolicy, 0);
     return seed;
   })();
+
+  adminSettings.attachmentMaxMb = getAttachmentMaxMb.get()?.attachment_max_mb ?? DEFAULT_ATTACHMENT_MAX_MB;
 
   // Hand the stored domain to the resolver, which holds it for every
   // passkey ceremony. Re-pushed on every settings change by
@@ -129,6 +138,7 @@ function createAppSettings({ db }) {
     getLoginBgRow,
     getPwaIconRow,
     setPwaIconStmt,
+    setAttachmentMaxMbStmt,
     brandingSettingsPayload,
     passkeyDomainState,
   };

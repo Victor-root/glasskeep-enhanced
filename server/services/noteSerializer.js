@@ -8,6 +8,7 @@ function createNoteSerializer({
   getUserIcon,
   noteAccessFor,
   getNoteFederation,
+  listNoteAttachments,
 }) {
   // Serialize a DB row into the canonical JSON note object returned by all endpoints.
   // When userId is provided, tags come from the per-user note_user_tags table and
@@ -41,6 +42,7 @@ function createNoteSerializer({
       items: JSON.parse(r.items_json || "[]"),
       tags: JSON.parse(tagsJson),
       images,
+      attachments: listNoteAttachments(r.id),
       icon: userId ? getUserIcon(r.id, userId) : null,
       color: r.color,
       pinned,

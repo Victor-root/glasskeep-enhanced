@@ -4,7 +4,7 @@
 // that push an event to one user, to the admins, to everyone, or to
 // every participant of a note that just changed.
 
-function createRealtime({ db, getNoteById, getCollaboratorUserIdsForNote, getNoteFederation }) {
+function createRealtime({ db, getNoteById, getCollaboratorUserIdsForNote, getNoteFederation, listNoteAttachments }) {
   // Map of userId (integer) -> Set of response streams.
   // All access goes through parseSseKey() which rejects non-integer values,
   // preventing NaN keys and string/number mismatch bugs.
@@ -113,6 +113,25 @@ function createRealtime({ db, getNoteById, getCollaboratorUserIdsForNote, getNot
     try { getNoteFederation()?.onNoteChangedLocally(noteId); } catch { /* fire-and-forget, see above */ }
   }
 
+  // Who shares the note gets its attachments as they are now, ahead of any
+  // note patch: those are held back while the note has unsaved edits, and a
+  // new file has nothing to do with the text being typed.
+  function broadcastNoteAttachments(noteId) {
+    try {
+      const note = getNoteById.get(noteId);
+      if (!note) return;
+      const evt = {
+        type: "note_attachments",
+        noteId,
+        attachments: listNoteAttachments(noteId),
+        lastEditedBy: note.last_edited_by,
+        lastEditedAt: note.last_edited_at,
+      };
+      const recipientIds = new Set([note.user_id, ...getCollaboratorUserIdsForNote(noteId)]);
+      for (const uid of recipientIds) sendEventToUser(uid, evt);
+    } catch { /* best-effort live refresh: never disturb the note operation */ }
+  }
+
   return {
     addSseClient,
     removeSseClient,
@@ -121,6 +140,7 @@ function createRealtime({ db, getNoteById, getCollaboratorUserIdsForNote, getNot
     broadcastToAdmins,
     broadcastToAll,
     broadcastNoteUpdated,
+    broadcastNoteAttachments,
   };
 }
 

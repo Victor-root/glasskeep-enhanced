@@ -35,6 +35,7 @@ const NOTE_VERSION_LATEST = 2;
 const NOTE_AAD_PREFIX = "glasskeep|note|v1";
 const TAG_VERSION_LATEST = 1;
 const TAG_AAD_PREFIX = "glasskeep|tags|v1";
+const ATTACHMENT_AAD_PREFIX = "glasskeep|attachment-meta|v1";
 
 // Placeholder values that take the spot of the encrypted columns in
 // SQLite when a row is at-rest encrypted. They satisfy the existing
@@ -199,6 +200,22 @@ function decryptTagsPayload(encPayload, ctx) {
   return aead.decrypt(dek, iv, ct, tag, tagAad(ctx)).toString("utf8");
 }
 
+// ── Attachment metadata ───────────────────────────────────────────────
+// note_attachments.enc_payload: the name, type and thumbnail of a file,
+// bound to the attachment and its note.
+function attachmentAad({ noteId, attachmentId }) {
+  return Buffer.from(`${ATTACHMENT_AAD_PREFIX}|${noteId}|${attachmentId}`, "utf8");
+}
+
+function encryptAttachmentMeta(json, ctx) {
+  return sealEnvelope(1, aead.encrypt(requireDek(), json, attachmentAad(ctx)));
+}
+
+function decryptAttachmentMeta(encPayload, ctx) {
+  const { iv, ct, tag } = openEnvelope(JSON.parse(encPayload));
+  return aead.decrypt(requireDek(), iv, ct, tag, attachmentAad(ctx)).toString("utf8");
+}
+
 module.exports = {
   isActive,
   encryptFields,
@@ -207,5 +224,7 @@ module.exports = {
   prepareRowForWrite,
   encryptTagsJson,
   decryptTagsPayload,
+  encryptAttachmentMeta,
+  decryptAttachmentMeta,
   NOTE_VERSION_LATEST,
 };

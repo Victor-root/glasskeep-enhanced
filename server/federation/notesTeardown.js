@@ -183,6 +183,7 @@ function createNoteTeardown({ q, store, deps, log, findRealUser, splitOrigin, po
         timestamp: note.timestamp,
         client_updated_at: deps.nowISO?.(),
       });
+      deps.attachments?.copyToNote(note.id, copyNoteId, userId);
       const maxPosRow = deps.getMaxUserEffectivePosition?.get(userId, userId, userId, userId);
       deps.upsertUserPosition?.run({
         note_id: copyNoteId,

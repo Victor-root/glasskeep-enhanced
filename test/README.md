@@ -33,6 +33,7 @@ réseau, pas de base de données, rien à nettoyer après. Assez rapide pour
 | Le texte d'une note hors de l'éditeur: import Google Keep, anciennes notes en Markdown, mode lecture, aperçu des cartes, note vide ou pas (mise à la corbeille en fermant), conversion en liste à cocher et retour sans perdre coches ni sections, copie vers le Bloc-notes et depuis le mode lecture | `unit/t29-rich-text-conversions.mjs` |
 | Les gestes du vrai éditeur: retirer une couleur sans toucher aux autres styles, indenter un élément de liste, bloc de code sur quelques mots ou plusieurs lignes, soulignements variés, cases cochées, collage depuis le Bloc-notes ou en « texte seul » (liens compris), copie d'une liste | `unit/t30-rich-text-editor.mjs` |
 | Une mise à jour Docker recrée le conteneur avec les réglages de la nouvelle image (son commit compris) et garde ceux de l'administrateur (variables du compose, dossiers, ports, réseau) | `unit/t31-docker-update-config.mjs` |
+| Un fichier joint se relit à l'identique une fois chiffré, et toute altération sur le disque (octet changé, blocs échangés, coupure nette) est refusée | `unit/t32-attachment-cipher.mjs` |
 
 Le premier mérite un mot: ce n'est pas le test d'une fonction, c'est le
 test d'une règle. Il recense chaque endroit où l'interface affiche du

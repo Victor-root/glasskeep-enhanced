@@ -117,6 +117,34 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS idx_notifications_recipient_pending
   ON notifications(recipient_user_id, delivered_at);
 
+-- Files attached to notes (see server/attachments/attachmentStore.js). The
+-- bytes sit on disk beside the database. A row of attachment_files is one
+-- such file; remote_link_id is set while it is only held by a federated
+-- peer. note_attachments ties a file to a note: name, type and thumbnail
+-- live in meta_json, or enc_payload when at-rest encryption is active.
+CREATE TABLE IF NOT EXISTS attachment_files (
+  id TEXT PRIMARY KEY,
+  size INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
+  is_encrypted INTEGER NOT NULL DEFAULT 0,
+  remote_link_id TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS note_attachments (
+  id TEXT PRIMARY KEY,
+  note_id TEXT NOT NULL,
+  file_id TEXT NOT NULL,
+  uploaded_by INTEGER,
+  created_at TEXT NOT NULL,
+  meta_json TEXT NOT NULL DEFAULT '{}',
+  enc_payload TEXT,
+  FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE,
+  FOREIGN KEY(file_id) REFERENCES attachment_files(id),
+  FOREIGN KEY(uploaded_by) REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_note_attachments_note ON note_attachments(note_id);
+CREATE INDEX IF NOT EXISTS idx_note_attachments_file ON note_attachments(file_id);
+
 CREATE TABLE IF NOT EXISTS user_settings (
   user_id INTEGER PRIMARY KEY,
   settings_json TEXT NOT NULL DEFAULT '{}',
@@ -509,6 +537,10 @@ function ensureAppSettingsColumns(db) {
       // Whether a user's own provider may sit on the local network.
       if (!names.has("sso_allow_private")) {
         db.exec(`ALTER TABLE app_settings ADD COLUMN sso_allow_private INTEGER NOT NULL DEFAULT 0`);
+      }
+      // Largest attachment accepted, in MB. 0 turns attachments off.
+      if (!names.has("attachment_max_mb")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN attachment_max_mb INTEGER NOT NULL DEFAULT 100`);
       }
     });
     tx();

@@ -15,6 +15,7 @@ function attachTrashRoutes(app, deps) {
     getNoteWithCollaboration,
     listTrashedNotes,
     runInsertNote,
+    attachments,
     deleteNote,
     markEditedBy,
     getUserTags,
@@ -98,6 +99,7 @@ function attachTrashRoutes(app, deps) {
         timestamp: collabNote.timestamp,
         client_updated_at: tsResult.iso,
       });
+      attachments.copyToNote(id, trashedCopyId, req.user.id);
       db.prepare("UPDATE notes SET trashed = 1 WHERE id = ?").run(trashedCopyId);
       if (userTagsJson && userTagsJson !== "[]") {
         runUpsertUserTags(trashedCopyId, req.user.id, userTagsJson);
@@ -259,6 +261,7 @@ function attachTrashRoutes(app, deps) {
         timestamp: existing.timestamp,
         client_updated_at: tsResult.iso,
       });
+      attachments.copyToNote(id, trashedCopyId, req.user.id);
       db.prepare("UPDATE notes SET trashed = 1 WHERE id = ?").run(trashedCopyId);
       if (tagsProprietaire && tagsProprietaire !== "[]") {
         runUpsertUserTags(trashedCopyId, req.user.id, tagsProprietaire);
@@ -422,6 +425,7 @@ function attachTrashRoutes(app, deps) {
 
     const recipientIds = new Set([existing.user_id, ...getCollaboratorUserIdsForNote(id)]);
     deleteNote.run(id, req.user.id);
+    attachments.scheduleSweep();
 
     const evt = { type: "note_deleted", noteId: id };
     for (const uid of recipientIds) sendEventToUser(uid, evt);

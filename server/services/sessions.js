@@ -160,7 +160,7 @@ function createSessions({ db, getUserById }) {
     next();
   }
 
-  return { signToken, sessionResponse, auth, authFromQueryOrHeader, adminOnly };
+  return { signToken, sessionResponse, auth, authFromQueryOrHeader, adminOnly, currentTokenVersion };
 }
 
 module.exports = { createSessions };

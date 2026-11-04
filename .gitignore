@@ -46,6 +46,10 @@ data/notes.db
 data/notes.db-shm
 data/notes.db-wal
 
+# Attached files, kept next to the DB
+server/note-files/
+data/note-files/
+
 # Auto-generated Web Push (VAPID) keys, persisted next to the DB
 .vapid.json
 **/.vapid.json

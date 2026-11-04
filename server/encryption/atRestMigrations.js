@@ -132,7 +132,7 @@ function runUpgradeMigrations(db, log) {
 // one transaction, with the per-user tags and icons. If anything fails
 // the transaction rolls back and the rows stay plaintext. The runtime
 // must already hold the new DEK.
-function encryptAllRows(db) {
+function encryptAllRows(db, attachments) {
   const migrate = db.transaction(() => {
     const rows = db.prepare("SELECT * FROM notes").all();
     const upd = db.prepare(`
@@ -200,6 +200,7 @@ function encryptAllRows(db) {
       });
       updIcon.run(enc, r.note_id, r.user_id);
     }
+    attachments.sealAllMeta();
     vault.markMigrated(db);
   });
   migrate();
@@ -208,7 +209,7 @@ function encryptAllRows(db) {
 // Deactivation: the reverse, every encrypted note, tag and icon row back
 // to plaintext columns and the vault disabled, all in one transaction so
 // a half-disabled state is impossible. The runtime must still hold the DEK.
-function decryptAllRows(db, log) {
+function decryptAllRows(db, log, attachments) {
   const migrate = db.transaction(() => {
     const rows = db.prepare("SELECT * FROM notes WHERE is_server_encrypted = 1").all();
     const upd = db.prepare(`
@@ -281,6 +282,7 @@ function decryptAllRows(db, log) {
       }
       updIcon.run(plain, r.note_id, r.user_id);
     }
+    attachments.openAllMeta();
     vault.disable(db);
   });
   migrate();

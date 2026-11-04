@@ -22,6 +22,7 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024; // ~2 MB data URL (≈1.5 MB decoded)
 const MAX_LOGIN_BG_BYTES = 4 * 1024 * 1024; // ~4 MB data URL (≈3 MB decoded)
 const MAX_APP_NAME_LEN = 10;
 const MAX_LOGIN_BLUR = 20; // px
+const MAX_ATTACHMENT_MB = 10240;
 
 function attachAdminSettingsRoutes(app, deps) {
   const {
@@ -34,6 +35,7 @@ function attachAdminSettingsRoutes(app, deps) {
     setLoginBgStmt,
     setLoginBgMetaStmt,
     setPwaIconStmt,
+    setAttachmentMaxMbStmt,
     brandingSettingsPayload,
     passkeyDomainState,
   } = deps;
@@ -45,8 +47,12 @@ function attachAdminSettingsRoutes(app, deps) {
 
   // Update admin settings
   app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
-    const { allowNewAccounts, ssoAllowed, ssoPolicy, ssoAllowPrivateNetwork, loginSlogan, appName, loginBackgroundBlur, loginTheme, passkeyDomain, logo, logoPwa, loginBackground, loginBackgroundColor, loginBackgroundHash } = req.body || {};
+    const { attachmentMaxMb, allowNewAccounts, ssoAllowed, ssoPolicy, ssoAllowPrivateNetwork, loginSlogan, appName, loginBackgroundBlur, loginTheme, passkeyDomain, logo, logoPwa, loginBackground, loginBackgroundColor, loginBackgroundHash } = req.body || {};
 
+    if (Number.isInteger(attachmentMaxMb) && attachmentMaxMb >= 0 && attachmentMaxMb <= MAX_ATTACHMENT_MB) {
+      adminSettings.attachmentMaxMb = attachmentMaxMb;
+      setAttachmentMaxMbStmt.run(attachmentMaxMb);
+    }
     if (typeof allowNewAccounts === 'boolean') {
       adminSettings.allowNewAccounts = allowNewAccounts;
     }
