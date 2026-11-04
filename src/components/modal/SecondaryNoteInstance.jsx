@@ -93,7 +93,7 @@ export default function SecondaryNoteInstance({
     modalTagInputRef, modalTagBtnRef, suppressTagBlurRef,
     mBodyRef, modalFileRef, modalIconFileRef, modalFmtBtnRef, modalColorBtnRef,
     scrimClickStartRef,
-    noteViewRef, modalScrollRef, savedModalScrollRatioRef,
+    noteViewRef, modalScrollRef, modalScrollAnchorRef,
     activeNoteObj, editedStamp, modalHasChanges,
     addTags, handleTagKeyDown, handleTagBlur, handleTagPaste,
     openImageViewer, closeImageViewer, nextImage, prevImage, resetMobileNav,
@@ -268,7 +268,7 @@ export default function SecondaryNoteInstance({
       suppressTagBlurRef={suppressTagBlurRef}
       modalColorBtnRef={modalColorBtnRef}
       scrimClickStartRef={scrimClickStartRef}
-      savedModalScrollRatioRef={savedModalScrollRatioRef}
+      modalScrollAnchorRef={modalScrollAnchorRef}
       activeNoteObj={activeNoteObj}
       onSetReminder={setNoteReminder}
       editedStamp={editedStamp}

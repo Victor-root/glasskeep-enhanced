@@ -199,6 +199,12 @@ html.dark .modal-footer-toolbar {
   background: rgba(0, 0, 0, 0.15);
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.2);
 }
+.modal-footer-toolbar[data-keyboard-rider] {
+  background-image: linear-gradient(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.04));
+}
+html.dark .modal-footer-toolbar[data-keyboard-rider] {
+  background-image: linear-gradient(rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.15));
+}
 
 /* Inside the mobile formatting sheet the ribbon becomes full-width rows:
    the super-groups stack (divided by a hairline) and each of their rows

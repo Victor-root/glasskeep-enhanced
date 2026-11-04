@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { caretRect, focusedEditable } from "../utils/caret.js";
 
 /** Publishes the soft-keyboard geometry on <html>: `--keyboard-inset` is its
  *  height, `--keyboard-pan` how far a full-screen overlay has to ride up so
@@ -19,16 +20,14 @@ import { useEffect } from "react";
  *  Inside the Android WebView the visual viewport says nothing at all: the
  *  window draws edge-to-edge, so the keyboard never resizes it. WebViewActivity
  *  forwards the real IME inset as `--android-keyboard-inset`, which takes over
- *  when it is present. */
+ *  when it is present, and `gk-keyboard-frame` events while the keyboard slides.
+ *  An open note lays itself out around the keyboard (useNoteKeyboardLayout);
+ *  the rest of the app rides up as described above. Each frame only touches
+ *  the open sheets: a custom property changed on <html> restyles the whole
+ *  page, so <html> just gets where the keyboard is heading. */
 
 const MIN_KEYBOARD = 150;
 const PAN_MARGIN = 8;
-
-function focusedEditable() {
-  const el = document.activeElement;
-  if (!el) return null;
-  return el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA" ? el : null;
-}
 
 function scrollableAncestor(el) {
   for (let n = el.parentElement; n; n = n.parentElement) {
@@ -38,17 +37,6 @@ function scrollableAncestor(el) {
   return null;
 }
 
-function caretRect(el) {
-  if (el.isContentEditable) {
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount) {
-      const r = sel.getRangeAt(0).getBoundingClientRect();
-      if (r.height || r.top) return r;
-    }
-  }
-  return el.getBoundingClientRect();
-}
-
 export default function useKeyboardInset() {
   useEffect(() => {
     const vv = window.visualViewport;
@@ -56,8 +44,10 @@ export default function useKeyboardInset() {
     let keyboard = 0;
     let pan = 0;
     let raf = 0;
+    let sliding = null;
 
     const measure = () => {
+      if (sliding) return Math.round(sliding.live);
       const android = root.style.getPropertyValue("--android-keyboard-inset");
       if (android) return Math.max(0, Math.round(parseFloat(android)) || 0);
       if (!vv) return 0;
@@ -80,7 +70,7 @@ export default function useKeyboardInset() {
       raf = 0;
       if (!keyboard) return;
       const el = focusedEditable();
-      if (!el) return;
+      if (!el || el.closest("[data-keyboard-managed]")) return;
       const rect = caretRect(el);
       const ceiling = window.innerHeight - keyboard - PAN_MARGIN;
       if (rect.bottom > ceiling) {
@@ -102,21 +92,45 @@ export default function useKeyboardInset() {
       const next = measure();
       if (next !== keyboard) {
         keyboard = next;
-        root.style.setProperty("--keyboard-inset", `${keyboard}px`);
+        publish();
         if (!keyboard) setPan(0);
       }
       schedule();
     };
 
+    const publish = () => {
+      const resting = sliding ? Math.round(sliding.target) : keyboard;
+      root.style.setProperty("--keyboard-inset", `${resting}px`);
+      document.querySelectorAll('.gk-sheet-root[data-state="open"]').forEach((sheet) => {
+        if (sliding) sheet.style.setProperty("--keyboard-inset", `${keyboard}px`);
+        else sheet.style.removeProperty("--keyboard-inset");
+      });
+    };
+
+    const onFrame = (e) => {
+      sliding = e.detail;
+      apply();
+    };
+
+    const onSettled = () => {
+      if (sliding) {
+        sliding = null;
+        publish();
+      }
+      apply();
+    };
+
     apply();
-    window.addEventListener("gk-android-insets", apply);
+    window.addEventListener("gk-keyboard-frame", onFrame);
+    window.addEventListener("gk-android-insets", onSettled);
     document.addEventListener("selectionchange", schedule);
     document.addEventListener("input", schedule);
     vv?.addEventListener("resize", apply);
     vv?.addEventListener("scroll", apply);
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("gk-android-insets", apply);
+      window.removeEventListener("gk-keyboard-frame", onFrame);
+      window.removeEventListener("gk-android-insets", onSettled);
       document.removeEventListener("selectionchange", schedule);
       document.removeEventListener("input", schedule);
       vv?.removeEventListener("resize", apply);

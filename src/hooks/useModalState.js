@@ -1,10 +1,11 @@
-import { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import { useState, useRef, useMemo, useEffect, useLayoutEffect, useCallback } from "react";
 import { t } from "../i18n";
 import { normalizeImageFilename, downloadDataUrl } from "../utils/files.js";
 import { formatEditedStamp } from "../utils/dates.js";
 import { attachPlainTextCodeCopy } from "../utils/plainTextCodeCopy.js";
 import { attachReadModeInlineCopy } from "../components/richtext/extensions/inlineCodeCopy.js";
 import { attachStickyCopyButton } from "../utils/codeCopySticky.js";
+import { restoreScrollAnchor } from "../utils/scrollAnchor.js";
 
 /**
  * useModalState — Pure UI state and effects for the note modal.
@@ -88,7 +89,7 @@ export default function useModalState({ notes, currentUser, closeModalRef }) {
   // Modal scroll container ref + state
   const modalScrollRef = useRef(null);
   const [modalScrollable, setModalScrollable] = useState(false);
-  const savedModalScrollRatioRef = useRef(0);
+  const modalScrollAnchorRef = useRef(null);
 
 
 
@@ -236,43 +237,6 @@ export default function useModalState({ notes, currentUser, closeModalRef }) {
     [notes, currentUser],
   );
 
-  // ─── Auto-resize modal textarea with debouncing ───
-  const resizeTimeoutRef = useRef(null);
-  const resizeModalTextarea = useCallback(() => {
-    const el = mBodyRef.current;
-    if (!el) return;
-
-    // Clear previous timeout
-    if (resizeTimeoutRef.current) {
-      clearTimeout(resizeTimeoutRef.current);
-    }
-
-    // Debounce the resize to prevent excessive updates
-    resizeTimeoutRef.current = setTimeout(() => {
-      const modalScrollEl = modalScrollRef.current;
-
-      // Save scroll position before collapsing textarea height
-      const savedScrollTop = modalScrollEl ? modalScrollEl.scrollTop : 0;
-
-      const MIN = 160;
-      el.style.height = "0px";
-      el.style.height = Math.max(el.scrollHeight, MIN) + "px";
-
-      requestAnimationFrame(() => {
-        if (!modalScrollEl) return;
-        // Mode-switch ratio takes priority, otherwise restore pre-resize position
-        const ratio = savedModalScrollRatioRef.current;
-        if (ratio > 0) {
-          const maxScroll = modalScrollEl.scrollHeight - modalScrollEl.clientHeight;
-          modalScrollEl.scrollTop = ratio * maxScroll;
-          savedModalScrollRatioRef.current = 0;
-        } else {
-          modalScrollEl.scrollTop = savedScrollTop;
-        }
-      });
-    }, 10); // Small delay to batch rapid changes
-  }, []);
-
   // ─── UI Effects ───
 
   // Lock body scroll on modal & image viewer (compensate scrollbar width to prevent layout shift)
@@ -336,23 +300,17 @@ export default function useModalState({ notes, currentUser, closeModalRef }) {
 
   // Note: Android back button (popstate) for the modal is handled centrally by useOverlayBackStack
 
-  // Auto-resize modal textarea effect
-  useEffect(() => {
-    if (!open || mType !== "text") return;
-    if (!viewMode) resizeModalTextarea();
-  }, [open, viewMode, mBody, mType, resizeModalTextarea]);
-
-  // Restore scroll ratio when switching edit→view (no textarea resize in this direction)
-  useEffect(() => {
-    if (!viewMode) return; // view→edit is handled inside resizeModalTextarea
-    const el = modalScrollRef.current;
-    const ratio = savedModalScrollRatioRef.current;
-    if (!el || ratio === 0) return;
-    requestAnimationFrame(() => {
-      const maxScroll = el.scrollHeight - el.clientHeight;
-      if (maxScroll > 0) el.scrollTop = ratio * maxScroll;
-      savedModalScrollRatioRef.current = 0;
-    });
+  // Keep the reader on the same block when the note switches between read
+  // and edit: before the first paint, then once more when the other mode's
+  // content has taken its final height.
+  useLayoutEffect(() => {
+    const anchor = modalScrollAnchorRef.current;
+    const scroller = modalScrollRef.current;
+    if (!anchor || !scroller) return undefined;
+    modalScrollAnchorRef.current = null;
+    restoreScrollAnchor(scroller, anchor);
+    const raf = requestAnimationFrame(() => restoreScrollAnchor(scroller, anchor));
+    return () => cancelAnimationFrame(raf);
   }, [viewMode]);
 
   // Ensure modal formatting menu hides when switching to view mode or non-text
@@ -517,7 +475,7 @@ export default function useModalState({ notes, currentUser, closeModalRef }) {
     scrimClickStartRef,
     noteViewRef,
     modalScrollRef,
-    savedModalScrollRatioRef,
+    modalScrollAnchorRef,
     // Derived
     activeNoteObj,
     editedStamp,

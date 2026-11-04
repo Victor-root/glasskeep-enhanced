@@ -6,7 +6,18 @@ import { useEffect } from "react";
 // the keyboard is opening (URL bar / predictive bar animations), which would
 // be misread as a keyboard close and immediately blur the field, making
 // editing unusable on iPhone. iOS already blurs naturally on Done.
+// In the Android app the visual viewport never moves: the keyboard's slide is
+// what tells.
 export default function useBlurOnKeyboardClose(active, inputRef) {
+  useEffect(() => {
+    if (!active) return undefined;
+    const onFrame = (e) => {
+      if (!e.detail.target) inputRef.current?.blur();
+    };
+    window.addEventListener("gk-keyboard-frame", onFrame);
+    return () => window.removeEventListener("gk-keyboard-frame", onFrame);
+  }, [active, inputRef]);
+
   useEffect(() => {
     if (!active || !window.visualViewport) return;
     const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";

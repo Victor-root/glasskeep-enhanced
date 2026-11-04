@@ -164,7 +164,7 @@ export default function NoteModalBody({
             <RichTextEditor
               key={activeId || "new"}
               {...richTextProps}
-              autoFocus={!activeId && !mTitle}
+              autoFocus={!noteId && !mTitle}
               minHeightClass="min-h-[160px]"
             />
           </div>

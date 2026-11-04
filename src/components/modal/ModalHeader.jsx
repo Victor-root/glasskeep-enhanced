@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useRef, useLayoutEffect, useCallback } from "react";
 import { PinOutline, PinFilled, CloseIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { modalBgFor } from "../../utils/colors.js";
@@ -113,11 +113,11 @@ export default function ModalHeader({
     el.style.height = el.scrollHeight + "px";
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (mobileTitleRef.current) {
       autoResizeTitle(mobileTitleRef.current);
     }
-  }, [mTitle, autoResizeTitle]);
+  }, [mTitle, viewMode, autoResizeTitle]);
 
   // Sticky toolbar
   return (

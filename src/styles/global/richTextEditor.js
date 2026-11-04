@@ -100,8 +100,6 @@ html.dark {
 .rt-editor-content {
   outline: none;
   cursor: text;
-  padding: 0.15rem 0.1rem;
-  line-height: 1.55;
 }
 .rt-editor-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

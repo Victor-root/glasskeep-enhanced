@@ -317,6 +317,12 @@ class WebViewActivity : AppCompatActivity() {
             injectSafeAreaInsets()
             insets
         }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            androidx.core.view.ViewCompat.setWindowInsetsAnimationCallback(
+                webView,
+                com.glasskeep.app.webview.KeyboardFollower(webView, systemBars),
+            )
+        }
 
         webView.apply {
             addJavascriptInterface(ThemeBridge(), "AndroidTheme")

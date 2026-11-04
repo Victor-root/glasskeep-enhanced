@@ -47,6 +47,10 @@ class SystemBars(
     // covering its lower half. Reported on API 30+ only (see recordInsets).
     private var keyboardInsetDp = 0.0
 
+    // While the keyboard slides, KeyboardFollower owns its height: the framework
+    // already reports the end position and must not reach the page early.
+    var keyboardAnimating = false
+
     // Theme colour last sent by the page (see ThemeBridge.onThemeColor). Null
     // until the page reports one; the window theme keeps the bars transparent
     // until then.
@@ -102,7 +106,7 @@ class SystemBars(
         safeAreaBottomDp = bars.bottom / density.toDouble()
         safeAreaLeftDp   = bars.left   / density.toDouble()
         safeAreaRightDp  = bars.right  / density.toDouble()
-        keyboardInsetDp  = ime / density.toDouble()
+        if (!keyboardAnimating) keyboardInsetDp = ime / density.toDouble()
     }
 
     /** The system-bar state the page lays itself out against: the insets, the
@@ -124,6 +128,24 @@ class SystemBars(
             })();
         """.trimIndent()
         webView.evaluateJavascript(js, null)
+    }
+
+    /** One frame of the keyboard's slide: where it is now and where it is
+     *  heading, in CSS pixels. */
+    fun injectKeyboardFrame(webView: WebView, livePx: Int, targetPx: Int) {
+        val density = activity.resources.displayMetrics.density.toDouble()
+        keyboardInsetDp = livePx / density
+        webView.evaluateJavascript(
+            "window.dispatchEvent(new CustomEvent('gk-keyboard-frame',{detail:" +
+                "{live:$keyboardInsetDp,target:${targetPx / density}}}))",
+            null,
+        )
+    }
+
+    /** The slide is over: the page goes back to [injectInsets]'s resting state. */
+    fun settleKeyboard(webView: WebView, targetPx: Int) {
+        keyboardInsetDp = targetPx / activity.resources.displayMetrics.density.toDouble()
+        injectInsets(webView)
     }
 
     /** Lays the bar backgrounds over the system bars: the status bar along

@@ -2,6 +2,7 @@ import React from "react";
 import { PencilIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
+import { captureScrollAnchor } from "../../utils/scrollAnchor.js";
 
 // A plain element rather than a component: the Reading mode button swaps
 // it in place of the Draw mode wave, and both stay the same <svg> node.
@@ -46,14 +47,11 @@ export default function FooterModeButtons({
   onToggleDrawMode,
   onExitDrawToView,
   modalScrollRef,
-  savedModalScrollRatioRef,
+  modalScrollAnchorRef,
 }) {
   const handleToggleViewMode = () => {
     const el = modalScrollRef?.current;
-    const maxScroll = el ? el.scrollHeight - el.clientHeight : 0;
-    if (savedModalScrollRatioRef) {
-      savedModalScrollRatioRef.current = maxScroll > 0 ? el.scrollTop / maxScroll : 0;
-    }
+    if (el && modalScrollAnchorRef) modalScrollAnchorRef.current = captureScrollAnchor(el);
     onToggleViewMode();
   };
 

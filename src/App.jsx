@@ -217,7 +217,7 @@ export default function App() {
     modalTagInputRef, modalTagBtnRef, suppressTagBlurRef,
     mBodyRef, modalFileRef, modalIconFileRef, modalFmtBtnRef, modalColorBtnRef,
     scrimClickStartRef,
-    noteViewRef, modalScrollRef, savedModalScrollRatioRef,
+    noteViewRef, modalScrollRef, modalScrollAnchorRef,
     // Derived
     activeNoteObj, editedStamp, modalHasChanges,
     // Tag helpers
@@ -807,7 +807,7 @@ export default function App() {
       suppressTagBlurRef={suppressTagBlurRef}
       modalColorBtnRef={modalColorBtnRef}
       scrimClickStartRef={scrimClickStartRef}
-      savedModalScrollRatioRef={savedModalScrollRatioRef}
+      modalScrollAnchorRef={modalScrollAnchorRef}
       activeNoteObj={activeNoteObj}
       onSetReminder={setNoteReminder}
       editedStamp={editedStamp}

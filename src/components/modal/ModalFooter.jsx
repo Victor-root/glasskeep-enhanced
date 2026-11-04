@@ -30,6 +30,7 @@ export default function ModalFooter({
   onTogglePin,
   reserveNavBar = false,
   rootRef,
+  keyboardManaged,
   isDesktop,
   // tags
   mTagList,
@@ -86,7 +87,7 @@ export default function ModalFooter({
   onToggleDrawMode,
   onExitDrawToView,
   modalScrollRef,
-  savedModalScrollRatioRef,
+  modalScrollAnchorRef,
   // actions
   activeId,
   notes,
@@ -140,9 +141,16 @@ export default function ModalFooter({
       ref={rootRef}
       className={`modal-footer-toolbar border-t border-[var(--border-light)]${isDesktop ? "" : " modal-footer-toolbar--touch"}`}
       data-save-state={isDesktop ? undefined : saveState}
+      data-keyboard-rider={keyboardManaged ? "" : undefined}
       // The gesture bar sits on top of the keyboard, so its inset would only
-      // be dead space above it once the panel has slid up.
-      style={reserveNavBar ? { paddingBottom: "max(0px, var(--safe-bottom) - var(--keyboard-inset))" } : undefined}
+      // be dead space above it once the panel has slid up. A footer riding
+      // the keyboard (useNoteKeyboardLayout) keeps it, under the keyboard,
+      // and slides over the text: its tint needs the note's colour behind it.
+      style={reserveNavBar
+        ? keyboardManaged
+          ? { paddingBottom: "var(--safe-bottom)", backgroundColor: sheetBg }
+          : { paddingBottom: "max(0px, var(--safe-bottom) - var(--keyboard-inset))" }
+        : undefined}
     >
       {/* Phones: the note's save state, along the footer's top edge
           (.gk-save-line), in place of the header's save check. */}
@@ -326,7 +334,7 @@ export default function ModalFooter({
           onToggleDrawMode={onToggleDrawMode}
           onExitDrawToView={onExitDrawToView}
           modalScrollRef={modalScrollRef}
-          savedModalScrollRatioRef={savedModalScrollRatioRef}
+          modalScrollAnchorRef={modalScrollAnchorRef}
         />
       </div>
     </div>
