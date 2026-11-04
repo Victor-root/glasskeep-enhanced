@@ -242,6 +242,7 @@ function attachFederationRoutes(
     log,
     store,
     noteFederation,
+    attachments: noteDeps?.attachments,
     hostOf,
     maxLabelLen: MAX_LABEL_LEN,
     searchLocalUsersStmt,

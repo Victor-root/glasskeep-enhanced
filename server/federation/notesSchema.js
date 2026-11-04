@@ -84,6 +84,17 @@ function migrateSchema(db, log) {
   } catch (e) {
     log.warn?.("[federation/notes] teardown migration:", e?.message);
   }
+  // The attachment list last pushed to this peer, as a fingerprint (see
+  // notesAttachments.js). A file added or removed does not touch the note's
+  // client_updated_at, so last_pushed_cua cannot tell.
+  try {
+    const cols = db.prepare(`PRAGMA table_info(federated_notes)`).all();
+    if (!cols.some((c) => c.name === "attachments_pushed")) {
+      db.exec(`ALTER TABLE federated_notes ADD COLUMN attachments_pushed TEXT`);
+    }
+  } catch (e) {
+    log.warn?.("[federation/notes] attachments migration:", e?.message);
+  }
 }
 
 // Runs the migrations, then prepares the statements against the result.
@@ -108,6 +119,7 @@ function createNoteFederationQueries(db, log) {
     `),
     // last_pushed_cua is per-peer, so the echo-guard is scoped to the link.
     setPushed: db.prepare(`UPDATE federated_notes SET last_pushed_cua = ? WHERE note_id = ? AND link_id = ?`),
+    setAttachmentsPushed: db.prepare(`UPDATE federated_notes SET attachments_pushed = ? WHERE note_id = ? AND link_id = ?`),
     // Record how this note's share must end, on every peer carrying it.
     setTeardownForNote: db.prepare(`UPDATE federated_notes SET teardown = ? WHERE note_id = ?`),
     setTeardownForLink: db.prepare(`UPDATE federated_notes SET teardown = ? WHERE note_id = ? AND link_id = ?`),

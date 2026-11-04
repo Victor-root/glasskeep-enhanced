@@ -107,6 +107,8 @@ function verifySignedRequest(link, { method, path, headers, rawBody }) {
 }
 
 // ── Outbound calls ───────────────────────────────────────────────────
+const FILE_TIMEOUT_MS = 60 * 60 * 1000;
+
 async function httpJson(url, { method = "POST", body, secret, linkId, path } = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
@@ -147,6 +149,25 @@ function postSigned(link, path, body) {
     linkId: link.id,
     path,
     body,
+  });
+}
+
+// The same, for an answer that is a file: the raw response, whose body the
+// caller reads as a stream. Only reaching the peer is timed: a large file
+// can take as long as it takes.
+async function fetchSigned(link, path, body) {
+  const bodyString = JSON.stringify(body);
+  const ts = Date.now();
+  return fetch(link.peer_base_url + path, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-gk-fed-link": link.id,
+      "x-gk-fed-ts": String(ts),
+      "x-gk-fed-sig": computeSignature(link.shared_secret, "POST", path, ts, bodyString),
+    },
+    body: bodyString,
+    signal: AbortSignal.timeout(FILE_TIMEOUT_MS),
   });
 }
 
@@ -360,6 +381,7 @@ module.exports = {
   verifySignedRequest,
   httpJson,
   postSigned,
+  fetchSigned,
   runTick,
   healthCheckOne,
   tlsAwareMessage,

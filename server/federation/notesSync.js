@@ -25,7 +25,7 @@ function contentFromNote(note) {
   };
 }
 
-function createNoteSync({ q, store, peer, deps, log }) {
+function createNoteSync({ q, store, peer, deps, log, attachmentSync }) {
   // Push one note's current content to its peer (LWW on the other side).
   async function pushNoteContent(link, note) {
     const body = {
@@ -109,6 +109,7 @@ function createNoteSync({ q, store, peer, deps, log }) {
       return;
     }
     if (!note) return;
+    await attachmentSync.reconcile(m, link);
     if (note.client_updated_at && note.client_updated_at === m.last_pushed_cua) return; // unchanged
     await pushNoteContent(link, note);
   }

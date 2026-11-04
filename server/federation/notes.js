@@ -38,6 +38,7 @@ const { createNoteParticipants } = require("./notesParticipants");
 const { contentFromNote, createNoteSync } = require("./notesSync");
 const { createProfileSync } = require("./notesProfiles");
 const { createNoteTeardown } = require("./notesTeardown");
+const { createAttachmentSync } = require("./notesAttachments");
 
 const CONTENT_FIELDS = ["type", "title", "content", "items_json", "images_json", "color", "timestamp"];
 
@@ -46,7 +47,8 @@ function createNoteFederation(ctx) {
   const q = createNoteFederationQueries(db, log);
   const shared = { q, store, peer, deps, log };
   const { findRealUser, ensureShadowUser, applyRoster, pushLeave } = createNoteParticipants(shared);
-  const { reconcileMapping, onNoteChangedLocally, onParticipantsChangedLocally } = createNoteSync(shared);
+  const attachmentSync = createAttachmentSync(shared);
+  const { reconcileMapping, onNoteChangedLocally, onParticipantsChangedLocally } = createNoteSync({ ...shared, attachmentSync });
   const { applyRemoteProfile, broadcastProfileToPeers, pushProfilesToLink } = createProfileSync(shared);
 
   // ── Helpers ─────────────────────────────────────────────────────────
@@ -523,6 +525,10 @@ function createNoteFederation(ctx) {
     },
     isPeerHost: (host) => !!activeLinkForHost(host),
     getMapping: (noteId) => q.getAnyMapping.get(noteId),
+    onAttachmentChanged: attachmentSync.onChanged,
+    ensureAttachmentFile: attachmentSync.ensureFile,
+    handleIncomingAttachments: attachmentSync.handleIncomingList,
+    handleIncomingAttachmentChange: attachmentSync.handleIncomingChange,
     // Friendly name of the server a shadow user belongs to, for badges.
     // Resolves by the (stable) link id embedded in federated_origin, and
     // falls back to matching an active link by host — so a re-paired link

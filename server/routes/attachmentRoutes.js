@@ -3,13 +3,11 @@
 // Adding, removing and opening the files attached to a note. See
 // server/attachments/attachmentStore.js for how they are kept.
 
-const { TooLargeError, EncryptionTransitionError } = require("../attachments/attachmentStore");
+const { TooLargeError, EncryptionTransitionError, ID_RE, THUMB_RE } = require("../attachments/attachmentStore");
 const { pipeline } = require("stream/promises");
 
 const MAX_PER_NOTE = 100;
-const THUMB_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+=*$/;
 const MAX_THUMB_LENGTH = 64 * 1024;
-const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 // Shown by the browser in place, with the app's scripts out of reach. The
 // rest (HTML and SVG above all, which would run on this origin) can only
@@ -68,6 +66,9 @@ function attachAttachmentRoutes(app, deps) {
     return note;
   }
 
+  const tellFederation = (noteId, change) =>
+    noteFederation ? noteFederation.onAttachmentChanged(noteId, change) : Promise.resolve(true);
+
   function changed(noteId, user) {
     markEditedBy(noteId, user);
     broadcastNoteAttachments(noteId);
@@ -117,6 +118,12 @@ function attachAttachmentRoutes(app, deps) {
         mime: req.headers["x-attachment-type"],
         uploadedBy: req.user.id,
       });
+      // On a mirror the note's own server has to take it, or nobody else
+      // will ever see the file: better to say so now.
+      if (!(await tellFederation(note.id, { add: attachments.peerItem(id) }))) {
+        attachments.remove(note.id, id);
+        return res.status(503).json({ error: "The server of this note can't be reached." });
+      }
       changed(note.id, req.user);
       res.status(201).json({ attachment });
     } catch (e) {
@@ -144,13 +151,21 @@ function attachAttachmentRoutes(app, deps) {
       return res.status(404).json({ error: "Attachment not found" });
     }
     broadcastNoteAttachments(note.id);
+    tellFederation(note.id, { add: attachments.peerItem(req.params.attachmentId) }).catch(() => {});
     res.json({ ok: true });
   });
 
-  app.delete("/api/notes/:id/attachments/:attachmentId", auth, (req, res) => {
+  app.delete("/api/notes/:id/attachments/:attachmentId", auth, async (req, res) => {
     const note = writableNote(req, res);
     if (!note) return;
-    if (attachments.remove(note.id, req.params.attachmentId)) changed(note.id, req.user);
+    const known = attachments.get(req.params.attachmentId);
+    if (!known || known.noteId !== note.id) return res.json({ ok: true });
+    if (!(await tellFederation(note.id, { removeId: known.id }))) {
+      return res.status(503).json({ error: "The server of this note can't be reached." });
+    }
+    attachments.remove(note.id, known.id);
+    changed(note.id, req.user);
+    tellFederation(note.id, {}).catch(() => {});
     res.json({ ok: true });
   });
 
@@ -189,6 +204,14 @@ function attachAttachmentRoutes(app, deps) {
     res.setHeader("Content-Security-Policy", attachment.mime === "application/pdf" && inline ? PDF_POLICY : SANDBOXED);
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cache-Control", "private, no-store");
+    try {
+      await noteFederation?.ensureAttachmentFile(attachment.fileId);
+    } catch (e) {
+      console.warn("[attachments] peer file:", e?.message);
+      res.removeHeader("Content-Length");
+      res.removeHeader("Content-Disposition");
+      return res.status(502).json({ error: "The server holding this file can't be reached." });
+    }
     try {
       await pipeline(attachments.openFile(attachment.fileId), res);
     } catch (e) {

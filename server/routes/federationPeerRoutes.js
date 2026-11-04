@@ -11,6 +11,7 @@
 // Also here: the two routes a signed-in user's share UI calls to list the
 // paired peers and search their users.
 
+const { pipeline } = require("stream/promises");
 const protocol = require("../federation/protocol");
 const peer = require("../federation/peer");
 const { safeEqual } = require("../services/safeEqual");
@@ -57,6 +58,7 @@ function attachFederationPeerRoutes(app, ctx) {
     log,
     store,
     noteFederation,
+    attachments,
     hostOf,
     maxLabelLen,
     searchLocalUsersStmt,
@@ -369,6 +371,37 @@ function attachFederationPeerRoutes(app, ctx) {
     note: b.note || {},
     roster: Array.isArray(b.roster) ? b.roster : null,
   }));
+
+  // The home server of a note we mirror sends its attachment list.
+  noteRoute("/api/federation/notes/attachments", (link, b) => noteFederation.handleIncomingAttachments({
+    linkId: link.id,
+    noteId: b.noteId,
+    attachments: b.attachments,
+  }));
+
+  // A mirror asks us, the note's home server, to add or remove a file.
+  noteRoute("/api/federation/notes/attachment-change", (link, b) => noteFederation.handleIncomingAttachmentChange({
+    linkId: link.id,
+    noteId: b.noteId,
+    add: b.add,
+    removeId: b.removeId,
+  }));
+
+  // A peer needs the bytes of a file of a note we share.
+  app.post("/api/federation/notes/attachment-file", async (req, res) => {
+    const link = verifyS2S(req, res);
+    if (!link) return;
+    const fileId = String(req.body?.fileId || "");
+    try {
+      await noteFederation.ensureAttachmentFile(fileId);
+      res.setHeader("Content-Type", "application/octet-stream");
+      await pipeline(attachments.openFile(fileId), res);
+    } catch (e) {
+      if (!res.headersSent) return res.status(404).json({ ok: false, error: "unknown_file" });
+      log.warn?.("[federation/notes] attachment file:", e?.message);
+      res.destroy();
+    }
+  });
 
   // A peer unshared/deleted a note we mirror → tear down the mirror.
   noteRoute("/api/federation/notes/remove", (link, b) => noteFederation.handleIncomingRemove({

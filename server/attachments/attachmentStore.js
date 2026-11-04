@@ -32,6 +32,8 @@ const { nowISO } = require("../utils/timestamps");
 
 const MAX_NAME_LENGTH = 255;
 const MIME_RE = /^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/;
+const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const THUMB_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+=*$/;
 const STALE_UPLOAD_MS = 24 * 3600 * 1000;
 // A file on disk without a row may be an upload finishing right now.
 const ORPHAN_GRACE_MS = 3600 * 1000;
@@ -234,6 +236,54 @@ function createAttachmentStore({ db, dbFile, log = console }) {
     })();
   }
 
+  // ── Federation ──────────────────────────────────────────────────────
+  // A shared note carries the same attachments on both servers, but the
+  // bytes stay where they were uploaded until someone opens them.
+  function peerShape(row) {
+    return { ...publicShape(row), fileId: row.file_id, sha256: row.sha256 };
+  }
+
+  const listForPeer = (noteId) => q.listRows.all(noteId).map(peerShape);
+
+  const validPeerItem = (item) => item
+    && ID_RE.test(String(item.id)) && ID_RE.test(String(item.fileId))
+    && Number.isSafeInteger(item.size) && item.size >= 0
+    && /^[0-9a-f]{64}$/.test(String(item.sha256));
+
+  function upsertFromPeer(noteId, item, linkId) {
+    if (!validPeerItem(item)) return;
+    const meta = { name: cleanName(item.name), mime: cleanMime(item.mime), thumb: THUMB_RE.test(String(item.thumb)) ? item.thumb : null };
+    const row = q.getRow.get(item.id);
+    if (row) {
+      if (row.note_id !== noteId) return;
+      const sealed = sealMeta(noteId, item.id, meta);
+      q.updateMeta.run(sealed.meta_json, sealed.enc_payload, item.id);
+      return;
+    }
+    if (!q.getFile.get(item.fileId)) {
+      registerFile({ fileId: item.fileId, size: item.size, sha256: item.sha256, encrypted: false, remoteLinkId: linkId });
+    }
+    const sealed = sealMeta(noteId, item.id, meta);
+    q.insertRow.run(item.id, noteId, item.fileId, null, nowISO(), sealed.meta_json, sealed.enc_payload);
+  }
+
+  function replaceFromPeer(noteId, items, linkId) {
+    const keep = new Set(items.map((i) => i?.id));
+    db.transaction(() => {
+      for (const row of q.listRows.all(noteId)) {
+        if (!keep.has(row.id)) q.deleteRow.run(row.id, noteId);
+      }
+      for (const item of items) upsertFromPeer(noteId, item, linkId);
+    })();
+    scheduleSweep();
+  }
+
+  // The bytes of a file a peer holds, now that someone needs them.
+  async function storePeerFile(file, source) {
+    const stored = await writeFile(source, { fileId: file.id, maxBytes: file.size, expectedSha256: file.sha256 });
+    q.setFileLocal.run(stored.encrypted ? 1 : 0, file.id);
+  }
+
   // ── Encryption state ────────────────────────────────────────────────
   // In the same transaction as the notes: see encryptAllRows.
   function sealAllMeta() {
@@ -347,6 +397,14 @@ function createAttachmentStore({ db, dbFile, log = console }) {
     setThumb,
     remove,
     copyToNote,
+    listForPeer,
+    upsertFromPeer,
+    replaceFromPeer,
+    storePeerFile,
+    peerItem: (attachmentId) => {
+      const row = q.getRow.get(attachmentId);
+      return row ? peerShape(row) : null;
+    },
     usage: () => q.totalSize.get(),
     sealAllMeta,
     openAllMeta,
@@ -361,4 +419,4 @@ function createAttachmentStore({ db, dbFile, log = console }) {
   };
 }
 
-module.exports = { createAttachmentStore, TooLargeError, EncryptionTransitionError };
+module.exports = { createAttachmentStore, TooLargeError, EncryptionTransitionError, ID_RE, THUMB_RE };

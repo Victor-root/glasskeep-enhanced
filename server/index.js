@@ -241,6 +241,7 @@ const federation = attachFederationRoutes(app, {
     createSharedNoteDeletedNotification: notifications.createSharedNoteDeletedNotification,
     createAccessRevokedNotification: notifications.createAccessRevokedNotification,
     broadcastNoteUpdated: realtime.broadcastNoteUpdated,
+    broadcastNoteAttachments: realtime.broadcastNoteAttachments,
     isNewerOrEqual,
     parseIsoTimestamp,
   },

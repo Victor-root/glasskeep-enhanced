@@ -8,7 +8,7 @@
 // disque.
 import path from "node:path";
 import crypto from "node:crypto";
-import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { startInstance, createAndLogin, listenEvents, runner, sleep } from "./lab.mjs";
 
 const PORT = 9518;
@@ -111,10 +111,7 @@ try {
   await inst.call("POST", "/api/notes/n1/collaborate", { token: alice.token, body: { username: "bob@x.test" } });
   await inst.call("POST", "/api/notes/n1/collaborate", { token: alice.token, body: { username: "carl@x.test" } });
   const carlRow = inst.db(true); const carlId = carlRow.prepare("SELECT id FROM users WHERE email='carl@x.test'").get().id; carlRow.close();
-  const acces = await inst.call("PATCH", `/api/notes/n1/collaborate/${carlId}`, { token: alice.token, body: { canWrite: false } });
-  if (!acces.ok) {
-    const b = inst.db(); b.prepare("UPDATE note_collaborators SET can_write = 0 WHERE note_id='n1' AND user_id=?").run(carlId); b.close();
-  }
+  await inst.call("PATCH", `/api/notes/n1/collaborate/${carlId}`, { token: alice.token, body: { access: "read" } });
   const idBob = crypto.randomUUID();
   t.check("un collaborateur ajoute un fichier", (await joindre(bob, "n1", Buffer.from("de bob"), { id: idBob, name: "bob.txt", type: "text/plain" })).status === 201);
   const lienBob = await lien(bob, "n1", id1);
