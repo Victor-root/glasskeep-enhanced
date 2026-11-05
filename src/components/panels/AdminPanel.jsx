@@ -8,6 +8,7 @@ import AdminUpdateSection from "../admin/AdminUpdateSection.jsx";
 import FederationSection from "../admin/federation/FederationSection.jsx";
 import PendingRegistrationsSection from "../admin/PendingRegistrationsSection.jsx";
 import SiteSettingsSection from "../admin/SiteSettingsSection.jsx";
+import AttachmentsAdminSection from "../admin/AttachmentsAdminSection.jsx";
 import UsersSection from "../admin/UsersSection.jsx";
 import CreateUserSection from "../admin/CreateUserSection.jsx";
 import EditUserModal from "../admin/EditUserModal.jsx";
@@ -214,6 +215,23 @@ export default function AdminPanel({
             highlightPasskeyDomain={highlightPasskeyDomain}
             onPasskeyDomainHighlighted={onPasskeyDomainHighlighted}
           />
+
+          <div className="mb-2">
+            <SettingsSection
+              icon={TI.Paperclip}
+              title={t("attachments")}
+              open={openSections.attachments}
+              onToggle={() => toggleSection("attachments")}
+            >
+              <AttachmentsAdminSection
+                open={openSections.attachments}
+                value={adminSettings.attachmentMaxMb}
+                authToken={authToken}
+                onSave={(attachmentMaxMb) => updateAdminSettings({ attachmentMaxMb })}
+                showToast={showToast}
+              />
+            </SettingsSection>
+          </div>
 
           {/* All users — same row pattern as Settings, with avatar in
               the leading icon slot and edit/delete actions on the right. */}
