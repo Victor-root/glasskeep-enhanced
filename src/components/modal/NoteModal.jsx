@@ -594,7 +594,7 @@ export default function NoteModal({
           {...fileDropHandlers}
         >
           {dragDepth > 0 && (
-            <div className="gk-attachment-drop">
+            <div className="gk-attachment-drop" style={{ backgroundColor: modalBgFor(mColor, dark) }}>
               <TI.Paperclip className="tabler-icon" />
               {t("dropFilesToAttach")}
             </div>

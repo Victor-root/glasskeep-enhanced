@@ -9,6 +9,7 @@ import android.webkit.URLUtil
 import android.webkit.WebView
 import android.widget.Toast
 import com.glasskeep.app.R
+import java.io.File
 
 /**
  * Files the page downloads. A server URL goes through the system
@@ -45,21 +46,30 @@ class WebDownloads(private val activity: Activity) {
                 })()
             """.trimIndent(), null)
         } else {
-            try {
-                val req = DownloadManager.Request(Uri.parse(downloadUrl)).apply {
-                    setMimeType(mimeType)
-                    addRequestHeader("Cookie", CookieManager.getInstance().getCookie(downloadUrl))
-                    addRequestHeader("User-Agent", userAgent)
-                    val filename = URLUtil.guessFileName(downloadUrl, contentDisposition, mimeType)
-                    setTitle(filename)
-                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
-                }
-                activity.getSystemService(DownloadManager::class.java).enqueue(req)
-                Toast.makeText(activity, activity.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
-            } catch (_: Exception) {
-                Toast.makeText(activity, activity.getString(R.string.download_error), Toast.LENGTH_SHORT).show()
+            enqueue(downloadUrl, URLUtil.guessFileName(downloadUrl, contentDisposition, mimeType), mimeType, userAgent)
+        }
+    }
+
+    /** A file whose name the page knows: guessFileName cannot read a
+     *  Content-Disposition carrying a UTF-8 name, and answers "file.bin". */
+    fun downloadNamed(url: String, name: String, mimeType: String) {
+        enqueue(url, File(name).name.ifBlank { "file" }, mimeType, null)
+    }
+
+    private fun enqueue(url: String, filename: String, mimeType: String?, userAgent: String?) {
+        try {
+            val req = DownloadManager.Request(Uri.parse(url)).apply {
+                setMimeType(mimeType)
+                addRequestHeader("Cookie", CookieManager.getInstance().getCookie(url))
+                userAgent?.let { addRequestHeader("User-Agent", it) }
+                setTitle(filename)
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
             }
+            activity.getSystemService(DownloadManager::class.java).enqueue(req)
+            Toast.makeText(activity, activity.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) {
+            Toast.makeText(activity, activity.getString(R.string.download_error), Toast.LENGTH_SHORT).show()
         }
     }
 

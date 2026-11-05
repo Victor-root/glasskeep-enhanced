@@ -11,7 +11,7 @@ import crypto from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { startInstance, createAndLogin, listenEvents, runner, sleep } from "./lab.mjs";
 
-const PORT = 9518;
+const PORT = 9522;
 const t = runner("Pièces jointes");
 const inst = await startInstance({ port: PORT });
 const dossier = path.join(path.dirname(inst.dbFile), "note-files");

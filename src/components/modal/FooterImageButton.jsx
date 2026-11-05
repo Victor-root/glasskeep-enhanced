@@ -120,12 +120,12 @@ export default function FooterImageButton({
           ref={imageBtnRef}
           className={`${btnClass} modal-footer-btn--image focus:outline-none`}
           onClick={() => setImageMenuOpen((v) => !v)}
-          data-tooltip={!isDesktop ? t("addImages") : undefined}
+          data-tooltip={!isDesktop ? t(addAttachments ? "imagesAndFiles" : "addImages") : undefined}
           aria-haspopup="menu"
           aria-expanded={imageMenuOpen ? "true" : "false"}
         >
           <AddImageIcon />
-          {isDesktop && <span>{t("image")}</span>}
+          {isDesktop && <span>{t(addAttachments ? "imagesAndFiles" : "image")}</span>}
           {noteIconBadge}
         </button>
       )}

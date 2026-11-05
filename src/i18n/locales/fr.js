@@ -1609,6 +1609,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fileSizeUnits: "o,Ko,Mo,Go",
   attachments: "Pièces jointes",
   attachFile: "Joindre un fichier",
+  imagesAndFiles: "Images et fichiers",
   attachmentFileLabel: "Fichier",
   attachmentWaiting: "En attente de connexion",
   attachmentUploadFailed: "Impossible d'envoyer ce fichier.",

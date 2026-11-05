@@ -92,10 +92,8 @@ async function upload(item) {
 
 async function pump() {
   if (running || !userId) return;
-  if (!navigator.onLine) {
-    items.filter((item) => item.status === "queued").forEach((item) => update(item.id, { status: "waiting" }));
-    return;
-  }
+  // No check of navigator.onLine: it says nothing about a server on the
+  // local network. The attempt itself is the only honest answer.
   for (;;) {
     const now = Date.now();
     const next = items.find((item) => (item.status === "queued" || item.status === "waiting") && !(item.notBefore > now));

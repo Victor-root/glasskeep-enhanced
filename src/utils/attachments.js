@@ -129,9 +129,13 @@ export async function attachmentLink(noteId, id, { inline = false } = {}) {
   return new URL(url, window.location.origin).href;
 }
 
-// A plain link click: the browser, or the Android app's download listener,
-// takes it from there.
-export function saveFromLink(url, name) {
+// The app's download manager, or a plain link click for the browser to take
+// from there.
+export function saveFromLink(url, name, mime) {
+  if (window.AndroidTheme?.downloadFile) {
+    window.AndroidTheme.downloadFile(url, name, mime || "application/octet-stream");
+    return;
+  }
   const a = document.createElement("a");
   a.href = url;
   a.download = name;

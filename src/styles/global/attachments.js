@@ -55,6 +55,9 @@ button.gk-attachment-main:focus-visible,
   border-radius: 8px;
 }
 .gk-attachment-thumb { object-fit: cover; }
+/* A tile can share its colour with the note. */
+html.dark .gk-attachment-thumb,
+html.dark .gk-attachment-tile { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22); }
 .gk-attachment-tile {
   display: flex;
   align-items: center;
@@ -146,9 +149,8 @@ html.dark .gk-attachment-btn:active { background-color: rgba(255, 255, 255, 0.14
   align-items: center;
   justify-content: center;
   gap: 10px;
-  border: 2px dashed var(--note-color-opaque, #6366f1);
+  border: 2px dashed currentColor;
   border-radius: 14px;
-  background: var(--gk-sheet-bg, rgba(255, 255, 255, 0.9));
   font-size: 1rem;
   font-weight: 600;
   pointer-events: none;

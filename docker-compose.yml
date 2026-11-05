@@ -111,8 +111,8 @@ services:
       # Optional: reminder scheduler sweep cadence in ms (default 30000).
       # REMINDER_SWEEP_MS: "30000"
     volumes:
-      # Persistent data: SQLite DB + auto-generated JWT secret.
-      # Back this directory up to preserve your notes.
+      # Persistent data: SQLite DB, attached files (note-files/) and the
+      # auto-generated JWT secret. Back this directory up to preserve your notes.
       - ./data:/data
 
       # --- One-click self-update from the admin panel -----------------------

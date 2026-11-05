@@ -95,6 +95,12 @@ class WebViewActivity : AppCompatActivity() {
             runOnUiThread { attachmentOpener.open(url, name, mimeType) }
         }
 
+        /** An attached file, saved under its own name. */
+        @JavascriptInterface
+        fun downloadFile(url: String, name: String, mimeType: String) {
+            runOnUiThread { downloads.downloadNamed(url, name, mimeType) }
+        }
+
         /** Off while the page draws its own scrollbar, under its header,
          *  which the WebView's (always on top) cannot do. */
         @JavascriptInterface

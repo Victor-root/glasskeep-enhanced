@@ -72,7 +72,7 @@ export default function AddImageMenu({
 
   if (asSheet) {
     return (
-      <Sheet open={open} onClose={onClose} title={t("image")} background={sheetBackground}>
+      <Sheet open={open} onClose={onClose} title={t(onAddFiles ? "imagesAndFiles" : "image")} background={sheetBackground}>
         {items.map((item) => (
           <SheetRow key={item.key} icon={item.icon} color={item.color} label={item.label} onClick={() => runItem(item)} />
         ))}

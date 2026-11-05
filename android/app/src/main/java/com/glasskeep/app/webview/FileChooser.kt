@@ -49,7 +49,7 @@ class FileChooser(private val activity: ComponentActivity) {
         fileUploadCallback?.onReceiveValue(null)
         fileUploadCallback = callback
 
-        if (ContextCompat.checkSelfPermission(
+        if (params.isCaptureEnabled && ContextCompat.checkSelfPermission(
                 activity, Manifest.permission.CAMERA
             ) != PackageManager.PERMISSION_GRANTED
         ) {

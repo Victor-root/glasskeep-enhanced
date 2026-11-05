@@ -62,6 +62,7 @@ GlassKeep also includes:
 * 👑 admin panel
 * 🗝️ secret recovery key login
 * 📝 Markdown notes, checklists, drawings, and images
+* 📎 file attachments on notes (PDFs, archives, anything): kept on your server, encrypted at rest when encryption is on, shared with collaborators and across federated servers, and queued while offline
 * 👥 real-time collaboration on notes
 * 📦 import / export with cross-device duplicate detection
 * 📥 Google Keep import (Takeout `.zip`, full colour, images, line breaks)
@@ -140,6 +141,9 @@ client_max_body_size 160m;
 
 Caddy has no such limit by default; Apache uses `LimitRequestBody 0`; on
 Traefik it is unlimited unless you set `buffering.maxRequestBodyBytes`.
+
+File attachments are limited separately, in the admin panel (100 MB by
+default): if you raise that past 160 MB, raise this limit with it.
 
 **Keep custom error pages away from `/api/`.** If your proxy replaces upstream
 error responses with its own pages, GlassKeep's answers stop reaching the

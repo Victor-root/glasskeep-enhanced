@@ -21,7 +21,6 @@ import {
 } from "../sync/attachmentUploads.js";
 
 const NO_LIMIT = { maxBytes: null, maxPerNote: null };
-const OFFLINE_ERROR = () => t("attachmentNeedsConnection");
 
 // The attachments of the note open in a pane: what the server has, what is
 // on its way there, and what can be done with each.
@@ -66,12 +65,13 @@ export default function useNoteAttachments({ note, noteId, canEdit, materializeD
   }, [limits, materializeDraftIfNeeded, noteId, showToast]);
 
   const failed = useCallback((e) => {
-    showToast?.(navigator.onLine ? localizeServerError(e?.message, "attachmentOpenFailed") : OFFLINE_ERROR(), "error");
+    // A request that never reached the server has no status.
+    showToast?.(e?.status ? localizeServerError(e?.message, "attachmentOpenFailed") : t("attachmentNeedsConnection"), "error");
   }, [showToast]);
 
   const download = useCallback(async (attachment) => {
     try {
-      saveFromLink(await attachmentLink(noteId, attachment.id), attachment.name);
+      saveFromLink(await attachmentLink(noteId, attachment.id), attachment.name, attachment.mime);
     } catch (e) {
       failed(e);
     }
