@@ -2,6 +2,7 @@ import React, { useRef } from "react";
 import AddImageMenu from "./AddImageMenu.jsx";
 import LogoPickerPopover from "./LogoPickerPopover.jsx";
 import { AddImageIcon, LogoIcon } from "../../icons/index.jsx";
+import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
 
 /**
@@ -120,12 +121,12 @@ export default function FooterImageButton({
           ref={imageBtnRef}
           className={`${btnClass} modal-footer-btn--image focus:outline-none`}
           onClick={() => setImageMenuOpen((v) => !v)}
-          data-tooltip={!isDesktop ? t(addAttachments ? "imagesAndFiles" : "addImages") : undefined}
+          data-tooltip={!isDesktop ? t(addAttachments ? "attach" : "addImages") : undefined}
           aria-haspopup="menu"
           aria-expanded={imageMenuOpen ? "true" : "false"}
         >
-          <AddImageIcon />
-          {isDesktop && <span>{t("image")}</span>}
+          {addAttachments ? <TI.Paperclip className="tabler-icon w-5 h-5" /> : <AddImageIcon />}
+          {isDesktop && <span>{t(addAttachments ? "attach" : "image")}</span>}
           {noteIconBadge}
         </button>
       )}
