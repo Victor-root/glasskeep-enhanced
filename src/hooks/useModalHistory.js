@@ -6,9 +6,10 @@ import { useRef, useCallback, useEffect, useState } from "react";
  * Groups rapid changes into a single undo step via a 1-second
  * debounce (similar to Word / Google Keep chunk-level undo).
  *
- * Completely independent from autosave — no coupling, no conflict.
- * Autosave reads state and persists it; this hook only manages the
- * undo/redo navigation stack.  They never interact.
+ * Text and title are saved by the autosave, which watches the state an
+ * undo restores. Checklist items are only saved on an explicit commit, so
+ * a restored list is handed to `saveItems`: otherwise the server keeps the
+ * list from before the undo, and it comes back.
  *
  * Tracked snapshot per note type:
  *   - text       → { type, title, body }
@@ -57,6 +58,7 @@ export default function useModalHistory({
   setMTitle,
   setMBody,
   setMItems,
+  saveItems,
   open,
   activeId,
   mType,
@@ -131,12 +133,13 @@ export default function useModalHistory({
       setMTitle(s.title);
       if (s.type === "checklist") {
         if (setMItems) setMItems(s.items);
+        saveItems?.(s.items);
       } else {
         if (setMBody) setMBody(s.body);
       }
       lastSnapRef.current = s;
     },
-    [setMTitle, setMBody, setMItems],
+    [setMTitle, setMBody, setMItems, saveItems],
   );
 
   /* ── flush pending debounce (save unsaved typing before undo) ─ */

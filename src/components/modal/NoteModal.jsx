@@ -282,6 +282,7 @@ export default function NoteModal({
   const { undo, redo, canUndo, canRedo } = useModalHistory({
     mTitle, mBody, mItems,
     setMTitle, setMBody, setMItems,
+    saveItems: syncChecklistItems,
     open, activeId, mType, viewMode,
   });
 
