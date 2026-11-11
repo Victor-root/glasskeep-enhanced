@@ -583,6 +583,8 @@ export default function NoteModal({
           style={{
             backgroundColor: modalBgFor(mColor, dark),
             height: mobileLayout ? '100dvh' : undefined,
+            // Full screen, the card's frame would only be a hairline on the edges.
+            border: mobileLayout ? 'none' : undefined,
             paddingTop: mobileLayout ? 'var(--safe-top)' : undefined,
             paddingLeft: mobileLayout && !edgeToEdgeLandscape ? 'var(--safe-left)' : undefined,
             paddingRight: mobileLayout ? 'var(--safe-right)' : undefined,
