@@ -3,8 +3,10 @@
 // Adding, removing and opening the files attached to a note. See
 // server/attachments/attachmentStore.js for how they are kept.
 
-const { TooLargeError, EncryptionTransitionError, ID_RE, THUMB_RE } = require("../attachments/attachmentStore");
+const fs = require("fs");
 const { pipeline } = require("stream/promises");
+const { EncryptionTransitionError, ID_RE, THUMB_RE } = require("../attachments/attachmentStore");
+const { createUploadSessions } = require("../attachments/uploadSessions");
 
 const MAX_PER_NOTE = 100;
 const MAX_THUMB_LENGTH = 64 * 1024;
@@ -21,6 +23,26 @@ const INLINE_TYPES = new Set([
 // access to the origin anyway.
 const SANDBOXED = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox";
 const PDF_POLICY = "default-src 'none'; object-src 'self'; style-src 'unsafe-inline'";
+
+// The whole body of a request, or null past `limit` bytes.
+function readBody(req, limit) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        req.removeAllListeners("data");
+        req.resume();
+        resolve(null);
+      } else {
+        chunks.push(chunk);
+      }
+    });
+    req.on("end", () => resolve(size > limit ? null : Buffer.concat(chunks, size)));
+    req.on("error", reject);
+  });
+}
 
 function contentDisposition(kind, name) {
   const ascii = name.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
@@ -44,6 +66,7 @@ function attachAttachmentRoutes(app, deps) {
     noteFederation,
   } = deps;
 
+  const uploads = createUploadSessions({ attachments });
   const maxBytes = () => (getAdminSettings().attachmentMaxMb || 0) * 1024 * 1024;
 
   // The note the requester may change, or the refusal already sent. A
@@ -83,61 +106,94 @@ function attachAttachmentRoutes(app, deps) {
     res.json(attachments.usage());
   });
 
-  // The file is the raw request body, sent as application/octet-stream
-  // whatever it really is: the JSON and form parsers would otherwise eat a
-  // .json or a .txt of the right type. Its name and type come in headers.
-  // The id is the client's so a retry after a lost answer changes nothing.
+  // A file starts with what it is; its bytes follow in pieces (see
+  // attachments/uploadSessions.js). The id is the client's, so a retry after
+  // a lost answer changes nothing.
   app.post("/api/notes/:id/attachments", auth, async (req, res) => {
     const note = writableNote(req, res);
     if (!note) return;
 
     const limit = maxBytes();
     if (!limit) return res.status(403).json({ error: "Attachments are turned off on this server." });
-    if (Number(req.headers["content-length"]) > limit) {
-      return res.status(413).json({ error: "File too large.", maxBytes: limit });
-    }
-    const id = String(req.headers["x-attachment-id"] || "");
-    if (!ID_RE.test(id)) return res.status(400).json({ error: "Invalid attachment id." });
+    const { id, name, type, size } = req.body || {};
+    if (!ID_RE.test(String(id || ""))) return res.status(400).json({ error: "Invalid attachment id." });
+    if (!Number.isSafeInteger(size) || size < 0) return res.status(400).json({ error: "Invalid file size." });
+    if (size > limit) return res.status(413).json({ error: "File too large.", maxBytes: limit });
     const known = attachments.get(id);
     if (known) {
       if (known.noteId !== note.id) return res.status(409).json({ error: "Attachment id already in use." });
-      req.resume();
       return res.json({ attachment: known });
     }
     if (attachments.count(note.id) >= MAX_PER_NOTE) {
       return res.status(409).json({ error: "This note has too many attachments." });
     }
-
-    let name;
     try {
-      name = decodeURIComponent(String(req.headers["x-attachment-name"] || ""));
-    } catch {
-      return res.status(400).json({ error: "Invalid file name." });
+      const upload = await uploads.begin({ userId: req.user.id, noteId: note.id, attachmentId: id, name: String(name ?? ""), mime: type, size });
+      res.status(201).json(upload);
+    } catch (e) {
+      if (e instanceof EncryptionTransitionError) return res.status(503).json({ error: "Try again in a moment." });
+      console.error("[attachments] upload start failed", e);
+      res.status(500).json({ error: "Could not store the file." });
+    }
+  });
+
+  // Where an upload has got to, to resume it.
+  app.get("/api/attachment-uploads/:uploadId", auth, (req, res) => {
+    const session = uploads.get(req.params.uploadId, req.user.id);
+    if (!session) return res.status(404).json({ error: "Upload not found" });
+    res.json({ next: session.next, pieceSize: uploads.PIECE_BYTES });
+  });
+
+  // One piece, as the raw body. X-Last marks the final one, which completes
+  // the file and attaches it.
+  app.put("/api/attachment-uploads/:uploadId/:index", auth, async (req, res) => {
+    const session = uploads.get(req.params.uploadId, req.user.id);
+    if (!session) return res.status(404).json({ error: "Upload not found" });
+    const index = Number(req.params.index);
+    if (session.busy) return res.status(409).json({ error: "Upload busy", next: session.next });
+    // A piece already taken (its answer was lost) is simply acknowledged.
+    if (index < session.next) {
+      req.resume();
+      return res.json({ next: session.next });
+    }
+    if (index !== session.next) return res.status(409).json({ error: "Unexpected piece", next: session.next });
+
+    const piece = await readBody(req, uploads.PIECE_BYTES);
+    if (!piece) {
+      await uploads.drop(session);
+      return res.status(413).json({ error: "Piece too large.", pieceSize: uploads.PIECE_BYTES });
+    }
+    const last = req.headers["x-last"] === "1";
+    if (session.writer.size + piece.length > session.size || (last && session.writer.size + piece.length !== session.size)) {
+      await uploads.drop(session);
+      return res.status(400).json({ error: "The file does not match its announced size." });
     }
 
     try {
-      const stored = await attachments.writeFile(req, { maxBytes: limit });
+      const stored = await uploads.add(session, index, piece, last);
+      if (!stored) return res.json({ next: session.next });
+      const note = getNoteWithCollaboration.get(req.user.id, session.noteId, req.user.id);
+      if (!note) {
+        await fs.promises.rm(attachments.filePath(stored.fileId), { force: true });
+        return res.status(404).json({ error: "Note not found" });
+      }
       const attachment = attachments.attach(note.id, stored, {
-        id,
-        name,
-        mime: req.headers["x-attachment-type"],
+        id: session.attachmentId,
+        name: session.name,
+        mime: session.mime,
         uploadedBy: req.user.id,
       });
       // On a mirror the note's own server has to take it, or nobody else
       // will ever see the file: better to say so now.
-      if (!(await tellFederation(note.id, { add: attachments.peerItem(id) }))) {
-        attachments.remove(note.id, id);
+      if (!(await tellFederation(note.id, { add: attachments.peerItem(attachment.id) }))) {
+        attachments.remove(note.id, attachment.id);
         return res.status(503).json({ error: "The server of this note can't be reached." });
       }
       changed(note.id, req.user);
       res.status(201).json({ attachment });
     } catch (e) {
+      await uploads.drop(session).catch(() => {});
       if (res.headersSent) return;
-      // What is left of the body goes nowhere, and the connection with it.
-      res.setHeader("Connection", "close");
-      req.resume();
-      if (e instanceof TooLargeError) return res.status(413).json({ error: "File too large.", maxBytes: limit });
-      if (e instanceof EncryptionTransitionError) return res.status(503).json({ error: "Try again in a moment." });
       console.error("[attachments] upload failed", e);
       res.status(500).json({ error: "Could not store the file." });
     }

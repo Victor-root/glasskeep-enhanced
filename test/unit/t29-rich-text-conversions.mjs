@@ -134,4 +134,16 @@ const fromRead = clip.domSelectionToCleanPlainText();
 t.check("copier des éléments d'une liste en mode lecture garde un élément par ligne et leurs vrais numéros",
   fromRead === "6. b\n7. c", JSON.stringify(fromRead));
 
+// ── Numéros de téléphone reconnus en mode lecture ─────────────────────
+{
+  const { PHONE_RE } = await import("../../src/utils/contactPatterns.js");
+  const trouves = (texte) => [...texte.matchAll(PHONE_RE)].map((m) => m[0]);
+  t.check("un numéro français est reconnu", trouves("appelle le 06 12 34 56 78 ce soir")[0] === "06 12 34 56 78");
+  t.check("un numéro international aussi", trouves("+33 6 12 34 56 78")[0] === "+33 6 12 34 56 78");
+  t.check("pas au milieu d'une longue suite de chiffres", trouves("11510079201745").length === 0, JSON.stringify(trouves("11510079201745")));
+  t.check("ni dans une référence collée à d'autres chiffres", trouves("commande 1151007920170").length === 0);
+  t.check("ni dans un IBAN", trouves("FR76 3000 1007 9201 7000 1234 567").length === 0, JSON.stringify(trouves("FR76 3000 1007 9201 7000 1234 567")));
+  t.check("un numéro commençant par 00 n'est pas un numéro français", trouves("0079201712").length === 0);
+}
+
 process.exit(t.summary() ? 0 : 1);

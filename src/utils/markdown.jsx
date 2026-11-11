@@ -1,4 +1,5 @@
 import React from "react";
+import { PHONE_RE, EMAIL_RE } from "./contactPatterns.js";
 import { marked as markedParser } from "marked";
 import DOMPurify from "dompurify";
 import { installStyleGuard } from "./safeStyle.js";
@@ -115,11 +116,6 @@ export const mdForDownload = (n) => {
 };
 
 /** ---------- Phone & email linkification ---------- */
-const PHONE_RE =
-  /(?:\+1[\s.-]?)?\(\d{3}\)[\s.-]?\d{3}[\s.-]?\d{4}|(?:\+1[\s.-]?)?\d{3}[\s.-]\d{3}[\s.-]\d{4}|\+33[\s.-]?\d[\s.-]?\d{2}[\s.-]?\d{2}[\s.-]?\d{2}[\s.-]?\d{2}|0\d[\s.-]?\d{2}[\s.-]?\d{2}[\s.-]?\d{2}[\s.-]?\d{2}/g;
-
-const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-
 const LINK_CLASS = "underline text-blue-600 dark:text-blue-400";
 
 /**

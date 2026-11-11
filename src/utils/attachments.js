@@ -81,31 +81,76 @@ const token = () => getAuth()?.token;
 
 // XMLHttpRequest rather than fetch: only it reports upload progress. Rejects
 // with { status } so the caller can tell a refusal from a lost connection
-// (status 0). Sent as a raw body: see the upload route.
-export function sendFile({ noteId, id, blob, name, mime, onProgress, signal }) {
+// (status 0).
+function sendPiece(url, piece, last, onProgress, signal) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_BASE}/notes/${encodeURIComponent(noteId)}/attachments`);
+    xhr.open("PUT", url);
     xhr.setRequestHeader("Authorization", `Bearer ${token()}`);
     xhr.setRequestHeader("Content-Type", "application/octet-stream");
     xhr.setRequestHeader("X-Client-Id", getClientId());
-    xhr.setRequestHeader("X-Attachment-Id", id);
-    xhr.setRequestHeader("X-Attachment-Name", encodeURIComponent(name));
-    xhr.setRequestHeader("X-Attachment-Type", mime || "application/octet-stream");
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress?.(e.loaded / e.total);
-    };
+    if (last) xhr.setRequestHeader("X-Last", "1");
+    xhr.upload.onprogress = (e) => onProgress(e.loaded);
     xhr.onload = () => {
       let body = null;
       try { body = JSON.parse(xhr.responseText); } catch { /* a proxy's own error page */ }
-      if (xhr.status >= 200 && xhr.status < 300 && body?.attachment) resolve(body.attachment);
-      else reject({ status: xhr.status, error: body?.error, maxBytes: body?.maxBytes });
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body || {});
+      else reject({ status: xhr.status, error: body?.error, fromProxy: !body, next: body?.next });
     };
     xhr.onerror = () => reject({ status: 0 });
     xhr.onabort = () => reject({ status: 0, aborted: true });
     signal?.addEventListener("abort", () => xhr.abort(), { once: true });
-    xhr.send(blob);
+    xhr.send(piece);
   });
+}
+
+async function startUpload(noteId, { id, name, mime, size }) {
+  const res = await fetch(`${API_BASE}/notes/${encodeURIComponent(noteId)}/attachments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}`, "X-Client-Id": getClientId() },
+    body: JSON.stringify({ id, name, type: mime || "application/octet-stream", size }),
+  }).catch(() => null);
+  if (!res) throw { status: 0 };
+  let body = null;
+  try { body = await res.json(); } catch { /* a proxy's own error page */ }
+  if (!res.ok) throw { status: res.status, error: body?.error, maxBytes: body?.maxBytes, fromProxy: !body };
+  return body;
+}
+
+async function resumePoint(uploadId) {
+  const res = await fetch(`${API_BASE}/attachment-uploads/${encodeURIComponent(uploadId)}`, {
+    headers: { Authorization: `Bearer ${token()}` },
+  }).catch(() => null);
+  if (!res) throw { status: 0 };
+  return res.ok ? res.json() : null;
+}
+
+// Sends a file in pieces (see server/attachments/uploadSessions.js) and
+// resolves with the attachment. `session` carries the upload across calls:
+// after a cut connection, the next call picks up where the server got to.
+export async function sendFile({ noteId, id, blob, name, mime, onProgress, signal, session }) {
+  let upload = session.uploadId ? await resumePoint(session.uploadId) : null;
+  if (upload) {
+    upload = { ...upload, uploadId: session.uploadId };
+  } else {
+    upload = await startUpload(noteId, { id, name, mime, size: blob.size });
+    if (upload.attachment) return upload.attachment;
+    session.uploadId = upload.uploadId;
+  }
+  const { uploadId, pieceSize } = upload;
+  const count = Math.max(1, Math.ceil(blob.size / pieceSize));
+  for (let index = upload.next; index < count; index++) {
+    const start = index * pieceSize;
+    const piece = blob.slice(start, Math.min(blob.size, start + pieceSize));
+    const last = index === count - 1;
+    const url = `${API_BASE}/attachment-uploads/${encodeURIComponent(uploadId)}/${index}`;
+    const result = await sendPiece(url, piece, last, (loaded) => onProgress?.(blob.size ? (start + loaded) / blob.size : 1), signal);
+    if (result.attachment) {
+      session.uploadId = null;
+      return result.attachment;
+    }
+  }
+  throw { status: 500 };
 }
 
 export const setAttachmentThumb = (noteId, id, thumb) =>

@@ -42,6 +42,8 @@ export const getUploadItems = () => items;
 export const hasUploadsFor = (noteId) => items.some((item) => item.noteId === String(noteId));
 
 function failureMessage(failure) {
+  // Refused by a reverse proxy in front of the server, not by GlassKeep.
+  if (failure.status === 413 && failure.fromProxy) return t("attachmentProxyTooLarge");
   if (failure.status === 413) return t("attachmentTooLarge");
   return localizeServerError(failure.error, "attachmentUploadFailed");
 }
@@ -64,6 +66,7 @@ async function upload(item) {
       mime: item.mime,
       signal: abort.signal,
       onProgress: (progress) => update(item.id, { progress }),
+      session: item.session,
     });
     if (item.thumb) {
       await setAttachmentThumb(item.noteId, item.id, item.thumb).catch(() => {});
@@ -78,7 +81,8 @@ async function upload(item) {
       update(item.id, { status: "waiting", attempts: item.attempts + 1 });
       return NOTE_PENDING_RETRY_MS;
     }
-    if (failure.status === 0 || failure.status === 423 || failure.status >= 500) {
+    // 409 with a position: out of step with the server, which says where to resume.
+    if (failure.status === 0 || failure.status === 423 || failure.status >= 500 || (failure.status === 409 && failure.next !== undefined)) {
       update(item.id, { status: "waiting", progress: 0 });
       return RETRY_MS;
     }
@@ -120,11 +124,12 @@ export function queueUpload(noteId, file, id, thumb) {
     status: "queued",
     progress: 0,
     attempts: 0,
+    session: {},
   };
   items = [...items, item];
   publish();
   // A fresh object: an IndexedDB record cannot carry the transient state.
-  const { status: _status, progress: _progress, attempts: _attempts, ...record } = item;
+  const { status: _status, progress: _progress, attempts: _attempts, session: _session, ...record } = item;
   putUpload(record).catch(() => { /* out of space: it still goes out while the page lives */ });
   pump();
 }
@@ -144,7 +149,7 @@ export function cancelUpload(id) {
 export function retryUpload(id) {
   const item = items.find((i) => i.id === id);
   if (!item) return;
-  update(id, { status: "queued", error: null, attempts: 0, notBefore: 0 });
+  update(id, { status: "queued", error: null, attempts: 0, notBefore: 0, session: {} });
   putUpload({
     id: item.id, noteId: item.noteId, userId: item.userId, name: item.name, mime: item.mime,
     size: item.size, thumb: item.thumb, blob: item.blob, createdAt: item.createdAt,
@@ -160,7 +165,7 @@ export async function startUploads(user, uploaded) {
   const known = new Set(items.map((item) => item.id));
   items = [
     ...items,
-    ...stored.filter((u) => !known.has(u.id)).map((u) => ({ ...u, status: "queued", progress: 0, attempts: 0 })),
+    ...stored.filter((u) => !known.has(u.id)).map((u) => ({ ...u, status: "queued", progress: 0, attempts: 0, session: {} })),
   ];
   publish();
   pump();

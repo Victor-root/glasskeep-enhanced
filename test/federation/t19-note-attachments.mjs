@@ -23,11 +23,20 @@ await waitFor(B, tB, (l) => l.some((x) => x.state === "online"), { timeout: 4000
 
 async function joindre(base, token, noteId, corps, name) {
   const id = crypto.randomUUID();
-  const res = await fetch(`${base}/api/notes/${noteId}/attachments`, {
-    method: "POST",
-    headers: { authorization: "Bearer " + token, "content-type": "application/octet-stream", "x-attachment-id": id, "x-attachment-name": encodeURIComponent(name), "x-attachment-type": "application/pdf" },
-    body: corps,
-  });
+  const h = { authorization: "Bearer " + token };
+  const debut = await (await fetch(`${base}/api/notes/${noteId}/attachments`, {
+    method: "POST", headers: { ...h, "content-type": "application/json" },
+    body: JSON.stringify({ id, name, type: "application/pdf", size: corps.length }),
+  })).json();
+  const nb = Math.max(1, Math.ceil(corps.length / debut.pieceSize));
+  let res;
+  for (let i = 0; i < nb; i++) {
+    res = await fetch(`${base}/api/attachment-uploads/${debut.uploadId}/${i}`, {
+      method: "PUT",
+      headers: { ...h, "content-type": "application/octet-stream", ...(i === nb - 1 ? { "x-last": "1" } : {}) },
+      body: corps.subarray(i * debut.pieceSize, (i + 1) * debut.pieceSize),
+    });
+  }
   return { id, status: res.status };
 }
 const lire = async (base, token, noteId) => ((await api(base, "/api/notes", { token })).json ?? []).find((n) => n.id === noteId);

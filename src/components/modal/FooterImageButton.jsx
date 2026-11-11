@@ -125,7 +125,7 @@ export default function FooterImageButton({
           aria-expanded={imageMenuOpen ? "true" : "false"}
         >
           <AddImageIcon />
-          {isDesktop && <span>{t(addAttachments ? "imagesAndFiles" : "image")}</span>}
+          {isDesktop && <span>{t("image")}</span>}
           {noteIconBadge}
         </button>
       )}

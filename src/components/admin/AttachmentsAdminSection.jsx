@@ -32,6 +32,7 @@ export default function AttachmentsAdminSection({ open, value, authToken, onSave
   const parsed = Number(draft);
   const valid = draft.trim() !== "" && Number.isInteger(parsed) && parsed >= 0 && parsed <= MAX_ATTACHMENT_MB;
   const dirty = draft !== stored;
+  const unitMb = t("fileSizeUnits").split(",")[2];
 
   const save = async () => {
     if (!valid || !dirty) return;
@@ -54,28 +55,35 @@ export default function AttachmentsAdminSection({ open, value, authToken, onSave
           <div className="font-medium">{t("adminAttachmentLimit")}</div>
           <div className="text-sm text-gray-500">
             {t("adminAttachmentLimitHint")}
-            {usage && ` ${t("adminAttachmentUsage", { files: usage.files, size: formatFileSize(usage.bytes) })}`}
+            {usage && ` ${usage.files
+              ? t("adminAttachmentUsage", { files: usage.files, size: formatFileSize(usage.bytes) })
+              : t("adminAttachmentUsageNone")}`}
           </div>
         </div>
       </div>
       <div className="flex flex-col sm:flex-row gap-2">
-        <input
-          type="number"
-          min="0"
-          max={MAX_ATTACHMENT_MB}
-          inputMode="numeric"
-          aria-label={t("adminAttachmentLimit")}
-          className="flex-1 px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--gk-chrome-accent)] text-sm"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              save();
-            }
-          }}
-          disabled={busy}
-        />
+        {/* A text field rather than type="number": no spinner arrows, and the
+            unit sits inside the field, where the eye reads the value. */}
+        <label className="flex-1 flex items-center border border-[var(--border-light)] rounded-lg focus-within:ring-2 focus-within:ring-[var(--gk-chrome-accent)]">
+          <input
+            type="text"
+            inputMode="numeric"
+            aria-label={t("adminAttachmentLimit")}
+            className="flex-1 min-w-0 px-3 py-2 bg-transparent focus:outline-none text-sm tabular-nums"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value.replace(/\D/g, "").slice(0, 5))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                save();
+              }
+            }}
+            disabled={busy}
+          />
+          <span className="pr-3 text-sm text-gray-500 select-none">
+            {parsed === 0 && draft !== "" ? t("adminAttachmentOff") : unitMb}
+          </span>
+        </label>
         <button
           type="button"
           onClick={save}

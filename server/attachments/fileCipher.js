@@ -109,4 +109,4 @@ function createDecryptStream(key, fileId) {
   });
 }
 
-module.exports = { createEncryptStream, createDecryptStream };
+module.exports = { createEncryptStream, createDecryptStream, sealFrame, MAGIC };

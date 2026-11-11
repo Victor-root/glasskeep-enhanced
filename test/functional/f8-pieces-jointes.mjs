@@ -33,21 +33,29 @@ const creerNote = (user, id, extra = {}) => {
     token: user.token, body: { id, type: "text", title: id, content: "corps", timestamp: ts, client_updated_at: ts, ...extra },
   });
 };
-async function joindre(user, noteId, contenu, { id = crypto.randomUUID(), name = "rapport.pdf", type = "application/pdf" } = {}) {
-  const res = await fetch(`${inst.base}/api/notes/${noteId}/attachments`, {
-    method: "POST",
-    headers: {
-      authorization: "Bearer " + user.token,
-      "content-type": "application/octet-stream",
-      "x-attachment-id": id,
-      "x-attachment-name": encodeURIComponent(name),
-      "x-attachment-type": type,
-    },
-    body: contenu,
+async function joindre(user, noteId, contenu, { id = crypto.randomUUID(), name = "rapport.pdf", type = "application/pdf", morceau } = {}) {
+  const h = { authorization: "Bearer " + user.token };
+  const debut = await fetch(`${inst.base}/api/notes/${noteId}/attachments`, {
+    method: "POST", headers: { ...h, "content-type": "application/json" },
+    body: JSON.stringify({ id, name, type, size: contenu.length }),
   });
   let json = null;
-  try { json = await res.json(); } catch { /* corps vide */ }
-  return { status: res.status, json };
+  try { json = await debut.json(); } catch { /* corps vide */ }
+  if (!debut.ok || json?.attachment) return { status: debut.status, json };
+  const taille = morceau || json.pieceSize;
+  const nb = Math.max(1, Math.ceil(contenu.length / taille));
+  let res = null;
+  for (let i = 0; i < nb; i++) {
+    res = await fetch(`${inst.base}/api/attachment-uploads/${json.uploadId}/${i}`, {
+      method: "PUT",
+      headers: { ...h, "content-type": "application/octet-stream", ...(i === nb - 1 ? { "x-last": "1" } : {}) },
+      body: contenu.subarray(i * taille, (i + 1) * taille),
+    });
+    if (!res.ok) break;
+  }
+  let fin = null;
+  try { fin = await res.json(); } catch { /* corps vide */ }
+  return { status: res.status, json: fin, uploadId: json.uploadId };
 }
 const lien = (user, noteId, id, inline = false) =>
   inst.call("POST", `/api/notes/${noteId}/attachments/${id}/link`, { token: user.token, body: { inline } });
@@ -90,6 +98,30 @@ try {
   t.check("il arrive comme un téléchargement, avec son vrai nom",
     /^attachment;/.test(dl.res.headers.get("content-disposition") || "")
       && (dl.res.headers.get("content-disposition") || "").includes("filename*=UTF-8''rapport%20annuel"));
+  // ── Envoi par morceaux: un proxy ne voit jamais de requête plus grosse
+  // qu'un morceau, et une coupure reprend où elle s'était arrêtée.
+  const depart = await inst.call("POST", "/api/notes/n1/attachments", { token: alice.token, body: { id: crypto.randomUUID(), name: "repris.bin", type: "application/octet-stream", size: contenu.length } });
+  t.check("un envoi annonce la taille de ses morceaux, sous la limite de nginx", depart.status === 201 && depart.json.pieceSize < 1024 * 1024, JSON.stringify(depart.json));
+  const morceau = (i, extra = {}) => fetch(`${inst.base}/api/attachment-uploads/${depart.json.uploadId}/${i}`, {
+    method: "PUT", headers: { authorization: "Bearer " + alice.token, "content-type": "application/octet-stream", ...extra },
+    body: contenu.subarray(i * depart.json.pieceSize, (i + 1) * depart.json.pieceSize),
+  });
+  await morceau(0);
+  await morceau(1);
+  t.check("un morceau en avance est refusé avec la position attendue", (await (await morceau(5)).json()).next === 2);
+  t.check("un morceau déjà reçu est simplement acquitté", (await (await morceau(1)).json()).next === 2);
+  const intrus = await fetch(`${inst.base}/api/attachment-uploads/${depart.json.uploadId}`, { headers: { authorization: "Bearer " + bob.token } });
+  t.check("l'envoi d'un autre est invisible", intrus.status === 404);
+  const reprise = await inst.call("GET", `/api/attachment-uploads/${depart.json.uploadId}`, { token: alice.token });
+  t.check("on retrouve où l'envoi s'était arrêté", reprise.json?.next === 2);
+  const nbMorceaux = Math.ceil(contenu.length / depart.json.pieceSize);
+  let fin = null;
+  for (let i = 2; i < nbMorceaux; i++) fin = await morceau(i, i === nbMorceaux - 1 ? { "x-last": "1" } : {});
+  const repris = (await fin.json()).attachment;
+  t.check("et il se termine", fin.status === 201 && repris?.size === contenu.length);
+  t.check("le fichier repris se relit à l'identique", contenu.equals((await telecharger((await lien(alice, "n1", repris.id)).json.url)).corps));
+  await inst.call("DELETE", `/api/notes/n1/attachments/${repris.id}`, { token: alice.token });
+
   t.check("le navigateur n'a pas à deviner le type", dl.res.headers.get("x-content-type-options") === "nosniff");
 
   const ts = iso();
@@ -164,18 +196,22 @@ try {
   await inst.call("PATCH", "/api/admin/settings", { token: a2, body: { attachmentMaxMb: 1 } });
   t.check("la taille maximale de l'administrateur est annoncée", (await inst.call("GET", "/api/attachments/config", { token: a2 })).json?.maxBytes === 1024 * 1024);
   const trop = await joindre(moi, "n2", crypto.randomBytes(1024 * 1024 + 1));
-  t.check("un fichier trop gros est refusé proprement", trop.status === 413 && trop.json?.maxBytes === 1024 * 1024, String(trop.status));
-  const fluxLong = new ReadableStream({ start(c) { for (let i = 0; i < 12; i++) c.enqueue(new Uint8Array(100 * 1024)); c.close(); } });
-  const sansTaille = await fetch(`${inst.base}/api/notes/n2/attachments`, {
-    method: "POST", duplex: "half", body: fluxLong,
-    headers: { authorization: "Bearer " + a2, "content-type": "application/octet-stream", "x-attachment-id": crypto.randomUUID(), "x-attachment-name": "x" },
-  }).catch(() => null);
-  t.check("même quand sa taille n'est pas annoncée", !sansTaille || sansTaille.status === 413, String(sansTaille?.status));
+  t.check("un fichier trop gros est refusé dès l'annonce", trop.status === 413 && trop.json?.maxBytes === 1024 * 1024, String(trop.status));
+  const menteur = await inst.call("POST", "/api/notes/n2/attachments", { token: a2, body: { id: crypto.randomUUID(), name: "x", type: "x/y", size: 10 } });
+  const gros = await fetch(`${inst.base}/api/attachment-uploads/${menteur.json.uploadId}/0`, { method: "PUT", headers: { authorization: "Bearer " + a2, "content-type": "application/octet-stream", "x-last": "1" }, body: Buffer.alloc(20) });
+  t.check("un envoi qui dépasse la taille annoncée est refusé", gros.status === 400, String(gros.status));
+  const court = await inst.call("POST", "/api/notes/n2/attachments", { token: a2, body: { id: crypto.randomUUID(), name: "x", type: "x/y", size: 10 } });
+  const finCourte = await fetch(`${inst.base}/api/attachment-uploads/${court.json.uploadId}/0`, { method: "PUT", headers: { authorization: "Bearer " + a2, "content-type": "application/octet-stream", "x-last": "1" }, body: Buffer.alloc(5) });
+  t.check("un envoi qui finit avant sa taille annoncée est refusé", finCourte.status === 400, String(finCourte.status));
+  const enorme = await inst.call("POST", "/api/notes/n2/attachments", { token: a2, body: { id: crypto.randomUUID(), name: "x", type: "x/y", size: 900 * 1024 } });
+  const tropGrosMorceau = await fetch(`${inst.base}/api/attachment-uploads/${enorme.json.uploadId}/0`, { method: "PUT", headers: { authorization: "Bearer " + a2, "content-type": "application/octet-stream" }, body: Buffer.alloc(enorme.json.pieceSize + 1) });
+  t.check("un morceau plus gros que prévu est refusé", tropGrosMorceau.status === 413, String(tropGrosMorceau.status));
   t.check("et il ne reste rien du refus", readdirSync(path.join(dossier, "tmp")).length === 0, readdirSync(path.join(dossier, "tmp")).join());
   await inst.call("PATCH", "/api/admin/settings", { token: a2, body: { attachmentMaxMb: 0 } });
   t.check("à 0, les pièces jointes sont coupées", (await joindre(moi, "n2", Buffer.from("x"))).status === 403);
   await inst.call("PATCH", "/api/admin/settings", { token: a2, body: { attachmentMaxMb: 100 } });
   t.check("un identifiant invalide est refusé", (await joindre(moi, "n2", Buffer.from("x"), { id: "../pas bien" })).status === 400);
+  t.check("un fichier vide passe", (await joindre(moi, "n2", Buffer.alloc(0), { name: "vide.bin" })).status === 201);
   t.check("une vignette qui n'en est pas une est refusée",
     (await inst.call("PATCH", `/api/notes/n2/attachments/${idPdf}`, { token: a2, body: { thumb: "javascript:alert(1)" } })).status === 400);
   const vignette = "data:image/jpeg;base64,/9j/4AAQ";
@@ -186,6 +222,7 @@ try {
   await creerNote(moi, "n3");
   const id3 = crypto.randomUUID();
   await joindre(moi, "n3", Buffer.from("à jeter un jour"), { id: id3, name: "jeter.bin" });
+  await sleep(5600); // le ménage des retraits précédents
   const avantRetrait = fichiersSurDisque().length;
   const tsT = iso();
   await inst.call("POST", "/api/notes/n3/trash", { token: a2, body: { client_updated_at: tsT } });

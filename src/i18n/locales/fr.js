@@ -1615,6 +1615,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   attachmentUploadFailed: "Impossible d'envoyer ce fichier.",
   attachmentOpenFailed: "Impossible d'ouvrir ce fichier.",
   attachmentTooLarge: "Ce fichier est trop volumineux pour ce serveur.",
+  attachmentProxyTooLarge: "Le proxy inverse devant le serveur a refusé le fichier : augmentez sa limite de taille des requêtes (client_max_body_size sur nginx).",
   attachmentTooLargeNamed: "{name} est trop volumineux (limite : {max}).",
   attachmentsDisabled: "Les pièces jointes sont désactivées sur ce serveur.",
   attachmentNeedsConnection: "Cette action nécessite une connexion au serveur.",
@@ -1632,4 +1633,6 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   adminAttachmentLimit: "Taille maximale d'une pièce jointe",
   adminAttachmentLimitHint: "En Mo. 0 désactive les pièces jointes.",
   adminAttachmentUsage: "{files} fichiers, {size} utilisés.",
+  adminAttachmentUsageNone: "Aucune pièce jointe pour l'instant.",
+  adminAttachmentOff: "désactivé",
 };

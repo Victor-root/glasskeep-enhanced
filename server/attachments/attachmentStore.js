@@ -27,7 +27,7 @@ const { Transform } = require("stream");
 const { pipeline } = require("stream/promises");
 const runtime = require("../encryption/runtimeUnlockState");
 const noteCipher = require("../encryption/noteCipher");
-const { createEncryptStream, createDecryptStream } = require("./fileCipher");
+const { createEncryptStream, createDecryptStream, sealFrame, MAGIC } = require("./fileCipher");
 const { nowISO } = require("../utils/timestamps");
 
 const MAX_NAME_LENGTH = 255;
@@ -93,6 +93,7 @@ function createAttachmentStore({ db, dbFile, log = console }) {
 
   let uploadsInFlight = 0;
   let filesOnHold = false;
+  const openWriters = new Set();
   let encryptPass = null;
 
   // ── Metadata ────────────────────────────────────────────────────────
@@ -166,6 +167,50 @@ function createAttachmentStore({ db, dbFile, log = console }) {
       source.unpipe(meter);
       uploadsInFlight--;
     }
+  }
+
+  // A file that arrives in pieces, one request each (see the upload routes):
+  // every piece is written as it comes, sealed as one frame of its own when
+  // the instance is encrypted. Nothing is registered before finish().
+  async function openPieceWriter(fileId = crypto.randomUUID()) {
+    if (filesOnHold) throw new EncryptionTransitionError("Encryption is changing state");
+    const tmp = tmpPath(fileId);
+    const key = noteCipher.isActive() ? currentKey() : null;
+    const hash = crypto.createHash("sha256");
+    const handle = await fs.promises.open(tmp, "wx", 0o600);
+    let size = 0;
+    let index = 0;
+    let closed = false;
+
+    const close = async () => {
+      if (closed) return;
+      closed = true;
+      openWriters.delete(writer);
+      await handle.close().catch(() => {});
+    };
+    const writer = {
+      fileId,
+      get size() { return size; },
+      async append(piece, last) {
+        hash.update(piece);
+        size += piece.length;
+        await handle.write(key ? sealFrame(key, fileId, index++, piece, last) : piece);
+      },
+      async finish() {
+        await close();
+        const final = filePath(fileId);
+        await fs.promises.mkdir(path.dirname(final), { recursive: true, mode: 0o700 });
+        await fs.promises.rename(tmp, final);
+        return { fileId, size, sha256: hash.digest("hex"), encrypted: !!key };
+      },
+      async abort() {
+        await close();
+        await fs.promises.rm(tmp, { force: true }).catch(() => {});
+      },
+    };
+    if (key) await handle.write(MAGIC);
+    openWriters.add(writer);
+    return writer;
   }
 
   function registerFile({ fileId, size, sha256, encrypted, remoteLinkId = null }) {
@@ -337,6 +382,9 @@ function createAttachmentStore({ db, dbFile, log = console }) {
   // rows are done, whatever happened.
   async function decryptAllFiles() {
     filesOnHold = true;
+    // A file still arriving in pieces would be finished under the old key:
+    // its client starts it over.
+    await Promise.all([...openWriters].map((w) => w.abort()));
     if (encryptPass) await encryptPass;
     while (uploadsInFlight > 0) await new Promise((r) => setTimeout(r, 50));
     for (const file of q.filesToDecrypt.all()) {
@@ -389,6 +437,7 @@ function createAttachmentStore({ db, dbFile, log = console }) {
 
   return {
     writeFile,
+    openPieceWriter,
     openFile,
     attach,
     list,
