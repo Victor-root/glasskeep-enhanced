@@ -59,7 +59,8 @@ export default function NoteTagPicker({
         value={tagInput}
         onChange={(e) => setTagInput(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Escape") { setTagInput(""); onClose(); return; }
+          // Escape closes the picker, not the note behind it.
+          if (e.key === "Escape") { e.stopPropagation(); setTagInput(""); onClose(); return; }
           handleTagKeyDown(e);
         }}
         onBlur={() => {

@@ -63,6 +63,9 @@ export default function FooterTagButton({
       <button
         ref={modalTagBtnRef}
         className={`${btnClass} focus:outline-none`}
+        // The search field keeps the focus: its blur closes the dropdown
+        // 200 ms later, and a click held longer then reopened it.
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => {
           setModalTagFocused((v) => {
             if (!v) setTimeout(() => { if (isDesktop) modalTagInputRef.current?.focus(); }, 0);
