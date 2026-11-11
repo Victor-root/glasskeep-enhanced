@@ -24,6 +24,17 @@ export const widgetsCSS = `
   border-right: 1px solid var(--border-light);
   border-bottom: 1px solid var(--border-light);
 }
+/* The arrow reaches into the row next to it: it takes that row's hover
+   shade, or it cuts a notch of the menu's background into the highlight.
+   Under (hover: hover), like Tailwind's hover: variant on the rows. */
+html { --gk-popover-row-hover: rgb(243 244 246); }
+html.dark { --gk-popover-row-hover: rgb(255 255 255 / 0.1); }
+@media (hover: hover) {
+  [data-arrow="down"]:has(> button:last-child:hover)::after,
+  [data-arrow="up"]:has(> button:first-child:hover)::after {
+    background-image: linear-gradient(var(--gk-popover-row-hover), var(--gk-popover-row-hover));
+  }
+}
 
 /* Login decorative floating cards */
 /* Fade in from 0 to the element's own opacity, held at 0 through the delay
