@@ -40,6 +40,27 @@ const VIEWS = {
   },
 };
 
+// The list to show from a copy read earlier (IndexedDB or the server): a
+// note edited locally since the copy was taken keeps its current state,
+// its current version, still created, or still removed from this list
+// (trashed, archived). `keep` tells which notes belong in the list shown.
+function keepLocalEdits(prev, copy, noLocalEdit, keep) {
+  const isEdited = (n) => !noLocalEdit(String(n.id));
+  if (!copy.some(isEdited) && !prev.some(isEdited)) return sortNotesByRecency(copy);
+  const current = new Map(prev.filter(isEdited).map((n) => [String(n.id), n]));
+  const list = [];
+  for (const n of copy) {
+    const id = String(n.id);
+    if (!isEdited(n)) list.push(n);
+    else if (current.has(id)) list.push(current.get(id));
+  }
+  const listed = new Set(list.map((n) => String(n.id)));
+  for (const [id, n] of current) {
+    if (!listed.has(id) && keep(n)) list.push(n);
+  }
+  return sortNotesByRecency(list);
+}
+
 const viewForFilter = (filter) =>
   filter === "ARCHIVED" ? "archived" : filter === "TRASHED" ? "trashed" : "active";
 
@@ -83,10 +104,11 @@ export default function useNotesLoader({
     try {
       // Local notes first, shown immediately.
       try {
+        const noLocalEdit = leases.snapshotAllEdits();
         const localNotes = await idbGetAllNotes(userId, sessionId, view.scope);
         if (localNotes.length > 0) {
           if (viewChanged()) return;
-          setNotes(sortNotesByRecency(localNotes));
+          setNotes((prev) => keepLocalEdits(prev, localNotes, noLocalEdit, view.keep));
         }
       } catch (e) {
         if (kind === "active") console.error("IndexedDB read failed:", e);
@@ -114,7 +136,7 @@ export default function useNotesLoader({
       const toWrite = [];
       for (const sn of serverNotes) {
         const nid = String(sn.id);
-        if (pendingSet.has(nid) || await isProtected(nid)) continue;
+        if (pendingSet.has(nid) || !noLocalEdit(nid) || await isProtected(nid)) continue;
         toWrite.push({ ...sn, id: nid, user_id: sn.user_id || userId, ...view.flags });
       }
       if (toWrite.length > 0) await idbPutNotes(toWrite, userId, sessionId);
@@ -155,25 +177,7 @@ export default function useNotesLoader({
       // A local version with a pending change may carry other view flags.
       const final = [...merged, ...localOnly].filter(view.keep);
       if (viewChanged()) return;
-      // A note edited locally while the list loaded keeps its current
-      // state: its current version, still created, or still removed from
-      // this list (trashed, archived).
-      setNotes((prev) => {
-        const isEdited = (n) => !noLocalEdit(String(n.id));
-        if (!final.some(isEdited) && !prev.some(isEdited)) return sortNotesByRecency(final);
-        const current = new Map(prev.filter(isEdited).map((n) => [String(n.id), n]));
-        const list = [];
-        for (const n of final) {
-          const id = String(n.id);
-          if (!isEdited(n)) list.push(n);
-          else if (current.has(id)) list.push(current.get(id));
-        }
-        const listed = new Set(list.map((n) => String(n.id)));
-        for (const [id, n] of current) {
-          if (!listed.has(id)) list.push(n);
-        }
-        return sortNotesByRecency(list);
-      });
+      setNotes((prev) => keepLocalEdits(prev, final, noLocalEdit, view.keep));
       return true; // server data fetched
     } catch (error) {
       console.error(view.errorLabel, error);
@@ -182,9 +186,10 @@ export default function useNotesLoader({
       if (view.fallback === "none") return;
       if (viewChanged()) return;
       try {
+        const noLocalEdit = leases.snapshotAllEdits();
         const localNotes = await idbGetAllNotes(userId, sessionId, view.scope);
         if (localNotes.length > 0) {
-          if (!viewChanged()) setNotes(sortNotesByRecency(localNotes));
+          if (!viewChanged()) setNotes((prev) => keepLocalEdits(prev, localNotes, noLocalEdit, view.keep));
         } else if (view.fallback === "localOrEmpty" && !viewChanged()) {
           setNotes([]);
         }

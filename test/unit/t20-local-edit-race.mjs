@@ -10,6 +10,12 @@
 //
 // La règle vérifiée ici: juste avant de remplacer la note, on revérifie
 // qu'aucune modification n'a commencé depuis.
+//
+// TROUVÉ ENSUITE PAR LE BANC DE SYNCHRO: une liste des notes demandée au
+// serveur juste avant qu'un enregistrement y arrive revenait sans lui, et
+// remplaçait le texte tapé une fois l'enregistrement sorti de la file. Une
+// modification terminée compte donc aussi: rangée dans le cache local, ou
+// reçue par le serveur, toute copie lue avant elle est plus ancienne.
 import { register } from "node:module";
 import { runner } from "../federation/lib.mjs";
 
@@ -59,5 +65,22 @@ t.check("une frappe en cours pendant l'écriture du cache est gardée",
         await applyServerAnswer({ editMeanwhile: true, editFinished: false }) === local.title);
 t.check("une frappe déjà terminée pendant cette attente est gardée aussi",
         await applyServerAnswer({ editMeanwhile: true, editFinished: true }) === local.title);
+
+// Une copie lue avant la fin d'une modification commencée plus tôt.
+{
+  const leases = useLocalLeases();
+  const lease = leases.acquireLocalLease("n1");
+  const pasEditee = leases.snapshotEdits("n1");
+  leases.releaseLocalLeaseWithPrune("n1", lease);
+  t.check("une copie lue avant que la frappe soit rangée dans le cache local est écartée", !pasEditee());
+}
+{
+  const leases = useLocalLeases();
+  const pasEditee = leases.snapshotEdits("n1");
+  const toutes = leases.snapshotAllEdits();
+  leases.editDone("n1");
+  t.check("une copie demandée avant que le serveur reçoive l'enregistrement est écartée", !pasEditee());
+  t.check("de même dans une liste complète, pour cette note seulement", !toutes("n1") && toutes("n2"));
+}
 
 process.exit(t.summary() ? 0 : 1);

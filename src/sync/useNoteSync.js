@@ -52,6 +52,7 @@ export default function useNoteSync({ token, userId, sessionId, leases, onSyncCo
       userId,
       sessionId,
       onStatusChange: (status) => setSyncStatus(status),
+      onWriteLanded: (item) => { if (item.noteId) leases.editDone(item.noteId); },
       onSyncComplete: async (item, result) => {
         try {
           await onSyncComplete(item, result);

@@ -21,7 +21,7 @@ réseau, pas de base de données, rien à nettoyer après. Assez rapide pour
 | Quelles adresses ont le droit de réécrire l'adresse d'appel retenue | `federation/t7-trust-policy.mjs` |
 | Adresses IA autorisées, certificat exigé par les scripts, domaine des passkeys, filtre de style, sceau du chiffrement, freinage de la connexion | `unit/t18-pure-rules.mjs` |
 | Un refus 401 sur une route sans jeton ne détruit pas la session ouverte | `unit/t19-unauthenticated-401.mjs` |
-| Une copie du serveur n'écrase pas une modification locale commencée pendant qu'on l'appliquait | `unit/t20-local-edit-race.mjs` |
+| Une copie du serveur n'écrase pas une modification locale commencée pendant qu'on l'appliquait, ni une modification terminée après qu'on l'a demandée (rangée dans le cache local ou reçue par le serveur) | `unit/t20-local-edit-race.mjs` |
 | L'écran TV garde un seul écouteur de retour au premier plan et le retire en se fermant | `unit/t21-tv-refresh-listeners.mjs` |
 | Une liste à cocher propose de reprendre un élément coché plutôt que d'en créer un doublon | `unit/t22-checklist-suggestions.mjs` |
 | L'IA renvoie une demande sans le paramètre qu'un modèle refuse (max_tokens, température) et s'en souvient | `unit/t23-ai-refused-parameters.mjs` |

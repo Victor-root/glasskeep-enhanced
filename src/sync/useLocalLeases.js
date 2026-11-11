@@ -26,10 +26,14 @@ export default function useLocalLeases() {
   const pendingReorderLeasesRef = useRef(new Map());
   const reorderTokenSeqRef = useRef(0);
   const localDeleteTombstoneRef = useRef(new Set());
-  // Map<noteId, number>: leases ever acquired per note, i.e. local edits
-  // started. Never decreases, so a change tells that an edit started in
+  // Map<noteId, number>: steps of local edits per note, started or
+  // completed. Never decreases, so a change tells that an edit happened in
   // between, even one already finished.
   const editVersionRef = useRef(new Map());
+  const countEditStep = (noteId) => {
+    const key = String(noteId);
+    editVersionRef.current.set(key, (editVersionRef.current.get(key) || 0) + 1);
+  };
 
   const acquireLocalLease = (noteId) => {
     const seq = ++leaseSeqRef.current;
@@ -37,8 +41,7 @@ export default function useLocalLeases() {
     const map = localLeaseRef.current;
     if (!map.has(noteId)) map.set(noteId, new Map());
     map.get(noteId).set(leaseId, { seq });
-    const key = String(noteId);
-    editVersionRef.current.set(key, (editVersionRef.current.get(key) || 0) + 1);
+    countEditStep(noteId);
     return leaseId;
   };
   const editVersion = (noteId) => editVersionRef.current.get(String(noteId)) || 0;
@@ -52,6 +55,8 @@ export default function useLocalLeases() {
   // Releases its own lease and prunes the older ones of the same note: a
   // newer mutation reached the queue safely, so they are superseded.
   const releaseLocalLeaseWithPrune = (noteId, leaseId) => {
+    // Stored locally now: a copy of the note read before lacks the edit.
+    countEditStep(noteId);
     const map = localLeaseRef.current;
     const leases = map.get(noteId);
     if (!leases) return;
@@ -128,6 +133,8 @@ export default function useLocalLeases() {
 
   return {
     acquireLocalLease,
+    // The server received a local change: a copy fetched before may lack it.
+    editDone: countEditStep,
     releaseLocalLease,
     releaseLocalLeaseWithPrune,
     isNoteLocallyProtected,

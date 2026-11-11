@@ -38,11 +38,12 @@ const HEALTH_OFFLINE_INTERVAL = 3000;    // 3s when server is known to be down
  *   pending/processing/failed/total/items: queue stats
  */
 export class SyncEngine {
-  constructor({ getToken, userId, sessionId, onStatusChange, onSyncComplete, onSyncError, onNoteInaccessible }) {
+  constructor({ getToken, userId, sessionId, onStatusChange, onWriteLanded, onSyncComplete, onSyncError, onNoteInaccessible }) {
     this.getToken = getToken;
     this._userId = userId;
     this._sessionId = sessionId;
     this.onStatusChange = onStatusChange || (() => {});
+    this.onWriteLanded = onWriteLanded || (() => {});
     this.onSyncComplete = onSyncComplete || (() => {});
     this.onSyncError = onSyncError || (() => {});
     this.onNoteInaccessible = onNoteInaccessible || (() => {});
@@ -195,6 +196,9 @@ export class SyncEngine {
 
         try {
           const result = await this._executeAction(item);
+          // Before the item leaves the queue: from then on nothing else
+          // tells a server copy fetched earlier from one that has the write.
+          this.onWriteLanded(item);
           await removeQueueItem(item.queueId);
           this._serverReachable = true;
           this._lastSyncAt = Date.now();
