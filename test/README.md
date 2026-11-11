@@ -34,6 +34,7 @@ réseau, pas de base de données, rien à nettoyer après. Assez rapide pour
 | Les gestes du vrai éditeur: retirer une couleur sans toucher aux autres styles, indenter un élément de liste, bloc de code sur quelques mots ou plusieurs lignes, soulignements variés, cases cochées, collage depuis le Bloc-notes ou en « texte seul » (liens compris), copie d'une liste | `unit/t30-rich-text-editor.mjs` |
 | Une mise à jour Docker recrée le conteneur avec les réglages de la nouvelle image (son commit compris) et garde ceux de l'administrateur (variables du compose, dossiers, ports, réseau) | `unit/t31-docker-update-config.mjs` |
 | Un fichier joint se relit à l'identique une fois chiffré, et toute altération sur le disque (octet changé, blocs échangés, coupure nette) est refusée | `unit/t32-attachment-cipher.mjs` |
+| Une sauvegarde ZIP se lit dans le navigateur sans être chargée en mémoire: fichiers stockés ou compressés, noms accentués, format ZIP64 des archives de plus de 4 Go | `unit/t33-zip-reader.mjs` |
 
 Le premier mérite un mot: ce n'est pas le test d'une fonction, c'est le
 test d'une règle. Il recense chaque endroit où l'interface affiche du
@@ -64,7 +65,7 @@ donc l'ordre d'exécution n'a aucune importance et un scénario qui
 | Panneau d'administration: inscriptions en attente, comptes, garde-fous, réglages d'instance, logos, domaine des passkeys | `functional/f5-administration.mjs` | 9515 à 9518 |
 | Connexion OpenID Connect avec un faux fournisseur: interrupteur de l'administrateur et ses deux politiques, fournisseur de l'instance associé par plusieurs comptes, fournisseur déclaré par chaque compte et secret qui ne ressort jamais, adresse privée refusée à un compte ordinaire tant que le réseau local n'est pas ouvert, association (une par compte), connexion par identifiant, identité tenue par issuer + sub, refus (autre identité, autre adresse, autre navigateur, ticket ou état rejoué, jeton falsifié, nonce faux, politique changée en cours de route), mise à jour d'une base antérieure aux politiques | `functional/f6-sso.mjs` | 9519, 9520, 9521 |
 | Le script de mise à jour native dans un bac à sable: bêta installée par son commit (même à numéro égal) et étiquetée avec lui, bêta déjà en place non retéléchargée, retour d'une bêta vers une version publiée, commit invalide, introuvable ou au mauvais numéro sans dégât, base d'avant remise quand la nouvelle version l'a convertie puis échoue | `functional/f7-mise-a-jour-native.mjs` | aucun |
-| Fichiers joints: relecture à l'identique, droits de chacun, fichiers piégés jamais affichés, limites, liens signés, ménage sur le disque, chiffrement au repos du contenu et des noms, dans les deux sens | `functional/f8-pieces-jointes.mjs` | 9522 |
+| Fichiers joints: relecture à l'identique, droits de chacun, fichiers piégés jamais affichés, limites, liens signés, ménage sur le disque, sauvegarde ZIP rapportée sur un autre compte sans rien doubler, chiffrement au repos du contenu et des noms, dans les deux sens | `functional/f8-pieces-jointes.mjs` | 9522 |
 
 ### Éprouvés par mutation
 

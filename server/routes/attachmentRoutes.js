@@ -238,7 +238,7 @@ function attachAttachmentRoutes(app, deps) {
       return res.status(404).json({ error: "Attachment not found" });
     }
     const token = downloadLinks.issue({
-      attachmentId: attachment.id,
+      subject: attachment.id,
       userId: req.user.id,
       tokenVersion: currentTokenVersion(req.user.id),
       inline: !!req.body?.inline,

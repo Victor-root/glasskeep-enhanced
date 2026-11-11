@@ -9,6 +9,11 @@ import {
   serializeRichContent,
 } from "../utils/richText.js";
 import { GKEEP_IMAGE_EXT, expandGkeepZips, keepNoteFromJson } from "../utils/googleKeepImport.js";
+import { isZip, readZipEntries, zipEntryBlob } from "../utils/zipReader.js";
+import { saveFromLink, sendFile, setAttachmentThumb } from "../utils/attachments.js";
+
+const NOTES_ENTRY = "notes.json";
+const SEND_ATTEMPTS = 3;
 
 // Normalise any inbound text note `content` (plain string, Markdown, or
 // already-rich envelope) into our current rich-JSON envelope string. Keeps
@@ -66,11 +71,31 @@ function buildImportMessage(result, attempted, successKey) {
   return `${withUpdated} ${t("importRejected").replace("{rejected}", String(rejectedSafe))}`;
 }
 
+// One file of a backup archive, onto the note the server planned it for.
+// A cut connection resumes where the server got to; a refusal (too large,
+// attachments off) does not get better by trying again.
+async function sendArchivedFile(archive, entries, file) {
+  const entry = entries.get(file.path);
+  if (!entry || entry.size !== file.size) return false;
+  const blob = await zipEntryBlob(archive, entry);
+  const session = {};
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await sendFile({ noteId: file.noteId, id: file.id, blob, name: file.name, mime: file.mime, session });
+      break;
+    } catch (e) {
+      if (e?.status !== 0 || attempt >= SEND_ATTEMPTS) return false;
+    }
+  }
+  if (file.thumb) await setAttachmentThumb(file.noteId, file.id, file.thumb).catch(() => {});
+  return true;
+}
+
 /**
  * Hook encapsulating import/export actions and secret key download.
  * Purely mechanical extraction from App — same flows, same behavior.
  */
-export default function useImportExport(token, { currentUser, loadNotes }) {
+export default function useImportExport(token, { currentUser, loadNotes, showToast, dismissNotification }) {
   const triggerJSONDownload = (filename, jsonText) => {
     const blob = new Blob([jsonText], {
       type: "application/json;charset=utf-8",
@@ -78,16 +103,19 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
     saveBlobViaLink(filename, blob);
   };
 
-  const exportAll = async () => {
+  // With the attachments, the server builds a ZIP archive that the browser
+  // or the app's download manager saves straight to the disk.
+  const exportAll = async ({ withAttachments = true } = {}) => {
     try {
-      const payload = await api("/notes/export", { token });
-      const json = JSON.stringify(payload, null, 2);
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
-      const fname =
-        sanitizeFilename(
-          `glass-keep-notes-${currentUser?.email || "user"}-${ts}`,
-        ) + ".json";
-      triggerJSONDownload(fname, json);
+      const base = sanitizeFilename(`glass-keep-notes-${currentUser?.email || "user"}-${ts}`);
+      if (withAttachments) {
+        const { url } = await api("/notes/export/link", { method: "POST", token });
+        saveFromLink(new URL(url, window.location.origin).href, `${base}.zip`, "application/zip");
+        return;
+      }
+      const payload = await api("/notes/export", { token });
+      triggerJSONDownload(`${base}.json`, JSON.stringify(payload, null, 2));
     } catch (e) {
       alert(localizeServerError(e.message, "exportFailed"));
     }
@@ -97,7 +125,22 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
     try {
       if (!fileList || !fileList.length) return;
       const file = fileList[0];
-      const text = await file.text();
+      const archive = (await isZip(file)) ? file : null;
+      let entries = null;
+      let text;
+      if (archive) {
+        try {
+          entries = await readZipEntries(archive);
+          const notesEntry = entries.get(NOTES_ENTRY);
+          if (!notesEntry) throw new Error("No notes in the archive");
+          text = await (await zipEntryBlob(archive, notesEntry)).text();
+        } catch {
+          alert(t("importInvalidArchive"));
+          return;
+        }
+      } else {
+        text = await file.text();
+      }
       // A truncated file or one that was never a GlassKeep export throws
       // here with a browser-native message ("Unexpected non-whitespace
       // character..."), meant for a developer console, not the person who
@@ -127,13 +170,38 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
         if (!n || n.type !== "text") return n;
         return { ...n, content: ensureRichContent(n.content) };
       });
+      // A plain JSON file names files it does not carry.
+      const notesToSend = archive ? upgraded : upgraded.map((n) => {
+        if (!n?.attachments) return n;
+        const { attachments: _files, ...rest } = n;
+        return rest;
+      });
       const result = await api("/notes/import", {
         method: "POST",
         token,
-        body: { notes: upgraded },
+        body: { notes: notesToSend },
       });
       await loadNotes();
-      alert(buildImportMessage(result, notesArr.length, "importedNotesSuccessfully"));
+      const message = buildImportMessage(result, notesArr.length, "importedNotesSuccessfully");
+      const files = archive && Array.isArray(result?.files) ? result.files : [];
+      if (!files.length) {
+        alert(message);
+        return;
+      }
+      const progress = showToast?.(t("importingAttachments", { count: files.length }), "info", null);
+      let failed = 0;
+      try {
+        for (const f of files) {
+          if (!(await sendArchivedFile(archive, entries, f).catch(() => false))) failed++;
+        }
+      } finally {
+        if (progress) dismissNotification?.(progress);
+      }
+      const sent = files.length - failed;
+      const filesLine = failed
+        ? t("importAttachmentsPartial", { sent, failed })
+        : t("importAttachmentsDone", { count: sent });
+      alert(`${message} ${filesLine}`);
     } catch (e) {
       alert(localizeServerError(e.message, "importFailed"));
     }

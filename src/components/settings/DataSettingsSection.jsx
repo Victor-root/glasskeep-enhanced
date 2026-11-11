@@ -1,7 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
 import { RowIcon } from "../common/SettingsAccordion.jsx";
+
+// Remembered on this device: whoever leaves the files out once usually
+// means it the next time too.
+const WITH_ATTACHMENTS_KEY = "gk-export-attachments";
+
+function readWithAttachments() {
+  try { return localStorage.getItem(WITH_ATTACHMENTS_KEY) !== "0"; } catch { return true; }
+}
 
 // Data management section of the Settings panel: exports, imports, the
 // secret key download and the note order reset (whose confirmation
@@ -16,21 +24,53 @@ export default function DataSettingsSection({
   onDownloadSecretKey,
   onOpenResetNoteOrder,
 }) {
+  const [withAttachments, setWithAttachments] = useState(readWithAttachments);
+  const toggleWithAttachments = () => {
+    const next = !withAttachments;
+    setWithAttachments(next);
+    try { localStorage.setItem(WITH_ATTACHMENTS_KEY, next ? "1" : "0"); } catch { /* kept for this session only */ }
+  };
+
   return (
     <div className="space-y-3">
-      <button
-        className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-        onClick={() => {
-          onClose();
-          onExportAll?.();
-        }}
-      >
-        <RowIcon icon={TI.Upload} />
-        <div className="min-w-0">
-          <div className="font-medium">{t("exportAllNotesJson")}</div>
-          <div className="text-sm text-gray-500">{t("downloadAllNotesJson")}</div>
+      <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
+        <button
+          className={`flex items-center gap-3 w-full text-left px-3 py-3 ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+          onClick={() => {
+            onClose();
+            onExportAll?.({ withAttachments });
+          }}
+        >
+          <RowIcon icon={TI.Upload} />
+          <div className="min-w-0">
+            <div className="font-medium">{t("exportAllNotes")}</div>
+            <div className="text-sm text-gray-500">
+              {t(withAttachments ? "exportAllNotesZipDesc" : "exportAllNotesJsonDesc")}
+            </div>
+          </div>
+        </button>
+        <div className="flex items-center justify-between gap-3 px-3 py-2.5 border-t border-[var(--border-light)]">
+          <span id="export-with-attachments" className="text-sm">{t("exportWithAttachments")}</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={withAttachments}
+            aria-labelledby="export-with-attachments"
+            onClick={toggleWithAttachments}
+            className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+              withAttachments
+                ? "bg-gradient-to-r from-indigo-500 to-violet-600 btn-gradient"
+                : "bg-gray-300 dark:bg-gray-600"
+            }`}
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                withAttachments ? "translate-x-[18px]" : "translate-x-[2px]"
+              }`}
+            />
+          </button>
         </div>
-      </button>
+      </div>
 
       <button
         className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
@@ -41,8 +81,8 @@ export default function DataSettingsSection({
       >
         <RowIcon icon={TI.Download} />
         <div className="min-w-0">
-          <div className="font-medium">{t("importNotesJson")}</div>
-          <div className="text-sm text-gray-500">{t("importNotesFromJsonFile")}</div>
+          <div className="font-medium">{t("importNotes")}</div>
+          <div className="text-sm text-gray-500">{t("importNotesDesc")}</div>
         </div>
       </button>
 

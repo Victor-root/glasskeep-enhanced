@@ -563,7 +563,7 @@ export default function App() {
 
   // Import/Export actions (hook)
   const { exportAll, importAll, importGKeep, importMd, downloadSecretKey } =
-    useImportExport(token, { currentUser, loadNotes });
+    useImportExport(token, { currentUser, loadNotes, showToast, dismissNotification });
 
   // Collaboration actions (hook)
   const {

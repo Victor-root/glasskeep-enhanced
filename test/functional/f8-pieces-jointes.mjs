@@ -3,13 +3,15 @@
 // Ce qui est vérifié: un fichier se relit à l'identique, seuls ceux qui
 // partagent la note y accèdent, un collaborateur en lecture seule lit sans
 // rien changer, un fichier piégé ne s'exécute jamais sur l'origine de
-// l'application, le disque ne garde rien d'un fichier retiré, et avec le
+// l'application, le disque ne garde rien d'un fichier retiré, avec le
 // chiffrement au repos ni le contenu ni le nom ne sont lisibles sur le
-// disque.
+// disque, et une sauvegarde ZIP rapporte les fichiers ailleurs sans en
+// doubler aucun.
 import path from "node:path";
 import crypto from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { startInstance, createAndLogin, listenEvents, runner, sleep } from "./lab.mjs";
+import { readZipEntries, zipEntryBlob } from "../../src/utils/zipReader.js";
 
 const PORT = 9522;
 const t = runner("Pièces jointes");
@@ -67,6 +69,25 @@ const lireNote = async (user, id) => {
   const r = await inst.call("GET", "/api/notes", { token: user.token });
   return (r.json || []).find((n) => n.id === id);
 };
+// La sauvegarde ZIP, lue comme le fera le navigateur.
+async function exporter(user) {
+  const { json } = await inst.call("POST", "/api/notes/export/link", { token: user.token });
+  const { res, corps } = await telecharger(json.url);
+  if (!res.ok) return { res };
+  const archive = new Blob([corps]);
+  const entrees = await readZipEntries(archive);
+  const lire = async (chemin) => Buffer.from(await (await zipEntryBlob(archive, entrees.get(chemin))).arrayBuffer());
+  return { res, corps, entrees, lire, notes: JSON.parse((await lire("notes.json")).toString()).notes, lien: json.url };
+}
+// Ce que fait l'interface: les notes d'abord, puis chaque fichier prévu.
+async function importer(user, sauvegarde) {
+  const r = await inst.call("POST", "/api/notes/import", { token: user.token, body: { notes: sauvegarde.notes } });
+  for (const f of r.json?.files || []) {
+    await joindre(user, f.noteId, await sauvegarde.lire(f.path), { id: f.id, name: f.name, type: f.mime });
+    if (f.thumb) await inst.call("PATCH", `/api/notes/${f.noteId}/attachments/${f.id}`, { token: user.token, body: { thumb: f.thumb } });
+  }
+  return r.json;
+}
 
 let flux = null;
 try {
@@ -244,7 +265,61 @@ try {
   await sleep(5600);
   t.check("supprimer une note pour de bon efface ses fichiers", fichiersSurDisque().length === avantPurge - 1, `${purgeAlt.status} ${avantPurge} -> ${fichiersSurDisque().length}`);
 
-  // ── 5. Le chiffrement au repos ──────────────────────────────────────
+  // ── 5. La sauvegarde avec les pièces jointes ────────────────────────
+  const dan = await createAndLogin(inst, { name: "Dan", email: "dan@x.test", password: "Passw0rd-dan" });
+  const eve = await createAndLogin(inst, { name: "Eve", email: "eve@x.test", password: "Passw0rd-eve" });
+  await creerNote(dan, "s1");
+  await creerNote(dan, "s2");
+  const plan = crypto.randomBytes(700 * 1024);
+  const photo = crypto.randomBytes(40 * 1024);
+  const memo = Buffer.from("mémo de la note deux");
+  const idPlan = crypto.randomUUID();
+  await joindre(dan, "s1", plan, { id: idPlan, name: "plan.pdf" });
+  await joindre(dan, "s1", photo, { name: "photo.jpg", type: "image/jpeg" });
+  await joindre(dan, "s2", memo, { name: "mémo.txt", type: "text/plain" });
+  await joindre(dan, "s2", memo, { name: "mémo.txt", type: "text/plain" });
+  await inst.call("PATCH", `/api/notes/s1/attachments/${idPlan}`, { token: dan.token, body: { thumb: vignette } });
+
+  const sauvegarde = await exporter(dan);
+  t.check("la sauvegarde arrive en archive ZIP, avec sa taille exacte",
+    sauvegarde.res.headers.get("content-type") === "application/zip"
+      && Number(sauvegarde.res.headers.get("content-length")) === sauvegarde.corps.length,
+    `${sauvegarde.res.headers.get("content-type")} ${sauvegarde.res.headers.get("content-length")}`);
+  const s1 = sauvegarde.notes.find((n) => n.id === "s1");
+  t.check("chaque note y décrit ses fichiers", s1?.attachments?.length === 2 && sauvegarde.notes.find((n) => n.id === "s2")?.attachments?.length === 2);
+  const decritPlan = s1.attachments.find((a) => a.name === "plan.pdf");
+  t.check("les fichiers y sont à l'identique", plan.equals(await sauvegarde.lire(decritPlan.path))
+    && memo.equals(await sauvegarde.lire(sauvegarde.notes.find((n) => n.id === "s2").attachments[0].path)));
+  t.check("avec leur vignette", decritPlan.thumb === vignette);
+  t.check("un lien de sauvegarde n'ouvre aucun fichier joint",
+    (await telecharger(`/api/attachments/${idPlan}/file?t=${new URL(sauvegarde.lien, inst.base).searchParams.get("t")}`)).res.status === 403);
+  const lienFichier = (await lien(dan, "s1", idPlan)).json.url;
+  t.check("un lien de fichier n'ouvre pas la sauvegarde",
+    (await telecharger(`/api/notes/export/archive?t=${new URL(lienFichier, inst.base).searchParams.get("t")}`)).res.status === 403);
+  t.check("un lien de sauvegarde retouché est refusé", (await telecharger(sauvegarde.lien.replace(/.$/, (c) => (c === "A" ? "B" : "A")))).res.status === 403);
+  t.check("l'export JSON reste sans fichiers", !(await inst.call("GET", "/api/notes/export", { token: dan.token })).json.notes.some((n) => n.attachments));
+
+  const versEve = await importer(eve, sauvegarde);
+  t.check("importée sur un autre compte, la sauvegarde demande ses quatre fichiers", versEve?.imported === 2 && versEve.files.length === 4, JSON.stringify(versEve));
+  const notesEve = (await inst.call("GET", "/api/notes", { token: eve.token })).json;
+  const s1Eve = notesEve.find((n) => n.title === "s1");
+  t.check("les notes arrivent sous de nouveaux identifiants", s1Eve && s1Eve.id !== "s1");
+  t.check("avec leurs fichiers, un fichier joint deux fois compris", s1Eve?.attachments?.length === 2 && notesEve.find((n) => n.title === "s2")?.attachments?.length === 2);
+  const planEve = s1Eve.attachments.find((a) => a.name === "plan.pdf");
+  t.check("qui se relisent à l'identique", plan.equals((await telecharger((await lien(eve, s1Eve.id, planEve.id)).json.url)).corps));
+  t.check("sous un autre identifiant que l'original, déjà pris", planEve.id !== idPlan);
+  t.check("la vignette suit", planEve.thumb === vignette);
+  const deNouveau = await importer(eve, sauvegarde);
+  t.check("réimporter la même sauvegarde ne double ni note ni fichier", deNouveau?.imported === 0 && !deNouveau.files, JSON.stringify(deNouveau));
+  const chezDan = await importer(dan, sauvegarde);
+  t.check("la réimporter chez soi ne double rien non plus", chezDan?.imported === 0 && !chezDan.files, JSON.stringify(chezDan));
+  await inst.call("DELETE", `/api/notes/${s1Eve.id}/attachments/${planEve.id}`, { token: eve.token });
+  const retour = await importer(eve, sauvegarde);
+  t.check("un fichier retiré depuis revient seul, sans doubler la note", retour?.imported === 0 && retour.files.length === 1 && retour.files[0].name === "plan.pdf", JSON.stringify(retour));
+  const sansFichiers = await inst.call("POST", "/api/notes/import", { token: eve.token, body: { notes: sauvegarde.notes.map((n) => ({ ...n, attachments: undefined })) } });
+  t.check("une sauvegarde JSON ne demande aucun fichier", sansFichiers.ok && !sansFichiers.json.files);
+
+  // ── 6. Le chiffrement au repos ──────────────────────────────────────
   await creerNote(moi, "n5");
   const clair = Buffer.from("TEXTE-LISIBLE-DU-FICHIER-" + "y".repeat(3000));
   const id5 = crypto.randomUUID();
@@ -263,6 +338,9 @@ try {
   const id6 = crypto.randomUUID();
   await joindre(moi, "n5", Buffer.from("NOUVEAU-EN-CLAIR-" + "w".repeat(2000)), { id: id6, name: "nouveau-nom.txt", type: "text/plain" });
   t.check("un nouveau fichier arrive chiffré", !lisible("NOUVEAU-EN-CLAIR"));
+  const chiffree = await exporter(moi);
+  const decritClair = chiffree.notes.find((n) => n.id === "n5")?.attachments?.find((a) => a.id === id5);
+  t.check("la sauvegarde rend les fichiers en clair", !!decritClair && clair.equals(await chiffree.lire(decritClair.path)));
   t.check("et se relit", (await telecharger((await lien(moi, "n5", id6)).json.url)).corps.toString().startsWith("NOUVEAU-EN-CLAIR"));
   const lienAvantVerrou = await lien(moi, "n5", id5);
   await inst.call("POST", "/api/instance/lock", { token: a2 });

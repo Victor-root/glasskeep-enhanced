@@ -64,7 +64,7 @@ GlassKeep also includes:
 * 📝 Markdown notes, checklists, drawings, and images
 * 📎 file attachments on notes (PDFs, archives, anything): kept on your server, encrypted at rest when encryption is on, shared with collaborators and across federated servers, and queued while offline
 * 👥 real-time collaboration on notes
-* 📦 import / export with cross-device duplicate detection
+* 📦 import / export with cross-device duplicate detection: a ZIP backup that carries the attachments, or plain JSON
 * 📥 Google Keep import (Takeout `.zip`, full colour, images, line breaks)
 * 🤖 optional AI assistant via any OpenAI-compatible endpoint (Ollama, Open WebUI, LiteLLM, OpenAI, …)
 * 📲 PWA support

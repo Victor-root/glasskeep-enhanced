@@ -501,7 +501,7 @@ export default function NotesHeader({
           <input
             ref={importFileRef}
             type="file"
-            accept="application/json"
+            accept="application/json,.json,application/zip,.zip"
             className="hidden"
             onChange={importFiles(onImportAll)}
           />

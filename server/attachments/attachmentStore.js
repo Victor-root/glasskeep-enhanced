@@ -249,6 +249,21 @@ function createAttachmentStore({ db, dbFile, log = console }) {
     return q.listRows.all(noteId).map(publicShape);
   }
 
+  // What tells a file already on a note from a new one: the same bytes
+  // under the same name.
+  const contentKey = (sha256, name) => `${sha256}|${cleanName(name)}`;
+
+  // How many times each file is on the note: one attached twice on purpose
+  // is twice in a backup too.
+  function contentCounts(noteId) {
+    const counts = new Map();
+    for (const row of q.listRows.all(noteId)) {
+      const key = contentKey(row.sha256, openMeta(row).name);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+  }
+
   function get(attachmentId) {
     const row = q.getRow.get(attachmentId);
     if (!row) return null;
@@ -441,6 +456,8 @@ function createAttachmentStore({ db, dbFile, log = console }) {
     openFile,
     attach,
     list,
+    contentKey,
+    contentCounts,
     get,
     count,
     setThumb,

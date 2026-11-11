@@ -5,6 +5,7 @@
 
 const crypto = require("crypto");
 const { uid } = require("../utils/ids");
+const { ID_RE } = require("../attachments/attachmentStore");
 const { validateAudioContent } = require("../utils/audioContent");
 const { nowISO, parseIsoTimestamp, normalizeDisplayTimestamp } = require("../utils/timestamps");
 
@@ -22,7 +23,16 @@ function attachNoteImportRoutes(app, deps) {
     getUserPosition,
     upsertUserPosition,
     sendEventToUser,
+    attachments,
   } = deps;
+
+  // The files a backup archive carries for a note, as the export describes
+  // them. Their bytes follow from the client, one upload each, once the
+  // notes exist.
+  const validFile = (f) => f
+    && typeof f.path === "string" && f.path.length > 0
+    && Number.isSafeInteger(f.size) && f.size >= 0
+    && /^[0-9a-f]{64}$/.test(String(f.sha256));
 
   app.post("/api/notes/import", auth, (req, res) => {
     const payload = req.body || {};
@@ -183,6 +193,35 @@ function attachNoteImportRoutes(app, deps) {
     let skipped = 0;
     let rejected = 0;
     const idsImportes = [];
+    const files = [];
+    const takenAttachmentIds = new Set();
+    const onNote = new Map();
+    const createdByFingerprint = new Map();
+    // Re-importing the same archive must not attach a file twice: each copy
+    // of the same bytes under the same name already on the note stands for
+    // one in the backup.
+    const planFiles = (noteId, n) => {
+      if (!Array.isArray(n.attachments)) return;
+      if (!onNote.has(noteId)) onNote.set(noteId, attachments.contentCounts(noteId));
+      const present = onNote.get(noteId);
+      for (const f of n.attachments) {
+        if (!validFile(f)) continue;
+        const key = attachments.contentKey(f.sha256, f.name);
+        const copies = present.get(key) || 0;
+        if (copies > 0) {
+          present.set(key, copies - 1);
+          continue;
+        }
+        const wanted = String(f.id || "");
+        const id = ID_RE.test(wanted) && !takenAttachmentIds.has(wanted) && !attachments.get(wanted)
+          ? wanted : crypto.randomUUID();
+        takenAttachmentIds.add(id);
+        files.push({
+          noteId, id, path: f.path, name: String(f.name ?? ""), mime: String(f.mime ?? ""), size: f.size,
+          thumb: typeof f.thumb === "string" ? f.thumb : null,
+        });
+      }
+    };
     try {
       const tx = db.transaction((arr) => {
         for (const n of arr) {
@@ -192,11 +231,16 @@ function attachNoteImportRoutes(app, deps) {
             // ressuscite pas discrètement ce que l'utilisateur a rangé ou
             // jeté, on se contente de ne pas le dupliquer.
             const dejaLa = noteParEmpreinte.get(fp);
-            if (dejaLa && !dejaLa.archived && !dejaLa.trashed && restaurerAttributs(dejaLa, n)) {
+            const active = dejaLa && !dejaLa.archived && !dejaLa.trashed;
+            if (active && restaurerAttributs(dejaLa, n)) {
               updated++;
             } else {
               skipped++;
             }
+            // Twins in the same file make one note: none of their files is
+            // lost for it.
+            const target = active ? dejaLa.id : createdByFingerprint.get(fp);
+            if (target) planFiles(target, n);
             continue;
           }
           seenFingerprints.add(fp);
@@ -244,6 +288,8 @@ function attachNoteImportRoutes(app, deps) {
           if (n.icon && typeof n.icon.src === "string") {
             runSetUserIcon(id, req.user.id, n.icon);
           }
+          planFiles(id, n);
+          createdByFingerprint.set(fp, id);
           idsImportes.push(id);
           imported++;
         }
@@ -261,7 +307,9 @@ function attachNoteImportRoutes(app, deps) {
           updated,
         });
       }
-      res.json({ ok: true, imported, updated, skipped, rejected });
+      // Only the files left to send, on the requester's own notes: an import
+      // without any keeps the answer to counts alone.
+      res.json({ ok: true, imported, updated, skipped, rejected, ...(files.length ? { files } : {}) });
     } catch (err) {
       // The raw message can name tables and columns, so it stays in the
       // server log and never rides the response. The client maps the bare
