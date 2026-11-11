@@ -695,17 +695,6 @@ export default function NoteModal({
               />
             )}
 
-            {!isDrawEdit && (
-              <ModalAttachments
-                attachments={noteAttachments.attachments}
-                onOpen={noteAttachments.open}
-                onDownload={noteAttachments.download}
-                onRemove={noteAttachments.remove}
-                onCancel={noteAttachments.cancel}
-                onRetry={noteAttachments.retry}
-              />
-            )}
-
             <OfflineCollabBanner visible={isCollaborativeNote(activeId) && syncState === "offline"} />
             <FederationReadOnlyBanner info={fedInfo} />
 
@@ -744,6 +733,16 @@ export default function NoteModal({
               drawToolbarEl={drawToolbarEl}
               editedStamp={editedStamp}
               modalScrollable={modalScrollable}
+              attachments={!isDrawEdit && (
+                <ModalAttachments
+                  attachments={noteAttachments.attachments}
+                  onOpen={noteAttachments.open}
+                  onDownload={noteAttachments.download}
+                  onRemove={noteAttachments.remove}
+                  onCancel={noteAttachments.cancel}
+                  onRetry={noteAttachments.retry}
+                />
+              )}
             />
 
             {/* Absolute Edited stamp: only when NOT scrollable (hidden in

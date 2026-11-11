@@ -8,8 +8,8 @@ export const attachmentsCSS = `
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
   gap: 8px;
-  margin: 0;
-  padding: 4px 24px 8px;
+  margin: 24px 0 0;
+  padding: 0;
   list-style: none;
 }
 .gk-attachment {
@@ -135,7 +135,6 @@ html.dark .gk-attachment-btn:active { background-color: rgba(255, 255, 255, 0.14
   transition: transform 0.2s linear;
 }
 @media (max-width: 639px) {
-  .gk-attachments { padding-right: 16px; padding-left: 16px; }
   .gk-attachment-btn { width: 40px; height: 44px; }
   .gk-attachment-thumb, .gk-attachment-tile { width: 44px; height: 44px; }
 }

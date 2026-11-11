@@ -95,6 +95,7 @@ export default function NoteModalBody({
   // edited stamp
   editedStamp,
   modalScrollable,
+  attachments,
 }) {
   // Rendered HTML for view mode. Rich-format notes render through Tiptap's
   // generateHTML (also sanitized); legacy Markdown notes keep the old marked
@@ -217,6 +218,8 @@ export default function NoteModalBody({
           {drawingPreview}
         </>
       )}
+
+      {attachments}
 
       {/* Audio bottom bar: storage gauge on the left (mirror of the
           "Edited:" stamp on the right). Always rendered so the

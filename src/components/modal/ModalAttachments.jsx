@@ -19,7 +19,7 @@ function statusLine(attachment) {
 }
 
 /**
- * The files attached to a note, between its images and its text. A row opens
+ * The files attached to a note, at the bottom of its content. A row opens
  * the file; downloading and removing have their own buttons. Rows still on
  * their way to the server show how far they got instead.
  */
