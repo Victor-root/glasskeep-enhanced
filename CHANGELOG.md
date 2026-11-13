@@ -1,5 +1,39 @@
 # 📋 Changelog
 
+## 🚀 Unreleased
+
+Headline features: **file attachments** on notes, with a **ZIP backup** that carries them, and **drag-and-drop reordering** that moves the other cards live, as in Google Keep, without shuffling the rest of the grid. Also: update **channels** with validated betas, an open note that follows the **phone keyboard** smoothly, and a round of sync fixes for text that could come back or disappear while typing.
+
+### ➕ Added
+- 📎 **File attachments** (issue #30): attach any file to a note (PDF, documents, archives, anything) from the **Attach** button of the note footer. Files are kept on your server, in their own folder beside the database, encrypted at rest when encryption is on, shared with collaborators and across federated servers, and queued while offline. They are sent in small pieces that resume after a cut connection and pass a reverse proxy's request size limit. Images, PDFs and text open in place, the rest downloads; the Android app opens them with the phone's apps. The size limit per file is set in Admin → *Attachments* (100 MB by default).
+- 📦 **Backup with attachments**: *Export all notes* now builds a ZIP archive with the notes and every attached file. A switch, remembered on the device, keeps the plain JSON export without files. *Import notes* reads the ZIP as well as the JSON, and importing the same backup twice duplicates neither notes nor files.
+- ✋ **Live drag-and-drop reordering**: hold a card (mouse, or a finger after a long press) and the other cards glide out of its way while you move it. In its own column the card slides between the others; over a card of another column the two trade places, and every other card keeps its column. The page scrolls when the card is held near an edge, and Escape cancels.
+- ☑️ **Checklist suggestions** (issue #33): typing an item suggests the note's checked items starting with the same word; picking one unchecks it instead of adding a duplicate, its sub-items included.
+- 🔐 **Sign in with the instance's provider in one click** (issue #31): with the *instance's provider only* single sign-on policy, the login button goes straight to the provider, without asking for an email first.
+- 🧪 **Update channels**: Admin → server version offers *Stable* or *Beta*. Betas are published only once their tests and a rollback test against the stable release pass. Entering the beta backs the database up first, and leaving it offers only what is safe: going back now, restoring the pre-beta backup, or waiting for the next release. A *Check now* button asks GitHub for updates at once, and the changelog only opens after an update to a stable release.
+- 💾 **Database safety on updates**: a copy of the database is taken whenever a different version opens it (the last five are kept), a version refuses to start on a database written in a newer format, and an update that fails puts the previous database back along with the previous version.
+- ⌨️ **An open note follows the phone keyboard** (Android app and installed web app): the note slides up and down with the keyboard, as in Google Keep, and the home screen no longer shows behind it when the keyboard closes.
+
+### 🔄 Changed
+- 🧩 **Tighter notes grid**: each note now goes into the shortest column, so a column of long notes no longer leaves a hole beside it. The first time, some notes may sit in a different spot than before; their order is unchanged.
+- 📎 The note footer's **Image** button is now **Attach**, with a paperclip, and attached files sit at the bottom of the note.
+- 🔁 **Converting between text and checklist** keeps ticks, sections (as headings) and sub-items, both ways.
+- 📝 **Touching lists of the same kind merge into one** (issue #35): deleting the empty line between two numbered lists gives one list numbered on, as in Word.
+- 📦 Every `npm audit` advisory is cleared, and the editor uses Tiptap's own text style again.
+
+### 🐛 Fixed
+- 🤖 **Newer OpenAI models** (gpt-5, the o-series) could not be connected (issue #34): a request a model refuses for `max_tokens` or the temperature is sent again without it, and the setting is remembered.
+- ✍️ **Typed words could disappear or come back**: a list of notes fetched just before a save reached the server (after a reconnection, for instance) replaced the text typed last. Copies older than a local save no longer overwrite it.
+- ↩️ **Undo and redo in a checklist were never saved**: the undone items came back on reopening the note or on another device.
+- 🏷️ The note's **tag dropdown did not close** on a second click held a little long, and Escape in its search field closed the note too.
+- 📱 **Android: dragging a card down from the top of the list** triggered pull-to-refresh, which dropped the card and reloaded the page.
+- 📱 A thin **border ran around a note opened full screen** on phones.
+- 🔢 **Long digit runs** (order numbers, IBANs) were underlined as phone numbers.
+- The footer's **Read mode** label could be cut off, and a popover's arrow kept its old colour over a hovered row.
+- 📷 The **QR scanner's camera** could stay off after a cold start renewed the session.
+- 🐳 **Docker updates** kept the old image's settings in the new container, so a beta could offer the same update again.
+- The chosen card of a set of choices (themes, update channel, SSO policy) lost its frame while focused.
+
 ## 🚀 v2.7.0 (2026-10-21)
 
 Headline feature: **single sign-on** with any OpenID Connect provider (Pocket ID, Authentik, Keycloak, Authelia, …), passkeys included, on the web and in the Android app. Also in this release: GlassKeep now runs on **Node.js 26**, installed for you by the updater, every library moves to its latest version, and the phone interface gets a large round of polish.
