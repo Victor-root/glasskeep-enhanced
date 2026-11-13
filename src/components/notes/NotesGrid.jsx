@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { holdPullToRefresh } from "../../utils/pullToRefresh.js";
 
 // How far a pressed mouse moves before the press becomes a drag, and how
 // long a finger rests before it picks a card up (under Android's long-press
@@ -203,6 +204,7 @@ export default function NotesGrid({ notes, columns, gapX, gapY, canDrag, renderC
     const d = drag.current;
     const box = d.el.getBoundingClientRect();
     d.active = true;
+    holdPullToRefresh("note-drag", true);
     d.offsetX = d.startX - box.left;
     d.offsetY = d.startY - box.top;
     d.scroller = scrollParent(containerRef.current);
@@ -223,6 +225,7 @@ export default function NotesGrid({ notes, columns, gapX, gapY, canDrag, renderC
     cancelAnimationFrame(d.scrollRaf);
     d.detach();
     if (!d.active) return;
+    holdPullToRefresh("note-drag", false);
     suppressClick.current = true;
     const finalOrder = commit ? orderRef.current : d.startOrder;
     if (!commit) setDragOrder(d.startOrder);

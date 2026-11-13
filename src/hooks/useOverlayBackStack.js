@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { holdPullToRefresh } from "../utils/pullToRefresh.js";
 
 /**
  * Back button / gesture handling for the app's overlays (the Android back
@@ -49,7 +50,7 @@ export default function useOverlayBackStack(layers) {
   useEffect(() => {
     const locked = overlayOpenCount > 0;
     document.documentElement.toggleAttribute("data-gk-overlay-locked", locked);
-    try { window.AndroidTheme?.setRefreshEnabled(!locked); } catch { /* Android bridge best-effort */ }
+    holdPullToRefresh("overlay", locked);
   }, [overlayOpenCount]);
 
   useEffect(() => {
