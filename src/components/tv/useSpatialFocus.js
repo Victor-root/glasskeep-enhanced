@@ -171,6 +171,14 @@ export function requestTvFocus(target) {
 // handle their own steps.
 const ROOT_MARKER = { tvRoot: true };
 
+// A field reached with the remote stays closed: the keyboard only opens
+// when OK is pressed on it. A WebView field opens the keyboard by itself
+// when it takes the focus, so it is read-only until then, and OK asks the
+// Android app to open the keyboard. An app too old to do that keeps the
+// fields as they were, or they could never be typed in.
+const canOpenKeyboard = () => typeof window.AndroidTheme?.showKeyboard === "function";
+const isClosedField = (el) => el?.tagName === "INPUT" && el.dataset.tvKeyboard === "closed";
+
 export default function useSpatialFocus({ enabled, onBack, onEdgeReached, onZoneChange } = {}) {
   const onBackRef = useRef(onBack);
   const onEdgeReachedRef = useRef(onEdgeReached);
@@ -198,6 +206,14 @@ export default function useSpatialFocus({ enabled, onBack, onEdgeReached, onZone
     const REPEAT_LOCK_MS = 110;
     const handler = (e) => {
       const active = document.activeElement;
+      if (e.key === "Enter" && isClosedField(active)) {
+        e.preventDefault();
+        delete active.dataset.tvKeyboard;
+        active.readOnly = false;
+        // Once the field is editable for the WebView too.
+        requestAnimationFrame(() => window.AndroidTheme.showKeyboard());
+        return;
+      }
       // In a text field the arrows move the caret, except Up and Down in a
       // single-line field, where they have no caret to move: there they go
       // to the next field, as everywhere else.
@@ -253,7 +269,13 @@ export default function useSpatialFocus({ enabled, onBack, onEdgeReached, onZone
     };
     document.addEventListener("keydown", handler);
     const onFocusIn = (e) => {
-      if (e.target instanceof HTMLElement && e.target.matches(FOCUSABLE_SELECTOR)) markFocused(e.target);
+      const el = e.target;
+      if (!(el instanceof HTMLElement) || !el.matches(FOCUSABLE_SELECTOR)) return;
+      markFocused(el);
+      if (el.tagName === "INPUT" && canOpenKeyboard()) {
+        el.dataset.tvKeyboard = "closed";
+        el.readOnly = true;
+      }
     };
     document.addEventListener("focusin", onFocusIn);
 

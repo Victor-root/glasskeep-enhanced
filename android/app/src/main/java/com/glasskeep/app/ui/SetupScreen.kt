@@ -215,10 +215,12 @@ internal fun ServerUrlField(
     subtextColor: Color,
     errorColor: Color,
     modifier: Modifier = Modifier,
+    readOnly: Boolean = false,
 ) {
     OutlinedTextField(
         value = url,
         onValueChange = onUrlChange,
+        readOnly = readOnly,
         label = { Text(stringResource(R.string.setup_label)) },
         placeholder = { Text(stringResource(R.string.setup_placeholder)) },
         singleLine = true,

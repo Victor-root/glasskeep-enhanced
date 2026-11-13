@@ -170,6 +170,9 @@ fun WelcomeScreen(onContinue: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                // The scrolled page stops above the pager's dots, laid
+                // over the bottom of the screen: no text runs under them.
+                .padding(bottom = 40.dp)
                 .verticalScroll(scrollState)
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

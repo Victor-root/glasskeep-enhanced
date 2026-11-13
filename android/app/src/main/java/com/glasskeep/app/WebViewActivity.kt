@@ -187,6 +187,20 @@ class WebViewActivity : AppCompatActivity() {
             runOnUiThread { finish() }
         }
 
+        /** Opens the keyboard on the page's focused field. The TV viewer
+         *  keeps its fields closed until OK is pressed on them, and a
+         *  WebView field only opens the keyboard on its own when it gains
+         *  the focus. */
+        @JavascriptInterface
+        fun showKeyboard() {
+            runOnUiThread {
+                val imm = getSystemService(android.view.inputmethod.InputMethodManager::class.java) ?: return@runOnUiThread
+                // The field was read-only when the input connection was made.
+                imm.restartInput(webView)
+                imm.showSoftInput(webView, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+            }
+        }
+
         /** Opens the single sign-on provider. Only an authorization URL
          *  that returns to this server's callback is accepted. */
         @JavascriptInterface

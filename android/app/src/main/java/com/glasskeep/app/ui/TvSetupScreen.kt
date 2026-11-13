@@ -14,7 +14,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -71,16 +76,24 @@ internal fun TvSetupScreen(
     LaunchedEffect(Unit) {
         (if (url.isBlank()) fieldFocus else connectFocus).requestFocus()
     }
-    // A one-line field has no line to move to: Up and Down leave it.
+    // The field stays closed while the remote passes over it: the keyboard
+    // opens on OK only. A one-line field has no line to move to: Up and
+    // Down leave it.
     val focusManager = LocalFocusManager.current
-    val leaveVertically = Modifier.onPreviewKeyEvent {
-        if (it.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-        when (it.key) {
-            Key.DirectionDown -> focusManager.moveFocus(FocusDirection.Down)
-            Key.DirectionUp -> focusManager.moveFocus(FocusDirection.Up)
-            else -> false
+    val keyboard = LocalSoftwareKeyboardController.current
+    var typing by remember { mutableStateOf(false) }
+    LaunchedEffect(typing) { if (typing) keyboard?.show() }
+    val fieldKeys = Modifier
+        .onFocusChanged { if (!it.isFocused) typing = false }
+        .onPreviewKeyEvent {
+            if (it.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (it.key) {
+                Key.DirectionCenter, Key.Enter -> if (typing) false else { typing = true; true }
+                Key.DirectionDown -> focusManager.moveFocus(FocusDirection.Down)
+                Key.DirectionUp -> focusManager.moveFocus(FocusDirection.Up)
+                else -> false
+            }
         }
-    }
     val brandBrush = Brush.horizontalGradient(listOf(TvTitleStart, TvTitleEnd))
     val bgBrush = Brush.radialGradient(
         colors = listOf(TvBgTop, TvBgMid, TvBgBottom),
@@ -144,7 +157,8 @@ internal fun TvSetupScreen(
                     borderColor = TvCardBorder,
                     subtextColor = TvSubtextColor,
                     errorColor = Color(0xFFfca5a5),
-                    modifier = Modifier.focusRequester(fieldFocus).then(leaveVertically),
+                    modifier = Modifier.focusRequester(fieldFocus).then(fieldKeys),
+                    readOnly = !typing,
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
