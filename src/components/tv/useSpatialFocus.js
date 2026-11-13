@@ -55,9 +55,28 @@ function zoneOf(el) {
   return "main";
 }
 
+// The grid's chunks of cards the WebView skips while out of view (see
+// TvNotesViewer): measuring a card inside one makes the WebView lay the
+// chunk out on the spot, so a move that measured every card laid the
+// whole grid out. Their cards are left out of a move unless the chunk
+// itself, measured without waking it, could hold a nearer card.
+function sleepingChunkOf(el) {
+  const chunk = el.parentElement;
+  if (!chunk?.classList.contains("tv-masonry__chunk")) return null;
+  if (typeof el.checkVisibility !== "function") return null;
+  return el.checkVisibility({ contentVisibilityAuto: true }) ? null : chunk;
+}
+
 function pickNextFocus(current, direction) {
-  const all = Array.from(document.querySelectorAll(FOCUSABLE_SELECTOR))
-    .filter(isFocusable);
+  const live = [];
+  const sleeping = new Map();
+  for (const el of document.querySelectorAll(FOCUSABLE_SELECTOR)) {
+    const chunk = sleepingChunkOf(el);
+    if (!chunk) live.push(el);
+    else if (sleeping.has(chunk)) sleeping.get(chunk).push(el);
+    else sleeping.set(chunk, [el]);
+  }
+  const all = live.filter(isFocusable);
   if (!all.length) return null;
   if (!current || !current.isConnected) return all[0];
   const cur = getRect(current);
@@ -78,16 +97,48 @@ function pickNextFocus(current, direction) {
       pool = all.filter((el) => zoneOf(el) === curZone);
     }
   }
-  let best = scoreBest(cur, pool, current, direction);
+  let found = scoreBest(cur, pool, current, direction);
   // If the zone-restricted pool yielded nothing (e.g. user is at the
   // top of the sidebar pressing Up — no sidebar candidate higher up),
   // fall back to the full focusable list so the focus can ESCAPE the
   // zone vertically. Otherwise the user would be stuck. The detail
   // viewer covers the screen: nothing behind it is reachable.
-  if (!best && pool !== all && curZone !== "detail") {
-    best = scoreBest(cur, all, current, direction);
+  const everywhere = !found.best && pool !== all && curZone !== "detail";
+  if (everywhere) found = scoreBest(cur, all, current, direction);
+  // Sleeping chunks belong to the notes: reachable from them, or when
+  // the move may leave its zone.
+  if (pool === all || everywhere) {
+    const chunks = [...sleeping.keys()]
+      .map((chunk) => ({ chunk, bound: lowerBound(cur, getRect(chunk), direction) }))
+      .filter((c) => c.bound < found.score)
+      .sort((a, b) => a.bound - b.bound);
+    for (const { chunk, bound } of chunks) {
+      if (bound >= found.score) break;
+      const cards = scoreBest(cur, sleeping.get(chunk).filter(isFocusable), current, direction);
+      if (cards.score < found.score) found = cards;
+    }
   }
-  return best;
+  return found.best;
+}
+
+// The lowest score any card inside `box` could get for this move, or
+// Infinity when none of it lies that way.
+function lowerBound(cur, box, direction) {
+  const gap = (v, lo, hi) => (v < lo ? lo - v : v > hi ? v - hi : 0);
+  if (direction === "right") {
+    if (box.right < cur.right - 8) return Infinity;
+    return Math.max(0, box.left - cur.right) + gap(cur.cy, box.top, box.bottom) * 2;
+  }
+  if (direction === "left") {
+    if (box.left > cur.left + 8) return Infinity;
+    return Math.max(0, cur.left - box.right) + gap(cur.cy, box.top, box.bottom) * 2;
+  }
+  if (direction === "down") {
+    if (box.bottom < cur.bottom - 8) return Infinity;
+    return Math.max(0, box.top - cur.bottom) + gap(cur.cx, box.left, box.right) * 2;
+  }
+  if (box.top > cur.top + 8) return Infinity;
+  return Math.max(0, cur.top - box.bottom) + gap(cur.cx, box.left, box.right) * 2;
 }
 
 function scoreBest(cur, pool, current, direction) {
@@ -118,7 +169,7 @@ function scoreBest(cur, pool, current, direction) {
     const score = primary + lateral * 2;
     if (score < bestScore) { bestScore = score; best = el; }
   }
-  return best;
+  return { best, score: bestScore };
 }
 
 let lastFocusedRef = null; // module-scoped: only one TV viewer alive at a time
@@ -131,21 +182,30 @@ function markFocused(el) {
   el.setAttribute("data-tv-focused", "true");
   lastFocusedRef = el;
 }
+// Non-smooth scroll: smooth is too laggy on older Shield WebViews (each
+// step triggers a paint). Instant scroll lets the focus transition be
+// the only animation.
+function revealElement(el) {
+  if (typeof el.scrollIntoView !== "function") return;
+  try { el.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+  catch { /* WebViews missing the options bag — skip */ }
+}
+
 function focusElement(el) {
   if (!el) return;
   if (typeof el.focus === "function") {
-    try { el.focus({ preventScroll: false }); }
+    try { el.focus({ preventScroll: true }); }
     catch { el.focus(); }
   }
   markFocused(el);
-  if (typeof el.scrollIntoView === "function") {
-    try {
-      // Non-smooth scroll: smooth is too laggy on older Shield WebViews
-      // (each step triggers a paint). Instant scroll lets the focus
-      // transition (scale + glow) be the only animation.
-      el.scrollIntoView({ block: "nearest", inline: "nearest" });
-    } catch { /* WebViews missing the options bag — skip */ }
-  }
+  revealElement(el);
+  // A grid chunk shown for the first time takes its real height a frame
+  // later (it had an estimated one while skipped): the cards around it
+  // move, sometimes the focused one out of view. Revealed again once
+  // they have.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (lastFocusedRef === el && el.isConnected) revealElement(el);
+  }));
 }
 
 function focusFirst() {
