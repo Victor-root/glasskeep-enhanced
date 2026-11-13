@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from "react";
+import React, { useMemo } from "react";
 import { t } from "../../i18n";
 import { bgFor, solid } from "../../utils/colors.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
@@ -6,7 +6,6 @@ import { isRichContent, contentToHTML, contentToHTMLPreview } from "../../utils/
 import { PinOutline, PinFilled, ImageIcon, MicrophoneFilledIcon } from "../../icons/index.jsx";
 import ChecklistRow from "../common/ChecklistRow.jsx";
 import DrawingPreview from "../common/DrawingPreview.jsx";
-import useNoteTouchDrag from "../../hooks/useNoteTouchDrag.js";
 import { getSections, isItem, countItems, countChecked, DEFAULT_SECTION_ID } from "../../utils/checklist.js";
 import { getContentImages } from "../../utils/noteIcon.js";
 import NoteCardFooter from "./NoteCardFooter.jsx";
@@ -26,11 +25,6 @@ function NoteCard({
   onToggleSelect = () => {},
   onCtrlSelect = () => {},
   disablePin = false,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
   currentUser,
   maxPreviewItems = 8,
 }) {
@@ -132,37 +126,10 @@ function NoteCard({
 
   const allTags = Array.isArray(n.tags) ? n.tags : [];
 
-  const group = n.pinned ? "pinned" : "others";
-  // Ordering is stored per-user server-side, so collaborators can drag shared
-  // notes in their own view without affecting other participants.
-  const canDrag = !multiMode;
-  const isTouchDevice = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
-  const cardRef = useRef(null);
-  useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId: n.id, group, onDragStart, onDrop, onDragEnd });
-
   return (
     <div
-      ref={cardRef}
       data-note-id={n.id}
-      draggable={canDrag && !isTouchDevice}
-      onDragStart={(e) => {
-        if (canDrag) onDragStart(n.id, e);
-      }}
-      onDragOver={(e) => {
-        if (canDrag) onDragOver(n.id, group, e);
-      }}
-      onDragLeave={(e) => {
-        if (canDrag) onDragLeave(e);
-      }}
-      onDrop={(e) => {
-        if (canDrag) onDrop(n.id, group, e);
-      }}
-      onDragEnd={(e) => {
-        if (canDrag) onDragEnd(e);
-      }}
       onClick={(e) => {
-        // Ignore click after touch drag release
-        if (cardRef.current?.dataset?.touchDragging) return;
         if (multiMode) {
           e.stopPropagation();
           onToggleSelect?.(n.id, !selected);
@@ -177,10 +144,9 @@ function NoteCard({
         }
       }}
       onContextMenu={(e) => e.preventDefault()}
-      className="note-card-wrapper mb-2 sm:mb-3 relative z-0 idle-hover:z-30 group select-none"
+      className="note-card-wrapper relative z-0 idle-hover:z-30 group select-none"
       style={{ WebkitTouchCallout: "none" }}
       data-id={n.id}
-      data-group={group}
     >
       {/* Pin popup — sits in a clipping container that lives just above
           the card top edge. The container has overflow:hidden, so the

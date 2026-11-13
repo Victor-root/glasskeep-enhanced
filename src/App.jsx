@@ -735,7 +735,7 @@ export default function App() {
 
   useAndroidReminderBridge({ notes, token });
 
-  const { resetNoteOrder, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd } = useNoteReorder({
+  const { resetNoteOrder, reorderGroup } = useNoteReorder({
     notes,
     setNotes,
     currentUser,
@@ -755,11 +755,7 @@ export default function App() {
   // latest closure, so the memo holds and only the modal subtree re-renders.
   const sOpenModal = useStableCallback(openModal);
   const sTogglePin = useStableCallback(togglePin);
-  const sOnDragStart = useStableCallback(onDragStart);
-  const sOnDragOver = useStableCallback(onDragOver);
-  const sOnDragLeave = useStableCallback(onDragLeave);
-  const sOnDrop = useStableCallback(onDrop);
-  const sOnDragEnd = useStableCallback(onDragEnd);
+  const sReorderGroup = useStableCallback(reorderGroup);
   const sOnToggleSelect = useStableCallback(onToggleSelect);
   const sOnCtrlSelect = useStableCallback(onCtrlSelect);
   const sOnEmptyTrash = useStableCallback(onEmptyTrash);
@@ -1247,11 +1243,7 @@ export default function App() {
         pinned={pinned}
         others={others}
         openModal={sOpenModal}
-        onDragStart={sOnDragStart}
-        onDragOver={sOnDragOver}
-        onDragLeave={sOnDragLeave}
-        onDrop={sOnDrop}
-        onDragEnd={sOnDragEnd}
+        onReorder={sReorderGroup}
         togglePin={sTogglePin}
         filteredEmptyWithSearch={filteredEmptyWithSearch}
         allEmpty={allEmpty}

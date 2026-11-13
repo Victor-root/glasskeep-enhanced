@@ -23,11 +23,7 @@ function NotesUI({
   pinned,
   others,
   openModal,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
+  onReorder,
   togglePin,
   onImportAll,
   onImportGKeep,
@@ -284,11 +280,7 @@ function NotesUI({
         onToggleSelect={onToggleSelect}
         onCtrlSelect={onCtrlSelect}
         activeTagFilter={activeTagFilter}
-        onDragStart={onDragStart}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-        onDragEnd={onDragEnd}
+        onReorder={onReorder}
         currentUser={currentUser}
         listView={listView}
         notesLoading={notesLoading}

@@ -113,26 +113,35 @@ html:not([data-gk-scrolling]) .note-card-wrapper:hover .note-card { will-change:
   content-visibility: visible;
   contain: layout style;
 }
-/* Drag & drop reorder styles.
-   Classes are added by the drag handlers to .note-card-wrapper but
-   the visual treatment is applied to the inner .note-card so the
-   pin popup container isnt scaled along with it. */
-.note-card.dragging,
-.note-card-wrapper.dragging > .note-card {
-  opacity: 0.35;
-  transform: scale(0.97);
-  transition: transform 0.15s ease, opacity 0.15s ease;
+/* Notes grid (components/notes/NotesGrid.jsx): every card is placed by its
+   transform. The cards glide only while a card is held and settles, so a
+   resize or a card growing never animates the grid. */
+.gk-notes-grid {
+  position: relative;
 }
-.note-card.drag-over,
-.note-card-wrapper.drag-over > .note-card {
-  outline: 2.5px dashed #6366f1;
-  outline-offset: 4px;
-  transition: outline-offset 0.15s ease, outline-color 0.15s ease;
+.gk-grid-item {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
-/* Pin popup must vanish the instant the card starts being dragged
-   (no transition — display:none beats both Tailwinds group-hover
-   transform and the buttons own 300 ms transition). */
-.note-card-wrapper.dragging .note-pin-popup {
+.gk-grid-item:hover {
+  z-index: 2;
+}
+.gk-notes-grid[data-animating] > .gk-grid-item {
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+/* The held card follows the pointer, lifted above the others. */
+.gk-notes-grid > .gk-grid-item[data-held] {
+  z-index: 40;
+  transition: none;
+  cursor: grabbing;
+}
+.gk-grid-item[data-held] .note-card {
+  transform: scale(1.03);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22), 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+/* Its pin popup stays tucked away while it is held. */
+.gk-grid-item[data-held] .note-pin-popup {
   display: none;
 }
 

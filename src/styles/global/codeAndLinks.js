@@ -186,7 +186,4 @@ html:not(.dark) .code-copy-btn {
 /* Drag handle cursor – native OS move cursor */
 .checklist-grab-handle { cursor: move; }
 .checklist-grab-handle:active { cursor: move; }
-.masonry-grid { display: flex; margin-left: -0.75rem; width: auto; }
-.masonry-grid-column { padding-left: 0.75rem; background-clip: padding-box; }
-.masonry-grid-column > div { margin-bottom: 0.75rem; }
 `;

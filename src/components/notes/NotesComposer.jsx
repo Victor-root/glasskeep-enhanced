@@ -99,11 +99,6 @@ export default function NotesComposer({
                       selected={false}
                       onToggleSelect={() => {}}
                       disablePin={true}
-                      onDragStart={() => {}}
-                      onDragOver={() => {}}
-                      onDragLeave={() => {}}
-                      onDrop={() => {}}
-                      onDragEnd={() => {}}
                       currentUser={currentUser}
                       maxPreviewItems={4}
                     />

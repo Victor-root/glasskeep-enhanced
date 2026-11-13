@@ -1,8 +1,14 @@
 import React from "react";
 import { t } from "../../i18n";
-import Masonry from "react-masonry-css";
 import NoteCard from "./NoteCard.jsx";
+import NotesGrid from "./NotesGrid.jsx";
 import { REMINDERS } from "../../utils/constants.js";
+
+const GAP_X = 12;
+const LIST_GAP = 24;
+// Columns by window width, as the grid always had.
+const BREAKPOINTS = [[767, 2], [1089, 3], [1339, 4], [1587, 5], [1835, 6]];
+const gridColumns = (width) => (BREAKPOINTS.find(([max]) => width <= max) || [0, 7])[1];
 
 function NotesSections({
   pinned,
@@ -15,11 +21,7 @@ function NotesSections({
   onToggleSelect,
   onCtrlSelect,
   activeTagFilter,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
+  onReorder,
   currentUser,
   listView,
   notesLoading,
@@ -48,41 +50,36 @@ function NotesSections({
       {t(labelKey)}
     </h2>
   ));
-  const renderCards = (notes) => notes.map((n) => (
-    <div key={n.id}>
-      <NoteCard
-        n={n}
-        dark={dark}
-        openModal={openModal}
-        togglePin={togglePin}
-        multiMode={multiMode}
-        selected={selectedIds.includes(String(n.id))}
-        onToggleSelect={onToggleSelect}
-        onCtrlSelect={onCtrlSelect}
-        disablePin={disablePin}
-        onDragStart={onDragStart}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-        onDragEnd={onDragEnd}
-        currentUser={currentUser}
-        maxPreviewItems={maxPreviewItems}
+  const renderCard = (n) => (
+    <NoteCard
+      n={n}
+      dark={dark}
+      openModal={openModal}
+      togglePin={togglePin}
+      multiMode={multiMode}
+      selected={selectedIds.includes(String(n.id))}
+      onToggleSelect={onToggleSelect}
+      onCtrlSelect={onCtrlSelect}
+      disablePin={disablePin}
+      currentUser={currentUser}
+      maxPreviewItems={maxPreviewItems}
+    />
+  );
+  const columns = listView ? 1 : gridColumns(windowWidth);
+  const renderGroup = (notes, group) => {
+    const grid = (
+      <NotesGrid
+        notes={notes}
+        columns={columns}
+        gapX={GAP_X}
+        gapY={listView ? LIST_GAP : windowWidth < 640 ? 8 : 12}
+        canDrag={!multiMode}
+        renderCard={renderCard}
+        onReorder={(ids) => onReorder(group, ids)}
       />
-    </div>
-  ));
-  const renderGroup = (notes) => (listView ? (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {renderCards(notes)}
-    </div>
-  ) : (
-    <Masonry
-      breakpointCols={{default: 7, 1835: 6, 1587: 5, 1339: 4, 1089: 3, 767: 2}}
-      className="masonry-grid"
-      columnClassName="masonry-grid-column"
-    >
-      {renderCards(notes)}
-    </Masonry>
-  ));
+    );
+    return listView ? <div className="max-w-2xl mx-auto">{grid}</div> : grid;
+  };
 
   return (
       <main className="px-4 sm:px-6 md:px-8 lg:px-12 pb-12">
@@ -99,14 +96,14 @@ function NotesSections({
         {pinned.length > 0 && (
           <section className="mb-10">
             {renderLabel("pinned")}
-            {renderGroup(pinned)}
+            {renderGroup(pinned, "pinned")}
           </section>
         )}
 
         {others.length > 0 && (
           <section>
             {pinned.length > 0 && renderLabel("others")}
-            {renderGroup(others)}
+            {renderGroup(others, "others")}
           </section>
         )}
 
@@ -137,9 +134,8 @@ function NotesSections({
 }
 
 // Memoized: all props are referentially stable (memoized pinned/others +
-// useStableCallback handlers + value-stable state), so the grid — and
-// react-masonry-css's per-render column redistribution — no longer re-runs
-// when App re-renders for unrelated reasons (a toast auto-dismissing, opening
+// useStableCallback handlers + value-stable state), so the grid no longer
+// re-renders when App re-renders for unrelated reasons (a toast auto-dismissing, opening
 // a modal/panel, typing in the composer). It still updates when notes,
 // selection, dark mode, sync status, etc. actually change.
 export default React.memo(NotesSections);
