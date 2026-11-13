@@ -9,9 +9,6 @@ const TOUCH_SLOP = 10;
 const LONG_PRESS_MS = 300;
 // The cards make way, and the dropped one settles, in this time (shell.js).
 const SETTLE_MS = 220;
-// A new order must bring the held card's slot this much closer to the
-// pointer: a pointer at rest never makes cards trade places back and forth.
-const MIN_GAIN = 8;
 // Scrolling while a card is held near the top or bottom of the view.
 const EDGE = 72;
 const MAX_SCROLL_STEP = 18;
@@ -43,19 +40,47 @@ function computeLayout(ids, heights, width, columns, gapX, gapY) {
   return { colWidth, slots, height: Math.max(0, height) };
 }
 
-// The orders that put `id` next to `targetId`: just before it, just after.
-const placesBeside = (ids, id, targetId) => {
-  const rest = ids.filter((x) => x !== id);
-  const at = rest.indexOf(targetId);
-  return [at, at + 1].map((i) => [...rest.slice(0, i), id, ...rest.slice(i)]);
-};
+// The cards of each column, top to bottom.
+function columnsOf(ids, layout, columns, gapX) {
+  const cols = Array.from({ length: columns }, () => []);
+  for (const id of ids) {
+    const slot = layout.slots.get(id);
+    if (!slot) continue;
+    const col = Math.min(columns - 1, Math.round(slot.x / (layout.colWidth + gapX)));
+    cols[col].push(id);
+  }
+  return cols;
+}
 
-// How far a point is from a card's slot: 0 inside it.
-const distanceTo = (slot, colWidth, x, y) => {
-  const dx = Math.max(slot.x - x, 0, x - (slot.x + colWidth));
-  const dy = Math.max(slot.y - y, 0, y - (slot.y + slot.h));
-  return Math.hypot(dx, dy);
-};
+// An order that the column layout above turns back into these columns: it
+// follows the same rule, the shortest column first, and hands that column
+// its next card. The layout leaves no column empty while another has
+// cards to spare: a column with none left takes the last card of the
+// column with the most height left, other than the held one. Only the
+// bottom of a column ever moves to fill a hole.
+function orderForColumns(cols, heights, gapY, heldId) {
+  const queues = cols.map((ids) => [...ids]);
+  const tops = new Array(cols.length).fill(0);
+  const height = (id) => (heights.get(id) || 0) + gapY;
+  const left = (q) => q.reduce((sum, id) => sum + height(id), 0);
+  const order = [];
+  while (queues.some((q) => q.length)) {
+    let col = 0;
+    for (let c = 1; c < cols.length; c++) if (tops[c] < tops[col]) col = c;
+    let id;
+    if (queues[col].length) {
+      id = queues[col].shift();
+    } else {
+      const donors = queues.filter((q) => q.length);
+      const spare = donors.filter((q) => q[q.length - 1] !== heldId);
+      const donor = (spare.length ? spare : donors).reduce((a, b) => (left(b) > left(a) ? b : a));
+      id = donor.pop();
+    }
+    order.push(id);
+    tops[col] += height(id);
+  }
+  return order;
+}
 
 /**
  * Notes laid out in columns, reorderable by dragging: the held card follows
@@ -90,8 +115,8 @@ export default function NotesGrid({ notes, columns, gapX, gapY, canDrag, renderC
     [order, heights, width, columns, gapX, gapY],
   );
   const layoutArgs = useRef(null);
-  // eslint-disable-next-line react-hooks/refs -- what the pointer handlers need to try other orders
-  layoutArgs.current = { heights, width, columns, gapX, gapY };
+  // eslint-disable-next-line react-hooks/refs -- what the pointer handlers need to place the held card
+  layoutArgs.current = { heights, columns, gapX, gapY };
   const layoutRef = useRef(layout);
   // eslint-disable-next-line react-hooks/refs -- the pointer handlers hit-test against the layout on screen
   layoutRef.current = layout;
@@ -146,11 +171,14 @@ export default function NotesGrid({ notes, columns, gapX, gapY, canDrag, renderC
     d.el.style.transform = `translate3d(${d.clientX - box.left - d.offsetX}px, ${d.clientY - box.top - d.offsetY}px, 0)`;
   };
 
-  // Over another card, the held card moves beside it, before or after:
-  // whichever brings its empty slot closest to the pointer, and only if
-  // closer than where it is. Columns repack when the order changes, so the
-  // slot does not always land where the other card was: this keeps it
-  // under the pointer instead of chasing it.
+  // The other cards keep the columns they had when the card was picked up.
+  // In its own column the held card slides between the others, which make
+  // way. Over a card of another column, the two trade places: that card
+  // goes where the held one was, so both columns keep about their height.
+  // Packing the whole order again instead would push cards into other
+  // columns all the way down. Its place is worked out against the columns
+  // as they were, so where it goes never depends on where it was a moment
+  // ago.
   const followPointer = () => {
     const d = drag.current;
     const box = containerRef.current?.getBoundingClientRect();
@@ -158,26 +186,43 @@ export default function NotesGrid({ notes, columns, gapX, gapY, canDrag, renderC
     placeHeld();
     const px = d.clientX - box.left;
     const py = d.clientY - box.top;
-    const { slots, colWidth } = layoutRef.current;
-    const inside = (id) => {
-      const s = slots.get(id);
-      return s && px >= s.x && px < s.x + colWidth && py >= s.y && py < s.y + s.h;
-    };
-    const ids = orderRef.current;
-    const target = ids.find((id) => id !== d.id && inside(id));
-    if (!target) return;
-    const { heights: hs, width: w, columns: cols, gapX: gx, gapY: gy } = layoutArgs.current;
-    let best = null;
-    let bestDistance = distanceTo(slots.get(d.id), colWidth, px, py) - MIN_GAIN;
-    for (const candidate of placesBeside(ids, d.id, target)) {
-      const tried = computeLayout(candidate, hs, w, cols, gx, gy);
-      const dist = distanceTo(tried.slots.get(d.id), colWidth, px, py);
-      if (dist < bestDistance) {
-        best = candidate;
-        bestDistance = dist;
+    const { colWidth } = layoutRef.current;
+    const { heights: hs, columns: cols, gapX: gx, gapY: gy } = layoutArgs.current;
+    const col = Math.max(0, Math.min(cols - 1, Math.floor((px + gx / 2) / (colWidth + gx))));
+    // Cards are passed by the held card's middle, against where they were
+    // when it was picked up; the card to trade places with is the one
+    // under the pointer.
+    const heldMiddle = py - d.offsetY + (hs.get(d.id) || 0) / 2;
+    let index = 0;
+    let under = null;
+    let top = 0;
+    for (const id of d.startColumns[col]) {
+      const h = hs.get(id) || 0;
+      if (id !== d.id) {
+        if (heldMiddle > top + h / 2) index++;
+        if (py >= top && py < top + h) under = id;
       }
+      top += h + gy;
     }
-    if (best) setDragOrder(best);
+    const swapWith = col !== d.home.col ? under : null;
+    const place = { col, index, swapWith };
+    if (d.place.col === col && (swapWith ? d.place.swapWith === swapWith : !d.place.swapWith && d.place.index === index)) return;
+    d.place = place;
+    if (col === d.home.col && index === d.home.index) {
+      setDragOrder(d.startOrder);
+      return;
+    }
+    let next;
+    if (swapWith) {
+      next = d.columns.map((ids, c) => {
+        if (c === col) return ids.map((id) => (id === swapWith ? d.id : id));
+        if (c === d.home.col) return [...ids.slice(0, d.home.index), swapWith, ...ids.slice(d.home.index)];
+        return ids;
+      });
+    } else {
+      next = d.columns.map((ids, c) => (c === col ? [...ids.slice(0, index), d.id, ...ids.slice(index)] : ids));
+    }
+    setDragOrder(orderForColumns(next, hs, gy, d.id));
   };
 
   const autoScroll = () => {
@@ -209,6 +254,13 @@ export default function NotesGrid({ notes, columns, gapX, gapY, canDrag, renderC
     d.offsetY = d.startY - box.top;
     d.scroller = scrollParent(containerRef.current);
     d.startOrder = orderRef.current;
+    const { columns: cols, gapX: gx } = layoutArgs.current;
+    const startColumns = columnsOf(d.startOrder, layoutRef.current, cols, gx);
+    const homeCol = startColumns.findIndex((ids) => ids.includes(d.id));
+    d.home = { col: homeCol, index: startColumns[homeCol].indexOf(d.id) };
+    d.place = { ...d.home, swapWith: null };
+    d.startColumns = startColumns;
+    d.columns = startColumns.map((ids) => ids.filter((id) => id !== d.id));
     finishSettle();
     try { d.el.setPointerCapture(d.pointerId); } catch { /* pointer already gone */ }
     setAnimating(true);
