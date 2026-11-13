@@ -184,8 +184,13 @@ export default function TvNotesViewer({
   useSpatialFocus({
     enabled: true,
     onBack: () => {
-      if (openNote) { closeDetail(); return; }
-      if (sidebarVisible) setSidebarVisible(false);
+      if (openNote) { closeDetail(); return true; }
+      if (sidebarVisible) {
+        moveFocusOutOfRail();
+        setSidebarVisible(false);
+        return true;
+      }
+      return false;
     },
     onEdgeReached: (direction, anchor) => {
       // Left at the leftmost card → pop the rail open.
@@ -203,6 +208,13 @@ export default function TvNotesViewer({
     },
   });
 
+  // A focus left inside the closing rail would be lost: it goes to the
+  // notes.
+  function moveFocusOutOfRail() {
+    if (!document.activeElement?.closest?.(".tv-sidebar")) return;
+    requestAnimationFrame(() => requestTvFocus(document.querySelector(".tv-notes-scroll .tv-focusable")));
+  }
+
   // Hamburger / MENU-key toggle updates BOTH the current state and
   // the stored preference (so the next launch lands on the user's
   // last explicit choice). We deliberately do NOT move focus when the
@@ -214,13 +226,14 @@ export default function TvNotesViewer({
   // below) still focuses the rail's first item because the user is
   // actively navigating *into* it.
   const toggleSidebar = useCallback(() => {
+    if (sidebarVisible) moveFocusOutOfRail();
     setSidebarVisible((v) => {
       const next = !v;
       savePref(STORAGE_SIDEBAR, next ? "open" : "closed");
       sidebarPrefHiddenRef.current = !next;
       return next;
     });
-  }, []);
+  }, [sidebarVisible]);
 
   // Left-edge: reveal the sidebar (without touching the preference)
   // and drop focus on its first focusable so the user can browse it.
@@ -332,6 +345,7 @@ export default function TvNotesViewer({
               slice={pagerSlice}
               hasPrev={pagerPage > 0}
               hasNext={pagerPage < pagerTotalPages - 1}
+              dark={theme === "dark"}
               onActivate={openDetail}
             />
           ) : (
@@ -341,14 +355,14 @@ export default function TvNotesViewer({
               columnClassName="tv-masonry__col"
             >
               {visible.map((n) => (
-                <TvNoteCard key={n.id} note={n} variant="grid" onActivate={openDetail} />
+                <TvNoteCard key={n.id} note={n} variant="grid" dark={theme === "dark"} onActivate={openDetail} />
               ))}
             </Masonry>
           )}
         </main>
       </div>
 
-      {openNote && <TvNoteDetail note={openNote} />}
+      {openNote && <TvNoteDetail note={openNote} dark={theme === "dark"} />}
     </div>
   );
 }

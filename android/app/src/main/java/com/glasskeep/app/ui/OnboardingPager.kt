@@ -3,7 +3,11 @@ package com.glasskeep.app.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +30,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -146,15 +152,25 @@ private fun BackButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    // Ringed and enlarged under the focus of a remote, like the buttons.
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
     Box(
         modifier = modifier
             .size(40.dp)
+            .scale(if (focused) 1.1f else 1f)
             .clip(CircleShape)
             .background(
                 if (dark) Color(0xFF282828).copy(alpha = 0.6f)
                 else Color.White.copy(alpha = 0.6f)
             )
-            .clickable(onClick = onClick),
+            .then(if (focused) Modifier.border(3.dp, if (dark) Color.White else Indigo, CircleShape) else Modifier)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(

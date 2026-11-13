@@ -214,6 +214,7 @@ internal fun ServerUrlField(
     borderColor: Color,
     subtextColor: Color,
     errorColor: Color,
+    modifier: Modifier = Modifier,
 ) {
     OutlinedTextField(
         value = url,
@@ -255,20 +256,21 @@ internal fun ServerUrlField(
             unfocusedPlaceholderColor = subtextColor,
             cursorColor = accentColor
         ),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().then(modifier)
     )
 }
 
 /** The full-width Connect button of both setup layouts. */
 @Composable
-internal fun ConnectButton(loading: Boolean, onClick: () -> Unit, height: Dp) {
+internal fun ConnectButton(loading: Boolean, onClick: () -> Unit, height: Dp, modifier: Modifier = Modifier) {
     GradientButton(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
         contentPadding = PaddingValues(0.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .height(height),
+            .height(height)
+            .then(modifier),
     ) {
         Text(
             stringResource(if (loading) R.string.connecting else R.string.setup_connect),

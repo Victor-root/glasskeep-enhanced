@@ -50,14 +50,18 @@ export default function TvLogin({
         setMode("profiles");
         setPassword("");
         setError(null);
-        return;
+        return true;
       }
       if (mode === "manual" && hasProfiles) {
         setMode("profiles");
         setError(null);
-        return;
+        return true;
       }
-      if (allowExit && typeof onExitTvMode === "function") onExitTvMode();
+      if (allowExit && typeof onExitTvMode === "function") {
+        onExitTvMode();
+        return true;
+      }
+      return false;
     },
   });
 

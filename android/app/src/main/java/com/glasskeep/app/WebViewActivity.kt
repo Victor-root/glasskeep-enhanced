@@ -180,6 +180,13 @@ class WebViewActivity : AppCompatActivity() {
         @JavascriptInterface
         fun isAndroidTV(): Boolean = isTelevision(this@WebViewActivity)
 
+        /** Back on the TV viewer's first screen, with nothing left to
+         *  close: the app closes, as any TV app does. */
+        @JavascriptInterface
+        fun exitApp() {
+            runOnUiThread { finish() }
+        }
+
         /** Opens the single sign-on provider. Only an authorization URL
          *  that returns to this server's callback is accepted. */
         @JavascriptInterface

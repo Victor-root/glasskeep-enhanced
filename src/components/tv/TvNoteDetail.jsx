@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../../i18n";
 import { bgFor, solid } from "../../utils/colors.js";
 import { isRichContent, contentToHTML } from "../../utils/richText.js";
@@ -6,10 +6,11 @@ import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { getSections, isItem, DEFAULT_SECTION_ID } from "../../utils/checklist.js";
 import { getContentImages } from "../../utils/noteIcon.js";
 import { parseAudioContent, formatDuration } from "../../utils/audioNote.js";
-import { Mic } from "lucide-react";
+import { Pause, Play } from "lucide-react";
 import DrawingPreview from "../common/DrawingPreview.jsx";
 import { drawingHasStrokes } from "../../utils/drawingContent.js";
 import { isColorDark } from "./tvNoteColors.js";
+import { requestTvFocus } from "./useSpatialFocus.js";
 
 function buildBodyHtml(note) {
   if (note.type === "text") {
@@ -42,8 +43,8 @@ function formatDate(iso) {
 
 // The detail renders no close affordance: Back / Esc (handled by
 // TvNotesViewer's useSpatialFocus.onBack) is the way out.
-export default function TvNoteDetail({ note }) {
-  const bg = bgFor(note?.color, true);
+export default function TvNoteDetail({ note, dark = true }) {
+  const bg = bgFor(note?.color, dark);
   const isDark = note ? isColorDark(bg) : true;
   const bodyRef = useRef(null);
 
@@ -63,42 +64,38 @@ export default function TvNoteDetail({ note }) {
     [note],
   );
 
-  // Keyboard scroll while the detail viewer is open. Runs in capture
-  // phase with stopImmediatePropagation so useSpatialFocus never sees
-  // the keystroke — that's what was leaking Down past the bottom of
-  // the body and scrolling the masonry grid behind the dialog.
-  //
-  // Down always consumed (even at the very bottom: no-op rather than
-  // pass-through). Up at the very top falls through to the focus loop
-  // so the user can land on the close (X) button and dismiss with OK.
+  // Keys while the detail viewer is open. Runs in capture phase with
+  // stopImmediatePropagation so useSpatialFocus never moves the focus onto
+  // the cards hidden behind the dialog. Up and Down scroll the body; over
+  // an audio note they go from recording to recording instead (the focus
+  // loop keeps them inside the dialog). Left, Right and OK have nothing to
+  // reach outside the dialog.
   useEffect(() => {
     if (!note) return undefined;
     const onKey = (e) => {
-      if (e.key !== "ArrowDown" && e.key !== "ArrowUp" &&
-          e.key !== "PageDown" && e.key !== "PageUp") return;
-      const el = bodyRef.current;
-      if (!el) return;
-      const atTop = el.scrollTop <= 0;
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
-      if (e.key === "ArrowUp" || e.key === "PageUp") {
-        if (atTop) return; // let focus loop reach the X button
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        el.scrollBy({ top: -el.clientHeight * 0.8, behavior: "smooth" });
-        return;
-      }
-      // Down / PageDown: always swallow the event so the masonry
-      // behind the dialog never scrolls. At the bottom we just do
-      // nothing — the user uses Back / Esc / D-pad onto X to leave.
+      const inside = !!document.activeElement?.closest?.(".tv-detail");
+      const vertical = e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "PageDown" || e.key === "PageUp";
+      if (inside && (vertical || e.key === "Enter" || e.key === " ")) return;
+      if (!vertical && e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Enter" && e.key !== " ") return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      if (!atBottom) {
-        el.scrollBy({ top: el.clientHeight * 0.8, behavior: "smooth" });
-      }
+      if (!vertical) return;
+      const el = bodyRef.current;
+      if (!el) return;
+      const down = e.key === "ArrowDown" || e.key === "PageDown";
+      el.scrollBy({ top: (down ? 1 : -1) * el.clientHeight * 0.8, behavior: "smooth" });
     };
     document.addEventListener("keydown", onKey, true);
     return () => document.removeEventListener("keydown", onKey, true);
   }, [note]);
+
+  // An audio note opens on its first recording, ready to play.
+  const hasClips = audioClips.length > 0;
+  useEffect(() => {
+    if (!hasClips) return undefined;
+    const id = requestAnimationFrame(() => requestTvFocus(document.querySelector(".tv-detail .tv-focusable")));
+    return () => cancelAnimationFrame(id);
+  }, [note?.id, hasClips]);
 
   if (!note) return null;
 
@@ -261,6 +258,10 @@ function ChecklistBody({ sections }) {
 }
 
 function AudioBody({ clips }) {
+  const audioRef = useRef(null);
+  const [playingId, setPlayingId] = useState(null);
+  useEffect(() => () => audioRef.current?.pause(), []);
+
   if (!clips || clips.length === 0) {
     return (
       <div style={{ opacity: 0.6, fontStyle: "italic" }}>
@@ -268,20 +269,44 @@ function AudioBody({ clips }) {
       </div>
     );
   }
+
+  // OK plays a recording, or pauses the one playing.
+  const toggle = (clip, key) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playingId === key) {
+      audio.pause();
+      setPlayingId(null);
+      return;
+    }
+    audio.src = clip.audioDataUrl;
+    audio.play().then(() => setPlayingId(key)).catch(() => setPlayingId(null));
+  };
+
   return (
     <div className="tv-checklist">
+      <audio ref={audioRef} onEnded={() => setPlayingId(null)} hidden />
       {clips.map((clip, i) => {
+        const key = clip.id || String(i);
+        const playing = playingId === key;
         const name = (clip.name && clip.name.trim()) ||
           t("audioClipDefaultName").replace("{n}", String(i + 1));
         const dur = Number.isFinite(clip.duration) ? clip.duration : 0;
         return (
-          <div key={clip.id || i} className="tv-checklist__item">
+          <button
+            key={key}
+            type="button"
+            className="tv-checklist__item tv-audio-clip tv-focusable tv-focusable--flat"
+            aria-pressed={playing}
+            aria-label={`${playing ? t("audioPause") : t("audioPlay")} ${name}`}
+            onClick={() => toggle(clip, key)}
+          >
             <span style={{
               width: 40, height: 40, borderRadius: 999, display: "flex",
               alignItems: "center", justifyContent: "center",
-              background: "rgba(124,58,237,0.35)", color: "#fff", flexShrink: 0,
+              background: playing ? "rgba(124,58,237,0.85)" : "rgba(124,58,237,0.35)", color: "#fff", flexShrink: 0,
             }}>
-              <Mic size={20} />
+              {playing ? <Pause size={20} /> : <Play size={20} />}
             </span>
             <span style={{ flex: 1, fontWeight: 600 }}>{name}</span>
             {dur > 0 && (
@@ -289,7 +314,7 @@ function AudioBody({ clips }) {
                 {formatDuration(dur)}
               </span>
             )}
-          </div>
+          </button>
         );
       })}
     </div>

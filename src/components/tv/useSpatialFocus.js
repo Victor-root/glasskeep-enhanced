@@ -82,8 +82,9 @@ function pickNextFocus(current, direction) {
   // If the zone-restricted pool yielded nothing (e.g. user is at the
   // top of the sidebar pressing Up — no sidebar candidate higher up),
   // fall back to the full focusable list so the focus can ESCAPE the
-  // zone vertically. Otherwise the user would be stuck.
-  if (!best && pool !== all) {
+  // zone vertically. Otherwise the user would be stuck. The detail
+  // viewer covers the screen: nothing behind it is reachable.
+  if (!best && pool !== all && curZone !== "detail") {
     best = scoreBest(cur, all, current, direction);
   }
   return best;
@@ -121,17 +122,22 @@ function scoreBest(cur, pool, current, direction) {
 }
 
 let lastFocusedRef = null; // module-scoped: only one TV viewer alive at a time
-function focusElement(el) {
-  if (!el) return;
+// The focus ring follows the focus wherever it comes from: this hook, a
+// click, or the WebView moving it between fields on its own.
+function markFocused(el) {
   if (lastFocusedRef && lastFocusedRef !== el) {
     lastFocusedRef.removeAttribute("data-tv-focused");
   }
+  el.setAttribute("data-tv-focused", "true");
+  lastFocusedRef = el;
+}
+function focusElement(el) {
+  if (!el) return;
   if (typeof el.focus === "function") {
     try { el.focus({ preventScroll: false }); }
     catch { el.focus(); }
   }
-  el.setAttribute("data-tv-focused", "true");
-  lastFocusedRef = el;
+  markFocused(el);
   if (typeof el.scrollIntoView === "function") {
     try {
       // Non-smooth scroll: smooth is too laggy on older Shield WebViews
@@ -155,6 +161,15 @@ export function requestTvFocus(target) {
     window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target } }));
   }
 }
+
+// The remote's Back key reaches the page as a history step back (the
+// Android app turns the key into it), never as a key press. A marker at
+// the bottom of the TV history catches the step that lands below it: the
+// screen gets its onBack, which returns whether it had something to
+// close, and with nothing left the app is closed as any TV app is. The
+// detail viewer and the user menu push their own markers above it and
+// handle their own steps.
+const ROOT_MARKER = { tvRoot: true };
 
 export default function useSpatialFocus({ enabled, onBack, onEdgeReached, onZoneChange } = {}) {
   const onBackRef = useRef(onBack);
@@ -183,12 +198,15 @@ export default function useSpatialFocus({ enabled, onBack, onEdgeReached, onZone
     const REPEAT_LOCK_MS = 110;
     const handler = (e) => {
       const active = document.activeElement;
+      // In a text field the arrows move the caret, except Up and Down in a
+      // single-line field, where they have no caret to move: there they go
+      // to the next field, as everywhere else.
+      const singleLine = active?.tagName === "INPUT";
       const isEditable = active && (
-        active.tagName === "INPUT" ||
-        active.tagName === "TEXTAREA" ||
-        active.isContentEditable
+        singleLine || active.tagName === "TEXTAREA" || active.isContentEditable
       );
-      if (isEditable) return;
+      const vertical = e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "Up" || e.key === "Down";
+      if (isEditable && !(singleLine && vertical)) return;
 
       if (DPAD_KEYS.has(e.key)) {
         const now = performance.now();
@@ -234,6 +252,10 @@ export default function useSpatialFocus({ enabled, onBack, onEdgeReached, onZone
       }
     };
     document.addEventListener("keydown", handler);
+    const onFocusIn = (e) => {
+      if (e.target instanceof HTMLElement && e.target.matches(FOCUSABLE_SELECTOR)) markFocused(e.target);
+    };
+    document.addEventListener("focusin", onFocusIn);
 
     const focusEvt = (e) => {
       const target = e.detail?.target;
@@ -242,10 +264,25 @@ export default function useSpatialFocus({ enabled, onBack, onEdgeReached, onZone
     };
     window.addEventListener("tv-focus", focusEvt);
 
+    if (!window.history.state?.tvRoot) window.history.pushState(ROOT_MARKER, "");
+    const onPop = () => {
+      // An overlay above the marker was closed: not this screen's Back.
+      if (window.history.state?.tvRoot) return;
+      const handled = typeof onBackRef.current === "function" && onBackRef.current();
+      if (!handled && window.AndroidTheme?.exitApp) {
+        window.AndroidTheme.exitApp();
+        return;
+      }
+      window.history.pushState(ROOT_MARKER, "");
+    };
+    window.addEventListener("popstate", onPop);
+
     return () => {
       cancelAnimationFrame(id);
       document.removeEventListener("keydown", handler);
+      document.removeEventListener("focusin", onFocusIn);
       window.removeEventListener("tv-focus", focusEvt);
+      window.removeEventListener("popstate", onPop);
     };
   }, [enabled]);
 }

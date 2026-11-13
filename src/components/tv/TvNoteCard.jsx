@@ -39,10 +39,10 @@ function buildPreviewHtml(n) {
   return "";
 }
 
-function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
+function TvNoteCardImpl({ note, variant = "grid", dark = true, onActivate }) {
   const isCarousel = variant === "carousel";
 
-  const bg = bgFor(note.color, true);
+  const bg = bgFor(note.color, dark);
   const isDark = isColorDark(bg);
 
   const imgs = useMemo(() => getContentImages(note.images), [note.images]);
@@ -61,7 +61,9 @@ function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
     if (!isChecklist) return null;
     const total = countItems(note.items);
     const done = countChecked(note.items);
-    const limit = isCarousel ? 3 : 5;
+    // A page card has room for many more items than a grid card: the
+    // card clips whatever doesn't fit.
+    const limit = isCarousel ? 12 : 5;
     const unchecked = (note.items || [])
       .filter(it => isItem(it) && !it.done)
       .slice(0, limit);

@@ -10,7 +10,7 @@ export const PAGER_PAGE_SIZE = 2;
 // at the first one. The intercept handler lives in TvNotesViewer
 // because the page state is lifted up (so the header can show the
 // indicator).
-export default function TvPager({ slice, hasPrev, hasNext, onActivate }) {
+export default function TvPager({ slice, hasPrev, hasNext, dark, onActivate }) {
   return (
     <div className="tv-pager">
       <div className="tv-pager__arrow tv-pager__arrow--decorative" aria-hidden="true">
@@ -18,7 +18,7 @@ export default function TvPager({ slice, hasPrev, hasNext, onActivate }) {
       </div>
       <div className="tv-pager__page">
         {slice.map((n) => (
-          <TvNoteCard key={n.id} note={n} variant="carousel" onActivate={onActivate} />
+          <TvNoteCard key={n.id} note={n} variant="carousel" dark={dark} onActivate={onActivate} />
         ))}
         {/* Fill any empty slot on the last page so the grid stays 2-column. */}
         {slice.length < PAGER_PAGE_SIZE && Array.from({ length: PAGER_PAGE_SIZE - slice.length }).map((_, i) => (

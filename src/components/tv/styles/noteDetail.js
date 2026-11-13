@@ -162,6 +162,16 @@ html[data-tv="1"] .tv-checklist__item {
   background: rgba(255, 255, 255, 0.04);
 }
 html[data-tv="1"] .tv-checklist__item--done { opacity: 0.45; text-decoration: line-through; }
+/* An audio recording: a row of the list that OK plays. */
+html[data-tv="1"] .tv-audio-clip {
+  width: 100%;
+  align-items: center;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 html[data-tv="1"] .tv-checklist__item--indent { margin-left: 32px; }
 html[data-tv="1"] .tv-checklist__box {
   width: 20px;
