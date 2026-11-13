@@ -2,7 +2,7 @@ import React, { memo, useMemo } from "react";
 import { t } from "../../i18n";
 import { bgFor, solid } from "../../utils/colors.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
-import { isRichContent, contentToHTML } from "../../utils/richText.js";
+import { isRichContent, contentToHTMLPreview } from "../../utils/richText.js";
 import { getContentImages } from "../../utils/noteIcon.js";
 import { Image as ImageLucide, Mic, Pencil, CheckSquare } from "lucide-react";
 import { countItems, countChecked, isItem } from "../../utils/checklist.js";
@@ -17,12 +17,15 @@ import { isColorDark } from "./tvNoteColors.js";
 // hardware where each card costs ~3ms to first-paint.
 
 const PREVIEW_MAX_CHARS = 360;
+// A card shows the start of a note: converting the rest only to clip it
+// costs on every long note. Enough blocks to fill a page view card.
+const PREVIEW_MAX_BLOCKS = 12;
 
 function buildPreviewHtml(n) {
   if (n.type === "text") {
     const raw = n.content || "";
     if (!raw) return "";
-    if (isRichContent(raw)) return contentToHTML(raw);
+    if (isRichContent(raw)) return contentToHTMLPreview(raw, PREVIEW_MAX_BLOCKS);
     const sliced = raw.length > PREVIEW_MAX_CHARS
       ? raw.slice(0, PREVIEW_MAX_CHARS).trimEnd() + "…"
       : raw;
@@ -33,10 +36,23 @@ function buildPreviewHtml(n) {
       const parsed = typeof n.content === "string" ? JSON.parse(n.content) : n.content;
       const txt = parsed?.text || "";
       if (!txt) return "";
-      return isRichContent(txt) ? contentToHTML(txt) : renderSafeMarkdown(txt);
+      return isRichContent(txt) ? contentToHTMLPreview(txt, PREVIEW_MAX_BLOCKS) : renderSafeMarkdown(txt);
     } catch { return ""; }
   }
   return "";
+}
+
+// The preview of a note, built once per version of it: the grid is
+// mounted again on every switch from the page view, and the HTML
+// conversion with its sanitising is the costliest part of a card.
+const previewCache = new WeakMap();
+function previewHtmlFor(note) {
+  let html = previewCache.get(note);
+  if (html === undefined) {
+    html = buildPreviewHtml(note);
+    previewCache.set(note, html);
+  }
+  return html;
 }
 
 function TvNoteCardImpl({ note, variant = "grid", dark = true, onActivate }) {
@@ -47,7 +63,7 @@ function TvNoteCardImpl({ note, variant = "grid", dark = true, onActivate }) {
 
   const imgs = useMemo(() => getContentImages(note.images), [note.images]);
   const icon = note.icon || null;
-  const previewHtml = useMemo(() => buildPreviewHtml(note), [note]);
+  const previewHtml = previewHtmlFor(note);
   const isChecklist = note.type === "checklist";
   const isDraw = note.type === "draw";
   const isAudio = note.type === "audio";

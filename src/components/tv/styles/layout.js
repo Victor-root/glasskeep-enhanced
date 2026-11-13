@@ -266,9 +266,21 @@ html[data-tv="1"] .tv-masonry__col {
   padding-left: var(--tv-gap);
   background-clip: padding-box;
 }
-html[data-tv="1"] .tv-masonry__col > .tv-card {
+html[data-tv="1"] .tv-masonry__chunk > .tv-card {
   margin-bottom: var(--tv-gap);
 }
+/* A chunk of cards out of view is neither laid out nor painted: opening
+   the rail or coming back from the page view re-flows what is on screen
+   only. It keeps the height it last had. Its paint containment clips at
+   its padding box: the padding leaves room for the focus ring. */
+html[data-tv="1"] .tv-masonry__chunk {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1600px;
+  padding: 4px;
+  margin: -4px;
+}
+/* Two paddings meet between chunks: the gap stays the cards' own. */
+html[data-tv="1"] .tv-masonry__chunk + .tv-masonry__chunk { margin-top: -8px; }
 
 /* ------- Pager (two fixed cards + decorative arrows) ------- */
 /* The scroll container drops its vertical scroll when the pager is
@@ -320,9 +332,7 @@ html[data-tv="1"] .tv-pager__page {
   min-height: 0;
   height: 100%;
   /* No overflow: hidden here. The card itself already does overflow:
-     hidden + max-height: 100%, so its content stays clipped while the
-     focus ring (a box-shadow living outside the card box) stays
-     visible on every side. */
+     hidden + max-height: 100%, so its content stays clipped. */
 }
 html[data-tv="1"] .tv-pager .tv-card {
   height: 100%;
@@ -333,12 +343,10 @@ html[data-tv="1"] .tv-pager .tv-card {
 }
 /* In the pager the cards already fill their cell exactly; the
    default focus scale (1.025) pushed them past the right edge of
-   their cell and clipped the glow. Use a ring-only focus (no scale)
-   for pager cards. */
+   their cell. Ring only (base.js), no scale, for pager cards. */
 html[data-tv="1"] .tv-pager .tv-card.tv-focusable:focus,
 html[data-tv="1"] .tv-pager .tv-card.tv-focusable[data-tv-focused="true"] {
   transform: none;
-  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.95);
 }
 html[data-tv="1"] .tv-pager .tv-card__preview {
   font-size: 16px;

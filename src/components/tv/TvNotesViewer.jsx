@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import Masonry from "react-masonry-css";
 import { t } from "../../i18n";
 import TvNoteCard from "./TvNoteCard.jsx";
 import TvNoteDetail from "./TvNoteDetail.jsx";
@@ -13,12 +12,16 @@ import { partitionNotes, pickColumnCount } from "./tvNotesList.js";
 import { loadPref, savePref } from "./tvPrefs.js";
 import { Menu, LayoutGrid, Rows3, Sun, Moon } from "lucide-react";
 
+// Cards per chunk of a grid column, skipped by the WebView while out of
+// view. Few enough chunks for a focus to stay cheap, small enough for the
+// rail opening to lay out only what is on screen.
+const GRID_CHUNK = 8;
+
 // TV-mode "home" screen.
 //
 // Two layouts:
-//   - "grid": real Pinterest-style masonry (react-masonry-css). Cards
-//     keep their natural height and stack without horizontal gaps,
-//     exactly like the phone and desktop views.
+//   - "grid": Pinterest-style masonry. Cards keep their natural height
+//     and stack in columns, dealt in turn like a hand of cards.
 //   - "carousel": single row, horizontal scroll-snap. Cards are roughly
 //     twice the grid size; 2-3 fit on screen and you flick between them.
 //
@@ -68,6 +71,20 @@ export default function TvNotesViewer({
 
   const visible = useMemo(() => partitionNotes(notes, filter), [notes, filter]);
   const colCount = useMemo(() => pickColumnCount(width), [width]);
+  // The grid's columns, dealt here once per change of notes or width. A
+  // masonry component that measured the window after every update made
+  // the WebView lay the whole grid out again each time: half a second on
+  // a TV box whenever the rail opened or the view changed. Each column is
+  // cut in chunks the WebView skips while out of view (see layout.js).
+  const gridColumns = useMemo(() => {
+    const cols = Array.from({ length: colCount }, () => []);
+    visible.forEach((n, i) => cols[i % colCount].push(n));
+    return cols.map((col) => {
+      const chunks = [];
+      for (let i = 0; i < col.length; i += GRID_CHUNK) chunks.push(col.slice(i, i + GRID_CHUNK));
+      return chunks;
+    });
+  }, [visible, colCount]);
 
   // Pager derived state. Clamp the page index when the visible list
   // shrinks (filter changed, notes deleted from another device).
@@ -349,15 +366,19 @@ export default function TvNotesViewer({
               onActivate={openDetail}
             />
           ) : (
-            <Masonry
-              breakpointCols={colCount}
-              className="tv-masonry"
-              columnClassName="tv-masonry__col"
-            >
-              {visible.map((n) => (
-                <TvNoteCard key={n.id} note={n} variant="grid" dark={theme === "dark"} onActivate={openDetail} />
+            <div className="tv-masonry">
+              {gridColumns.map((chunks, i) => (
+                <div key={i} className="tv-masonry__col" style={{ width: `${100 / colCount}%` }}>
+                  {chunks.map((chunk) => (
+                    <div key={chunk[0].id} className="tv-masonry__chunk">
+                      {chunk.map((n) => (
+                        <TvNoteCard key={n.id} note={n} variant="grid" dark={theme === "dark"} onActivate={openDetail} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
               ))}
-            </Masonry>
+            </div>
           )}
         </main>
       </div>
