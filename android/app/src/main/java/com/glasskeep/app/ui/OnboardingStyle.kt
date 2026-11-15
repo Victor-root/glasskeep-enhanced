@@ -60,11 +60,11 @@ internal val ButtonGradient = Brush.horizontalGradient(
     colors = listOf(Color(0xFF6366f1), Color(0xFF7c3aed))
 )
 internal val Indigo = Color(0xFF6366f1)
-private val FocusRingLight = Color(0xFF6d28d9)
+private val FocusRingLight = Color(0xFF111827)
 
 /** The focus ring's colour on a screen that follows the system theme:
- *  white on the dark one, deep violet on the light one, where a white ring
- *  was lost against the light cards. */
+ *  white on the dark one, near black on the light one: a white ring was
+ *  lost against the light cards, a violet one against the violet buttons. */
 @Composable
 internal fun focusRingColor(): Color = if (isSystemInDarkTheme()) Color.White else FocusRingLight
 
