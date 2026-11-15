@@ -252,20 +252,23 @@ export default function LoginView({
       {oidcButton}
       <QrLoginButton open={qrOpen} onToggle={setQrOpen} />
 
-      <div className="mt-4 text-sm flex justify-between items-center">
-        {hasProfiles && (
-          <button
-            className="text-indigo-600 hover:underline"
-            onClick={() => { setMode("profiles"); setErr(""); setPw(""); }}
-          >{t("backToProfiles")}</button>
-        )}
+      {/* One link per line, centred: side by side, their lengths differ
+          too much for a phone's width and they wrapped unevenly. Back,
+          which leaves this form, comes last and in grey. */}
+      <div className="mt-5 text-sm flex flex-col items-center gap-3 text-center">
+        <button className="text-indigo-600 hover:underline" onClick={goSecret}>{t("forgotUsernamePassword")}</button>
         {allowRegistration && (
           <button
             className="text-indigo-600 hover:underline"
             onClick={goRegister}
           >{t("createAccount")}</button>
         )}
-        <button className="text-indigo-600 hover:underline" onClick={goSecret}>{t("forgotUsernamePassword")}</button>
+        {hasProfiles && (
+          <button
+            className="text-gray-500 dark:text-gray-400 hover:underline"
+            onClick={() => { setMode("profiles"); setErr(""); setPw(""); }}
+          >{t("backToProfiles")}</button>
+        )}
       </div>
     </AuthShell>
   );
