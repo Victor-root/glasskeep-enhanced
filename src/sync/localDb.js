@@ -2,13 +2,19 @@
 // IndexedDB wrapper for local-first note storage and sync queue
 
 const DB_NAME = "glasskeep";
-const DB_VERSION = 5; // v5: files waiting to be uploaded (attachmentUploads store)
+const DB_VERSION = 4; // v4: session-scoped notes cache (sessionNotes store)
 const NOTES_STORE = "notes"; // legacy (v1-v3), kept for migration compatibility
 const SESSION_NOTES_STORE = "sessionNotes"; // v4+: session-scoped note cache
 const QUEUE_STORE = "syncQueue";
+
+// Files waiting to be uploaded have a database of their own: a new store
+// in this one would raise its version, and an older release, after a
+// rollback, could no longer open the notes cache.
+const UPLOADS_DB_NAME = "glasskeep-uploads";
 const UPLOADS_STORE = "attachmentUploads";
 
 let dbPromise = null;
+let uploadsDbPromise = null;
 
 function openDb() {
   if (dbPromise) return dbPromise;
@@ -57,24 +63,36 @@ function openDb() {
           sns.createIndex("userSession", ["userId", "sessionId"], { unique: false });
         }
       }
-
-      // ─── v5: files waiting to be uploaded ───
-      if (oldVersion < 5) {
-        const us = db.createObjectStore(UPLOADS_STORE, { keyPath: "id" });
-        us.createIndex("userId", "userId", { unique: false });
-      }
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      // A later release left the cache at a higher version. Versions only
+      // ever add stores, so it still holds every store this one uses.
+      if (req.error?.name !== "VersionError") { reject(req.error); return; }
+      const current = indexedDB.open(DB_NAME);
+      current.onsuccess = () => resolve(current.result);
+      current.onerror = () => reject(current.error);
+    };
   });
   return dbPromise;
 }
 
-function tx(storeName, mode = "readonly") {
-  return openDb().then((db) => {
-    const t = db.transaction(storeName, mode);
-    return t.objectStore(storeName);
+function openUploadsDb() {
+  if (uploadsDbPromise) return uploadsDbPromise;
+  uploadsDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(UPLOADS_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const us = req.result.createObjectStore(UPLOADS_STORE, { keyPath: "id" });
+      us.createIndex("userId", "userId", { unique: false });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
   });
+  return uploadsDbPromise;
+}
+
+function tx(storeName, mode = "readonly", open = openDb) {
+  return open().then((db) => db.transaction(storeName, mode).objectStore(storeName));
 }
 
 // ─── Helpers ───
@@ -88,7 +106,7 @@ function makeCacheKey(userId, sessionId, noteId) {
 // keeps its bytes here until the server has them.
 
 export async function putUpload(upload) {
-  const store = await tx(UPLOADS_STORE, "readwrite");
+  const store = await tx(UPLOADS_STORE, "readwrite", openUploadsDb);
   return new Promise((resolve, reject) => {
     const req = store.put(upload);
     req.onsuccess = () => resolve();
@@ -97,7 +115,7 @@ export async function putUpload(upload) {
 }
 
 export async function deleteUpload(id) {
-  const store = await tx(UPLOADS_STORE, "readwrite");
+  const store = await tx(UPLOADS_STORE, "readwrite", openUploadsDb);
   return new Promise((resolve, reject) => {
     const req = store.delete(id);
     req.onsuccess = () => resolve();
@@ -106,7 +124,7 @@ export async function deleteUpload(id) {
 }
 
 export async function getUploads(userId) {
-  const store = await tx(UPLOADS_STORE);
+  const store = await tx(UPLOADS_STORE, "readonly", openUploadsDb);
   return new Promise((resolve, reject) => {
     const req = store.index("userId").getAll(userId);
     req.onsuccess = () => resolve(req.result || []);
