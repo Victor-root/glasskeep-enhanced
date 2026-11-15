@@ -63,4 +63,9 @@
     <string name="cert_unknown_title">Certificat non reconnu</string>
     <string name="cert_unknown_message">Android ne reconnaît pas le certificat de ce serveur, comme pour un certificat auto-signé. Ne lui faites confiance que s\'il est bien celui de votre serveur : l\'empreinte ci-dessous doit être celle qu\'affiche le serveur.\n\nSHA-256 :\n%1$s</string>
     <string name="cert_trust">Faire confiance</string>
+    <string name="welcome_mic_desc_tv">Enregistrer des notes audio depuis l\'app.</string>
+    <string name="welcome_camera_desc_tv">Scanner le QR code qui vous connecte sur un autre appareil.</string>
+    <string name="welcome_notif_desc_tv">Être prévenu des nouvelles versions de l\'app.</string>
+    <string name="welcome_battery_desc_tv">Des rappels à l\'heure, même l\'app fermée.</string>
+    <string name="welcome_install_desc_tv">Installer les mises à jour que l\'app télécharge pour vous.</string>
 </resources>

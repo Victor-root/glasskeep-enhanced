@@ -15,14 +15,17 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -157,85 +160,40 @@ fun WelcomeScreen(onContinue: () -> Unit) {
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val cardBg = if (dark) DarkCardBg else LightCardBg
 
-    // A remote moving up to the first card has nothing focusable above it
-    // to scroll the title back into view: reaching that card does it.
-    val scrollState = rememberScrollState()
-    val scope = rememberCoroutineScope()
-
-    Box(modifier = Modifier.fillMaxSize().then(bgModifier)) {
-        // Same animated background as SetupScreen — soft pastel cards
-        // drifting in the back, theme-aware via the dark flag.
-        FloatingCardsBackground(dark)
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                // The scrolled page stops above the pager's dots, laid
-                // over the bottom of the screen: no text runs under them.
-                .padding(bottom = 40.dp)
-                .verticalScroll(scrollState)
-                .padding(horizontal = 24.dp, vertical = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            GlassKeepLogo(size = 72.dp, cornerRadius = 16.dp, elevation = 8.dp)
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                text = stringResource(R.string.welcome_title),
-                color = titleColor,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.welcome_subtitle),
-                color = subtextColor,
-                fontSize = 15.sp,
-                lineHeight = 22.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = 480.dp),
-            )
-            Spacer(modifier = Modifier.height(28.dp))
-
-            PermissionCard(
+    val permissions = buildList {
+        add(
+            Permission(
                 iconRes = R.drawable.ic_tabler_microphone,
                 title = stringResource(R.string.welcome_mic_title),
                 description = stringResource(R.string.welcome_mic_desc),
+                tvDescription = stringResource(R.string.welcome_mic_desc_tv),
                 granted = micGranted,
                 tried = micTried,
-                cardBg = cardBg,
-                titleColor = titleColor,
-                subtextColor = subtextColor,
                 onGrant = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) },
                 onSettings = openAppSettings,
-                modifier = Modifier.onFocusChanged {
-                    if (it.hasFocus) scope.launch { scrollState.animateScrollTo(0) }
-                },
             )
-            Spacer(modifier = Modifier.height(14.dp))
-            PermissionCard(
+        )
+        add(
+            Permission(
                 iconRes = R.drawable.ic_tabler_camera,
                 title = stringResource(R.string.welcome_camera_title),
                 description = stringResource(R.string.welcome_camera_desc),
+                tvDescription = stringResource(R.string.welcome_camera_desc_tv),
                 granted = cameraGranted,
                 tried = cameraTried,
-                cardBg = cardBg,
-                titleColor = titleColor,
-                subtextColor = subtextColor,
                 onGrant = { cameraLauncher.launch(Manifest.permission.CAMERA) },
                 onSettings = openAppSettings,
             )
-            if (!isFdroid) {
-                Spacer(modifier = Modifier.height(14.dp))
-                PermissionCard(
+        )
+        if (!isFdroid) {
+            add(
+                Permission(
                     iconRes = R.drawable.ic_tabler_bell,
                     title = stringResource(R.string.welcome_notif_title),
                     description = stringResource(R.string.welcome_notif_desc),
+                    tvDescription = stringResource(R.string.welcome_notif_desc_tv),
                     granted = notifGranted,
                     tried = notifTried,
-                    cardBg = cardBg,
-                    titleColor = titleColor,
-                    subtextColor = subtextColor,
                     onGrant = {
                         if (needsNotifPerm) {
                             notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -247,22 +205,21 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                     },
                     onSettings = openAppSettings,
                 )
-            }
-            // Battery optimization — optional, shown for every install source.
-            // It's a special-access setting (not a runtime permission), so it
-            // lives here as a tappable card that opens the system dialog and
-            // NEVER gates "Continuer". Lets background reminders fire reliably
-            // on aggressive-power-management OEMs.
-            Spacer(modifier = Modifier.height(14.dp))
-            PermissionCard(
+            )
+        }
+        // Battery optimization — optional, shown for every install source.
+        // It's a special-access setting (not a runtime permission), so it
+        // lives here as a tappable card that opens the system dialog and
+        // NEVER gates "Continuer". Lets background reminders fire reliably
+        // on aggressive-power-management OEMs.
+        add(
+            Permission(
                 iconRes = R.drawable.ic_tabler_bolt,
                 title = stringResource(R.string.welcome_battery_title),
                 description = stringResource(R.string.welcome_battery_desc),
+                tvDescription = stringResource(R.string.welcome_battery_desc_tv),
                 granted = batteryIgnored,
                 tried = batteryTried,
-                cardBg = cardBg,
-                titleColor = titleColor,
-                subtextColor = subtextColor,
                 onGrant = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         batteryLauncher.launch(
@@ -275,17 +232,16 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 },
                 onSettings = openAppSettings,
             )
-            if (!isFdroid) {
-                Spacer(modifier = Modifier.height(14.dp))
-                PermissionCard(
+        )
+        if (!isFdroid) {
+            add(
+                Permission(
                     iconRes = R.drawable.ic_tabler_download,
                     title = stringResource(R.string.welcome_install_title),
                     description = stringResource(R.string.welcome_install_desc),
+                    tvDescription = stringResource(R.string.welcome_install_desc_tv),
                     granted = installGranted,
                     tried = installTried,
-                    cardBg = cardBg,
-                    titleColor = titleColor,
-                    subtextColor = subtextColor,
                     // "Install unknown apps" is a special-access setting,
                     // never a runtime permission popup: both the initial
                     // grant action AND the post-denial "Ouvrir les
@@ -293,30 +249,175 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                     onGrant = openInstallSettings,
                     onSettings = openInstallSettings,
                 )
-            }
+            )
+        }
+    }
+    val colors = CardColors(cardBg, titleColor, subtextColor)
 
-            Spacer(modifier = Modifier.height(32.dp))
-            ContinueButton(onClick = onContinue)
-            // Extra bottom room so the last button doesn't slide under
-            // the pager's page indicator dots.
-            Spacer(modifier = Modifier.height(48.dp))
+    Box(modifier = Modifier.fillMaxSize().then(bgModifier)) {
+        // Same animated background as SetupScreen — soft pastel cards
+        // drifting in the back, theme-aware via the dark flag.
+        FloatingCardsBackground(dark)
+        if (isTelevision()) {
+            TvWelcome(permissions, colors, onContinue)
+        } else {
+            PhoneWelcome(permissions, colors, onContinue)
         }
     }
 }
 
+/** One permission the welcome explains, with its state and its actions. */
+private class Permission(
+    val iconRes: Int,
+    val title: String,
+    val description: String,
+    /** The TV's shorter wording: five tiles share one row there. */
+    val tvDescription: String,
+    val granted: Boolean,
+    val tried: Boolean,
+    val onGrant: () -> Unit,
+    val onSettings: () -> Unit,
+)
+
+private class CardColors(val background: Color, val title: Color, val subtext: Color)
+
+/** The phone's welcome: the permissions one under the other, scrolled. */
+@Composable
+private fun PhoneWelcome(
+    permissions: List<Permission>,
+    colors: CardColors,
+    onContinue: () -> Unit,
+) {
+    // A remote moving up to the first card has nothing focusable above it
+    // to scroll the title back into view: reaching that card does it.
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            // The scrolled page stops above the pager's dots, laid
+            // over the bottom of the screen: no text runs under them.
+            .padding(bottom = 40.dp)
+            .verticalScroll(scrollState)
+            .padding(horizontal = 24.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        GlassKeepLogo(size = 72.dp, cornerRadius = 16.dp, elevation = 8.dp)
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(
+            text = stringResource(R.string.welcome_title),
+            color = colors.title,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = stringResource(R.string.welcome_subtitle),
+            color = colors.subtext,
+            fontSize = 15.sp,
+            lineHeight = 22.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.widthIn(max = 480.dp),
+        )
+        Spacer(modifier = Modifier.height(28.dp))
+
+        permissions.forEachIndexed { index, permission ->
+            if (index > 0) Spacer(modifier = Modifier.height(14.dp))
+            PermissionCard(
+                permission = permission,
+                colors = colors,
+                modifier = Modifier
+                    .widthIn(max = 560.dp)
+                    .fillMaxWidth()
+                    .then(
+                        if (index == 0) {
+                            Modifier.onFocusChanged {
+                                if (it.hasFocus) scope.launch { scrollState.animateScrollTo(0) }
+                            }
+                        } else {
+                            Modifier
+                        }
+                    ),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+        ContinueButton(onClick = onContinue, modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth())
+        // Extra bottom room so the last button doesn't slide under
+        // the pager's page indicator dots.
+        Spacer(modifier = Modifier.height(48.dp))
+    }
+}
+
+/** The TV's welcome: a screen is wider than tall, so the permissions sit
+ *  side by side, every one on screen, as tiles of one height under a short
+ *  header, and the remote moves along them with left and right. Nothing
+ *  scrolls. */
+@Composable
+private fun TvWelcome(
+    permissions: List<Permission>,
+    colors: CardColors,
+    onContinue: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            // Clear of the pager's dots, laid over the bottom of the screen.
+            .padding(start = 48.dp, end = 48.dp, top = 20.dp, bottom = 44.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            GlassKeepLogo(size = 52.dp, cornerRadius = 13.dp, elevation = 8.dp)
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = stringResource(R.string.welcome_title),
+                color = colors.title,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.welcome_subtitle),
+            color = colors.subtext,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Max),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            permissions.forEach { permission ->
+                PermissionCard(
+                    permission = permission,
+                    colors = colors,
+                    tile = true,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+        ContinueButton(onClick = onContinue, modifier = Modifier.width(320.dp))
+    }
+}
+
+/** A permission's card: what it is for, then its state or the button
+ *  asking for it. [tile] is the TV's narrow tile: the icon over the title,
+ *  the short wording, and that button pinned to the bottom of a tile
+ *  given its height. */
 @Composable
 private fun PermissionCard(
-    iconRes: Int,
-    title: String,
-    description: String,
-    granted: Boolean,
-    tried: Boolean,
-    cardBg: Color,
-    titleColor: Color,
-    subtextColor: Color,
-    onGrant: () -> Unit,
-    onSettings: () -> Unit,
+    permission: Permission,
+    colors: CardColors,
     modifier: Modifier = Modifier,
+    tile: Boolean = false,
 ) {
     // `tried` is owned by the parent — it flips to true ONLY when the
     // matching launcher's callback fires (i.e. Android actually
@@ -327,13 +428,11 @@ private fun PermissionCard(
 
     Column(
         modifier = modifier
-            .widthIn(max = 560.dp)
-            .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(cardBg)
-            .padding(16.dp),
+            .background(colors.background)
+            .padding(if (tile) 14.dp else 16.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        val icon = @Composable {
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -342,41 +441,54 @@ private fun PermissionCard(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    painter = painterResource(iconRes),
+                    painter = painterResource(permission.iconRes),
                     contentDescription = null,
                     tint = Indigo,
                     modifier = Modifier.size(22.dp),
                 )
             }
-            Spacer(modifier = Modifier.size(12.dp))
+        }
+        val title = @Composable {
             Text(
-                text = title,
-                color = titleColor,
-                fontSize = 17.sp,
+                text = permission.title,
+                color = colors.title,
+                fontSize = if (tile) 16.sp else 17.sp,
                 fontWeight = FontWeight.SemiBold,
             )
         }
+        if (tile) {
+            icon()
+            Spacer(modifier = Modifier.height(10.dp))
+            title()
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                icon()
+                Spacer(modifier = Modifier.size(12.dp))
+                title()
+            }
+        }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = description,
-            color = subtextColor,
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
+            text = if (tile) permission.tvDescription else permission.description,
+            color = colors.subtext,
+            fontSize = if (tile) 13.sp else 14.sp,
+            lineHeight = if (tile) 18.sp else 20.sp,
         )
         Spacer(modifier = Modifier.height(14.dp))
+        if (tile) Spacer(modifier = Modifier.weight(1f))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (granted) {
+            if (permission.granted) {
                 Text(
                     text = stringResource(R.string.welcome_granted),
                     color = Color(0xFF059669),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
-            } else if (tried) {
+            } else if (permission.tried) {
                 // Launcher fired and the OS returned without a grant —
                 // either the user clicked Deny in the popup, dismissed
                 // the system settings page without flipping the toggle,
@@ -393,7 +505,7 @@ private fun PermissionCard(
                 Spacer(modifier = Modifier.size(12.dp))
                 PillButton(
                     label = stringResource(R.string.welcome_settings),
-                    onClick = onSettings,
+                    onClick = permission.onSettings,
                 )
             } else {
                 // Idle state — the user hasn't kicked off any attempt
@@ -402,7 +514,7 @@ private fun PermissionCard(
                 // jumps to the per-app settings page (install perm).
                 PillButton(
                     label = stringResource(R.string.welcome_grant),
-                    onClick = onGrant,
+                    onClick = permission.onGrant,
                 )
             }
         }
@@ -426,14 +538,12 @@ private fun PillButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ContinueButton(onClick: () -> Unit) {
+private fun ContinueButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     GradientButton(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
         contentPadding = PaddingValues(vertical = 16.dp),
-        modifier = Modifier
-            .widthIn(max = 560.dp)
-            .fillMaxWidth(),
+        modifier = modifier,
     ) {
         Text(
             text = stringResource(R.string.welcome_continue),

@@ -16,6 +16,7 @@ Headline features: **file attachments** on notes, with a **ZIP backup** that car
 - ⌨️ **An open note follows the phone keyboard** (Android app and installed web app): the note slides up and down with the keyboard, as in Google Keep, and the home screen no longer shows behind it when the keyboard closes.
 
 ### 🔄 Changed
+- 📺 **Android TV welcome page in tiles** (1.6.0): the permissions sit side by side across the screen, all of them visible at once, instead of a list to scroll down.
 - 🧩 **Tighter notes grid**: each note now goes into the shortest column, so a column of long notes no longer leaves a hole beside it. The first time, some notes may sit in a different spot than before; their order is unchanged.
 - 📎 The note footer's **Image** button is now **Attach**, with a paperclip, and attached files sit at the bottom of the note.
 - 🔁 **Converting between text and checklist** keeps ticks, sections (as headings) and sub-items, both ways.

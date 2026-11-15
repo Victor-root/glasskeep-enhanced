@@ -70,4 +70,9 @@
     <string name="cert_unknown_title">Unrecognised certificate</string>
     <string name="cert_unknown_message">Android does not recognise this server\'s certificate, as happens with a self-signed one. Only trust it if it is your server\'s: its fingerprint below must be the one the server shows.\n\nSHA-256:\n%1$s</string>
     <string name="cert_trust">Trust it</string>
+    <string name="welcome_mic_desc_tv">Record audio notes from the app.</string>
+    <string name="welcome_camera_desc_tv">Scan the QR code that signs you in on another device.</string>
+    <string name="welcome_notif_desc_tv">Hear about new versions of the app.</string>
+    <string name="welcome_battery_desc_tv">Reminders on time, even with the app closed.</string>
+    <string name="welcome_install_desc_tv">Install the updates the app downloads for you.</string>
 </resources>
