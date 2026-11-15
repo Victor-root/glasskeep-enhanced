@@ -10,6 +10,7 @@ export const tvBaseCSS = `
   --tv-safe-y: 3vh;
   --tv-focus-pad: 14px;
   --tv-gap: 14px;
+  --tv-ring: rgba(167, 139, 250, 0.95);
 }
 html[data-tv="1"], html[data-tv="1"] body {
   background: #0b0d12 !important;
@@ -31,6 +32,8 @@ html[data-tv="1"][data-tv-theme="light"], html[data-tv="1"][data-tv-theme="light
   background: #f3f4f6 !important;
   color: #1f2937;
 }
+/* The pale violet ring vanishes on white and yellow cards. */
+html[data-tv="1"][data-tv-theme="light"] { --tv-ring: #6d28d9; }
 html[data-tv="1"][data-tv-theme="light"] body {
   background: radial-gradient(circle at 20% 0%, #ede9fe 0%, #f3f4f6 55%, #e5e7eb 100%) !important;
 }
@@ -55,12 +58,12 @@ html[data-tv="1"] .tv-focusable {
 }
 html[data-tv="1"] .tv-focusable:focus,
 html[data-tv="1"] .tv-focusable[data-tv-focused="true"] {
-  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.95);
+  box-shadow: 0 0 0 3px var(--tv-ring);
   z-index: 50;
 }
 html[data-tv="1"] .tv-focusable.tv-focusable--flat:focus,
 html[data-tv="1"] .tv-focusable.tv-focusable--flat[data-tv-focused="true"] {
-  box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.95);
+  box-shadow: 0 0 0 2px var(--tv-ring);
 }
 /* A note card's ring is a layer of its own laid over the card, fading in
    and out on the compositor: a ring drawn by the card itself repainted
@@ -77,7 +80,7 @@ html[data-tv="1"] .tv-card::after {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: inset 0 0 0 3px rgba(167, 139, 250, 0.95);
+  box-shadow: inset 0 0 0 3px var(--tv-ring);
   opacity: 0;
   transition: opacity 90ms ease;
   pointer-events: none;
