@@ -1,5 +1,15 @@
 package com.glasskeep.app.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,6 +70,7 @@ private val TvAccent = Color(0xFFa78bfa) // violet-400: focus / accent
 // behaviour, but rendered with the dark-violet glass theme that
 // matches the in-app TvLogin React component. No floating cards
 // decoration here: keeps the layout calm at 10-foot distance.
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun TvSetupScreen(
     url: String,
@@ -94,6 +105,12 @@ internal fun TvSetupScreen(
                 else -> false
             }
         }
+    // The TV keyboard floats over the bottom half of the screen and tells
+    // the app it is open, never how tall it is: no inset to resize to.
+    // While it is open the screen keeps only the field and Connect, at
+    // the top, above it.
+    val keyboardOpen = WindowInsets.isImeVisible
+    val verticalBias by animateFloatAsState(if (keyboardOpen) -1f else 0f, label = "setupBias")
     val brandBrush = Brush.horizontalGradient(listOf(TvTitleStart, TvTitleEnd))
     val bgBrush = Brush.radialGradient(
         colors = listOf(TvBgTop, TvBgMid, TvBgBottom),
@@ -104,8 +121,9 @@ internal fun TvSetupScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(bgBrush),
-        contentAlignment = Alignment.Center
+            .background(bgBrush)
+            .padding(vertical = 16.dp),
+        contentAlignment = BiasAlignment(0f, verticalBias)
     ) {
         Column(
             modifier = Modifier
@@ -114,30 +132,38 @@ internal fun TvSetupScreen(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            GlassKeepLogo(size = 84.dp, cornerRadius = 20.dp, elevation = 12.dp)
+            AnimatedVisibility(
+                visible = !keyboardOpen,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    GlassKeepLogo(size = 84.dp, cornerRadius = 20.dp, elevation = 12.dp)
 
-            Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-            // TextStyle.brush (Compose 1.4+) fills the glyphs with the
-            // gradient: same effect the web brand uses.
-            Text(
-                text = "GlassKeep TV",
-                style = TextStyle(
-                    brush = brandBrush,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            )
+                    // TextStyle.brush (Compose 1.4+) fills the glyphs with the
+                    // gradient: same effect the web brand uses.
+                    Text(
+                        text = "GlassKeep TV",
+                        style = TextStyle(
+                            brush = brandBrush,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    )
 
-            Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
-            Text(
-                text = stringResource(R.string.setup_subtitle),
-                fontSize = 13.sp,
-                color = TvSubtextColor
-            )
+                    Text(
+                        text = stringResource(R.string.setup_subtitle),
+                        fontSize = 13.sp,
+                        color = TvSubtextColor
+                    )
 
-            Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
+                }
+            }
 
             Column(
                 modifier = Modifier

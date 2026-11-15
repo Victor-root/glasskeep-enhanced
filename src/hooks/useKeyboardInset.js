@@ -24,7 +24,8 @@ import { caretRect, focusedEditable } from "../utils/caret.js";
  *  An open note lays itself out around the keyboard (useNoteKeyboardLayout);
  *  the rest of the app rides up as described above. Each frame only touches
  *  the open sheets: a custom property changed on <html> restyles the whole
- *  page, so <html> just gets where the keyboard is heading. */
+ *  page, so <html> just gets where the keyboard is heading, and
+ *  `data-keyboard-open` while it is up. */
 
 const MIN_KEYBOARD = 150;
 const PAN_MARGIN = 8;
@@ -101,6 +102,7 @@ export default function useKeyboardInset() {
     const publish = () => {
       const resting = sliding ? Math.round(sliding.target) : keyboard;
       root.style.setProperty("--keyboard-inset", `${resting}px`);
+      root.toggleAttribute("data-keyboard-open", resting > 0);
       document.querySelectorAll('.gk-sheet-root[data-state="open"]').forEach((sheet) => {
         if (sliding) sheet.style.setProperty("--keyboard-inset", `${keyboard}px`);
         else sheet.style.removeProperty("--keyboard-inset");
@@ -137,6 +139,7 @@ export default function useKeyboardInset() {
       vv?.removeEventListener("scroll", apply);
       root.style.removeProperty("--keyboard-inset");
       root.style.removeProperty("--keyboard-pan");
+      root.removeAttribute("data-keyboard-open");
     };
   }, []);
 }

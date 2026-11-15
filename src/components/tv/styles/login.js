@@ -61,6 +61,18 @@ html[data-tv="1"] .tv-login {
      hovering 30-200px away. */
   gap: 0;
 }
+/* The TV keyboard covers the lower half of the screen: while it is up,
+   the login keeps only its card, at the top, above it. */
+html[data-tv="1"][data-keyboard-open] .tv-login {
+  justify-content: flex-start;
+  padding-bottom: var(--keyboard-inset);
+}
+html[data-tv="1"][data-keyboard-open] .tv-login__logo,
+html[data-tv="1"][data-keyboard-open] .tv-login__brand,
+html[data-tv="1"][data-keyboard-open] .tv-login__subtitle,
+html[data-tv="1"][data-keyboard-open] .tv-login__slogan {
+  display: none;
+}
 html[data-tv="1"] .tv-login__card {
   width: 100%;
   max-width: 520px;
