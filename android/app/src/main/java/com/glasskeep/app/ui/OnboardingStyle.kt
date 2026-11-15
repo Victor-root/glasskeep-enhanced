@@ -22,14 +22,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
@@ -71,12 +69,14 @@ private val FocusRingLight = Color(0xFF6d28d9)
 internal fun focusRingColor(): Color = if (isSystemInDarkTheme()) Color.White else FocusRingLight
 
 /** The gradient button of the onboarding screens. Focus from a remote or
- *  a keyboard rings it, a little off the button, and enlarges it, so a
- *  D-pad shows where it is. */
+ *  a keyboard rings it and enlarges it, so a D-pad shows where it is. The
+ *  ring hugs the button, its corners concentric with the button's; its
+ *  inner edge runs a pixel under the button, so no seam shows between
+ *  them. */
 @Composable
 internal fun GradientButton(
     onClick: () -> Unit,
-    shape: Shape,
+    shape: RoundedCornerShape,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
     ringColor: Color = focusRingColor(),
@@ -90,11 +90,15 @@ internal fun GradientButton(
             .drawBehind {
                 if (focused) {
                     val stroke = 3.dp.toPx()
-                    val grow = 3.dp.toPx() + stroke / 2
-                    val ring = shape.createOutline(
-                        Size(size.width + grow * 2, size.height + grow * 2), layoutDirection, this,
+                    val grow = stroke / 2 - 1f
+                    val radius = shape.topStart.toPx(size, this) + grow
+                    drawRoundRect(
+                        color = ringColor,
+                        topLeft = Offset(-grow, -grow),
+                        size = Size(size.width + grow * 2, size.height + grow * 2),
+                        cornerRadius = CornerRadius(radius),
+                        style = Stroke(stroke),
                     )
-                    translate(-grow, -grow) { drawOutline(ring, ringColor, style = Stroke(stroke)) }
                 }
             }
             .clip(shape)

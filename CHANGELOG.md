@@ -23,7 +23,7 @@ Headline features: **file attachments** on notes, with a **ZIP backup** that car
 - 📦 Every `npm audit` advisory is cleared, and the editor uses Tiptap's own text style again.
 
 ### 🐛 Fixed
-- 📺 **TV focus invisible in the light theme**: on the welcome page of the Android app (1.6.2) and on the notes, the focus ring was white or pale violet on white cards. It is now deep violet there, and stands a little off the app's buttons.
+- 📺 **TV focus invisible in the light theme**: on the welcome page of the Android app (1.6.2) and on the notes, the focus ring was white or pale violet on white cards. It is now deep violet there, and hugs the app's buttons.
 - 🤖 **Newer OpenAI models** (gpt-5, the o-series) could not be connected (issue #34): a request a model refuses for `max_tokens` or the temperature is sent again without it, and the setting is remembered.
 - ✍️ **Typed words could disappear or come back**: a list of notes fetched just before a save reached the server (after a reconnection, for instance) replaced the text typed last. Copies older than a local save no longer overwrite it.
 - ↩️ **Undo and redo in a checklist were never saved**: the undone items came back on reopening the note or on another device.
