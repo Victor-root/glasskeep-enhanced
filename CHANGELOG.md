@@ -38,6 +38,8 @@ Headline features: **file attachments** on notes, with a **ZIP backup** that car
 - The footer's **Read mode** label could be cut off, and a popover's arrow kept its old colour over a hovered row.
 - 📷 The **QR scanner's camera** could stay off after a cold start renewed the session.
 - 🐳 **Docker updates** kept the old image's settings in the new container, so a beta could offer the same update again.
+- 📱 **Android 7 to 9: saving a file closed the app** (1.6.0): exports and downloads went through a storage only Android 10 has. They now ask for the storage permission once and land in Downloads.
+- 💾 After a **failed update** or **leaving the beta**, the previous release could no longer open the notes kept in the browser. Files waiting to be sent now have a storage of their own, so the previous release opens the rest as before.
 - The chosen card of a set of choices (themes, update channel, SSO policy) lost its frame while focused.
 
 ## 🚀 v2.7.0 (2026-10-21)

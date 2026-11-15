@@ -1,16 +1,27 @@
 package com.glasskeep.app.webview
 
-import android.app.Activity
+import android.Manifest
 import android.app.DownloadManager
+import android.content.ContentValues
+import android.content.pm.PackageManager
+import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
 import android.webkit.CookieManager
 import android.webkit.URLUtil
 import android.webkit.WebView
 import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
 import com.glasskeep.app.R
 import com.glasskeep.app.net.TrustedCertificate
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -21,12 +32,24 @@ import java.util.concurrent.Executors
  * DownloadManager, or is fetched by the app itself from a server whose
  * certificate only the app trusts (see [TrustedCertificate]); a blob: URL
  * is read by the page itself and comes back through [saveBlobFile]
- * (window.AndroidTheme.saveBlobFile). Both are written to the Downloads
- * collection.
+ * (window.AndroidTheme.saveBlobFile). Both are written to Downloads.
+ * Its permission launcher is registered when it is constructed, so it is
+ * created while the activity is.
  */
-class WebDownloads(private val activity: Activity) {
+class WebDownloads(private val activity: ComponentActivity) {
 
     private val worker = Executors.newSingleThreadExecutor()
+
+    /** Downloads waiting for the storage permission, Android 9 and below. */
+    private val waitingForStorage = mutableListOf<() -> Unit>()
+
+    private val storagePermission = activity.registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val waiting = waitingForStorage.toList()
+        waitingForStorage.clear()
+        if (granted) waiting.forEach { it() } else failed()
+    }
 
     /** The WebView's DownloadListener. */
     fun onDownloadStart(
@@ -65,7 +88,10 @@ class WebDownloads(private val activity: Activity) {
         enqueue(url, File(name).name.ifBlank { "file" }, mimeType, null)
     }
 
-    private fun enqueue(url: String, filename: String, mimeType: String?, userAgent: String?) {
+    private fun enqueue(url: String, filename: String, mimeType: String?, userAgent: String?) =
+        withStorage { download(url, filename, mimeType, userAgent) }
+
+    private fun download(url: String, filename: String, mimeType: String?, userAgent: String?) {
         // DownloadManager runs in another process, which knows nothing of
         // the certificate the user trusted.
         if (TrustedCertificate.pinFor(activity, Uri.parse(url).host) != null) {
@@ -120,30 +146,34 @@ class WebDownloads(private val activity: Activity) {
             failed()
             return
         }
-        writeToDownloads(filename, mimeType) { it.write(bytes) }
+        activity.runOnUiThread {
+            withStorage { worker.execute { writeToDownloads(filename, mimeType) { it.write(bytes) } } }
+        }
+    }
+
+    /** Runs [action] once the app may write to Downloads: always from
+     *  Android 10, after the user's yes to the storage permission before.
+     *  Main thread. */
+    private fun withStorage(action: () -> Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ||
+            ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            action()
+            return
+        }
+        waitingForStorage += action
+        if (waitingForStorage.size == 1) storagePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
     }
 
     /** Writes a file into Downloads from any thread, and says how it went. */
     private fun writeToDownloads(filename: String, mimeType: String, write: (OutputStream) -> Unit) {
         try {
-            val contentValues = android.content.ContentValues().apply {
-                put(android.provider.MediaStore.Downloads.DISPLAY_NAME, filename)
-                put(android.provider.MediaStore.Downloads.MIME_TYPE, mimeType)
-                put(android.provider.MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                writeToCollection(filename, mimeType, write)
+            } else {
+                writeToFolder(filename, mimeType, write)
             }
-            val uri = activity.contentResolver.insert(
-                android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues
-            )
-            if (uri == null) {
-                failed()
-                return
-            }
-            activity.contentResolver.openOutputStream(uri)?.use(write)
-            val updateValues = android.content.ContentValues().apply {
-                put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
-            }
-            activity.contentResolver.update(uri, updateValues, null, null)
             activity.runOnUiThread {
                 Toast.makeText(activity, activity.getString(R.string.download_complete, filename), Toast.LENGTH_SHORT).show()
             }
@@ -151,6 +181,37 @@ class WebDownloads(private val activity: Activity) {
             android.util.Log.e("GlassKeep", "download not saved", e)
             failed()
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun writeToCollection(filename: String, mimeType: String, write: (OutputStream) -> Unit) {
+        val resolver = activity.contentResolver
+        val uri = resolver.insert(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, filename)
+                put(MediaStore.Downloads.MIME_TYPE, mimeType)
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            },
+        ) ?: throw IOException("no Downloads entry")
+        resolver.openOutputStream(uri)?.use(write) ?: throw IOException("Downloads entry not writable")
+        resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+    }
+
+    /** The Downloads folder itself, before Android 10 and its collection.
+     *  A name already taken gets a number, as the collection does. */
+    @Suppress("DEPRECATION")
+    private fun writeToFolder(filename: String, mimeType: String, write: (OutputStream) -> Unit) {
+        val folder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (!folder.isDirectory && !folder.mkdirs()) throw IOException("no Downloads folder")
+        val stem = filename.substringBeforeLast('.')
+        val extension = filename.substringAfterLast('.', "").let { if (it.isEmpty()) "" else ".$it" }
+        val file = generateSequence(1) { it + 1 }
+            .map { n -> File(folder, if (n == 1) filename else "$stem ($n)$extension") }
+            .first { !it.exists() }
+        FileOutputStream(file).use(write)
+        MediaScannerConnection.scanFile(activity, arrayOf(file.path), arrayOf(mimeType), null)
     }
 
     private fun failed() {
