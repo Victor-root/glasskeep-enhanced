@@ -12,7 +12,7 @@ Headline features: **file attachments** on notes, with a **ZIP backup** that car
 - 🔐 **Sign in with the instance's provider in one click** (issue #31): with the *instance's provider only* single sign-on policy, the login button goes straight to the provider, without asking for an email first.
 - 🧪 **Update channels**: Admin → server version offers *Stable* or *Beta*. Betas are published only once their tests and a rollback test against the stable release pass. Entering the beta backs the database up first, and leaving it offers only what is safe: going back now, restoring the pre-beta backup, or waiting for the next release. A *Check now* button asks GitHub for updates at once, and the changelog only opens after an update to a stable release.
 - 💾 **Database safety on updates**: a copy of the database is taken whenever a different version opens it (the last five are kept), a version refuses to start on a database written in a newer format, and an update that fails puts the previous database back along with the previous version.
-- 🔒 **Self-signed certificates in the Android app** (1.6.1): a server whose certificate Android does not recognise, a self-signed one typically, now shows its fingerprint at connection; once trusted, the app, its reminders, attachments and downloads use that exact certificate for that server. If the server's certificate changes, the app goes back to the connection screen to show the new one.
+- 🔒 **Self-signed certificates in the Android app** (1.6.0): a server whose certificate Android does not recognise, a self-signed one typically, now shows its fingerprint at connection; once trusted, the app, its reminders, attachments and downloads use that exact certificate for that server. If the server's certificate changes, the app goes back to the connection screen to show the new one.
 - ⌨️ **An open note follows the phone keyboard** (Android app and installed web app): the note slides up and down with the keyboard, as in Google Keep, and the home screen no longer shows behind it when the keyboard closes.
 
 ### 🔄 Changed
@@ -23,7 +23,7 @@ Headline features: **file attachments** on notes, with a **ZIP backup** that car
 - 📦 Every `npm audit` advisory is cleared, and the editor uses Tiptap's own text style again.
 
 ### 🐛 Fixed
-- 📺 **TV focus invisible in the light theme**: on the welcome page of the Android app (1.6.2) and on the notes, the focus ring was white or pale violet on white cards. It is now deep violet there, and hugs the app's buttons.
+- 📺 **TV focus invisible in the light theme**: on the welcome page of the Android app (1.6.0) and on the notes, the focus ring was white or pale violet on white cards. It is now deep violet there, and hugs the app's buttons.
 - 🤖 **Newer OpenAI models** (gpt-5, the o-series) could not be connected (issue #34): a request a model refuses for `max_tokens` or the temperature is sent again without it, and the setting is remembered.
 - ✍️ **Typed words could disappear or come back**: a list of notes fetched just before a save reached the server (after a reconnection, for instance) replaced the text typed last. Copies older than a local save no longer overwrite it.
 - ↩️ **Undo and redo in a checklist were never saved**: the undone items came back on reopening the note or on another device.

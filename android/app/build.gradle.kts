@@ -22,6 +22,9 @@ val hasReleaseSigning =
     keystoreProps.getProperty("storeFile")?.isNotBlank() == true &&
         rootProject.file(keystoreProps.getProperty("storeFile")).exists()
 
+// 2024-01-01T00:00Z, in minutes since the epoch.
+val minutesTo2024 = 28_401_120L
+
 android {
     namespace = "com.glasskeep.app"
     compileSdk = 37
@@ -30,8 +33,11 @@ android {
         applicationId = "com.glasskeep.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 14
-        versionName = "1.6.2"
+        // Minutes since 2024 at build time: every build is above the last,
+        // so a test build installs over the previous one under the same
+        // version name. Far below the largest version code Android takes.
+        versionCode = (System.currentTimeMillis() / 60_000 - minutesTo2024).toInt()
+        versionName = "1.6.0"
     }
 
     signingConfigs {
