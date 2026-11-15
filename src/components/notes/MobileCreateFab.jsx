@@ -6,6 +6,13 @@ import { setSystemBarsScrim } from "../../utils/systemBars.js";
 // Darkness of the backdrop, matched on the Android status and navigation bars.
 const SCRIM_ALPHA = 0.3;
 
+// A press leaves the focus where it was. In the Android WebView, a button
+// taking the focus makes the keyboard look for the next field, and from
+// here that search crosses the whole notes grid: the first time, it lays
+// out every card not drawn yet, close to a second on a phone with a couple
+// hundred notes. The keyboard still focuses these buttons.
+const pressWithoutFocus = (e) => e.preventDefault();
+
 export default function MobileCreateFab({
   open,
   setOpen,
@@ -136,6 +143,7 @@ export default function MobileCreateFab({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        onMouseDown={pressWithoutFocus}
         aria-label={t("addNote")}
         aria-expanded={open}
         className="pointer-events-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white active:scale-95 transition-transform duration-200 flex items-center justify-center focus:outline-none btn-gradient"
@@ -163,6 +171,7 @@ function FabDialButton({ onClick, label, icon, colorClasses, iconBg, title, desc
     <button
       type="button"
       onClick={onClick}
+      onMouseDown={pressWithoutFocus}
       aria-label={label}
       className={`w-44 flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 active:scale-[0.98] transition-transform duration-150 text-left focus:outline-none ${colorClasses}`}
     >
