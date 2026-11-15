@@ -49,8 +49,8 @@ html[data-tv="1"][data-tv-theme="light"] .tv-detail__close {
   background: rgba(0, 0, 0, 0.08);
   border-color: rgba(0, 0, 0, 0.12);
 }
-html[data-tv="1"][data-tv-theme="light"] .tv-card {
-  border-color: rgba(0, 0, 0, 0.08);
+html[data-tv="1"][data-tv-theme="light"] .tv-card::before {
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 html[data-tv="1"][data-tv-theme="light"] .tv-checklist__item {
   background: rgba(0, 0, 0, 0.04);

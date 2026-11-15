@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { LogOut } from "lucide-react";
 import { t } from "../../i18n";
 import { requestTvFocus } from "./useSpatialFocus.js";
+import TvButton from "./TvButton.jsx";
 
 // Clickable header chip + popover. Tapping it opens a small menu
 // (currently just "Sign out"); the menu closes on outside click, Back
@@ -103,8 +104,7 @@ export default function TvHeaderUserChip({ currentUser, onSignOut }) {
 
   return (
     <div className="tv-header__user-menu-wrap" ref={wrapRef}>
-      <button
-        type="button"
+      <TvButton
         className="tv-header__user tv-focusable tv-focusable--flat"
         aria-label={label}
         aria-haspopup="menu"
@@ -119,19 +119,18 @@ export default function TvHeaderUserChip({ currentUser, onSignOut }) {
         <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {label}
         </span>
-      </button>
+      </TvButton>
       {open && (
         <div className="tv-header__user-menu" role="menu">
           {typeof onSignOut === "function" && (
-            <button
-              type="button"
+            <TvButton
               className="tv-header__user-menu-item tv-focusable tv-focusable--flat"
               role="menuitem"
               onClick={() => { setOpen(false); onSignOut(); }}
             >
               <span className="tv-header__user-menu-item-icon"><LogOut size={14} /></span>
               <span>{t("logout") || "Sign out"}</span>
-            </button>
+            </TvButton>
           )}
         </div>
       )}

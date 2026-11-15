@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { t } from "../../i18n";
 import { getContentImages } from "../../utils/noteIcon.js";
 import { Files, ImageIcon, Hash, Settings as SettingsIcon } from "lucide-react";
+import TvButton from "./TvButton.jsx";
 
 // Filter rail for the TV viewer. Real lucide icons, no emoji, no pin
 // filter (the closed card no longer shows a pin so the standalone
@@ -44,8 +45,7 @@ export default function TvSidebar({
   return (
     <aside className="tv-sidebar" aria-label={t("filters") || "Filters"}>
       <div className="tv-sidebar__group-label">{t("allNotes") || "All notes"}</div>
-      <button
-        type="button"
+      <TvButton
         className="tv-sidebar__item tv-focusable tv-focusable--flat"
         data-active={isActive("all") ? "true" : "false"}
         onClick={() => onSelectFilter({ type: "all" })}
@@ -53,10 +53,9 @@ export default function TvSidebar({
         <span className="tv-sidebar__item-icon"><Files size={16} /></span>
         <span className="tv-sidebar__item-label">{t("allNotes") || "All notes"}</span>
         <span className="tv-sidebar__item-count">{totalActive}</span>
-      </button>
+      </TvButton>
       {grouped.withImages > 0 && (
-        <button
-          type="button"
+        <TvButton
           className="tv-sidebar__item tv-focusable tv-focusable--flat"
           data-active={isActive("images") ? "true" : "false"}
           onClick={() => onSelectFilter({ type: "images" })}
@@ -64,16 +63,15 @@ export default function TvSidebar({
           <span className="tv-sidebar__item-icon"><ImageIcon size={16} /></span>
           <span className="tv-sidebar__item-label">{t("image") || "Images"}</span>
           <span className="tv-sidebar__item-count">{grouped.withImages}</span>
-        </button>
+        </TvButton>
       )}
 
       {grouped.tags.length > 0 && (
         <>
           <div className="tv-sidebar__group-label">{t("tagsLabel") || "Tags"}</div>
           {grouped.tags.map(([tag, count]) => (
-            <button
+            <TvButton
               key={tag}
-              type="button"
               className="tv-sidebar__item tv-focusable tv-focusable--flat"
               data-active={isActive("tag", tag) ? "true" : "false"}
               onClick={() => onSelectFilter({ type: "tag", value: tag })}
@@ -81,7 +79,7 @@ export default function TvSidebar({
               <span className="tv-sidebar__item-icon"><Hash size={16} /></span>
               <span className="tv-sidebar__item-label">{tag}</span>
               <span className="tv-sidebar__item-count">{count}</span>
-            </button>
+            </TvButton>
           ))}
         </>
       )}
@@ -93,14 +91,13 @@ export default function TvSidebar({
       {typeof onExit === "function" && (
         <>
           <div className="tv-sidebar__group-label">{t("settings") || "Settings"}</div>
-          <button
-            type="button"
+          <TvButton
             className="tv-sidebar__item tv-focusable tv-focusable--flat"
             onClick={onExit}
           >
             <span className="tv-sidebar__item-icon"><SettingsIcon size={16} /></span>
             <span className="tv-sidebar__item-label">{t("tvExitButton") || "Phone layout"}</span>
-          </button>
+          </TvButton>
         </>
       )}
     </aside>

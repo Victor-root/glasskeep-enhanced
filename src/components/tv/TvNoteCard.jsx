@@ -10,6 +10,7 @@ import { parseAudioContent } from "../../utils/audioNote.js";
 import DrawingPreview from "../common/DrawingPreview.jsx";
 import { drawingHasStrokes } from "../../utils/drawingContent.js";
 import { isColorDark } from "./tvNoteColors.js";
+import TvButton from "./TvButton.jsx";
 
 // Closed note card for TV. Renders into the dark 10-foot palette and
 // is wrapped in React.memo so an unrelated parent rerender (clock tick,
@@ -99,8 +100,7 @@ function TvNoteCardImpl({ note, variant = "grid", dark = true, onActivate }) {
   };
 
   return (
-    <button
-      type="button"
+    <TvButton
       className={`tv-card tv-focusable ${isDark ? "tv-card--dark" : ""}`}
       style={{ background: solid(bg) }}
       onClick={handleActivate}
@@ -241,7 +241,7 @@ function TvNoteCardImpl({ note, variant = "grid", dark = true, onActivate }) {
           </span>
         )}
       </div>
-    </button>
+    </TvButton>
   );
 }
 

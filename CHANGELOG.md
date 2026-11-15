@@ -25,6 +25,7 @@ Headline features: **file attachments** on notes, with a **ZIP backup** that car
 - 📦 Every `npm audit` advisory is cleared, and the editor uses Tiptap's own text style again.
 
 ### 🐛 Fixed
+- 📺 **TV remote lagging on large accounts**: every move of the focus made the Android WebView go over the whole page, because the TV's cards and buttons were HTML buttons. With two hundred notes a move cost 10 to 15 ms on the emulator and much more on a TV box, and opening the rail a quarter of a second. They are now focusable elements with the button role: a move takes under a millisecond, the rail opens four times faster. The focus ring of a card also runs along its very edge.
 - 📺 **TV keyboard covering the form**: on the Android TV setup screen (1.6.0) and on the TV sign-in, the keyboard hid the fields below the one being typed in and the button. While it is up, the form now moves to the top of the screen, above it, with its fields and Sign in only. The TV sign-in by hand also fits the screen when profiles are offered: the slogan under it was cut off.
 - 📺 **TV focus invisible in the light theme**: on the welcome page of the Android app (1.6.0) and on the notes, the focus ring was white or pale violet on white cards. It is now deep violet on the notes and near black on the app's buttons, which it hugs.
 - 🤖 **Newer OpenAI models** (gpt-5, the o-series) could not be connected (issue #34): a request a model refuses for `max_tokens` or the temperature is sent again without it, and the setting is remembered.

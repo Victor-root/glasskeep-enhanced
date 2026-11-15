@@ -11,6 +11,7 @@ import useViewportWidth from "./useViewportWidth.js";
 import { partitionNotes, pickColumnCount } from "./tvNotesList.js";
 import { loadPref, savePref } from "./tvPrefs.js";
 import { Menu, LayoutGrid, Rows3, Sun, Moon } from "lucide-react";
+import TvButton from "./TvButton.jsx";
 
 // Cards per chunk of a grid column, skipped by the WebView while out of
 // view. Few enough chunks for a focus to stay cheap, small enough for the
@@ -289,30 +290,27 @@ export default function TvNotesViewer({
   return (
     <div className="tv-screen">
       <header className="tv-header">
-        <button
-          type="button"
+        <TvButton
           className="tv-header__hamburger tv-focusable tv-focusable--flat"
           aria-label={t("toggleSidebar") || "Toggle sidebar"}
           onClick={toggleSidebar}
         >
           <Menu size={18} />
-        </button>
-        <button
-          type="button"
+        </TvButton>
+        <TvButton
           className="tv-header__viewtoggle tv-focusable tv-focusable--flat"
           aria-label={t("toggleView") || "Toggle view"}
           onClick={toggleView}
         >
           {viewMode === "grid" ? <Rows3 size={18} /> : <LayoutGrid size={18} />}
-        </button>
-        <button
-          type="button"
+        </TvButton>
+        <TvButton
           className="tv-header__themetoggle tv-focusable tv-focusable--flat"
           aria-label={t("toggleTheme") || "Toggle theme"}
           onClick={toggleTheme}
         >
           {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+        </TvButton>
         <img
           src="/favicon-32x32.png"
           srcSet="/pwa-192.png 2x, /pwa-512.png 3x"

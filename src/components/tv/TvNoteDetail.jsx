@@ -11,6 +11,7 @@ import DrawingPreview from "../common/DrawingPreview.jsx";
 import { drawingHasStrokes } from "../../utils/drawingContent.js";
 import { isColorDark } from "./tvNoteColors.js";
 import { requestTvFocus } from "./useSpatialFocus.js";
+import TvButton from "./TvButton.jsx";
 
 function buildBodyHtml(note) {
   if (note.type === "text") {
@@ -293,9 +294,8 @@ function AudioBody({ clips }) {
           t("audioClipDefaultName").replace("{n}", String(i + 1));
         const dur = Number.isFinite(clip.duration) ? clip.duration : 0;
         return (
-          <button
+          <TvButton
             key={key}
-            type="button"
             className="tv-checklist__item tv-audio-clip tv-focusable tv-focusable--flat"
             aria-pressed={playing}
             aria-label={`${playing ? t("audioPause") : t("audioPlay")} ${name}`}
@@ -314,7 +314,7 @@ function AudioBody({ clips }) {
                 {formatDuration(dur)}
               </span>
             )}
-          </button>
+          </TvButton>
         );
       })}
     </div>

@@ -68,12 +68,21 @@ html[data-tv="1"] .tv-focusable.tv-focusable--flat[data-tv-focused="true"] {
 /* A note card's ring is a layer of its own laid over the card, fading in
    and out on the compositor: a ring drawn by the card itself repainted
    the card on every frame of the fade, both the card left and the card
-   reached, which a TV box's GPU felt on every move. It sits inside the
-   edge, the card clipping what overflows it. */
+   reached, which a TV box's GPU felt on every move. It runs along the
+   card's very edge, over its hairline edge, drawn inside too since a
+   border would stay outside the ring. */
 html[data-tv="1"] .tv-card.tv-focusable:focus,
 html[data-tv="1"] .tv-card.tv-focusable[data-tv-focused="true"] {
   box-shadow: none;
   z-index: auto;
+}
+html[data-tv="1"] .tv-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  pointer-events: none;
 }
 html[data-tv="1"] .tv-card::after {
   content: "";

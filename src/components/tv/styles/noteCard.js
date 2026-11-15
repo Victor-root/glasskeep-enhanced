@@ -5,13 +5,14 @@ export const tvNoteCardCSS = `
 /* ------- Note card (closed) ------- */
 html[data-tv="1"] .tv-card {
   border-radius: 14px;
-  padding: 16px 16px 14px;
+  /* Its hairline edge is drawn inside (base.js), so the focus ring can
+     reach the card's very edge: the padding makes up for that pixel. */
+  padding: 17px 17px 15px;
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 7px;
   color: #111827;
-  border: 1px solid rgba(255, 255, 255, 0.06);
   position: relative;
   overflow: hidden;
   text-align: left;
