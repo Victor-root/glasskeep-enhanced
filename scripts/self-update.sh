@@ -507,16 +507,36 @@ CURRENT_ACTION="restarting the service"
 write_status "starting_service" "$CURRENT_STEP" "Restarting the service..." ""
 systemctl restart "$SERVICE_NAME"
 
-# Give the service a moment to come up. Healthcheck-ish.
-sleep 2
-if ! systemctl is-active --quiet "$SERVICE_NAME"; then
-    # Try once more after a longer wait; better-sqlite3 can take a beat
-    # on slower hosts after a fresh build.
-    sleep 5
-    if ! systemctl is-active --quiet "$SERVICE_NAME"; then
-        CURRENT_ACTION="service failed to start after update"
-        false
+# The new version has to stay up: running with the same process for
+# STABLE_SECONDS in a row. One that crashes once started is restarted by
+# systemd (Restart=always) and would look active at a single glance,
+# while it keeps falling over on data it may already have migrated: it
+# is rolled back, database included, like any failed update. A slow host
+# gets until STARTUP_TIMEOUT for that.
+STABLE_SECONDS="${UPDATE_STABLE_SECONDS:-15}"
+STARTUP_TIMEOUT="${UPDATE_STARTUP_TIMEOUT:-90}"
+stable_pid=""
+stable_for=0
+waited=0
+while (( stable_for < STABLE_SECONDS && waited < STARTUP_TIMEOUT )); do
+    sleep 1
+    waited=$((waited + 1))
+    pid="$(systemctl show -p MainPID --value "$SERVICE_NAME" 2>/dev/null || echo 0)"
+    if systemctl is-active --quiet "$SERVICE_NAME" && [[ "$pid" != "0" ]]; then
+        if [[ "$pid" == "$stable_pid" ]]; then
+            stable_for=$((stable_for + 1))
+        else
+            stable_pid="$pid"
+            stable_for=0
+        fi
+    else
+        stable_pid=""
+        stable_for=0
     fi
+done
+if (( stable_for < STABLE_SECONDS )); then
+    CURRENT_ACTION="service failed to start after update"
+    false
 fi
 
 # ── Success ──────────────────────────────────────────────────────────────────

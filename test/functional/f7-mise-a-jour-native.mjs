@@ -13,7 +13,8 @@
 // commit; une bêta déjà en place n'est pas retéléchargée; on redescend
 // d'une bêta vers une version publiée; un commit invalide ou introuvable,
 // ou un numéro qui ne correspond pas, ne laisse rien de cassé; une version
-// qui a converti la base puis échoue au redémarrage laisse la base d'avant.
+// qui a converti la base puis échoue au redémarrage, ou démarre puis
+// tombe en boucle, laisse la base d'avant.
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, chmodSync, existsSync } from "node:fs";
@@ -39,7 +40,9 @@ try {
   }
   // Avec GK_ECHEC, le premier redémarrage joue une nouvelle version qui
   // copie la base puis la convertit (comme db/dbSafety.js), et le service
-  // ne tient pas.
+  // ne tient pas: arrêté avec GK_PANNE=arret, ou relancé sans fin par
+  // systemd avec GK_PANNE=boucle (actif à chaque coup d'oeil, mais jamais
+  // le même processus).
   writeFileSync(path.join(stub, "systemctl"), `#!/bin/sh
 echo "[stub] systemctl $*"
 if [ -n "$GK_ECHEC" ]; then
@@ -48,8 +51,10 @@ if [ -n "$GK_ECHEC" ]; then
     cp "$DATA_DIR/notes.db" "$DATA_DIR/backups/auto-2099-01-01-from-$GK_DEPUIS.db"
     echo "base convertie" > "$DATA_DIR/notes.db"
   fi
-  [ "$1" = is-active ] && exit 3
+  [ "$1" = is-active ] && [ "$GK_PANNE" = arret ] && exit 3
+  [ "$1" = show ] && [ "$GK_PANNE" = boucle ] && echo $$ && exit 0
 fi
+[ "$1" = show ] && echo 4242
 exit 0
 `);
   chmodSync(path.join(stub, "systemctl"), 0o755);
@@ -88,7 +93,7 @@ exit 0
     if (cible) writeFileSync(path.join(data, ".update-target-version"), cible);
     if (commit) writeFileSync(path.join(data, ".update-target-commit"), commit);
     const r = spawnSync("bash", [path.join(app, "scripts", "self-update.sh")], {
-      env: { ...process.env, PATH: `${stub}:${process.env.PATH}`, INSTALL_DIR: app, DATA_DIR: data, ...env },
+      env: { ...process.env, PATH: `${stub}:${process.env.PATH}`, INSTALL_DIR: app, DATA_DIR: data, UPDATE_STABLE_SECONDS: "2", UPDATE_STARTUP_TIMEOUT: "5", ...env },
       encoding: "utf8",
     });
     spawnSync("sleep", ["0.3"]);
@@ -128,11 +133,20 @@ exit 0
   writeFileSync(path.join(data, "notes.db"), "base d'avant");
   writeFileSync(path.join(data, "backups", "auto-2000-01-01-from-2.0.0.db"), "vieille copie");
   spawnSync("sleep", ["1"]);
-  r = lancer({ version: "2.1.0-beta", commit: b1, env: { GK_ECHEC: echec, GK_DEPUIS: "2.0.0" } });
+  r = lancer({ version: "2.1.0-beta", commit: b1, env: { GK_ECHEC: echec, GK_DEPUIS: "2.0.0", GK_PANNE: "arret" } });
   t.check("une version qui a converti la base puis ne tient pas laisse la base d'avant, pas une copie plus ancienne",
     r.code !== 0 && r.head === v2 && r.statut.state === "rolled_back"
       && readFileSync(path.join(data, "notes.db"), "utf8") === "base d'avant",
     `${r.statut.state} ${readFileSync(path.join(data, "notes.db"), "utf8")}`);
+
+  rmSync(path.join(echec, "redemarre"));
+  spawnSync("sleep", ["1"]);
+  r = lancer({ version: "2.1.0-beta", commit: b1, env: { GK_ECHEC: echec, GK_DEPUIS: "2.0.0", GK_PANNE: "boucle" } });
+  t.check("une version qui démarre puis tombe en boucle est retirée, et la base d'avant revient",
+    r.code !== 0 && r.head === v2 && r.statut.state === "rolled_back"
+      && r.statut.error === "service failed to start after update (exit 1)"
+      && readFileSync(path.join(data, "notes.db"), "utf8") === "base d'avant",
+    `${r.statut.state} ${r.statut.error} ${readFileSync(path.join(data, "notes.db"), "utf8")}`);
 
   r = lancer({ version: "2.1.0-beta", commit: "pas-un-commit" });
   t.check("un commit invalide est refusé avant de toucher à quoi que ce soit",
