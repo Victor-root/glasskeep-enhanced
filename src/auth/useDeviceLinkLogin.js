@@ -12,7 +12,7 @@ import { t } from "../i18n";
 import { createDeviceLink, pollDeviceLink, buildLinkUrl } from "./deviceLinkClient.js";
 
 // Don't poll harder than this regardless of what the server returns
-// in `pollIntervalMs` — keeps a rogue server config from DoS-ing
+// in `pollIntervalMs`: keeps a rogue server config from DoS-ing
 // itself with a 100 ms interval.
 const MIN_POLL_INTERVAL_MS = 1000;
 
@@ -66,7 +66,7 @@ export default function useDeviceLinkLogin(onLoggedIn) {
     };
   }, [generate]);
 
-  // Polling loop — bound to the current token.
+  // Polling loop, bound to the current token.
   useEffect(() => {
     if (!linkToken || status !== "pending") return undefined;
     let cancelled = false;
@@ -93,7 +93,7 @@ export default function useDeviceLinkLogin(onLoggedIn) {
           setStatus("expired");
           return;
         }
-        // Transient network blip — keep polling on the next tick.
+        // Transient network blip: keep polling on the next tick.
       }
     };
     const id = setInterval(tick, pollIntervalMs);

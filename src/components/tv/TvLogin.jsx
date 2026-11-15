@@ -7,14 +7,14 @@ import TvQrLogin from "./TvQrLogin.jsx";
 
 // Couch-friendly login. Mirrors the phone's three-step flow but keeps
 // it focused on what works with a remote:
-//   1. "profiles" — Jellyfin-style avatar grid (no email needed). This
+//   1. "profiles": Jellyfin-style avatar grid (no email needed). This
 //      is the default whenever /login/profiles returned something.
-//   2. "password" — once a profile is picked, prompt only for the
+//   2. "password": once a profile is picked, prompt only for the
 //      password and submit via onLoginById(profile.id, password).
-//   3. "manual"   — fallback for accounts that don't appear in the
+//   3. "manual":   fallback for accounts that don't appear in the
 //      public profile list. Single identifier field (auto-detects
 //      email vs username by '@') + password, submits via onLoginManual.
-//   4. "qr"       — a QR code a signed-in phone scans, as on desktop: no
+//   4. "qr":       a QR code a signed-in phone scans, as on desktop: no
 //      password typed with a remote. Reached from 1 and 3, Back returns
 //      to the one it came from; the session goes to onLoginQr.
 
@@ -383,6 +383,6 @@ export default function TvLogin({
         </button>
       )}
     </form>,
-    { subtitle: t("tvLoginHint") || "Sign in once on your TV — your notes will appear, ready to read." }
+    { subtitle: t("tvLoginHint") || "Sign in once on your TV, your notes will appear, ready to read." }
   );
 }

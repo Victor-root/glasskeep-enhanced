@@ -4,7 +4,7 @@
 // sign-in flow. The lifecycle (challenge creation, polling, expiry
 // countdown) is useDeviceLinkLogin's, so callers just mount/unmount it
 // and provide an onLoggedIn callback that fires with the
-// `/api/device-link/poll` payload — same shape `completeLogin` already
+// `/api/device-link/poll` payload, same shape `completeLogin` already
 // consumes from the password / passkey flows.
 //
 // Renders without any modal chrome: it's a regular "card" meant to

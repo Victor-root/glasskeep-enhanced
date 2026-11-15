@@ -188,7 +188,7 @@ function markFocused(el) {
 function revealElement(el) {
   if (typeof el.scrollIntoView !== "function") return;
   try { el.scrollIntoView({ block: "nearest", inline: "nearest" }); }
-  catch { /* WebViews missing the options bag — skip */ }
+  catch { /* WebViews missing the options bag: skip */ }
 }
 
 function focusElement(el) {

@@ -207,7 +207,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 )
             )
         }
-        // Battery optimization — optional, shown for every install source.
+        // Battery optimization: optional, shown for every install source.
         // It's a special-access setting (not a runtime permission), so it
         // lives here as a tappable card that opens the system dialog and
         // NEVER gates "Continuer". Lets background reminders fire reliably
@@ -255,7 +255,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
     val colors = CardColors(cardBg, titleColor, subtextColor)
 
     Box(modifier = Modifier.fillMaxSize().then(bgModifier)) {
-        // Same animated background as SetupScreen — soft pastel cards
+        // Same animated background as SetupScreen: soft pastel cards
         // drifting in the back, theme-aware via the dark flag.
         FloatingCardsBackground(dark)
         if (isTelevision()) {
