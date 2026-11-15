@@ -295,9 +295,16 @@ internal fun ServerUrlField(
 
 /** The full-width Connect button of both setup layouts. */
 @Composable
-internal fun ConnectButton(loading: Boolean, onClick: () -> Unit, height: Dp, modifier: Modifier = Modifier) {
+internal fun ConnectButton(
+    loading: Boolean,
+    onClick: () -> Unit,
+    height: Dp,
+    modifier: Modifier = Modifier,
+    ringColor: Color = focusRingColor(),
+) {
     GradientButton(
         onClick = onClick,
+        ringColor = ringColor,
         shape = RoundedCornerShape(12.dp),
         contentPadding = PaddingValues(0.dp),
         modifier = Modifier

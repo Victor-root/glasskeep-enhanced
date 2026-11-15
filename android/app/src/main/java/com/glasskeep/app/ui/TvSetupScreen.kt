@@ -168,6 +168,8 @@ internal fun TvSetupScreen(
                     onClick = onConnect,
                     height = 52.dp,
                     modifier = Modifier.focusRequester(connectFocus),
+                    // This screen stays dark whatever the system theme.
+                    ringColor = Color.White,
                 )
             }
         }

@@ -3,10 +3,10 @@ package com.glasskeep.app.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,12 +19,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
@@ -57,16 +62,24 @@ internal val ButtonGradient = Brush.horizontalGradient(
     colors = listOf(Color(0xFF6366f1), Color(0xFF7c3aed))
 )
 internal val Indigo = Color(0xFF6366f1)
+private val FocusRingLight = Color(0xFF6d28d9)
+
+/** The focus ring's colour on a screen that follows the system theme:
+ *  white on the dark one, deep violet on the light one, where a white ring
+ *  was lost against the light cards. */
+@Composable
+internal fun focusRingColor(): Color = if (isSystemInDarkTheme()) Color.White else FocusRingLight
 
 /** The gradient button of the onboarding screens. Focus from a remote or
- *  a keyboard rings it in white and enlarges it, so a D-pad shows where
- *  it is. */
+ *  a keyboard rings it, a little off the button, and enlarges it, so a
+ *  D-pad shows where it is. */
 @Composable
 internal fun GradientButton(
     onClick: () -> Unit,
     shape: Shape,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
+    ringColor: Color = focusRingColor(),
     content: @Composable BoxScope.() -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -74,9 +87,18 @@ internal fun GradientButton(
     Box(
         modifier = modifier
             .scale(if (focused) 1.04f else 1f)
+            .drawBehind {
+                if (focused) {
+                    val stroke = 3.dp.toPx()
+                    val grow = 3.dp.toPx() + stroke / 2
+                    val ring = shape.createOutline(
+                        Size(size.width + grow * 2, size.height + grow * 2), layoutDirection, this,
+                    )
+                    translate(-grow, -grow) { drawOutline(ring, ringColor, style = Stroke(stroke)) }
+                }
+            }
             .clip(shape)
             .background(ButtonGradient)
-            .then(if (focused) Modifier.border(3.dp, Color.White, shape) else Modifier)
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
