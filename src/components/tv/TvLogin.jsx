@@ -263,15 +263,14 @@ export default function TvLogin({
 
         <button
           type="button"
-          className="tv-btn tv-focusable tv-focusable--flat"
+          className="tv-btn tv-login__submit tv-focusable tv-focusable--flat"
           onClick={() => {
             setMode("profiles");
             setPassword("");
             setError(null);
           }}
-          style={{ alignSelf: "center" }}
         >
-          ← {t("selectProfile") || "Pick another profile"}
+          {t("tvSwitchProfile")}
         </button>
       </form>
     );
@@ -326,14 +325,13 @@ export default function TvLogin({
       {hasProfiles && (
         <button
           type="button"
-          className="tv-btn tv-focusable tv-focusable--flat"
+          className="tv-btn tv-login__submit tv-focusable tv-focusable--flat"
           onClick={() => {
             setMode("profiles");
             setError(null);
           }}
-          style={{ alignSelf: "center" }}
         >
-          ← {t("selectProfile") || "Pick a profile"}
+          {t("tvSwitchProfile")}
         </button>
       )}
 

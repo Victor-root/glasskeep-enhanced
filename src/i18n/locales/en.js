@@ -23,6 +23,7 @@ export const en = {
   tvExitButton: "Use phone layout",
   tvPagerIndicatorLabel: "Pager page",
   tvManualLogin: "Sign in with another account",
+  tvSwitchProfile: "Switch profile",
   tvIdentifier: "Email or username",
   toggleSidebar: "Toggle sidebar",
   toggleView: "Toggle view",

@@ -23,6 +23,7 @@ export const fr = {
   tvExitButton: "Mode téléphone",
   tvPagerIndicatorLabel: "Page",
   tvManualLogin: "Se connecter avec un autre compte",
+  tvSwitchProfile: "Changer de profil",
   tvIdentifier: "Email ou identifiant",
   toggleSidebar: "Afficher/masquer la sidebar",
   toggleView: "Changer de vue",
