@@ -1,11 +1,11 @@
 // src/components/auth/QrLoginPanel.jsx
 //
 // Standalone panel rendering the QR + status for the cross-device
-// sign-in flow. Owns the full lifecycle (challenge creation, polling,
-// expiry countdown) so callers just mount/unmount it and provide an
-// onLoggedIn callback that fires with the `/api/device-link/poll`
-// payload — same shape `completeLogin` already consumes from the
-// password / passkey flows, so the post-login pipeline is identical.
+// sign-in flow. The lifecycle (challenge creation, polling, expiry
+// countdown) is useDeviceLinkLogin's, so callers just mount/unmount it
+// and provide an onLoggedIn callback that fires with the
+// `/api/device-link/poll` payload — same shape `completeLogin` already
+// consumes from the password / passkey flows.
 //
 // Renders without any modal chrome: it's a regular "card" meant to
 // be slotted into a layout next to the auth form (see AuthShell's
@@ -13,119 +13,13 @@
 // padding) match the auth form's own card so the two read as a
 // matched pair on a wide screen.
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import QRCode from "qrcode";
+import React from "react";
 import { t } from "../../i18n";
-import {
-  createDeviceLink,
-  pollDeviceLink,
-  buildLinkUrl,
-} from "../../auth/deviceLinkClient.js";
+import useDeviceLinkLogin, { qrStatusMessage } from "../../auth/useDeviceLinkLogin.js";
 import { QrSpinner, CloseGlyph, CheckGlyph } from "./QrGlyphs.jsx";
 
-// Don't poll harder than this regardless of what the server returns
-// in `pollIntervalMs` — keeps a rogue server config from DoS-ing
-// itself with a 100 ms interval.
-const MIN_POLL_INTERVAL_MS = 1000;
-
 export default function QrLoginPanel({ dark, onLoggedIn, onCancel }) {
-  const tokenRef = useRef(null);
-  const [linkToken, setLinkToken] = useState(null);
-  const [qrDataUrl, setQrDataUrl] = useState(null);
-  const [expiresAt, setExpiresAt] = useState(null);
-  const [pollIntervalMs, setPollIntervalMs] = useState(2000);
-
-  const [status, setStatus] = useState("loading"); // loading | pending | approved | expired | rejected | error
-  const [errorText, setErrorText] = useState("");
-  const [secondsLeft, setSecondsLeft] = useState(null);
-
-  const generate = useCallback(async () => {
-    setStatus("loading");
-    setErrorText("");
-    setQrDataUrl(null);
-    setLinkToken(null);
-    tokenRef.current = null;
-    try {
-      const created = await createDeviceLink();
-      tokenRef.current = created.token;
-      setLinkToken(created.token);
-      setExpiresAt(created.expiresAt);
-      setPollIntervalMs(
-        Math.max(MIN_POLL_INTERVAL_MS, Number(created.pollIntervalMs) || 2000),
-      );
-      const url = buildLinkUrl(created.token);
-      const data = await QRCode.toDataURL(url, {
-        margin: 1,
-        width: 320,
-        errorCorrectionLevel: "M",
-        color: { dark: "#1f1f1f", light: "#ffffff" },
-      });
-      setQrDataUrl(data);
-      setStatus("pending");
-    } catch (e) {
-      setErrorText((e && e.message) || "Network error");
-      setStatus("error");
-    }
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- request a fresh link token and QR code on mount
-    generate();
-    return () => {
-      tokenRef.current = null;
-    };
-  }, [generate]);
-
-  // Polling loop — bound to the current token.
-  useEffect(() => {
-    if (!linkToken || status !== "pending") return undefined;
-    let cancelled = false;
-    const tick = async () => {
-      const t0 = tokenRef.current;
-      if (cancelled || !t0 || t0 !== linkToken) return;
-      try {
-        const r = await pollDeviceLink(t0);
-        if (cancelled || tokenRef.current !== t0) return;
-        if (r.status === "approved" && r.token && r.user) {
-          setStatus("approved");
-          queueMicrotask(() => {
-            try { onLoggedIn?.(r); } catch { /* parent decides */ }
-          });
-        } else if (r.status === "expired") {
-          setStatus("expired");
-        } else if (r.status === "rejected") {
-          setStatus("rejected");
-        } else if (r.status === "consumed") {
-          setStatus("expired");
-        }
-      } catch (e) {
-        if (e?.status === 404 || e?.status === 410) {
-          setStatus("expired");
-          return;
-        }
-        // Transient network blip — keep polling on the next tick.
-      }
-    };
-    const id = setInterval(tick, pollIntervalMs);
-    const kick = setTimeout(tick, pollIntervalMs);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-      clearTimeout(kick);
-    };
-  }, [linkToken, status, pollIntervalMs, onLoggedIn]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the countdown when there is no expiry, then tick it every second
-    if (!expiresAt) { setSecondsLeft(null); return undefined; }
-    const update = () => {
-      const ms = new Date(expiresAt).getTime() - Date.now();
-      setSecondsLeft(Math.max(0, Math.round(ms / 1000)));
-    };
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
-  }, [expiresAt]);
+  const { status, qrDataUrl, errorText, secondsLeft, generate } = useDeviceLinkLogin(onLoggedIn);
 
   return (
     // Mirrors the auth card's chrome (glass-card, rounded-xl, p-6,
@@ -217,56 +111,24 @@ function QrCanvas({ status, qrDataUrl, dark }) {
   );
 }
 
+const STATUS_TONE = {
+  muted: "text-gray-500 dark:text-gray-400",
+  error: "text-red-600 dark:text-red-400",
+  success: "text-emerald-600 dark:text-emerald-300 font-medium",
+};
+
 function StatusLine({ status, errorText, secondsLeft }) {
-  if (status === "loading") {
-    return (
-      <p className="text-sm text-gray-500 dark:text-gray-400">
-        {t("qrLoginGenerating")}
-      </p>
-    );
-  }
-  if (status === "error") {
-    return (
-      <p className="text-sm text-red-600 dark:text-red-400">
-        {errorText || t("qrLoginError")}
-      </p>
-    );
-  }
-  if (status === "pending") {
-    return (
-      <p className="text-sm text-gray-500 dark:text-gray-400">
-        {t("qrLoginWaiting")}
-        {secondsLeft != null && (
-          <>
-            {" · "}
-            <span className="tabular-nums">
-              {t("qrLoginExpiresIn").replace("%s", String(secondsLeft))}
-            </span>
-          </>
-        )}
-      </p>
-    );
-  }
-  if (status === "approved") {
-    return (
-      <p className="text-sm text-emerald-600 dark:text-emerald-300 font-medium">
-        {t("qrLoginApproved")}
-      </p>
-    );
-  }
-  if (status === "rejected") {
-    return (
-      <p className="text-sm text-red-600 dark:text-red-400">
-        {t("qrLoginRejected")}
-      </p>
-    );
-  }
-  if (status === "expired") {
-    return (
-      <p className="text-sm text-gray-500 dark:text-gray-400">
-        {t("qrLoginExpired")}
-      </p>
-    );
-  }
-  return null;
+  const message = qrStatusMessage(status, errorText, secondsLeft);
+  if (!message) return null;
+  return (
+    <p className={`text-sm ${STATUS_TONE[message.tone]}`}>
+      {message.text}
+      {message.countdown && (
+        <>
+          {" · "}
+          <span className="tabular-nums">{message.countdown}</span>
+        </>
+      )}
+    </p>
+  );
 }

@@ -135,6 +135,7 @@ export default function TvApp() {
         profiles={loginProfiles}
         onLoginManual={signInManual}
         onLoginById={signInById}
+        onLoginQr={completeLogin}
         loginSlogan={loginSlogan}
         allowExit={!window.__isAndroidTV}
         onExitTvMode={exitTvMode}

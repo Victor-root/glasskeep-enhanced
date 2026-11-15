@@ -3,6 +3,7 @@ import { t } from "../../i18n";
 import useSpatialFocus, { requestTvFocus } from "./useSpatialFocus.js";
 import useKeyboardInset from "../../hooks/useKeyboardInset.js";
 import UserAvatar from "../common/UserAvatar.jsx";
+import TvQrLogin from "./TvQrLogin.jsx";
 
 // Couch-friendly login. Mirrors the phone's three-step flow but keeps
 // it focused on what works with a remote:
@@ -13,11 +14,15 @@ import UserAvatar from "../common/UserAvatar.jsx";
 //   3. "manual"   — fallback for accounts that don't appear in the
 //      public profile list. Single identifier field (auto-detects
 //      email vs username by '@') + password, submits via onLoginManual.
+//   4. "qr"       — a QR code a signed-in phone scans, as on desktop: no
+//      password typed with a remote. Reached from 1 and 3, Back returns
+//      to the one it came from; the session goes to onLoginQr.
 
 export default function TvLogin({
   profiles,
   onLoginManual,
   onLoginById,
+  onLoginQr,
   loginSlogan,
   allowExit,
   onExitTvMode,
@@ -33,6 +38,9 @@ export default function TvLogin({
   const passwordRef = useRef(null);
   const firstProfileRef = useRef(null);
   const identifierRef = useRef(null);
+  const qrCancelRef = useRef(null);
+  // Where Back and Cancel return from the QR code.
+  const loginMode = hasProfiles ? "profiles" : "manual";
 
   // Update default mode when profiles arrive after first render.
   useEffect(() => {
@@ -50,6 +58,10 @@ export default function TvLogin({
         setMode("profiles");
         setPassword("");
         setError(null);
+        return true;
+      }
+      if (mode === "qr") {
+        setMode(loginMode);
         return true;
       }
       if (mode === "manual" && hasProfiles) {
@@ -72,6 +84,7 @@ export default function TvLogin({
       if (mode === "profiles") target = firstProfileRef.current;
       else if (mode === "password") target = passwordRef.current;
       else if (mode === "manual") target = identifierRef.current;
+      else if (mode === "qr") target = qrCancelRef.current;
       requestTvFocus(target);
     });
     return () => cancelAnimationFrame(id);
@@ -127,6 +140,25 @@ export default function TvLogin({
       </div>
     </div>
   );
+
+  const qrButton = (
+    <button
+      type="button"
+      className="tv-btn tv-login__submit tv-focusable tv-focusable--flat"
+      onClick={() => {
+        setMode("qr");
+        setError(null);
+      }}
+    >
+      {t("qrLoginTitle")}
+    </button>
+  );
+
+  if (mode === "qr") {
+    return renderShell(
+      <TvQrLogin onLoggedIn={onLoginQr} onCancel={() => setMode(loginMode)} cancelRef={qrCancelRef} />
+    );
+  }
 
   if (mode === "profiles") {
     return renderShell(
@@ -186,17 +218,19 @@ export default function TvLogin({
           ))}
         </div>
 
-        <button
-          type="button"
-          className="tv-btn tv-focusable tv-focusable--flat"
-          onClick={() => {
-            setMode("manual");
-            setError(null);
-          }}
-          style={{ alignSelf: "center", marginTop: 8 }}
-        >
-          {t("tvManualLogin") || "Sign in with another account"}
-        </button>
+        <div className="tv-login__actions">
+          <button
+            type="button"
+            className="tv-btn tv-login__submit tv-focusable tv-focusable--flat"
+            onClick={() => {
+              setMode("manual");
+              setError(null);
+            }}
+          >
+            {t("otherAccount")}
+          </button>
+          {qrButton}
+        </div>
 
         {allowExit && (
           <button
@@ -322,18 +356,21 @@ export default function TvLogin({
         {busy ? (t("signingIn") || "Signing in…") : (t("signIn") || "Sign in")}
       </button>
 
-      {hasProfiles && (
-        <button
-          type="button"
-          className="tv-btn tv-login__submit tv-focusable tv-focusable--flat"
-          onClick={() => {
-            setMode("profiles");
-            setError(null);
-          }}
-        >
-          {t("tvSwitchProfile")}
-        </button>
-      )}
+      <div className="tv-login__actions">
+        {hasProfiles && (
+          <button
+            type="button"
+            className="tv-btn tv-login__submit tv-focusable tv-focusable--flat"
+            onClick={() => {
+              setMode("profiles");
+              setError(null);
+            }}
+          >
+            {t("tvSwitchProfile")}
+          </button>
+        )}
+        {qrButton}
+      </div>
 
       {allowExit && (
         <button

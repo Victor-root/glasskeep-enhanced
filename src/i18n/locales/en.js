@@ -22,7 +22,6 @@ export const en = {
   tvEmptyHint: "Once you create notes from your phone or the web app they'll show up here, ready to read on the big screen.",
   tvExitButton: "Use phone layout",
   tvPagerIndicatorLabel: "Pager page",
-  tvManualLogin: "Sign in with another account",
   tvSwitchProfile: "Switch profile",
   tvIdentifier: "Email or username",
   toggleSidebar: "Toggle sidebar",

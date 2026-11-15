@@ -76,6 +76,7 @@ html[data-tv="1"][data-keyboard-open] .tv-login__logo,
 html[data-tv="1"][data-keyboard-open] .tv-login__brand,
 html[data-tv="1"][data-keyboard-open] .tv-login__subtitle,
 html[data-tv="1"][data-keyboard-open] .tv-login__slogan,
+html[data-tv="1"][data-keyboard-open] .tv-login__actions,
 html[data-tv="1"][data-keyboard-open] .tv-login__card .tv-btn:not(.tv-btn--primary) {
   display: none;
 }
@@ -174,6 +175,66 @@ html[data-tv="1"] .tv-login__input {
 }
 html[data-tv="1"] .tv-login__input:focus { border-color: #a78bfa; box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.4); }
 html[data-tv="1"] .tv-login__submit { padding: 12px; font-size: 14px; }
+/* Secondary ways in, side by side under the main button. */
+html[data-tv="1"] .tv-login__actions {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  max-width: 520px;
+  align-self: center;
+}
+html[data-tv="1"] .tv-login__actions > * { flex: 1 1 0; }
+
+/* QR code sign-in: the code on the left, white so a phone reads it from
+   across the room, what to do on the right. */
+html[data-tv="1"] .tv-login__card.tv-qr {
+  max-width: 720px;
+  flex-direction: row;
+  align-items: center;
+  gap: 28px;
+}
+html[data-tv="1"] .tv-qr__code {
+  position: relative;
+  flex: 0 0 240px;
+  height: 240px;
+  padding: 8px;
+  border-radius: 16px;
+  background: #ffffff;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+html[data-tv="1"] .tv-qr__code--empty {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #9ca3af;
+}
+html[data-tv="1"] .tv-qr__code img { width: 100%; height: 100%; user-select: none; }
+html[data-tv="1"] .tv-qr__img--spent { opacity: 0.3; }
+html[data-tv="1"] .tv-qr__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #374151;
+}
+html[data-tv="1"] .tv-qr__overlay--ok { background: rgba(16, 185, 129, 0.15); }
+html[data-tv="1"] .tv-qr__side {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+html[data-tv="1"] .tv-qr__explain { margin: 0; font-size: 14px; line-height: 1.5; color: #cbd5e1; }
+html[data-tv="1"] .tv-qr__status { margin: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+html[data-tv="1"] .tv-qr__status--muted { color: #9ca3af; }
+html[data-tv="1"] .tv-qr__status--error { color: #fca5a5; }
+html[data-tv="1"] .tv-qr__status--success { color: #6ee7b7; }
+html[data-tv="1"] .tv-qr__actions { display: flex; gap: 10px; margin-top: 6px; }
+html[data-tv="1"] .tv-qr__actions > * { flex: 1 1 0; }
 html[data-tv="1"] .tv-login__error {
   color: #fca5a5;
   background: rgba(220, 38, 38, 0.12);
