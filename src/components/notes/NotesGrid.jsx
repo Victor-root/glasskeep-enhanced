@@ -9,6 +9,7 @@ const TOUCH_SLOP = 10;
 const LONG_PRESS_MS = 300;
 // The cards make way, and the dropped one settles, in this time (shell.js).
 const SETTLE_MS = 220;
+const APPEAR_MS = 150;
 // Scrolling while a card is held near the top or bottom of the view.
 const EDGE = 72;
 const MAX_SCROLL_STEP = 18;
@@ -153,10 +154,13 @@ export default function NotesGrid({ notes, columns, gapX, gapY, canDrag, renderC
     measure();
   }, [noteIds, columns, width, measure]);
 
+  // A card fades in when it appears. Not through a CSS animation: a reorder
+  // moves cards in the DOM, which would start it again on each of them.
   const registerItem = useCallback((el) => {
     const id = el.dataset.gridId;
     itemEls.current.set(id, el);
     observerRef.current?.observe(el);
+    el.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: APPEAR_MS, easing: "ease-out" });
     return () => {
       observerRef.current?.unobserve(el);
       if (itemEls.current.get(id) === el) itemEls.current.delete(id);

@@ -124,6 +124,10 @@ html:not([data-gk-scrolling]) .note-card-wrapper:hover .note-card { will-change:
   top: 0;
   left: 0;
 }
+/* NotesGrid fades its cards in itself. */
+.gk-grid-item .note-card {
+  animation: none;
+}
 .gk-grid-item:hover {
   z-index: 2;
 }
