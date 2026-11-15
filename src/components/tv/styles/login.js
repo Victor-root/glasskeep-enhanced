@@ -135,6 +135,9 @@ html[data-tv="1"] .tv-login__subtitle {
   margin: 6px 0 18px;
 }
 html[data-tv="1"][data-tv-theme="light"] .tv-login__subtitle { color: #6b7280; }
+/* With no subtitle (a profile's password), the brand keeps the same
+   distance from the card. */
+html[data-tv="1"] .tv-login__brand + .tv-login__card { margin-top: 18px; }
 /* Glass pill that holds the server's loginSlogan (fetched live from
    /api/admin/login-slogan, falls back to t("loginSlogan")). Sits
    under the card. block + width:fit-content reliably centers itself
