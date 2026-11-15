@@ -12,6 +12,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.ServiceWorkerClient
 import android.webkit.ServiceWorkerController
+import android.webkit.SslErrorHandler
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -25,6 +26,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.browser.customtabs.CustomTabsIntent
 import com.glasskeep.app.net.CleartextPolicy
+import com.glasskeep.app.net.TrustedCertificate
 import com.glasskeep.app.reminders.RemindersBridge
 import com.glasskeep.app.ui.ChangeServerDialog
 import com.glasskeep.app.ui.isDarkMode
@@ -523,6 +525,30 @@ class WebViewActivity : AppCompatActivity() {
                     // navigation — the page might mount on top of stale
                     // (or zero) values otherwise.
                     injectSafeAreaInsets()
+                }
+
+                // A certificate Android does not trust is accepted when it is
+                // the one the user trusted for this server. Another one on
+                // the server itself sends the user back to the setup screen,
+                // where it is shown to them.
+                override fun onReceivedSslError(
+                    view: WebView,
+                    handler: SslErrorHandler,
+                    error: android.net.http.SslError,
+                ) {
+                    if (TrustedCertificate.matches(this@WebViewActivity, error.url, error.certificate)) {
+                        handler.proceed()
+                        return
+                    }
+                    handler.cancel()
+                    if (BuildConfig.DEBUG_TOOLS) NetDebug.log("certificate refused (${error.primaryError}) on ${error.url}")
+                    if (Uri.parse(error.url).host.equals(Uri.parse(appUrl).host, ignoreCase = true) && !isFinishing) {
+                        startActivity(
+                            Intent(this@WebViewActivity, MainActivity::class.java)
+                                .putExtra(MainActivity.EXTRA_CHECK_SERVER, true)
+                        )
+                        finish()
+                    }
                 }
 
                 override fun onReceivedError(

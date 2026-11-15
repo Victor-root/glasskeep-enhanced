@@ -10,6 +10,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import com.glasskeep.app.net.TrustedCertificate
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -104,6 +105,7 @@ class NetDebug(private val context: Context, private val serverOrigin: String) {
                 val outcome = try {
                     val conn = URL("$serverOrigin/api/health?_probe=${System.currentTimeMillis()}")
                         .openConnection() as HttpURLConnection
+                    TrustedCertificate.applyTo(context, conn)
                     conn.connectTimeout = 5000
                     conn.readTimeout = 5000
                     conn.useCaches = false

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Color
 import com.glasskeep.app.MainActivity
 import com.glasskeep.app.R
+import com.glasskeep.app.net.TrustedCertificate
 
 /**
  * "Change server?" confirmation of the WebView screen, built from plain
@@ -148,6 +149,7 @@ internal object ChangeServerDialog {
                     .edit()
                     .remove("server_url")
                     .remove(MainActivity.KEY_URL_VETTED)
+                    .let(TrustedCertificate::forget)
                     .apply()
                 val intent = Intent(activity, MainActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

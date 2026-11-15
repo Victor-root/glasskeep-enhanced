@@ -60,4 +60,7 @@
     <string name="attachment_opening">Ouverture du fichier…</string>
     <string name="attachment_open_failed">Impossible d\'ouvrir ce fichier.</string>
     <string name="attachment_no_app">Aucune application de ce téléphone ne peut ouvrir ce fichier.</string>
+    <string name="cert_unknown_title">Certificat non reconnu</string>
+    <string name="cert_unknown_message">Android ne reconnaît pas le certificat de ce serveur, comme pour un certificat auto-signé. Ne lui faites confiance que s\'il est bien celui de votre serveur : l\'empreinte ci-dessous doit être celle qu\'affiche le serveur.\n\nSHA-256 :\n%1$s</string>
+    <string name="cert_trust">Faire confiance</string>
 </resources>

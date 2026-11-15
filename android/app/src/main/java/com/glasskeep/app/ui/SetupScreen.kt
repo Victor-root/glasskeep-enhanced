@@ -1,6 +1,9 @@
 package com.glasskeep.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,10 +18,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,7 +32,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -37,7 +46,9 @@ import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
 import com.glasskeep.app.net.CleartextPolicy
 import com.glasskeep.app.net.ServerCheck
+import com.glasskeep.app.net.TrustedCertificate
 import com.glasskeep.app.net.checkGlassKeepServer
+import java.security.cert.X509Certificate
 
 // Amber, not red: an unencrypted address on your own network is allowed,
 // it is just worth knowing about. Legible on both the light card and the
@@ -54,6 +65,10 @@ fun SetupScreen(initialUrl: String = "", onConnect: (String) -> Unit) {
     var url by remember { mutableStateOf(initialUrl) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
+    // The certificate of the address just tried, shown for the user to
+    // trust when Android does not.
+    var unknownCertificate by remember { mutableStateOf<X509Certificate?>(null) }
+    val context = LocalContext.current.applicationContext
     val handler = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
     val errorEmpty = stringResource(R.string.error_empty_url)
     val errorInvalid = stringResource(R.string.error_invalid_url)
@@ -98,18 +113,34 @@ fun SetupScreen(initialUrl: String = "", onConnect: (String) -> Unit) {
                         }
                         return@Thread
                     }
-                    val result = checkGlassKeepServer(trimmed)
+                    val result = checkGlassKeepServer(context, trimmed)
                     handler.post {
                         loading = false
                         when (result) {
-                            ServerCheck.OK -> onConnect(trimmed)
-                            ServerCheck.NOT_GLASSKEEP -> error = errorNotGlasskeep
-                            ServerCheck.UNREACHABLE -> error = errorUnreachable
+                            ServerCheck.Ok -> onConnect(trimmed)
+                            ServerCheck.NotGlassKeep -> error = errorNotGlasskeep
+                            ServerCheck.Unreachable -> error = errorUnreachable
+                            is ServerCheck.UntrustedCertificate -> unknownCertificate = result.certificate
                         }
                     }
                 }.start()
             }
         }
+    }
+
+    unknownCertificate?.let { certificate ->
+        UnknownCertificateDialog(
+            certificate = certificate,
+            onTrust = {
+                unknownCertificate = null
+                val host = android.net.Uri.parse(url.trim()).host
+                if (host != null) {
+                    TrustedCertificate.trust(context, host, certificate)
+                    doConnect()
+                }
+            },
+            onDismiss = { unknownCertificate = null },
+        )
     }
 
     // Branch the whole screen for TV — same fields and behaviour, but a
@@ -281,4 +312,40 @@ internal fun ConnectButton(loading: Boolean, onClick: () -> Unit, height: Dp, mo
             fontSize = 16.sp
         )
     }
+}
+
+/** Asks whether to trust a certificate Android does not, showing the
+ *  fingerprint to compare with the server's. Cancel holds the focus first,
+ *  for a remote to reach the buttons. */
+@Composable
+private fun UnknownCertificateDialog(certificate: X509Certificate, onTrust: () -> Unit, onDismiss: () -> Unit) {
+    val cancelFocus = remember { FocusRequester() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.cert_unknown_title)) },
+        text = {
+            Text(stringResource(R.string.cert_unknown_message, TrustedCertificate.formatted(certificate)))
+        },
+        confirmButton = { DialogButton(stringResource(R.string.cert_trust), onTrust) },
+        dismissButton = {
+            DialogButton(stringResource(android.R.string.cancel), onDismiss, Modifier.focusRequester(cancelFocus))
+            // Here, not beside the dialog: its buttons live in the dialog's
+            // own window, attached once this runs.
+            LaunchedEffect(Unit) { cancelFocus.requestFocus() }
+        },
+    )
+}
+
+/** A dialog's text button, ringed under the focus of a remote. */
+@Composable
+private fun DialogButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    TextButton(
+        onClick = onClick,
+        interactionSource = interactionSource,
+        modifier = modifier.then(
+            if (focused) Modifier.border(2.dp, Indigo, RoundedCornerShape(20.dp)) else Modifier
+        ),
+    ) { Text(label) }
 }

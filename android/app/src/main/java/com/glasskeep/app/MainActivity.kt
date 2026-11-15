@@ -49,7 +49,7 @@ class MainActivity : ComponentActivity() {
 
         // Fast path: onboarding done AND URL configured → straight to
         // the WebView, same as the previous behaviour.
-        if (welcomeDone && savedUrl != null) {
+        if (welcomeDone && savedUrl != null && !intent.getBooleanExtra(EXTRA_CHECK_SERVER, false)) {
             // App-shortcut entry point: long-press launcher → one of
             // five shortcuts ("Scan QR" / new text / checklist / draw
             // / audio). Each shortcut sends a distinct action; we map
@@ -151,6 +151,10 @@ class MainActivity : ComponentActivity() {
         // where it actually points. WebViewActivity clears it along with
         // the address itself when the user switches server.
         const val KEY_URL_VETTED = "server_url_vetted"
+
+        // Shows the setup screen on the stored address instead of opening
+        // it, for the server's certificate to be examined there.
+        const val EXTRA_CHECK_SERVER = "checkServer"
 
         // Action strings must match res/xml/shortcuts.xml. Each maps
         // to the (queryParamKey, queryParamValue) pair MainActivity

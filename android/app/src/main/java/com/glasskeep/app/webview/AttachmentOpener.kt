@@ -6,6 +6,7 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.glasskeep.app.R
+import com.glasskeep.app.net.TrustedCertificate
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -41,6 +42,7 @@ class AttachmentOpener(private val activity: Activity) {
         // The name comes from the page: only ever its last path segment.
         val file = File(folder, File(name).name.ifBlank { "file" })
         val connection = URL(url).openConnection() as HttpURLConnection
+        TrustedCertificate.applyTo(activity, connection)
         try {
             connection.connectTimeout = TIMEOUT_MS
             connection.readTimeout = TIMEOUT_MS

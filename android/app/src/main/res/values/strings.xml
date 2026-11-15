@@ -67,4 +67,7 @@
     <string name="attachment_opening">Opening the file…</string>
     <string name="attachment_open_failed">Could not open this file.</string>
     <string name="attachment_no_app">No app on this phone can open this file.</string>
+    <string name="cert_unknown_title">Unrecognised certificate</string>
+    <string name="cert_unknown_message">Android does not recognise this server\'s certificate, as happens with a self-signed one. Only trust it if it is your server\'s: its fingerprint below must be the one the server shows.\n\nSHA-256:\n%1$s</string>
+    <string name="cert_trust">Trust it</string>
 </resources>

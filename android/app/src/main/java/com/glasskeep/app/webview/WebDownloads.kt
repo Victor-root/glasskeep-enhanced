@@ -9,15 +9,24 @@ import android.webkit.URLUtil
 import android.webkit.WebView
 import android.widget.Toast
 import com.glasskeep.app.R
+import com.glasskeep.app.net.TrustedCertificate
 import java.io.File
+import java.io.OutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.Executors
 
 /**
  * Files the page downloads. A server URL goes through the system
- * DownloadManager; a blob: URL is read by the page itself and comes back
- * through [saveBlobFile] (window.AndroidTheme.saveBlobFile), written to
- * the Downloads collection.
+ * DownloadManager, or is fetched by the app itself from a server whose
+ * certificate only the app trusts (see [TrustedCertificate]); a blob: URL
+ * is read by the page itself and comes back through [saveBlobFile]
+ * (window.AndroidTheme.saveBlobFile). Both are written to the Downloads
+ * collection.
  */
 class WebDownloads(private val activity: Activity) {
+
+    private val worker = Executors.newSingleThreadExecutor()
 
     /** The WebView's DownloadListener. */
     fun onDownloadStart(
@@ -57,6 +66,12 @@ class WebDownloads(private val activity: Activity) {
     }
 
     private fun enqueue(url: String, filename: String, mimeType: String?, userAgent: String?) {
+        // DownloadManager runs in another process, which knows nothing of
+        // the certificate the user trusted.
+        if (TrustedCertificate.pinFor(activity, Uri.parse(url).host) != null) {
+            fetch(url, filename, mimeType, userAgent)
+            return
+        }
         try {
             val req = DownloadManager.Request(Uri.parse(url)).apply {
                 setMimeType(mimeType)
@@ -73,9 +88,44 @@ class WebDownloads(private val activity: Activity) {
         }
     }
 
+    private fun fetch(url: String, filename: String, mimeType: String?, userAgent: String?) {
+        Toast.makeText(activity, activity.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+        val cookie = CookieManager.getInstance().getCookie(url)
+        worker.execute {
+            val connection = URL(url).openConnection() as HttpURLConnection
+            try {
+                TrustedCertificate.applyTo(activity, connection)
+                cookie?.let { connection.setRequestProperty("Cookie", it) }
+                userAgent?.let { connection.setRequestProperty("User-Agent", it) }
+                connection.connectTimeout = TIMEOUT_MS
+                connection.readTimeout = TIMEOUT_MS
+                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                    failed()
+                    return@execute
+                }
+                val type = mimeType?.takeIf { it.isNotBlank() } ?: connection.contentType ?: "application/octet-stream"
+                writeToDownloads(filename, type) { out -> connection.inputStream.use { it.copyTo(out) } }
+            } catch (_: Exception) {
+                failed()
+            } finally {
+                connection.disconnect()
+            }
+        }
+    }
+
     fun saveBlobFile(base64Data: String, filename: String, mimeType: String) {
+        val bytes = try {
+            android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+        } catch (_: Exception) {
+            failed()
+            return
+        }
+        writeToDownloads(filename, mimeType) { it.write(bytes) }
+    }
+
+    /** Writes a file into Downloads from any thread, and says how it went. */
+    private fun writeToDownloads(filename: String, mimeType: String, write: (OutputStream) -> Unit) {
         try {
-            val bytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
             val contentValues = android.content.ContentValues().apply {
                 put(android.provider.MediaStore.Downloads.DISPLAY_NAME, filename)
                 put(android.provider.MediaStore.Downloads.MIME_TYPE, mimeType)
@@ -86,12 +136,10 @@ class WebDownloads(private val activity: Activity) {
                 android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues
             )
             if (uri == null) {
-                activity.runOnUiThread {
-                    Toast.makeText(activity, activity.getString(R.string.download_error), Toast.LENGTH_SHORT).show()
-                }
+                failed()
                 return
             }
-            activity.contentResolver.openOutputStream(uri)?.use { out -> out.write(bytes) }
+            activity.contentResolver.openOutputStream(uri)?.use(write)
             val updateValues = android.content.ContentValues().apply {
                 put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
             }
@@ -100,10 +148,18 @@ class WebDownloads(private val activity: Activity) {
                 Toast.makeText(activity, activity.getString(R.string.download_complete, filename), Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            android.util.Log.e("GlassKeep", "saveBlobFile failed", e)
-            activity.runOnUiThread {
-                Toast.makeText(activity, activity.getString(R.string.download_error), Toast.LENGTH_SHORT).show()
-            }
+            android.util.Log.e("GlassKeep", "download not saved", e)
+            failed()
         }
+    }
+
+    private fun failed() {
+        activity.runOnUiThread {
+            Toast.makeText(activity, activity.getString(R.string.download_error), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private companion object {
+        const val TIMEOUT_MS = 30_000
     }
 }

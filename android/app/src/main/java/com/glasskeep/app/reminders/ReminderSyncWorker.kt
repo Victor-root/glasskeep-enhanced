@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.glasskeep.app.MainActivity
 import com.glasskeep.app.net.CleartextPolicy
+import com.glasskeep.app.net.TrustedCertificate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -91,6 +92,7 @@ class ReminderSyncWorker(
     /** GET with bearer auth. Returns the body; null on 401/403; throws on network error. */
     private fun httpGet(urlStr: String, token: String): String? {
         val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+            TrustedCertificate.applyTo(applicationContext, this)
             requestMethod = "GET"
             setRequestProperty("Authorization", "Bearer $token")
             setRequestProperty("Accept", "application/json")
