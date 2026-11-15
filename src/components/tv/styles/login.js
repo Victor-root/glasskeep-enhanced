@@ -54,7 +54,12 @@ html[data-tv="1"] .tv-login {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* A card too tall for the screen (sign-in by hand, profiles offered)
+     first shrinks the logo, then scrolls; "safe" keeps its top
+     reachable instead of centring it off screen. */
+  justify-content: safe center;
+  min-height: 0;
+  overflow-y: auto;
   padding: 4vh 4vw;
   /* Removed the global gap — every element now uses tight explicit
      margins so "GlassKeep TV" sits flush under the logo instead of
@@ -62,7 +67,7 @@ html[data-tv="1"] .tv-login {
   gap: 0;
 }
 /* The TV keyboard covers the lower half of the screen: while it is up,
-   the login keeps only its card, at the top, above it. */
+   the login keeps only its fields and Sign in, at the top, above it. */
 html[data-tv="1"][data-keyboard-open] .tv-login {
   justify-content: flex-start;
   padding-bottom: var(--keyboard-inset);
@@ -70,7 +75,8 @@ html[data-tv="1"][data-keyboard-open] .tv-login {
 html[data-tv="1"][data-keyboard-open] .tv-login__logo,
 html[data-tv="1"][data-keyboard-open] .tv-login__brand,
 html[data-tv="1"][data-keyboard-open] .tv-login__subtitle,
-html[data-tv="1"][data-keyboard-open] .tv-login__slogan {
+html[data-tv="1"][data-keyboard-open] .tv-login__slogan,
+html[data-tv="1"][data-keyboard-open] .tv-login__card .tv-btn:not(.tv-btn--primary) {
   display: none;
 }
 html[data-tv="1"] .tv-login__card {
@@ -94,8 +100,11 @@ html[data-tv="1"] .tv-login__title {
 }
 /* Big rounded logo above the login card, matching mobile AuthShell. */
 html[data-tv="1"] .tv-login__logo {
-  width: 84px;
+  width: auto;
   height: 84px;
+  min-height: 44px;
+  aspect-ratio: 1;
+  flex-shrink: 1;
   border-radius: 20px;
   box-shadow: 0 12px 28px -10px rgba(0, 0, 0, 0.55);
   /* No bottom margin — the brand title's own padding-top puts it
