@@ -75,6 +75,19 @@ export default function ChangelogModal({ open, onClose }) {
         };
     }, [open]);
 
+    // Escape closes it. Caught on the way down and stopped there: it can
+    // sit over the admin panel, which must not close with it.
+    useEffect(() => {
+        if (!open) return undefined;
+        const onKey = (e) => {
+            if (e.key !== "Escape") return;
+            e.stopPropagation();
+            onClose?.();
+        };
+        window.addEventListener("keydown", onKey, true);
+        return () => window.removeEventListener("keydown", onKey, true);
+    }, [open, onClose]);
+
     // Translated markdown is compiled on the fly; the original is
     // pre-compiled once at module load. The "Show original" toggle
     // flips between the two without re-parsing the source.
