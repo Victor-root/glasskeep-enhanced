@@ -219,24 +219,30 @@ async function inspectContainer(nameOrId) {
     return dockerRequest("GET", `/containers/${encodeURIComponent(nameOrId)}/json`);
 }
 
+// Why the new container cannot be kept, or null once it is healthy. One
+// that stopped, or that its restart policy already brought back after a
+// crash, has failed: waiting for a health check would only let it crash
+// again on data it may have migrated.
 async function waitHealthy(containerId, timeoutMs = 90_000) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
         try {
             const info = await inspectContainer(containerId);
             const state = info.State || {};
+            if (state.Status === "exited") return `it stopped (exit code ${state.ExitCode})`;
+            // Back up between crashes, it reports exit code 0: the count tells.
+            if (state.Restarting || info.RestartCount > 0) return "it crashed and Docker restarted it";
             const health = state.Health && state.Health.Status;
-            if (health === "healthy") return true;
-            if (health === "unhealthy") return false;
+            if (health === "healthy") return null;
+            if (health === "unhealthy") return "it failed its health check";
             // No healthcheck configured → fall back to "Running"
-            if (!state.Health && state.Running) return true;
-            if (state.Status === "exited") return false;
+            if (!state.Health && state.Running) return null;
         } catch {
             /* container might not be queryable yet */
         }
         await sleep(2000);
     }
-    return false;
+    return `it was not healthy after ${timeoutMs / 1000} s`;
 }
 
 function sleep(ms) {
@@ -335,9 +341,9 @@ async function main() {
     await dockerRequest("POST", `/containers/${encodeURIComponent(created.Id)}/start`);
 
     console.log("[docker-update-helper] waiting for the new container to be healthy");
-    const ok = await waitHealthy(created.Id, 90_000);
-    if (!ok) {
-        throw new Error("new container did not become healthy in 90s");
+    const problem = await waitHealthy(created.Id, 90_000);
+    if (problem) {
+        throw new Error(`the new container was not kept: ${problem}`);
     }
 
     // Clean up the old container — its data volume is mounted in the
