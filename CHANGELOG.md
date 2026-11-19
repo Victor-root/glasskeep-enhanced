@@ -1,6 +1,6 @@
 # 📋 Changelog
 
-## 🚀 Unreleased
+## 🚀 v2.8.0 (2026-11-19)
 
 Headline features: **file attachments** on notes, with a **ZIP backup** that carries them, and **drag-and-drop reordering** that moves the other cards live, as in Google Keep, without shuffling the rest of the grid. Also: update **channels** with validated betas, an open note that follows the **phone keyboard** smoothly, and a round of sync fixes for text that could come back or disappear while typing.
 
