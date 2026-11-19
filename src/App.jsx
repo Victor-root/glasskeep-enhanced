@@ -724,7 +724,7 @@ export default function App() {
     { open: syncDropdownOpen, close: () => setSyncDropdownOpen(false) },
     { open: mobileSearchOpen, close: () => { setSearch(""); setMobileSearchOpen(false); } },
     { open: headerMenuOpen, close: () => setHeaderMenuOpen(false) },
-    { open: multiMode, close: () => setMultiMode(false) },
+    { open: multiMode, close: onExitMulti },
     { open: typographyModalOpen, close: () => setTypographyModalOpen(false) },
     { open: settingsPanelOpen, close: () => setSettingsPanelOpen(false) },
     { open: adminPanelOpen, close: () => setAdminPanelOpen(false) },
