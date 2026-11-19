@@ -16,7 +16,9 @@ const getShimPadding = () => {
 
 // Applies a mode change, then scrolls by exactly what the shim's padding
 // gained or lost, so the visible notes stay where they were. Only the
-// change counts: on desktop the shim already has a base padding.
+// change counts: on desktop the shim already has a base padding. At the
+// very top, the dock pushes the content down instead, so the creation
+// buttons show below it.
 const keepContentInPlace = (applyChange) => {
   const scrollEl = getNotesScrollTarget();
   const scrollX = scrollEl ? scrollEl.scrollLeft : window.scrollX;
@@ -25,7 +27,7 @@ const keepContentInPlace = (applyChange) => {
   applyChange();
   requestAnimationFrame(() => {
     const delta = getShimPadding() - padBefore;
-    if (!delta) return;
+    if (!delta || (delta > 0 && scrollY < 1)) return;
     const target = { left: scrollX, top: Math.max(0, scrollY + delta), behavior: "instant" };
     if (scrollEl) scrollEl.scrollTo(target);
     else window.scrollTo(target);

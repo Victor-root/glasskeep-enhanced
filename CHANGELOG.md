@@ -31,7 +31,7 @@ Headline features: **file attachments** on notes, with a **ZIP backup** that car
 - 🤖 **Newer OpenAI models** (gpt-5, the o-series) could not be connected (issue #34): a request a model refuses for `max_tokens` or the temperature is sent again without it, and the setting is remembered.
 - ✍️ **Typed words could disappear or come back**: a list of notes fetched just before a save reached the server (after a reconnection, for instance) replaced the text typed last. Copies older than a local save no longer overwrite it.
 - ↩️ **Undo and redo in a checklist were never saved**: the undone items came back on reopening the note or on another device.
-- ☑️ **Notes jumping when multi-select opens** on a computer: entering it scrolled the notes up a notch, and leaving it with the back button or entering it with Ctrl + click moved them too. They now stay exactly where they were.
+- ☑️ **Notes jumping when multi-select opens** on a computer: entering it scrolled the notes up a notch, and leaving it with the back button or entering it with Ctrl + click moved them too. At the top of the page, the selection bar now pushes the creation buttons down below it; further down, the notes stay exactly where they were.
 - 🏷️ The note's **tag dropdown did not close** on a second click held a little long, and Escape in its search field closed the note too.
 - 📱 **Android: dragging a card down from the top of the list** triggered pull-to-refresh, which dropped the card and reloaded the page.
 - 📱 A thin **border ran around a note opened full screen** on phones.
