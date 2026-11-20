@@ -13,12 +13,31 @@ const QUEUE_STORE = "syncQueue";
 const UPLOADS_DB_NAME = "glasskeep-uploads";
 const UPLOADS_STORE = "attachmentUploads";
 
-let dbPromise = null;
-let uploadsDbPromise = null;
+// One shared connection per database. The browser can close it on its own
+// (after the computer sleeps, for one): every call then failed until the
+// page was reloaded, which left the app offline. A closed connection is
+// dropped, and the next call opens a new one.
+function sharedConnection(open) {
+  let promise = null;
+  let connected = null;
+  const connect = () => {
+    promise ??= open().then((db) => {
+      connected = db;
+      db.onclose = () => connect.drop(db);
+      return db;
+    });
+    return promise;
+  };
+  connect.drop = (db) => {
+    if (db !== connected) return;
+    connected = null;
+    promise = null;
+  };
+  return connect;
+}
 
-function openDb() {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
+const openDb = sharedConnection(() =>
+  new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
@@ -73,13 +92,11 @@ function openDb() {
       current.onsuccess = () => resolve(current.result);
       current.onerror = () => reject(current.error);
     };
-  });
-  return dbPromise;
-}
+  }),
+);
 
-function openUploadsDb() {
-  if (uploadsDbPromise) return uploadsDbPromise;
-  uploadsDbPromise = new Promise((resolve, reject) => {
+const openUploadsDb = sharedConnection(() =>
+  new Promise((resolve, reject) => {
     const req = indexedDB.open(UPLOADS_DB_NAME, 1);
     req.onupgradeneeded = () => {
       const us = req.result.createObjectStore(UPLOADS_STORE, { keyPath: "id" });
@@ -87,12 +104,25 @@ function openUploadsDb() {
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
-  });
-  return uploadsDbPromise;
+  }),
+);
+
+// A connection the browser is closing refuses new transactions before its
+// close event arrives: that one is dropped and the transaction retried once
+// on a new connection.
+async function transaction(storeName, mode = "readonly", open = openDb) {
+  const db = await open();
+  try {
+    return db.transaction(storeName, mode);
+  } catch (err) {
+    if (err?.name !== "InvalidStateError") throw err;
+    open.drop(db);
+    return (await open()).transaction(storeName, mode);
+  }
 }
 
 function tx(storeName, mode = "readonly", open = openDb) {
-  return open().then((db) => db.transaction(storeName, mode).objectStore(storeName));
+  return transaction(storeName, mode, open).then((t) => t.objectStore(storeName));
 }
 
 // ─── Helpers ───
@@ -184,8 +214,7 @@ export async function patchNote(noteId, fields, userId, sessionId) {
 }
 
 export async function putNotes(notes, userId, sessionId) {
-  const db = await openDb();
-  const t = db.transaction(SESSION_NOTES_STORE, "readwrite");
+  const t = await transaction(SESSION_NOTES_STORE, "readwrite");
   const store = t.objectStore(SESSION_NOTES_STORE);
   for (const note of notes) {
     const cacheKey = makeCacheKey(userId, sessionId, String(note.id));
@@ -209,8 +238,7 @@ export async function deleteNote(noteId, userId, sessionId) {
 
 // Deletes every record of `storeName` whose `indexName` key is `key`.
 async function deleteByIndex(storeName, indexName, key) {
-  const db = await openDb();
-  const t = db.transaction(storeName, "readwrite");
+  const t = await transaction(storeName, "readwrite");
   const store = t.objectStore(storeName);
   const idx = store.index(indexName);
   const req = idx.openCursor(IDBKeyRange.only(key));
@@ -291,8 +319,7 @@ export async function getPendingQueue(userId) {
 }
 
 export async function updateQueueItem(queueId, updates) {
-  const db = await openDb();
-  const t = db.transaction(QUEUE_STORE, "readwrite");
+  const t = await transaction(QUEUE_STORE, "readwrite");
   const store = t.objectStore(QUEUE_STORE);
   return new Promise((resolve, reject) => {
     const getReq = store.get(queueId);
@@ -374,8 +401,7 @@ export async function collapseQueue(userId) {
       }
     }
 
-    const db = await openDb();
-    const t = db.transaction(QUEUE_STORE, "readwrite");
+    const t = await transaction(QUEUE_STORE, "readwrite");
     const store = t.objectStore(QUEUE_STORE);
     for (const id of toRemove) {
       store.delete(id);
@@ -434,8 +460,7 @@ export async function hasQueuedCreate(noteId, userId) {
  * so stale mutations don't retry and generate 403/404 noise.
  */
 export async function purgeQueueForNote(noteId, userId) {
-  const db = await openDb();
-  const t = db.transaction(QUEUE_STORE, "readwrite");
+  const t = await transaction(QUEUE_STORE, "readwrite");
   const store = t.objectStore(QUEUE_STORE);
   const req = store.index("noteId").openCursor(IDBKeyRange.only(noteId));
   req.onsuccess = (e) => {
