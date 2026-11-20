@@ -632,11 +632,7 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         // Handle gesture back navigation (swipe back)
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                webView.evaluateJavascript("window.history.back()", null)
-            }
-        })
+        onBackPressedDispatcher.addCallback(this, backCallback)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -722,6 +718,25 @@ class WebViewActivity : AppCompatActivity() {
         }
     }
 
+    private val backCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() = goBack()
+    }
+
+    /** Back closes what the page opened: it pushes a history entry of its
+     *  own for each (an overlay, the TV's root marker) and handles Back on
+     *  it. On a plain entry nothing is left to close, so Back does what it
+     *  does in any app: it leaves. */
+    private fun goBack() {
+        webView.evaluateJavascript(
+            "(function(){if(history.state==null)return false;history.back();return true})()"
+        ) { handled ->
+            if (handled == "true") return@evaluateJavascript
+            backCallback.isEnabled = false
+            onBackPressedDispatcher.onBackPressed()
+            backCallback.isEnabled = true
+        }
+    }
+
     private val handler = Handler(Looper.getMainLooper())
     private var backHeld = false
     private var dialogShown = false
@@ -756,9 +771,7 @@ class WebViewActivity : AppCompatActivity() {
         if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
             handler.removeCallbacks(longBackRunnable)
             backHeld = false
-            if (!dialogShown) {
-                webView.evaluateJavascript("window.history.back()", null)
-            }
+            if (!dialogShown) goBack()
             dialogShown = false
             return true
         }
