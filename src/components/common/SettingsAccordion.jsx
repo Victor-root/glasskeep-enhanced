@@ -35,8 +35,8 @@ function SectionIcon({ icon: Icon }) {
 // Collapsible section wrapper used to declutter the long side panels.
 // Header is a button (chevron + icon + title), content slides open and
 // closed with a grid-template-rows animation that handles variable
-// height without JS. The chevron flips between right and down and
-// turns indigo when the section is open. Closed content is marked
+// height without JS (.gk-acc in globalCSS). The chevron flips between
+// right and down and turns indigo when the section is open. Closed content is marked
 // inert + aria-hidden so it stays out of the keyboard tab order and
 // out of the accessibility tree.
 export function SettingsSection({ icon, title, open, onToggle, children }) {
@@ -45,7 +45,7 @@ export function SettingsSection({ icon, title, open, onToggle, children }) {
       <button
         type="button"
         onClick={onToggle}
-        aria-expanded={open}
+        aria-expanded={!!open}
         className="group w-full flex items-center gap-3 pl-3 pr-3 py-2 -mx-1 rounded-xl text-left hover:bg-[var(--gk-chrome-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 transition-colors"
       >
         <TI.ChevronDown
@@ -58,23 +58,12 @@ export function SettingsSection({ icon, title, open, onToggle, children }) {
         <SectionIcon icon={icon} />
         <span className="text-md font-semibold flex-1 min-w-0">{title}</span>
       </button>
-      <div
-        className={`grid min-w-0 transition-[grid-template-rows] duration-300 ease-out ${
-          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        }`}
-        aria-hidden={!open}
-        inert={!open}
-      >
-        {/* gk-acc-body clips during the open/close animation (so the grid
-            collapse hides content), then switches to overflow:visible once
-            open — see globalCSS — so button hover glows / focus rings on the
-            last row aren't clipped at the section's bottom edge.
-            min-w-0 lets this grid item shrink to the track width instead of
-            its content's min-width (grid items default to min-width:auto),
-            so a section with wide content — e.g. the federation URL in a
-            whitespace-nowrap <code> — can't push the whole panel past the
-            viewport on mobile; the inner elements scroll/wrap/truncate. */}
-        <div className={`gk-acc-body min-w-0${open ? " is-open" : ""}`}>
+      {/* min-w-0 lets the body shrink to the track width instead of its
+          content's min-width, so wide content (e.g. the federation URL in a
+          whitespace-nowrap <code>) can't push the panel past the viewport
+          on mobile. Animation and clipping: .gk-acc in globalCSS. */}
+      <div className={`gk-acc min-w-0${open ? " is-open" : ""}`} aria-hidden={!open} inert={!open}>
+        <div className="gk-acc-body min-w-0">
           <div className="pt-4 pb-2">{children}</div>
         </div>
       </div>
