@@ -544,7 +544,6 @@ export default function App() {
   } = editor;
 
   const { signOut, signIn, signInById, signInWithSecret, register, oidcLoginError } = useAuthActions({
-    token,
     session,
     navigate,
     showToast,

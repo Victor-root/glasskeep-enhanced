@@ -105,15 +105,20 @@ export function testInstanceOidc(token, body) {
   return api("/admin/oidc/test", { method: "POST", token, timeoutMs: 30000, body });
 }
 
+// A single sign-on outcome, from the callback's query parameters.
+export function oidcOutcome(params) {
+  return {
+    ticket: params.get("oidc_ticket"),
+    error: params.get("oidc_error"),
+    linked: params.get("oidc_linked") === "1",
+  };
+}
+
 // What the callback left in the address bar, removed at once so a reload
 // or a shared link never replays it.
 export function takeOidcRedirectResult() {
   const url = new URL(window.location.href);
-  const result = {
-    ticket: url.searchParams.get("oidc_ticket"),
-    error: url.searchParams.get("oidc_error"),
-    linked: url.searchParams.get("oidc_linked") === "1",
-  };
+  const result = oidcOutcome(url.searchParams);
   if (REDIRECT_PARAMS.some((k) => url.searchParams.has(k))) {
     for (const k of REDIRECT_PARAMS) url.searchParams.delete(k);
     window.history.replaceState(null, "", url.pathname + url.search + url.hash);

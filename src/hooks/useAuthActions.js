@@ -6,7 +6,7 @@ import {
   clearQueueForUser as idbClearQueueForUser,
   clearNotesForSession as idbClearNotesForSession,
 } from "../sync/localDb.js";
-import { exchangeOidcTicket, oidcErrorMessage, takeOidcRedirectResult } from "../auth/oidcClient.js";
+import { exchangeOidcTicket, oidcErrorMessage, oidcOutcome, takeOidcRedirectResult } from "../auth/oidcClient.js";
 
 /**
  * Sign-in, registration and sign-out, plus the two ways a session ends
@@ -14,7 +14,6 @@ import { exchangeOidcTicket, oidcErrorMessage, takeOidcRedirectResult } from "..
  * the single sign-on redirect coming back with an error.
  */
 export default function useAuthActions({
-  token,
   session,
   navigate,
   showToast,
@@ -70,22 +69,30 @@ export default function useAuthActions({
 
   // Back from the single sign-on provider: a one-time ticket to trade for
   // a session, the outcome of linking an identity from the settings, or
-  // the reason it failed. Read once, at boot.
+  // the reason it failed. Read at boot from the address, and later from the
+  // Android app, which hands it to the open page: reloading the page with
+  // it made the sign-in page flash and come in again before the notes.
   const [oidcLoginError, setOidcLoginError] = useState(null);
-  useEffect(() => {
-    const { ticket, error, linked } = takeOidcRedirectResult();
+  const applyOidcOutcome = ({ ticket, error, linked }) => {
     if (ticket) {
       exchangeOidcTicket(ticket)
         .then(completeLogin)
         .catch((e) => setOidcLoginError(e || "oidc_failed"));
-    } else if (error && !token) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot read of the sign-in redirect result at boot
+    } else if (error && !currentUserIdRef.current) {
       setOidcLoginError(error);
     } else if (error) {
       showToast(oidcErrorMessage(error), "error");
     } else if (linked) {
       showToast(t("oidcLinkedToast"), "success");
     }
+  };
+  useEffect(() => {
+    applyOidcOutcome(takeOidcRedirectResult());
+    window.__gkSsoReturn = (query) => {
+      applyOidcOutcome(oidcOutcome(new URLSearchParams(query)));
+      return true;
+    };
+    return () => { delete window.__gkSsoReturn; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

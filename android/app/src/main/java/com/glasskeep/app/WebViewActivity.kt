@@ -672,7 +672,24 @@ class WebViewActivity : AppCompatActivity() {
             pendingOpenNoteId = it
             maybeDispatchOpenNote()
         }
-        ssoReturnUrl(intent)?.let { webView.loadUrl(it) }
+        deliverSsoOutcome(intent)
+    }
+
+    /** A sign-on outcome reaching the running app goes to the open page,
+     *  which signs in where it stands: reloading it with the outcome made
+     *  the sign-in page blank out and come in again before the notes. A
+     *  page without that hook (an older server) is reloaded as before. The
+     *  outcome is only [A-Za-z0-9_=-] (SsoReturnActivity), safe in quotes. */
+    private fun deliverSsoOutcome(intent: Intent) {
+        val outcome = intent.getStringExtra(EXTRA_SSO_OUTCOME) ?: return
+        val reload = { ssoReturnUrl(intent)?.let { webView.loadUrl(it) } }
+        if (!pageLoaded) {
+            reload()
+            return
+        }
+        webView.evaluateJavascript(
+            "window.__gkSsoReturn ? window.__gkSsoReturn('$outcome') === true : false"
+        ) { delivered -> if (delivered != "true") reload() }
     }
 
     /** The web app's address that finishes single sign-on, when [intent]
