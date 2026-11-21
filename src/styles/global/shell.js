@@ -331,8 +331,34 @@ html[data-gk-screen="leaving-app"] .gk-app-screen {
   opacity: 0;
   transition: opacity 240ms ease-in;
 }
+/* One sign-in screen's steps (AuthShell step): the card's height
+   follows its content (useSmoothHeight), the new step rises in, and the
+   brand's subtitle folds away rather than vanishing. */
+.auth-card-body {
+  transition: height 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.auth-step {
+  animation:
+    gkScreenLift 560ms cubic-bezier(0.16, 1, 0.3, 1) backwards,
+    gkScreenFade 300ms cubic-bezier(0.33, 0, 0.25, 1) backwards;
+}
+.auth-subtitle {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 380ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease;
+}
+.auth-subtitle[data-shown="false"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.auth-subtitle > p {
+  min-height: 0;
+  overflow: hidden;
+}
 @media (prefers-reduced-motion: reduce) {
-  .auth-shell[data-ready="true"] :is(.auth-card, .auth-trailing) { animation: none; }
+  .auth-shell[data-ready="true"] :is(.auth-card, .auth-trailing),
+  .auth-step { animation: none; }
+  .auth-card-body, .auth-subtitle { transition: none; }
 }
 /* Sign-in page on short screens: the logo, the card and the gaps around
    them tighten so the whole page, its footer included, fits without

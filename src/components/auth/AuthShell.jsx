@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Sun, Moon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
@@ -9,6 +9,41 @@ import { enterScreen } from "../../utils/screenTransitions.js";
 
 // The longest the card waits for what it shows (see `ready`).
 const READY_WAIT_MS = 1200;
+
+// The card's height follows its content: when a step replaces it (a profile
+// picked, back to the profiles...) or an error line appears, the card grows
+// or shrinks smoothly instead of jumping. Clipped only while it moves, so
+// the fields' focus rings are not cut off the rest of the time.
+function useSmoothHeight(bodyRef, contentRef) {
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    const content = contentRef.current;
+    if (!body || !content || typeof ResizeObserver === "undefined") return undefined;
+    let last = content.offsetHeight;
+    const observer = new ResizeObserver(() => {
+      const next = content.offsetHeight;
+      if (next === last) return;
+      if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+        body.style.overflow = "hidden";
+        body.style.height = `${last}px`;
+        body.getBoundingClientRect();
+        body.style.height = `${next}px`;
+      }
+      last = next;
+    });
+    const settle = (e) => {
+      if (e.target !== body || e.propertyName !== "height") return;
+      body.style.height = "";
+      body.style.overflow = "";
+    };
+    observer.observe(content);
+    body.addEventListener("transitionend", settle);
+    return () => {
+      observer.disconnect();
+      body.removeEventListener("transitionend", settle);
+    };
+  }, [bodyRef, contentRef]);
+}
 
 // Whether a sign-in screen was already shown since the page loaded: the
 // switch from one to another (sign-in, account creation...) only brings
@@ -47,7 +82,7 @@ function removeBootBgLayer() {
   if (el) el.remove();
 }
 
-export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, loginSlogan, children, sidePanel, ready = true }) {
+export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, loginSlogan, children, sidePanel, ready = true, step }) {
   const { branding } = useBranding();
   const appName = branding.appName || DEFAULT_APP_NAME;
 
@@ -78,6 +113,22 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
     return () => clearTimeout(timer);
   }, [ready]);
   const cardReady = ready || waitedEnough;
+
+  // Steps of one sign-in screen (profiles, password, other account) share
+  // this card: the new one comes in once the step has changed, and the
+  // subtitle folds away instead of vanishing (it keeps its last text while
+  // it does).
+  const [shownStep, setShownStep] = useState(step);
+  const [stepChanged, setStepChanged] = useState(false);
+  if (step !== shownStep) {
+    setShownStep(step);
+    setStepChanged(true);
+  }
+  const [subtitle, setSubtitle] = useState(title);
+  if (title && title !== subtitle) setSubtitle(title);
+  const cardBodyRef = useRef(null);
+  const cardContentRef = useRef(null);
+  useSmoothHeight(cardBodyRef, cardContentRef);
 
   // In the Android app the sign-in screens draw behind the system bars,
   // as its native welcome screens do, whatever the edge-to-edge option.
@@ -233,7 +284,9 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
                 draggable="false"
               />
               <h1 className="text-3xl font-bold">{appName}</h1>
-              <p className="text-gray-500 dark:text-gray-400">{title}</p>
+              <div className="auth-subtitle" data-shown={title ? "true" : "false"}>
+                <p className="text-gray-500 dark:text-gray-400">{subtitle}</p>
+              </div>
             </div>
           )}
 
@@ -272,7 +325,13 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
                   {title && <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">{title}</p>}
                 </div>
               )}
-              {children}
+              <div ref={cardBodyRef} className="auth-card-body">
+                <div ref={cardContentRef}>
+                  <div key={step} className={stepChanged ? "auth-step" : undefined}>
+                    {children}
+                  </div>
+                </div>
+              </div>
             </div>
             {sidePanel && (
               <>

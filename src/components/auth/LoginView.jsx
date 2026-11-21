@@ -79,6 +79,10 @@ export default function LoginView({
 
   // If no visible profiles, show manual login directly
   const hasProfiles = loginProfiles && loginProfiles.length > 0;
+  // Which step the card shows, for its change from one to the next.
+  const step = mode === "password" && selectedProfile ? "password"
+    : hasProfiles && mode === "profiles" ? "profiles"
+    : "manual";
 
   const loginErrorMessage = (er) => {
     if (er?.status === 401) return localizeSecretRejection(er, "errInvalidCredentials", "loginFailed");
@@ -120,6 +124,7 @@ export default function LoginView({
         floatingCardsEnabled={floatingCardsEnabled}
         loginSlogan={loginSlogan}
         ready={ready}
+        step={step}
         sidePanel={qrSidePanel}
       >
         <div className="flex flex-wrap justify-center gap-5 mb-4">
@@ -174,6 +179,7 @@ export default function LoginView({
         floatingCardsEnabled={floatingCardsEnabled}
         loginSlogan={loginSlogan}
         ready={ready}
+        step={step}
         sidePanel={qrSidePanel}
       >
         <div className="flex flex-col items-center mb-4">
@@ -231,6 +237,7 @@ export default function LoginView({
       floatingCardsEnabled={floatingCardsEnabled}
       loginSlogan={loginSlogan}
       ready={ready}
+      step={step}
       sidePanel={qrSidePanel}
     >
       <form onSubmit={handleManualSubmit} className="space-y-4">
