@@ -10,6 +10,7 @@ import {
 } from "../../utils/richText.js";
 import { clipboardEditorProps } from "../../utils/richTextClipboard.js";
 import RichTextToolbar from "./RichTextToolbar.jsx";
+import { isInListItem } from "./extensions/WordKeys.js";
 
 /**
  * RichTextEditor
@@ -131,17 +132,17 @@ const RichTextEditor = forwardRef(function RichTextEditor(
       // Copy as clean plain text, line-preserving plain-text paste and the
       // "plain" paste mode. See utils/richTextClipboard.js.
       ...clipboardEditorProps(() => pasteModeRef.current),
-      handleKeyDown: (_, event) => {
-        // Shift+Tab → hand focus back to the parent (title input).
-        // Plain Tab is left to ProseMirror so list / code-block tab
-        // semantics keep working.
+      handleKeyDown: (view, event) => {
+        // Shift+Tab → hand focus back to the parent (title input), except
+        // in a list, where it takes the item up a level (WordKeys).
         if (
           event.key === "Tab" &&
           event.shiftKey &&
           !event.ctrlKey &&
           !event.metaKey &&
           !event.altKey &&
-          onShiftTabExit
+          onShiftTabExit &&
+          !isInListItem(view.state.selection.$from)
         ) {
           event.preventDefault();
           onShiftTabExit();

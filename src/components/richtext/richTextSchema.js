@@ -17,6 +17,8 @@ import SmartCodeBlock from "./extensions/SmartCodeBlock.js";
 import CodeBlockCopy from "./extensions/CodeBlockCopy.js";
 import EditExtras from "./extensions/EditExtras.js";
 import JoinAdjacentLists from "./extensions/JoinAdjacentLists.js";
+import NumberedOrderedList from "./extensions/ListNumbering.js";
+import WordKeys from "./extensions/WordKeys.js";
 
 // Factory so the editor instance and the (stateless) render helpers can share
 // the same configured extensions but the editor can still override
@@ -41,7 +43,10 @@ export function buildRichTextExtensions({ placeholder = "" } = {}) {
       // version so edit-mode code blocks expose the same copy button
       // the view-mode renderer already provides.
       codeBlock: false,
+      // Replaced by NumberedOrderedList (Word-like numbering).
+      orderedList: false,
     }),
+    NumberedOrderedList,
     CodeBlockCopy,
     UnderlineVariant,
     TextStyle,
@@ -67,6 +72,7 @@ export function buildRichTextExtensions({ placeholder = "" } = {}) {
     }),
     Indent,
     JoinAdjacentLists,
+    WordKeys,
     SmartCodeBlock,
     // Inline-code hover + link tooltip / ctrl-click / middle-click /
     // mobile-tap-popover. Gated at runtime by the `data-edit-extras`

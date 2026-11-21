@@ -311,55 +311,12 @@ html.gk-strike-checked .note-content ul[data-type="taskList"] > li[data-checked=
   opacity: 0.6;
 }
 
-/* --------------------------------------------------------------------
-   Continuous numbering for ordered lists.
-
-   Problem: when the user types an ordered list, a code block (or any
-   other non-list block) and another ordered list, ProseMirror emits
-   two separate <ol> elements. Each <ol> natively restarts at 1, which
-   was confusing the user ("mon 2. est redevenu 1. après un bloc de
-   code").
-
-   Fix: a named CSS counter (gk-ol) scoped to the editor / view
-   container, surfaced via ::marker so the NATIVE <ol> layout is kept
-   untouched (no padding/indent change — only the digits displayed are
-   replaced). Nested ordered lists (inside an <li>) explicitly reset
-   the counter so sub-lists still start at 1.
-   -------------------------------------------------------------------- */
-.rt-editor-content,
-.note-content--dense,
-.note-content {
-  counter-reset: gk-ol;
-}
-.rt-editor-content li ol,
-.note-content--dense li ol,
-.note-content li ol {
-  counter-reset: gk-ol;
-}
-/* Restart the gk-ol counter when an ordered list directly follows a
-   "break" element — paragraph, heading, blockquote, bullet list,
-   horizontal rule. Matches the Word / Google Docs behaviour: leaving
-   a list and typing a new title before starting a fresh list resets
-   the numbering to 1. The code block (<pre>) is deliberately absent
-   from this list, which preserves the existing "ol then code block
-   then ol keeps counting" behaviour. Adjacent-sibling selector (the
-   plus combinator) keeps the reset local to the ordered list itself,
-   dodging the CSS counter scoping quirk where a counter-reset on a
-   block leaks into its following siblings. */
-.rt-editor-content :is(p, h1, h2, h3, h4, h5, h6, blockquote, ul, hr) + ol,
-.note-content--dense :is(p, h1, h2, h3, h4, h5, h6, blockquote, ul, hr) + ol,
-.note-content :is(p, h1, h2, h3, h4, h5, h6, blockquote, ul, hr) + ol {
-  counter-reset: gk-ol;
-}
-.rt-editor-content ol > li,
-.note-content--dense ol > li,
-.note-content ol > li {
-  counter-increment: gk-ol;
-}
+/* Ordered list numbers: the browser's own, from each <ol>'s start
+   attribute, which the editor and read mode both set to the number the
+   list continues from (see richtext/extensions/ListNumbering.js). */
 .rt-editor-content ol > li::marker,
 .note-content--dense ol > li::marker,
 .note-content ol > li::marker {
-  content: counter(gk-ol) ". ";
   font-variant-numeric: tabular-nums;
 }
 
