@@ -20,6 +20,7 @@ import { OrderedList } from "@tiptap/extension-list";
 import { wrappingInputRule } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { wordSelectionToggle } from "./ListToggles.js";
 
 const CONTINUE_META = "gkContinueList";
 const numberingKey = new PluginKey("listNumbering");
@@ -111,13 +112,9 @@ export const NumberedOrderedList = OrderedList.extend({
   },
 
   addCommands() {
-    const parent = this.parent?.();
     return {
-      ...parent,
-      toggleOrderedList: () => (props) => {
-        props.tr.setMeta(CONTINUE_META, true);
-        return parent.toggleOrderedList()(props);
-      },
+      ...this.parent?.(),
+      toggleOrderedList: () => wordSelectionToggle(this, (tr) => tr.setMeta(CONTINUE_META, true)),
     };
   },
 

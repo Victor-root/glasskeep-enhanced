@@ -12,6 +12,7 @@
 // another rich-text target still get full fidelity.
 
 import { Fragment, Slice } from "@tiptap/pm/model";
+import { officeListsToHTML } from "./officeLists.js";
 
 /* -------------------- ProseMirror / Tiptap slice -------------------- */
 
@@ -338,6 +339,8 @@ export function clipboardEditorProps(getPasteMode) {
     // The HTML side of the clipboard is left to PM's default so a
     // paste into another rich-text target still gets full fidelity.
     clipboardTextSerializer: (slice) => sliceToCleanPlainText(slice),
+    // Word puts lists on the clipboard as styled paragraphs: rebuild them.
+    transformPastedHTML: officeListsToHTML,
     // Inbound plain-text pastes: PM's default parser collapses
     // sources whose only line separator is `\r\n` / `\n` (typical
     // for Windows Notepad, terminal output, …) into a single

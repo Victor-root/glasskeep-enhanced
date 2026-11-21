@@ -5,8 +5,8 @@
 //     list goes on numbering after it.
 //   Tab nests a list item, or types a tab anywhere else; Shift+Tab takes a
 //     nested item up a level. Neither moves the focus out of the note.
-//   Delete at the end of a paragraph followed by a list brings the first
-//     item's text up into the paragraph.
+//   Delete at the end of a line brings the next line's text up into it,
+//     between a paragraph and a list as anywhere else.
 //   Enter starts a new undo step, so Ctrl+Z takes back the last line typed
 //     instead of everything typed quickly before it.
 //   Formatting chosen for an empty line (bold, colour...) survives that
@@ -18,7 +18,6 @@ import { canJoin } from "@tiptap/pm/transform";
 import { closeHistory } from "@tiptap/pm/history";
 
 const ITEM_TYPES = new Set(["listItem", "taskItem"]);
-const LIST_TYPES = new Set(["bulletList", "orderedList", "taskList"]);
 
 // The list item holding the cursor's textblock, when that textblock is the
 // item's first child: { depth, node }.
@@ -34,6 +33,24 @@ function innermostItem($from) {
     if (ITEM_TYPES.has($from.node(d).type.name)) return { depth: d, node: $from.node(d) };
   }
   return null;
+}
+
+// The next textblock from `pos` on, with nothing but block wrappers in
+// between (no rule or image the Delete would swallow): { node, start }.
+function nextTextblock(doc, pos) {
+  let found = null;
+  let blocked = false;
+  doc.nodesBetween(pos, doc.content.size, (node, nodePos) => {
+    if (found || blocked) return false;
+    if (nodePos < pos) return true;
+    if (node.isTextblock) {
+      found = { node, start: nodePos + 1 };
+      return false;
+    }
+    if (node.isLeaf) blocked = true;
+    return !blocked;
+  });
+  return found;
 }
 
 export const isInListItem = ($pos) => innermostItem($pos) !== null;
@@ -61,19 +78,16 @@ export const WordKeys = Extension.create({
         const { state } = editor;
         const { $from, empty } = state.selection;
         if (!empty || !$from.parent.isTextblock || $from.parentOffset !== $from.parent.content.size) return false;
-        if (innermostItem($from)) return false;
-        const after = $from.after();
-        const list = state.doc.nodeAt(after);
-        if (!list || !LIST_TYPES.has(list.type.name)) return false;
-        // Into the first item's first textblock.
-        let target = null;
-        list.firstChild.descendants((node, pos) => {
-          if (target !== null) return false;
-          if (node.isTextblock) target = after + 2 + pos + 1;
-          return !node.isTextblock;
-        });
-        if (target === null) return false;
-        editor.view.dispatch(state.tr.delete($from.pos, target).scrollIntoView());
+        const next = nextTextblock(state.doc, $from.after());
+        if (!next || next.node.type.name === "codeBlock") return false;
+        const $next = state.doc.resolve(next.start);
+        const fromItem = innermostItem($from);
+        const toItem = innermostItem($next);
+        // Into a list, or out of one; Tiptap handles moves within a list.
+        const intoList = !fromItem && toItem && itemOfFirstChild($next);
+        const outOfList = fromItem && !toItem;
+        if (!intoList && !outOfList) return false;
+        editor.view.dispatch(state.tr.delete($from.pos, next.start).scrollIntoView());
         return true;
       },
 

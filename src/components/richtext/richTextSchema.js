@@ -8,7 +8,7 @@ import { Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-s
 import Highlight from "@tiptap/extension-highlight";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
-import { TaskList, TaskItem } from "@tiptap/extension-list";
+import { BulletList, TaskList, TaskItem } from "@tiptap/extension-list";
 import TextAlign from "@tiptap/extension-text-align";
 import Placeholder from "@tiptap/extension-placeholder";
 import UnderlineVariant from "./extensions/UnderlineVariant.js";
@@ -19,6 +19,7 @@ import EditExtras from "./extensions/EditExtras.js";
 import JoinAdjacentLists from "./extensions/JoinAdjacentLists.js";
 import NumberedOrderedList from "./extensions/ListNumbering.js";
 import WordKeys from "./extensions/WordKeys.js";
+import { withWordSelection } from "./extensions/ListToggles.js";
 
 // Factory so the editor instance and the (stateless) render helpers can share
 // the same configured extensions but the editor can still override
@@ -43,10 +44,12 @@ export function buildRichTextExtensions({ placeholder = "" } = {}) {
       // version so edit-mode code blocks expose the same copy button
       // the view-mode renderer already provides.
       codeBlock: false,
-      // Replaced by NumberedOrderedList (Word-like numbering).
+      // Replaced below: Word-like numbering and selection.
       orderedList: false,
+      bulletList: false,
     }),
     NumberedOrderedList,
+    withWordSelection(BulletList, "toggleBulletList"),
     CodeBlockCopy,
     UnderlineVariant,
     TextStyle,
@@ -62,7 +65,7 @@ export function buildRichTextExtensions({ placeholder = "" } = {}) {
     // schema across the editor, generateHTML (read mode) and
     // generateJSON (legacy migration). `checked` is stored per item in
     // the Tiptap JSON so the state persists across save / reopen.
-    TaskList,
+    withWordSelection(TaskList, "toggleTaskList"),
     TaskItem.configure({ nested: true }),
     TextAlign.configure({
       types: ["heading", "paragraph"],
