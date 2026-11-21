@@ -1585,7 +1585,6 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   oidcSignIn: "Se connecter avec mon fournisseur",
   oidcSignInIdentifierPlaceholder: "Pseudo ou e-mail GlassKeep",
   oidcSignInContinue: "Continuer",
-  oidcSignInProgress: "Redirection…",
   oidcErrFailed: "La connexion avec le fournisseur a échoué. Réessayez.",
   oidcErrExpired: "Cette tentative de connexion a expiré ou a été lancée dans un autre navigateur. Veuillez réessayer.",
   oidcErrDenied: "La connexion a été annulée chez le fournisseur.",

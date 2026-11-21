@@ -360,6 +360,39 @@ html[data-gk-screen="leaving-app"] .gk-app-screen {
   .auth-step { animation: none; }
   .auth-card-body, .auth-subtitle { transition: none; }
 }
+/* The provider sign-in button while it waits (OidcLoginButton): its icon
+   gives way to a spinner, the label stays. */
+.oidc-busy-icon {
+  position: relative;
+  display: inline-grid;
+  width: 1rem;
+  height: 1rem;
+}
+.oidc-busy-icon > * {
+  grid-area: 1 / 1;
+  transition: opacity 220ms ease, transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.oidc-busy-icon__spinner {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  opacity: 0;
+  transform: scale(0.6);
+  animation: oidcBusySpin 800ms linear infinite;
+}
+.oidc-busy-icon[data-busy="true"] .oidc-busy-icon__idle {
+  opacity: 0;
+  transform: scale(0.6);
+}
+.oidc-busy-icon[data-busy="true"] .oidc-busy-icon__spinner {
+  opacity: 0.8;
+  transform: scale(1);
+}
+@keyframes oidcBusySpin {
+  to { rotate: 360deg; }
+}
 /* Sign-in page on short screens: the logo, the card and the gaps around
    them tighten so the whole page, its footer included, fits without
    scrolling. */

@@ -16,26 +16,63 @@ import TI from "../../icons/editor/index.jsx";
 import { oidcErrorMessage, startOidcSignIn } from "../../auth/oidcClient.js";
 
 const BUTTON_CLASSES =
-  "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-[var(--border-light)] text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors disabled:opacity-60";
+  "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-[var(--border-light)] text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors aria-busy:pointer-events-none";
+
+// The longest the button stays busy while the provider is open over the
+// page (in the Android app): the answer, or coming back without one,
+// usually ends it first.
+const BUSY_MAX_MS = 4000;
+
+// The icon, giving way to a spinner while busy: the label does not change,
+// so the button no longer flickers between two texts on a tap.
+function BusyIcon({ busy, children }) {
+  return (
+    <span className="oidc-busy-icon" data-busy={busy ? "true" : "false"} aria-hidden="true">
+      <span className="oidc-busy-icon__idle">{children}</span>
+      <span className="oidc-busy-icon__spinner" />
+    </span>
+  );
+}
 
 export default function OidcLoginButton({ userId, direct, defaultEmail = "", error, onError }) {
   const [asking, setAsking] = useState(false);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // An error brought back from the provider ends the attempt.
+  const [seenError, setSeenError] = useState(error);
+  if (error !== seenError) {
+    setSeenError(error);
+    if (error) setBusy(false);
+  }
+
   // Coming back with the browser's Back button restores this page from
-  // the back-forward cache, the button still disabled from the click.
+  // the back-forward cache, the button still busy from the click. In the
+  // Android app the provider opens over the page: coming back to it
+  // without an answer, or a few seconds, end the busy state.
   useEffect(() => {
+    if (!busy) return undefined;
+    let back;
     const onPageShow = (e) => { if (e.persisted) setBusy(false); };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") back = setTimeout(() => setBusy(false), 700);
+    };
+    const limit = setTimeout(() => setBusy(false), BUSY_MAX_MS);
     window.addEventListener("pageshow", onPageShow);
-    return () => window.removeEventListener("pageshow", onPageShow);
-  }, []);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearTimeout(back);
+      clearTimeout(limit);
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [busy]);
 
   const start = async (who) => {
     onError("");
     setBusy(true);
     try {
-      if (await startOidcSignIn(who)) setBusy(false);
+      await startOidcSignIn(who);
     } catch (e) {
       onError(oidcErrorMessage(e));
       setBusy(false);
@@ -68,16 +105,20 @@ export default function OidcLoginButton({ userId, direct, defaultEmail = "", err
           />
           <button
             type="submit"
-            disabled={busy || !email.trim()}
-            className="shrink-0 px-3 py-2 rounded-lg border border-[var(--border-light)] text-sm font-medium hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-60"
+            disabled={!email.trim()}
+            aria-busy={busy || undefined}
+            className="shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-light)] text-sm font-medium hover:bg-black/5 dark:hover:bg-white/10 transition-colors disabled:opacity-60 aria-busy:pointer-events-none"
           >
-            {busy ? t("oidcSignInProgress") : t("oidcSignInContinue")}
+            {busy && <BusyIcon busy />}
+            {t("oidcSignInContinue")}
           </button>
         </form>
       ) : (
-        <button type="button" onClick={onButton} disabled={busy} className={BUTTON_CLASSES}>
-          <TI.UserCircle className="tabler-icon w-4 h-4" />
-          {busy ? t("oidcSignInProgress") : t("oidcSignIn")}
+        <button type="button" onClick={onButton} aria-busy={busy || undefined} className={BUTTON_CLASSES}>
+          <BusyIcon busy={busy}>
+            <TI.UserCircle className="tabler-icon w-4 h-4" />
+          </BusyIcon>
+          {t("oidcSignIn")}
         </button>
       )}
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
