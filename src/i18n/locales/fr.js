@@ -597,7 +597,6 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   openSideBySide: "Ouvrir côte à côte",
   emptyTrash: "Vider la corbeille",
   emptyTrashConfirm: "Supprimer définitivement toutes les notes de la corbeille ? Cette action est irréversible.",
-  loadingNotes: "Chargement des notes…",
   creating: "En cours...",
   updating: "Mise à jour...",
   saving: "Enregistrement...",

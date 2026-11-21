@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The page's own backdrop (its light theme gradient): the
+     window shows it before the page has painted, instead of white. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:angle="315"
+        android:startColor="#FFEEE5FF"
+        android:centerColor="#FFE5F3FD"
+        android:endColor="#FFFDE5EE" />
+</shape>

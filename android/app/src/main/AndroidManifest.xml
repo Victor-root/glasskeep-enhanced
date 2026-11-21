@@ -109,6 +109,7 @@
         <activity
             android:name=".WebViewActivity"
             android:exported="false"
+            android:theme="@style/Theme.GlassKeep.Web"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />

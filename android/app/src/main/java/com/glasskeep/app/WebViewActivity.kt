@@ -3,6 +3,7 @@ package com.glasskeep.app
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -314,6 +315,9 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         webView = findViewById(R.id.webview)
+        // Transparent until the page paints its own backdrop: the window's
+        // (Theme.GlassKeep.Web) shows through instead of a white frame.
+        webView.setBackgroundColor(Color.TRANSPARENT)
 
         // Pull-to-refresh
         swipeRefresh = findViewById(R.id.swipe_refresh)

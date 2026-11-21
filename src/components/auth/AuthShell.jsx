@@ -1,10 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import { Sun, Moon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
 import { useBranding, DEFAULT_APP_NAME } from "../../branding/BrandingContext.jsx";
 import { applyShellThemeClass, applyStoredShellTheme, DEFAULT_SHELL_THEME } from "../../theme/shellTheme.js";
 import DecoCard from "../common/DecoCard.jsx";
+import { enterScreen } from "../../utils/screenTransitions.js";
+
+// The longest the card waits for what it shows (see `ready`).
+const READY_WAIT_MS = 1200;
+
+// Whether a sign-in screen was already shown since the page loaded: the
+// switch from one to another (sign-in, account creation...) only brings
+// the new card in, the brand and the backdrop stay.
+let authShown = false;
 
 // Decorative floating note cards behind the sign-in card.
 const AUTH_CARDS = [
@@ -38,7 +47,7 @@ function removeBootBgLayer() {
   if (el) el.remove();
 }
 
-export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, loginSlogan, children, sidePanel }) {
+export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, loginSlogan, children, sidePanel, ready = true }) {
   const { branding } = useBranding();
   const appName = branding.appName || DEFAULT_APP_NAME;
 
@@ -49,6 +58,26 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
     applyShellThemeClass(loginTheme);
     return () => applyStoredShellTheme();
   }, [loginTheme]);
+
+  // The whole page comes in on the first sign-in screen of the page and
+  // after signing out; a switch between sign-in screens only brings the
+  // card in (CSS: styles/global/shell.js).
+  useLayoutEffect(() => {
+    const signedOut = document.documentElement.dataset.gkScreen === "leaving-app";
+    if (!authShown || signedOut) enterScreen("auth");
+    authShown = true;
+  }, []);
+
+  // The card waits for what decides its content (accounts offered, account
+  // creation, single sign-on) so it does not jump as each answer arrives,
+  // at most READY_WAIT_MS.
+  const [waitedEnough, setWaitedEnough] = useState(false);
+  useEffect(() => {
+    if (ready) return undefined;
+    const timer = setTimeout(() => setWaitedEnough(true), READY_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [ready]);
+  const cardReady = ready || waitedEnough;
 
   // In the Android app the sign-in screens draw behind the system bars,
   // as its native welcome screens do, whatever the edge-to-edge option.
@@ -122,6 +151,7 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
     // whole page fits.
     <div
       className="auth-shell min-h-[calc(100dvh-var(--safe-top)-var(--safe-bottom))] flex flex-col px-4 relative overflow-hidden"
+      data-ready={cardReady ? "true" : "false"}
       style={{ top: "calc(-1 * var(--keyboard-pan, 0px))" }}
     >
       {/* Admin-configured login background. Fixed + behind everything
@@ -168,7 +198,7 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
           />
         </div>
       )}
-      {showDecoCards && <div aria-hidden="true">
+      {showDecoCards && <div className="auth-deco" aria-hidden="true">
         {AUTH_CARDS.map((card, i) => <DecoCard key={i} {...card} />)}
       </div>}
       {/* Centered card area, takes the remaining vertical space so the
@@ -279,7 +309,7 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
               mx-auto; on lg+ the rows snap to the left of the
               wider wrapper (lg:mx-0) so they sit directly under the
               form card instead of between the two cards. */}
-          <div className="w-full max-w-md mx-auto lg:mx-0">
+          <div className="auth-trailing w-full max-w-md mx-auto lg:mx-0">
             <div className="mt-[clamp(0.75rem,3dvh,1.5rem)] text-center">
               <button
                 onClick={onToggleDark}
@@ -307,7 +337,7 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
           </div>
         </div>
       </div>
-      <p className="text-center text-xs text-gray-400 dark:text-gray-600 z-10 select-none pb-[clamp(0.5rem,2dvh,1rem)] pt-2 relative">
+      <p className="auth-footer text-center text-xs text-gray-400 dark:text-gray-600 z-10 select-none pb-[clamp(0.5rem,2dvh,1rem)] pt-2 relative">
         <span className={hasCustomBg ? "inline-block rounded-full px-3 py-1 bg-black/20 backdrop-blur-sm" : ""}>
           Open source project · Originally by{" "}
           <a href="https://github.com/nikunjsingh93" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">nikunjsingh93</a>

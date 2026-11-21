@@ -10,20 +10,17 @@
 // credential availability here (browsers will surface "no passkey
 // available" themselves if there's nothing to use).
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { t } from "../../i18n";
 import { isWebAuthnSupported, loginWithPasskey, isPasskeyCancellation } from "../../auth/passkeyClient.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
 
 export default function PasskeyLoginButton({ onLoggedIn }) {
-  const [supported, setSupported] = useState(false);
+  // Known at once: probed on the first render, the button no longer
+  // appears a frame later and pushes the card down.
+  const [supported] = useState(isWebAuthnSupported);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- probe WebAuthn support once after mount
-    setSupported(isWebAuthnSupported());
-  }, []);
 
   if (!supported) return null;
 

@@ -8,9 +8,11 @@ export default function usePublicLoginInfo() {
   const [allowRegistration, setAllowRegistration] = useState(true);
   const [loginSlogan, setLoginSlogan] = useState("");
   const [loginProfiles, setLoginProfiles] = useState([]);
+  // Every answer is in (or failed): the sign-in card can show.
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    (async () => {
+    const registration = (async () => {
       try {
         const response = await api("/admin/allow-registration");
         setAllowRegistration(response.allowNewAccounts);
@@ -19,7 +21,7 @@ export default function usePublicLoginInfo() {
         setAllowRegistration(false);
       }
     })();
-    (async () => {
+    const slogan = (async () => {
       try {
         const response = await api("/admin/login-slogan");
         setLoginSlogan(response.loginSlogan || "");
@@ -27,7 +29,7 @@ export default function usePublicLoginInfo() {
         console.error("Failed to fetch login slogan:", e);
       }
     })();
-    (async () => {
+    const profiles = (async () => {
       try {
         const profiles = await api("/login/profiles");
         setLoginProfiles(Array.isArray(profiles) ? profiles : []);
@@ -36,7 +38,8 @@ export default function usePublicLoginInfo() {
         setLoginProfiles([]);
       }
     })();
+    Promise.all([registration, slogan, profiles]).then(() => setLoaded(true));
   }, []);
 
-  return { allowRegistration, loginSlogan, setLoginSlogan, loginProfiles };
+  return { allowRegistration, loginSlogan, setLoginSlogan, loginProfiles, loaded };
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12 and later: the launch screen takes the page's backdrop
+         colour, so it fades into the sign-in page or the notes instead of
+         going from white to lavender. -->
+    <style name="Theme.GlassKeep" parent="Base.Theme.GlassKeep">
+        <item name="android:windowSplashScreenBackground">#FFEEE5FF</item>
+    </style>
+</resources>

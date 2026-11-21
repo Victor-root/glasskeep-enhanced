@@ -272,6 +272,68 @@ header.glass-card {
   font-weight: 600;
   box-shadow: 0 2px 10px -4px color-mix(in srgb, var(--gk-chrome-grad-to) 55%, transparent);
 }
+/* ───────── Sign-in and notes screens coming and going ─────────
+   utils/screenTransitions.js sets data-gk-screen on <html>. The sign-in
+   card comes in once what it shows is known (data-ready); on a first
+   arrival or after signing out, the brand and the backdrop come with it.
+   Leaving, the sign-in page lifts and fades before the notes come down
+   into place. Only opacity reaches the notes' scroll area: a transform
+   there would carry its fixed + button along. */
+@keyframes gkScreenLift {
+  from { transform: translateY(18px) scale(0.985); }
+  to   { transform: none; }
+}
+@keyframes gkScreenLower {
+  from { transform: translateY(-16px); }
+  to   { transform: none; }
+}
+@keyframes gkScreenFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+/* Movement long and settling, fade shorter and even: the eye follows the
+   whole entrance instead of a pop with a long tail. */
+.auth-shell {
+  --gk-in-lift: gkScreenLift 760ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  --gk-in-fade: gkScreenFade 480ms cubic-bezier(0.33, 0, 0.25, 1) backwards;
+}
+.auth-shell[data-ready="false"] :is(.auth-card, .auth-trailing) {
+  opacity: 0;
+}
+.auth-shell[data-ready="true"] .auth-card {
+  animation: var(--gk-in-lift), var(--gk-in-fade);
+  animation-delay: 90ms;
+}
+.auth-shell[data-ready="true"] .auth-trailing {
+  animation: var(--gk-in-lift), var(--gk-in-fade);
+  animation-delay: 200ms;
+}
+html[data-gk-screen="entering-auth"] .auth-shell .auth-brand {
+  animation: var(--gk-in-lift), var(--gk-in-fade);
+}
+html[data-gk-screen="entering-auth"] .auth-shell :is(.auth-deco, .auth-footer) {
+  animation: gkScreenFade 1000ms ease 150ms backwards;
+}
+html[data-gk-screen="leaving-auth"] .auth-shell :is(.auth-brand, .auth-card, .auth-trailing, .auth-footer, .auth-deco) {
+  opacity: 0;
+  transform: translateY(-14px) scale(0.98);
+  transition: opacity 240ms ease-in, transform 260ms cubic-bezier(0.4, 0, 1, 1);
+}
+html[data-gk-screen="entering-app"] .gk-app-screen header.glass-card {
+  animation:
+    gkScreenLower 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards,
+    gkScreenFade 420ms cubic-bezier(0.33, 0, 0.25, 1) backwards;
+}
+html[data-gk-screen="entering-app"] .gk-app-screen .notes-scroll-area {
+  animation: gkScreenFade 600ms cubic-bezier(0.33, 0, 0.25, 1) 140ms backwards;
+}
+html[data-gk-screen="leaving-app"] .gk-app-screen {
+  opacity: 0;
+  transition: opacity 240ms ease-in;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-shell[data-ready="true"] :is(.auth-card, .auth-trailing) { animation: none; }
+}
 /* Sign-in page on short screens: the logo, the card and the gaps around
    them tighten so the whole page, its footer included, fits without
    scrolling. */
@@ -288,7 +350,7 @@ header.glass-card {
   .auth-shell .auth-card :is(input, button) { padding-block: 0.375rem; }
   .auth-shell .auth-card :is(.mt-3, .mt-4, .mt-5) { margin-top: 0.5rem; }
   .auth-shell .glass-card.rounded-full { padding-block: 0.125rem; }
-  .auth-shell > p { padding-top: 0; }
+  .auth-shell .auth-footer { padding-top: 0; }
 }
 /* Custom background image active (login screen or app), LIGHT mode only.
    The photo is shown raw (vivid), so legibility can't come from the

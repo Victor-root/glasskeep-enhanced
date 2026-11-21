@@ -1,5 +1,6 @@
 import React, {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useCallback,
@@ -336,7 +337,7 @@ export default function App() {
   // the new values without a reload.
   const { refreshBranding } = useBranding();
 
-  const { allowRegistration, loginSlogan, setLoginSlogan, loginProfiles } = usePublicLoginInfo();
+  const { allowRegistration, loginSlogan, setLoginSlogan, loginProfiles, loaded: loginInfoLoaded } = usePublicLoginInfo();
 
   // Admin panel state (hook)
   const {
@@ -418,8 +419,9 @@ export default function App() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [headerMenuOpen]);
 
-  // CSS inject
-  useEffect(() => {
+  // CSS inject, before the first paint: injected after it, the first
+  // frame showed the sign-in page unstyled.
+  useLayoutEffect(() => {
     const style = document.createElement("style");
     style.innerHTML = globalCSS;
     document.head.appendChild(style);
@@ -1045,6 +1047,7 @@ export default function App() {
         floatingCardsEnabled={true}
         loginSlogan={loginSlogan}
         loginProfiles={loginProfiles}
+        loginInfoLoaded={loginInfoLoaded}
       />
     );
   }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, getAuth, setAuth } from "../utils/api.js";
+import { leaveScreen } from "../utils/screenTransitions.js";
 
 const newSessionId = () =>
   crypto.randomUUID?.() ??
@@ -100,7 +101,9 @@ export default function useSession({ navigate }) {
     };
   }, [token]);
 
-  const completeLogin = (res) => {
+  // The sign-in screen plays its exit first, then the notes take over.
+  const completeLogin = async (res) => {
+    await leaveScreen("auth");
     const sessionWithId = { ...res, sessionId: newSessionId() };
     setSession(sessionWithId);
     setAuth(sessionWithId);

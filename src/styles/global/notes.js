@@ -157,6 +157,49 @@ html.dark .multi-select-dock__menu {
     animation: none;
   }
 }
+/* ───────── Placeholder cards while the first notes load ─────────
+   (NotesSkeleton). Faded in after a short wait, so a quick load goes
+   straight to the cards; then they breathe gently. */
+.gk-notes-skeleton {
+  display: flex;
+  align-items: flex-start;
+  animation: gkSkeletonIn 400ms ease 250ms backwards;
+}
+.gk-notes-skeleton__column {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.gk-notes-skeleton__card {
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem 1.1rem;
+  animation: gkSkeletonBreathe 1.6s ease-in-out infinite;
+}
+.gk-notes-skeleton__line {
+  height: 0.6rem;
+  margin-top: 0.6rem;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.1;
+}
+.gk-notes-skeleton__line--title {
+  width: 55%;
+  height: 0.8rem;
+  margin-top: 0;
+  opacity: 0.16;
+}
+@keyframes gkSkeletonIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes gkSkeletonBreathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gk-notes-skeleton__card { animation: none; }
+}
 .note-content { -webkit-user-select: text; user-select: text; }
 /* Text cursor on the modal's note body (both edit AND view mode) so the
    user sees the selection cursor when hovering the text — useful for

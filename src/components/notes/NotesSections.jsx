@@ -2,6 +2,7 @@ import React from "react";
 import { t } from "../../i18n";
 import NoteCard from "./NoteCard.jsx";
 import NotesGrid from "./NotesGrid.jsx";
+import NotesSkeleton from "./NotesSkeleton.jsx";
 import { REMINDERS } from "../../utils/constants.js";
 
 const GAP_X = 12;
@@ -108,9 +109,7 @@ function NotesSections({
         )}
 
         {notesLoading && pinned.length + others.length === 0 && (
-          <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
-            {t("loadingNotes")}
-          </p>
+          <NotesSkeleton columns={listView ? 1 : gridColumns(windowWidth)} gap={GAP_X} />
         )}
         {!notesLoading && filteredEmptyWithSearch && (
           <p className="text-center text-gray-500 dark:text-gray-400 mt-10">

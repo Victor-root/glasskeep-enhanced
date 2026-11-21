@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { t } from "../../i18n";
 import { ALL_IMAGES, REMINDERS } from "../../utils/constants.js";
 import { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, RemindersSidebarIcon } from "../../icons/sidebarIcons.jsx";
@@ -8,6 +8,7 @@ import PageScrollbar from "../common/PageScrollbar.jsx";
 import NotesComposer from "./NotesComposer.jsx";
 import NotesSections from "./NotesSections.jsx";
 import useScrollActivity from "../../hooks/useScrollActivity.js";
+import { enterScreen } from "../../utils/screenTransitions.js";
 /** ---------- NotesUI (presentational) ---------- */
 function NotesUI({
   currentUser,
@@ -178,9 +179,12 @@ function NotesUI({
   }, [headerMenuOpen, setHeaderMenuOpen]);
 
 
+  // The notes come in: after signing in, or on opening the app.
+  useLayoutEffect(() => enterScreen("app"), []);
+
   return (
     <div
-      className={`min-h-screen overflow-x-clip${isMobile ? "" : " notes-shell-desktop"}`}
+      className={`gk-app-screen min-h-screen overflow-x-clip${isMobile ? "" : " notes-shell-desktop"}`}
       style={{ marginLeft: sidebarPermanent ? `${sidebarWidth}px` : "0px", position:"relative", zIndex:2 }}
     >
       {/* In this stacking context, so the header (z-40) covers it. */}

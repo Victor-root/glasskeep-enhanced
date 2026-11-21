@@ -82,6 +82,13 @@ export default function useNotesLoader({
   leases,
 }) {
   const [notesLoading, setNotesLoading] = useState(!!token);
+  // A session that just started is loading until its first load ends: the
+  // render right after sign-in showed "No notes yet" before the load began.
+  const [loadingToken, setLoadingToken] = useState(token);
+  if (token !== loadingToken) {
+    setLoadingToken(token);
+    setNotesLoading(!!token);
+  }
   // Whether `notes` holds the regular (non-archive/trash) list.
   const notesAreRegular = useRef(true);
 

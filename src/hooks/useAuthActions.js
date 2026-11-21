@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { t } from "../i18n";
 import { api } from "../utils/api.js";
+import { leaveScreen } from "../utils/screenTransitions.js";
 import {
   clearQueueForUser as idbClearQueueForUser,
   clearNotesForSession as idbClearNotesForSession,
@@ -62,7 +63,8 @@ export default function useAuthActions({
     navigate("#/login");
   };
 
-  const signOut = () => {
+  const signOut = async () => {
+    await leaveScreen("app");
     cleanupClientSession(true);
   };
 

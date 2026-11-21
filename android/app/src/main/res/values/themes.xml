@@ -1,7 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.GlassKeep" parent="Theme.AppCompat.Light.NoActionBar">
+    <!-- DayNight: the WebView answers prefers-color-scheme from it, so the
+         page boots dark straight away in the dark theme. -->
+    <style name="Base.Theme.GlassKeep" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <style name="Theme.GlassKeep" parent="Base.Theme.GlassKeep" />
+
+    <!-- The notes screen: until the page paints, the window shows the
+         page's backdrop rather than a white frame (the WebView is
+         transparent until then, see WebViewActivity). -->
+    <style name="Theme.GlassKeep.Web">
+        <item name="android:windowBackground">@drawable/app_backdrop</item>
     </style>
 </resources>

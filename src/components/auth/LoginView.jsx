@@ -21,6 +21,7 @@ export default function LoginView({
   floatingCardsEnabled,
   loginSlogan,
   loginProfiles,
+  loginInfoLoaded = true,
   onPasskeyLogin,
   oidcError,
 }) {
@@ -52,10 +53,16 @@ export default function LoginView({
   // failure reported by the provider's redirect arrives through
   // `oidcError`, possibly after this screen mounted.
   const [oidcStatus, setOidcStatus] = useState({ available: false, direct: false });
+  const [oidcChecked, setOidcChecked] = useState(false);
   const [oidcErr, setOidcErr] = useState("");
   useEffect(() => {
-    fetchOidcStatus().then(setOidcStatus).catch(() => setOidcStatus({ available: false, direct: false }));
+    fetchOidcStatus()
+      .then(setOidcStatus)
+      .catch(() => setOidcStatus({ available: false, direct: false }))
+      .finally(() => setOidcChecked(true));
   }, []);
+  // What decides the card's content is known: it can come in.
+  const ready = loginInfoLoaded && oidcChecked;
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- show a provider error that arrives after mount; the user can clear it locally
     if (oidcError) setOidcErr(oidcErrorMessage(oidcError));
@@ -112,6 +119,7 @@ export default function LoginView({
         onToggleDark={onToggleDark}
         floatingCardsEnabled={floatingCardsEnabled}
         loginSlogan={loginSlogan}
+        ready={ready}
         sidePanel={qrSidePanel}
       >
         <div className="flex flex-wrap justify-center gap-5 mb-4">
@@ -165,6 +173,7 @@ export default function LoginView({
         onToggleDark={onToggleDark}
         floatingCardsEnabled={floatingCardsEnabled}
         loginSlogan={loginSlogan}
+        ready={ready}
         sidePanel={qrSidePanel}
       >
         <div className="flex flex-col items-center mb-4">
@@ -221,6 +230,7 @@ export default function LoginView({
       onToggleDark={onToggleDark}
       floatingCardsEnabled={floatingCardsEnabled}
       loginSlogan={loginSlogan}
+      ready={ready}
       sidePanel={qrSidePanel}
     >
       <form onSubmit={handleManualSubmit} className="space-y-4">
