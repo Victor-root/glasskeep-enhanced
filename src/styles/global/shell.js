@@ -272,6 +272,24 @@ header.glass-card {
   font-weight: 600;
   box-shadow: 0 2px 10px -4px color-mix(in srgb, var(--gk-chrome-grad-to) 55%, transparent);
 }
+/* Sign-in page on short screens: the logo, the card and the gaps around
+   them tighten so the whole page, its footer included, fits without
+   scrolling. */
+@media (max-height: 800px) {
+  .auth-shell .auth-brand img { width: 3rem; height: 3rem; margin-bottom: 0.5rem; }
+  .auth-shell .auth-brand h1 { font-size: 1.5rem; line-height: 2rem; }
+  .auth-shell .auth-card { padding: 1rem 1.25rem; }
+  .auth-shell .auth-card form > :not(:last-child) { margin-block-end: 0.75rem; }
+}
+@media (max-height: 680px) {
+  .auth-shell .auth-brand { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 0.75rem; }
+  .auth-shell .auth-brand img { width: 2.25rem; height: 2.25rem; margin: 0; }
+  .auth-shell .auth-card { padding-block: 0.75rem; }
+  .auth-shell .auth-card :is(input, button) { padding-block: 0.375rem; }
+  .auth-shell .auth-card :is(.mt-3, .mt-4, .mt-5) { margin-top: 0.5rem; }
+  .auth-shell .glass-card.rounded-full { padding-block: 0.125rem; }
+  .auth-shell > p { padding-top: 0; }
+}
 /* Custom background image active (login screen or app), LIGHT mode only.
    The photo is shown raw (vivid), so legibility can't come from the
    backdrop — instead the text-bearing surfaces become near-opaque so

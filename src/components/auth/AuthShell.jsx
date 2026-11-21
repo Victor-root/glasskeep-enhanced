@@ -117,8 +117,11 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
   return (
     // Rides up as one block when the soft keyboard would cover the field
     // being typed in (useKeyboardInset), like the note overlays do.
+    // The screen's height less the system bars, which the body already
+    // leaves room for, with spacings that tighten on short screens so the
+    // whole page fits.
     <div
-      className="min-h-screen flex flex-col px-4 relative overflow-hidden"
+      className="auth-shell min-h-[calc(100dvh-var(--safe-top)-var(--safe-bottom))] flex flex-col px-4 relative overflow-hidden"
       style={{ top: "calc(-1 * var(--keyboard-pan, 0px))" }}
     >
       {/* Admin-configured login background. Fixed + behind everything
@@ -176,7 +179,7 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
           (≥1024 px). On narrower viewports the side panel falls back
           to a stacked layout below the auth card so the user can
           still see it without horizontal scroll. */}
-      <div className="flex-1 w-full flex items-center justify-center py-8">
+      <div className="flex-1 w-full flex items-center justify-center py-[clamp(0.75rem,4dvh,2rem)]">
         <div
           className={`relative z-10 w-full mx-auto ${
             sidePanel ? "lg:max-w-4xl" : "max-w-md"
@@ -192,7 +195,7 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
               image (and a transparent logo can be unreadable), so it
               moves INTO the form card instead (see below). */}
           {!hasCustomBg && (
-            <div className="text-center mb-6 w-full max-w-md mx-auto lg:mx-0">
+            <div className="auth-brand text-center mb-[clamp(0.75rem,3dvh,1.5rem)] w-full max-w-md mx-auto lg:mx-0">
               <img
                 src={logoSrc}
                 alt={appName}
@@ -277,7 +280,7 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
               wider wrapper (lg:mx-0) so they sit directly under the
               form card instead of between the two cards. */}
           <div className="w-full max-w-md mx-auto lg:mx-0">
-            <div className="mt-6 text-center">
+            <div className="mt-[clamp(0.75rem,3dvh,1.5rem)] text-center">
               <button
                 onClick={onToggleDark}
                 className={`inline-flex items-center gap-2 text-sm ${dark ? "text-gray-300" : "text-gray-700"} hover:underline ${hasCustomBg ? "glass-card rounded-full px-4 py-1.5 shadow-sm" : ""}`}
@@ -287,14 +290,14 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
               </button>
             </div>
             {(loginSlogan || t("loginSlogan")) && (
-              <div className="mt-4 text-center">
+              <div className="mt-[clamp(0.5rem,2dvh,1rem)] text-center">
                 <span className="glass-card inline-block rounded-full px-4 py-1.5 text-sm text-gray-600 dark:text-gray-300 shadow-sm">
                   {loginSlogan || t("loginSlogan")}
                 </span>
               </div>
             )}
             {window.AndroidTheme && (
-              <div className="mt-4 text-center">
+              <div className="mt-[clamp(0.5rem,2dvh,1rem)] text-center">
                 <button
                   className="text-xs text-indigo-600 hover:underline"
                   onClick={() => window.AndroidTheme.changeServer()}
@@ -304,7 +307,7 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
           </div>
         </div>
       </div>
-      <p className="text-center text-xs text-gray-400 dark:text-gray-600 z-10 select-none pb-4 pt-2 relative">
+      <p className="text-center text-xs text-gray-400 dark:text-gray-600 z-10 select-none pb-[clamp(0.5rem,2dvh,1rem)] pt-2 relative">
         <span className={hasCustomBg ? "inline-block rounded-full px-3 py-1 bg-black/20 backdrop-blur-sm" : ""}>
           Open source project · Originally by{" "}
           <a href="https://github.com/nikunjsingh93" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">nikunjsingh93</a>
