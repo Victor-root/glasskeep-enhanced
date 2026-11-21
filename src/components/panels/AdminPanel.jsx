@@ -17,6 +17,7 @@ import { SettingsSection } from "../common/SettingsAccordion.jsx";
 import useServerPowerActions from "./useServerPowerActions.js";
 import ServerPowerOverlay from "./ServerPowerOverlay.jsx";
 import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
+import usePageScrollLock from "../../hooks/usePageScrollLock.js";
 
 export default function AdminPanel({
   open,
@@ -109,13 +110,7 @@ export default function AdminPanel({
     }
   };
 
-  // Prevent body scroll while the panel is open — same trick as
-  // SettingsPanel.
-  React.useEffect(() => {
-    if (open) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "";
-    return () => { document.body.style.overflow = ""; };
-  }, [open]);
+  usePageScrollLock(open);
 
   // Non-admins should never see this panel — also avoids mounting the
   // admin-only sections (AiAdminSection, EncryptionAdminSection …) which
@@ -125,16 +120,14 @@ export default function AdminPanel({
 
   return (
     <>
-      {open && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) onClose();
-          }}
-        />
-      )}
       <div
-        className={`gk-side-panel fixed top-0 right-0 z-50 h-full w-full lg:w-[32rem] transition-transform duration-200 ${open ? "translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
+        className={`gk-panel-scrim fixed inset-0 z-50 bg-black/50${open ? " is-open lg:backdrop-blur-sm" : ""}`}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      />
+      <div
+        className={`gk-side-panel fixed top-0 right-0 z-50 h-full w-full lg:w-[32rem] gk-panel-slide ${open ? "is-open translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
         style={{
           borderLeft: "1px solid var(--border-light)",
           paddingTop: "var(--safe-top)",

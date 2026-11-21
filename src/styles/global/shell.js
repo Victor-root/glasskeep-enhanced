@@ -42,13 +42,13 @@ html[data-gk-overlay-locked] body {
   overscroll-behavior: none !important;
   overscroll-behavior-y: none !important;
 }
-/* The open tag drawer keeps the scrolling to itself (TagSidebar): its list
-   does not hand an overscroll on to the notes, and the notes behind it do
-   not scroll at all, whatever the finger drags. */
-html[data-gk-drawer-open] {
+/* Panels over the notes (tag drawer, settings, admin) keep the scrolling
+   to themselves: their lists do not hand an overscroll on to the page, and
+   the page does not scroll at all while one is open (usePageScrollLock). */
+html[data-gk-page-locked] {
   overflow: hidden;
 }
-.gk-drawer .gk-sidebar-body {
+:is(.gk-drawer .gk-sidebar-body, .gk-side-panel-scroll) {
   overscroll-behavior: contain;
 }
 /* While any full-screen overlay is open, the decorative background cards

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { t } from "../../i18n";
 import { SearchIcon, CloseIcon } from "../../icons/index.jsx";
 import { ALL_IMAGES, REMINDERS } from "../../utils/constants.js";
+import usePageScrollLock from "../../hooks/usePageScrollLock.js";
 
 import { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, RemindersSidebarIcon } from "../../icons/sidebarIcons.jsx";
 export { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, RemindersSidebarIcon };
@@ -70,16 +71,7 @@ export default function TagSidebar({
     }
   }, [skipTransition]);
 
-  // While the drawer is open over the notes, they do not scroll behind it:
-  // reaching the end of its list, or dragging its header or the shade,
-  // scrolled them (CSS: html[data-gk-drawer-open] in styles/global/shell.js).
-  const drawerOpen = open && !permanent;
-  useEffect(() => {
-    if (!drawerOpen) return undefined;
-    const root = document.documentElement;
-    root.setAttribute("data-gk-drawer-open", "");
-    return () => root.removeAttribute("data-gk-drawer-open");
-  }, [drawerOpen]);
+  usePageScrollLock(open && !permanent);
 
   return (
     <>
