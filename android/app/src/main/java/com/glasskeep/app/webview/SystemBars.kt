@@ -62,12 +62,27 @@ class SystemBars(
     private var barsScrim = 0f
     private var barsScrimAnimator: ValueAnimator? = null
 
-    /** Portrait edge-to-edge: the user option is on and the phone is upright.
-     *  The bars then stay transparent and the page draws behind them. */
+    // Set while the page shows a screen drawn behind the bars whatever the
+    // option: the sign-in screens, before the notes (setScreenEdgeToEdge).
+    private var screenEdgeToEdge = false
+
+    /** Portrait edge-to-edge: the user option is on, or the screen asks for
+     *  it, and the phone is upright. The bars then stay transparent and the
+     *  page draws behind them. */
     private fun isEdgeToEdgeActive(): Boolean =
-        activity.getSharedPreferences("glasskeep", Context.MODE_PRIVATE)
-            .getBoolean(KEY_EDGE_TO_EDGE_PORTRAIT, false) &&
+        (screenEdgeToEdge ||
+            activity.getSharedPreferences("glasskeep", Context.MODE_PRIVATE)
+                .getBoolean(KEY_EDGE_TO_EDGE_PORTRAIT, false)) &&
             activity.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+
+    /** The page's screen draws behind the bars whatever the option, until
+     *  it says otherwise. False when that was already so. */
+    fun setScreenEdgeToEdge(enabled: Boolean): Boolean {
+        if (screenEdgeToEdge == enabled) return false
+        screenEdgeToEdge = enabled
+        paint()
+        return true
+    }
 
     /** Settings → "Edge-to-edge in portrait". Stored natively so the bars
      *  are already right at the next cold start, before the page loads.

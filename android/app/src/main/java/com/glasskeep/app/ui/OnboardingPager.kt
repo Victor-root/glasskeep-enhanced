@@ -11,8 +11,11 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -54,7 +57,7 @@ import kotlinx.coroutines.launch
  * who have already completed the welcome (e.g. an existing 1.2.x
  * install that's just changed its server URL).
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun OnboardingPager(
     startAtSetup: Boolean,
@@ -102,14 +105,18 @@ fun OnboardingPager(
             }
         }
 
-        PageDots(
-            currentPage = currentPage,
-            pageCount = 2,
-            dark = dark,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp),
-        )
+        // Hidden while typing: the page shrinks above the keyboard and the
+        // dots would sit on the setup card's button.
+        if (!WindowInsets.isImeVisible) {
+            PageDots(
+                currentPage = currentPage,
+                pageCount = 2,
+                dark = dark,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp),
+            )
+        }
 
         // Back-arrow overlay only visible on the setup page. Swipe-back
         // still works alongside it, but a discoverable tap target at

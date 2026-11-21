@@ -125,6 +125,14 @@ class WebViewActivity : AppCompatActivity() {
             }
         }
 
+        /** The sign-in screens: drawn behind the bars whatever the option. */
+        @JavascriptInterface
+        fun setScreenEdgeToEdge(enabled: Boolean) {
+            runOnUiThread {
+                if (systemBars.setScreenEdgeToEdge(enabled)) injectSafeAreaInsets()
+            }
+        }
+
         @JavascriptInterface
         fun setRefreshEnabled(enabled: Boolean) {
             runOnUiThread { swipeRefresh.isEnabled = enabled }

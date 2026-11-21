@@ -49,6 +49,16 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
     applyShellThemeClass(loginTheme);
     return () => applyStoredShellTheme();
   }, [loginTheme]);
+
+  // In the Android app the sign-in screens draw behind the system bars,
+  // as its native welcome screens do, whatever the edge-to-edge option.
+  useEffect(() => {
+    const setScreen = (on) => {
+      try { window.AndroidTheme?.setScreenEdgeToEdge?.(on); } catch { /* Android bridge best-effort */ }
+    };
+    setScreen(true);
+    return () => setScreen(false);
+  }, []);
   const logoSrc = branding.logo || "/pwa-192.png";
   // A custom logo is shown raw (no rounded clip / shadow) so a
   // transparent PNG doesn't get an ugly box behind it; the bundled

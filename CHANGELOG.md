@@ -25,6 +25,8 @@ Headline features: **file attachments** on notes, with a **ZIP backup** that car
 - 📦 Every `npm audit` advisory is cleared, and the editor uses Tiptap's own text style again.
 
 ### 🐛 Fixed
+- 📱 **Android app sign-in screens edge-to-edge** (1.6.0): sign-in, account creation and instance unlock now draw behind the status and navigation bars, as the welcome screens do, whatever the edge-to-edge option; the notes keep following it.
+- 📱 **Page dots over the Connect button** (1.6.0): on the Android app's server screen, the welcome pager's dots sat on the button while the keyboard was up. They hide while typing.
 - 🔢 **Numbered lists count as in Word and LibreOffice**: a list started with "5. " starts at 5; taking the number off a middle item, or pressing Enter on an empty middle item, no longer restarts the rest of the list at 1; the numbering button continues the list above. Read mode shows the same numbers as the editor.
 - 📋 **Lists pasted from Word** arrive as real numbered or bulleted lists, nested as in Word, instead of paragraphs starting with "1.    ".
 - ☑️ **Ctrl+A then the list button** takes the numbers or bullets off the whole note again; it numbered the empty last line instead. A selection ending at the very start of a line leaves that line out, as in Word.
