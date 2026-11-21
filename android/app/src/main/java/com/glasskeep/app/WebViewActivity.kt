@@ -125,6 +125,11 @@ class WebViewActivity : AppCompatActivity() {
             }
         }
 
+        /** The edge-to-edge option stored on this phone, for the page to
+         *  start from before it has a value of its own. */
+        @JavascriptInterface
+        fun isEdgeToEdgePortrait(): Boolean = systemBars.edgeToEdgePortraitOption()
+
         /** The sign-in screens: drawn behind the bars whatever the option. */
         @JavascriptInterface
         fun setScreenEdgeToEdge(enabled: Boolean) {

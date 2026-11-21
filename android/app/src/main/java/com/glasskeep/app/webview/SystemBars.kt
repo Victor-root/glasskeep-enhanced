@@ -70,10 +70,13 @@ class SystemBars(
      *  it, and the phone is upright. The bars then stay transparent and the
      *  page draws behind them. */
     private fun isEdgeToEdgeActive(): Boolean =
-        (screenEdgeToEdge ||
-            activity.getSharedPreferences("glasskeep", Context.MODE_PRIVATE)
-                .getBoolean(KEY_EDGE_TO_EDGE_PORTRAIT, false)) &&
+        (screenEdgeToEdge || edgeToEdgePortraitOption()) &&
             activity.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+
+    /** Settings → "Edge-to-edge in portrait", as stored on this phone. */
+    fun edgeToEdgePortraitOption(): Boolean =
+        activity.getSharedPreferences("glasskeep", Context.MODE_PRIVATE)
+            .getBoolean(KEY_EDGE_TO_EDGE_PORTRAIT, false)
 
     /** The page's screen draws behind the bars whatever the option, until
      *  it says otherwise. False when that was already so. */
@@ -262,9 +265,9 @@ class SystemBars(
     private fun isLight(color: Int): Boolean =
         (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255 > 0.5
 
-    private companion object {
+    companion object {
         const val KEY_EDGE_TO_EDGE_PORTRAIT = "edge_to_edge_portrait"
         // Matches the FAB overlay's fade (MobileCreateFab).
-        const val BARS_SCRIM_MS = 200L
+        private const val BARS_SCRIM_MS = 200L
     }
 }

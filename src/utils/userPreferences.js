@@ -136,8 +136,14 @@ export const PREFERENCES = {
     save: (v) => store("edgeToEdgeLandscape", String(v)),
   },
   // Android app: transparent system bars, the notes scroll behind them.
+  // Without a value of its own yet, the page starts from the Android app's:
+  // on for a new install of the app, off for one that already ran.
   edgeToEdgePortrait: {
-    read: () => stored("edgeToEdgePortrait") === "true",
+    read: () => {
+      const value = stored("edgeToEdgePortrait");
+      if (value !== null) return value === "true";
+      try { return window.AndroidTheme?.isEdgeToEdgePortrait?.() === true; } catch { return false; }
+    },
     parse: isBoolean,
     save: (v) => store("edgeToEdgePortrait", String(v)),
   },

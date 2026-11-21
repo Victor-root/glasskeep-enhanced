@@ -22,6 +22,7 @@ import com.glasskeep.app.ui.TvBgBottom
 import com.glasskeep.app.ui.isDarkMode
 import com.glasskeep.app.ui.isTelevision
 import com.glasskeep.app.ui.theme.GlassKeepTheme
+import com.glasskeep.app.webview.SystemBars
 
 class MainActivity : ComponentActivity() {
 
@@ -37,6 +38,13 @@ class MainActivity : ComponentActivity() {
         // permissions onboarding — existing users updating from 1.2.x
         // shouldn't suddenly see the welcome flow.
         val welcomeDone = prefs.getBoolean(KEY_WELCOME_DONE, storedUrl != null)
+
+        // A new install draws edge-to-edge in portrait; an install updated
+        // from a release that already ran keeps the option as it was (off).
+        if (!prefs.contains(SystemBars.KEY_EDGE_TO_EDGE_PORTRAIT)) {
+            val newInstall = storedUrl == null && !prefs.contains(KEY_WELCOME_DONE)
+            prefs.edit().putBoolean(SystemBars.KEY_EDGE_TO_EDGE_PORTRAIT, newInstall).apply()
+        }
 
         // A stored address that sends everything in the clear across the
         // internet does not get used again, whatever it was allowed to do
