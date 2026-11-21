@@ -42,6 +42,15 @@ html[data-gk-overlay-locked] body {
   overscroll-behavior: none !important;
   overscroll-behavior-y: none !important;
 }
+/* The open tag drawer keeps the scrolling to itself (TagSidebar): its list
+   does not hand an overscroll on to the notes, and the notes behind it do
+   not scroll at all, whatever the finger drags. */
+html[data-gk-drawer-open] {
+  overflow: hidden;
+}
+.gk-drawer .gk-sidebar-body {
+  overscroll-behavior: contain;
+}
 /* While any full-screen overlay is open, the decorative background cards
    sit behind its scrim — invisible (occluded, and blurred when the scrim
    has a backdrop-filter) but still animating. A moving backdrop forces

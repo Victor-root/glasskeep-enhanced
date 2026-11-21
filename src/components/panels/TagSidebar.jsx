@@ -70,6 +70,17 @@ export default function TagSidebar({
     }
   }, [skipTransition]);
 
+  // While the drawer is open over the notes, they do not scroll behind it:
+  // reaching the end of its list, or dragging its header or the shade,
+  // scrolled them (CSS: html[data-gk-drawer-open] in styles/global/shell.js).
+  const drawerOpen = open && !permanent;
+  useEffect(() => {
+    if (!drawerOpen) return undefined;
+    const root = document.documentElement;
+    root.setAttribute("data-gk-drawer-open", "");
+    return () => root.removeAttribute("data-gk-drawer-open");
+  }, [drawerOpen]);
+
   return (
     <>
       {!permanent && (
