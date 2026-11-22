@@ -387,41 +387,14 @@ html[class*="gk-theme-"] {
 html[class*="gk-theme-"] :is(input, textarea, select):focus {
   --tw-ring-color: var(--gk-chrome-accent);
 }
-/* Settings/Admin accordion (SettingsSection). Opens decelerating and
-   closes accelerating, with the side panels' curves, while its content
-   fades in. Closed, the content skips layout and paint (content-visibility),
-   so a section's animation never relays out the others; that switch waits
-   for the close to finish so the content stays visible while it folds.
-   min-height:0 lets the row shrink below its content, and the clip hides
-   what the row doesn't show yet. Once open, the clip margin lets a hover
-   glow or focus ring on the last row show past the section's edge. */
-.gk-acc {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 220ms cubic-bezier(0.3, 0, 0.8, 0.15);
-}
-.gk-acc.is-open {
-  grid-template-rows: 1fr;
-  transition: grid-template-rows 320ms cubic-bezier(0.2, 0, 0, 1);
-}
-.gk-acc-body {
-  min-height: 0;
-  overflow: clip;
-  overflow-clip-margin: 0px;
-  opacity: 0;
-  content-visibility: hidden;
-  transition: opacity 160ms ease-in, content-visibility 0s 220ms;
-  transition-behavior: allow-discrete;
-}
-.gk-acc.is-open > .gk-acc-body {
-  overflow-clip-margin: 16px;
-  opacity: 1;
-  content-visibility: visible;
-  transition: opacity 260ms ease-out 40ms, overflow-clip-margin 0s 320ms, content-visibility 0s;
-}
-@media (prefers-reduced-motion: reduce) {
-  .gk-acc, .gk-acc.is-open, .gk-acc-body, .gk-acc.is-open > .gk-acc-body { transition: none; }
-}
+/* Settings/Admin accordion (SettingsSection, moved by useFoldMotion).
+   Closed, the content skips layout and paint and takes no height. The
+   window clips the content sliding in or out from under the header; at rest
+   its margin lets a hover glow or focus ring on the last row show past the
+   section's edge. */
+.gk-acc { overflow: clip; overflow-clip-margin: 16px; }
+.gk-acc:not(.is-open) { content-visibility: hidden; }
+.gk-acc[data-moving] { overflow-clip-margin: 0px; }
 /* The chosen card of a set of choices (themes, update channel, SSO policy).
    A shadow and not a Tailwind ring: the mouse-focus reset in index.css
    clears rings, which thinned the chosen card's frame while it had focus. */

@@ -6,6 +6,7 @@
 
 import React from "react";
 import TI from "../../icons/editor/index.jsx";
+import useFoldMotion from "../../hooks/useFoldMotion.js";
 
 // 32x32 themed chip (option-row tier: --gk-icon-fg / --gk-icon-bg, derived
 // from the active theme) wrapping a Tabler icon. Placed in front of OPTION
@@ -34,12 +35,12 @@ function SectionIcon({ icon: Icon }) {
 
 // Collapsible section wrapper used to declutter the long side panels.
 // Header is a button (chevron + icon + title), content slides open and
-// closed with a grid-template-rows animation that handles variable
-// height without JS (.gk-acc in globalCSS). The chevron flips between
-// right and down and turns indigo when the section is open. Closed content is marked
+// closed (useFoldMotion). The chevron flips between right and down and
+// turns indigo when the section is open. Closed content is marked
 // inert + aria-hidden so it stays out of the keyboard tab order and
 // out of the accessibility tree.
 export function SettingsSection({ icon, title, open, onToggle, children }) {
+  const [foldRef, laidOut] = useFoldMotion(!!open, ".gk-side-panel-scroll");
   return (
     <>
       <button
@@ -49,7 +50,7 @@ export function SettingsSection({ icon, title, open, onToggle, children }) {
         className="group w-full flex items-center gap-3 pl-3 pr-3 py-2 -mx-1 rounded-xl text-left hover:bg-[var(--gk-chrome-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 transition-colors"
       >
         <TI.ChevronDown
-          className={`tabler-icon w-5 h-5 shrink-0 transition-all duration-200 ${
+          className={`tabler-icon w-5 h-5 shrink-0 transition-[rotate] duration-200 ${
             open
               ? "text-[var(--gk-icon2-fg)]"
               : "text-gray-400 dark:text-gray-500 -rotate-90"
@@ -58,14 +59,16 @@ export function SettingsSection({ icon, title, open, onToggle, children }) {
         <SectionIcon icon={icon} />
         <span className="text-md font-semibold flex-1 min-w-0">{title}</span>
       </button>
-      {/* min-w-0 lets the body shrink to the track width instead of its
-          content's min-width, so wide content (e.g. the federation URL in a
-          whitespace-nowrap <code>) can't push the panel past the viewport
-          on mobile. Animation and clipping: .gk-acc in globalCSS. */}
-      <div className={`gk-acc min-w-0${open ? " is-open" : ""}`} aria-hidden={!open} inert={!open}>
-        <div className="gk-acc-body min-w-0">
-          <div className="pt-4 pb-2">{children}</div>
-        </div>
+      {/* Clip window of the content (.gk-acc in globalCSS). min-w-0 keeps
+          wide content (e.g. the federation URL in a whitespace-nowrap
+          <code>) from pushing the panel past the viewport on mobile. */}
+      <div
+        ref={foldRef}
+        className={`gk-acc min-w-0${laidOut ? " is-open" : ""}`}
+        aria-hidden={!open}
+        inert={!open}
+      >
+        <div className="pt-4 pb-2">{children}</div>
       </div>
     </>
   );
