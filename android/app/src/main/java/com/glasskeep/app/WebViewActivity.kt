@@ -47,8 +47,9 @@ class WebViewActivity : AppCompatActivity() {
     private lateinit var swipeRefresh: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
     private lateinit var systemBars: SystemBars
     private lateinit var webAuthnBridge: WebAuthnBridge
-    // Debug builds only, see NetDebug.
+    // Debug builds only, see NetDebug and PerfDebug.
     private var netDebug: NetDebug? = null
+    private var perfDebug: PerfDebug? = null
 
     // Reminder notification deep-link: the target note id (from a tap) plus a
     // flag for whether the web app has finished loading, so we only fire the
@@ -407,6 +408,10 @@ class WebViewActivity : AppCompatActivity() {
                 netDebug = NetDebug(this@WebViewActivity, origin).also {
                     it.start()
                     addJavascriptInterface(it.Bridge(), NetDebug.JS_INTERFACE_NAME)
+                }
+                perfDebug = PerfDebug(this@WebViewActivity).also {
+                    it.start()
+                    addJavascriptInterface(it.Bridge(), PerfDebug.JS_INTERFACE_NAME)
                 }
             }
 
@@ -848,6 +853,7 @@ class WebViewActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         netDebug?.stop()
+        perfDebug?.stop()
         if (this::systemBars.isInitialized) systemBars.release()
         super.onDestroy()
     }

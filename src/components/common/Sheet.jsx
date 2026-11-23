@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { usePresence } from "../../hooks/usePresence.js";
+import { perfCapture } from "../../utils/perfDebug.js";
 
 // Past this share of its height, or this speed (px/ms) towards its own edge,
 // a released drag closes the sheet instead of snapping it back.
@@ -30,6 +31,11 @@ export default function Sheet({ open, onClose, title, titleAction, edge = "botto
   const scrimRef = useRef(null);
   const dragRef = useRef(null);
   const { mounted, shown, unmount } = usePresence(open, sheetRef, UNMOUNT_DELAY_MS);
+
+  // Debug builds of the Android app: logs how smoothly the sheet comes in.
+  useLayoutEffect(() => {
+    if (open) perfCapture(`sheet ${edge} ${typeof title === "string" ? title : ""}`.trim());
+  }, [open, edge, title]);
 
   useEffect(() => {
     if (!open) return undefined;
