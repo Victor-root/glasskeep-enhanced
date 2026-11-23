@@ -8,7 +8,10 @@ export const modalFooterCSS = `
    rounded bottom corners, see the [data-edge="top"] rules below). Only transform (sheet) and
    opacity (backdrop) animate; it decelerates in and accelerates out. Lifted
    above the soft keyboard through --keyboard-inset. Content is laid out with
-   the field / row bricks below, straight on the sheet's background. */
+   the field / row bricks below, straight on the sheet's background. No drop
+   shadow: barely seen over the dimmed backdrop, its wide blur was the most
+   expensive part of the sheet to paint, done piece by piece as the sheet
+   slid in, which made phones drop frames while it opened. */
 /* Above the note it opens from (z 40-50), below what may open from inside
    it: confirmation dialogs (z 60) and menus / popovers (z 9999+). */
 .gk-sheet-root {
@@ -40,14 +43,12 @@ export const modalFooterCSS = `
   background: var(--gk-sheet-bg);
   color: #1f2937;
   border-radius: 28px 28px 0 0;
-  box-shadow: 0 -10px 36px rgba(0, 0, 0, 0.16);
   transform: translateY(100%);
   transition: transform 260ms cubic-bezier(0.3, 0, 0.8, 0.15);
   will-change: transform;
 }
 html.dark .gk-sheet {
   color: #f3f4f6;
-  box-shadow: 0 -10px 36px rgba(0, 0, 0, 0.5);
 }
 /* A sheet takes the open note's colour (or the header's): greys and accent
    tints made for neutral surfaces fade into it, pale ones on light pastels,
@@ -132,10 +133,8 @@ html.dark .gk-sheet-grabber { background: rgba(255, 255, 255, 0.28); }
   padding-top: var(--safe-top);
   padding-bottom: 0;
   border-radius: 0 0 28px 28px;
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.16);
   transform: translateY(-100%);
 }
-html.dark .gk-sheet[data-edge="top"] { box-shadow: 0 10px 36px rgba(0, 0, 0, 0.5); }
 .gk-sheet[data-edge="top"][data-state="open"] { transform: translateY(0); }
 .gk-sheet[data-edge="top"] > .gk-sheet-head:first-child { padding: 14px 20px 12px; }
 .gk-sheet[data-edge="top"] > .gk-sheet-head:last-child { padding: 12px 20px 12px; }
@@ -416,6 +415,10 @@ html.dark .modal-footer-labeled-btn {
   max-width: 44px;
   height: auto;
   aspect-ratio: 1;
+  /* Each button on its own layer: its press and release bounce then moves
+     only itself. Otherwise the whole footer was repainted on every frame of
+     the bounce, right while the sheet the button opens was sliding in. */
+  will-change: transform;
 }
 .modal-footer-toolbar--touch .modal-footer-btn > svg,
 .modal-footer-toolbar--touch .modal-footer-btn > .tabler-icon {
