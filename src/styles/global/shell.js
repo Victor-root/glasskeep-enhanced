@@ -48,6 +48,15 @@ html[data-gk-overlay-locked] body {
 html[data-gk-page-locked] {
   overflow: hidden;
 }
+/* The open note, full screen on a phone, hides the notes (useRootFlag in
+   NoteModal): they are left out of rendering until it leaves. Otherwise a
+   tap in the note could make the browser bring the off-screen cards back
+   into its layout one by one before the next frame: over a second on a slow
+   phone when opening a sheet from the note's footer. The grid keeps its own
+   height, so the page's does not change. */
+html[data-gk-page-covered] .gk-notes-grid {
+  content-visibility: hidden;
+}
 :is(.gk-drawer .gk-sidebar-body, .gk-side-panel-scroll) {
   overscroll-behavior: contain;
 }

@@ -13,6 +13,7 @@ import FederationReadOnlyBanner from "./FederationReadOnlyBanner.jsx";
 import NoteModalBody from "./NoteModalBody.jsx";
 import NoteEditedStamp from "./NoteEditedStamp.jsx";
 import useModalHistory from "../../hooks/useModalHistory.js";
+import useRootFlag from "../../hooks/useRootFlag.js";
 import useNoteKeyboardLayout from "../../hooks/useNoteKeyboardLayout.js";
 import useNoteAttachments from "../../hooks/useNoteAttachments.js";
 import ModalAttachments from "./ModalAttachments.jsx";
@@ -420,6 +421,12 @@ export default function NoteModal({
   // Force mobile layout when running inside Android WebView (tablets)
   const mobileLayout = windowWidth < 640 || isLandscapeMobile || isWebView;
 
+  // Full screen, the open note hides the notes: once it has come in, until it
+  // starts leaving, they are left out of rendering (html[data-gk-page-covered]).
+  const [cameIn, setCameIn] = React.useState(false);
+  if (!open && cameIn) setCameIn(false);
+  useRootFlag("data-gk-page-covered", mobileLayout && open && cameIn && !isModalClosing);
+
   /* Android navigation bar: on the mobile layout it sits right under the
      footer, so it takes the footer's own colour (its translucent tint over
      the note's background) rather than the note's; handed back to the
@@ -593,6 +600,9 @@ export default function NoteModal({
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
+          onAnimationEnd={(e) => {
+            if (e.target === e.currentTarget && e.animationName === "noteModalIn") setCameIn(true);
+          }}
           onKeyDown={handleModalKeyDown}
           {...fileDropHandlers}
         >

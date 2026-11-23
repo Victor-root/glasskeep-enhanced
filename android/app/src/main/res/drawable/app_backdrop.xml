@@ -4,7 +4,7 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
     <gradient
         android:angle="315"
-        android:startColor="#FFEEE5FF"
+        android:startColor="@color/app_backdrop"
         android:centerColor="#FFE5F3FD"
         android:endColor="#FFFDE5EE" />
 </shape>

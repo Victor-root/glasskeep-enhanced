@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -54,6 +55,7 @@ class WebViewActivity : AppCompatActivity() {
     // window.__glasskeepOpenNote hook when the page can actually handle it.
     private var pendingOpenNoteId: String? = null
     private var pageLoaded = false
+    private var backdropSettled = false
 
     // The server address this screen was opened on.
     private lateinit var appUrl: String
@@ -317,6 +319,7 @@ class WebViewActivity : AppCompatActivity() {
         webView = findViewById(R.id.webview)
         // Transparent until the page paints its own backdrop: the window's
         // (Theme.GlassKeep.Web) shows through instead of a white frame.
+        // Made opaque again once it has (settleBackdrop).
         webView.setBackgroundColor(Color.TRANSPARENT)
 
         // Pull-to-refresh
@@ -586,6 +589,12 @@ class WebViewActivity : AppCompatActivity() {
                     if (BuildConfig.DEBUG_TOOLS) NetDebug.log("HTTP ${errorResponse.statusCode} on ${request.method} ${request.url.path}")
                 }
 
+                override fun onPageCommitVisible(view: WebView, pageUrl: String?) {
+                    super.onPageCommitVisible(view, pageUrl)
+                    backdropSettled = true
+                    settleBackdrop()
+                }
+
                 override fun onPageFinished(view: WebView, pageUrl: String?) {
                     super.onPageFinished(view, pageUrl)
                     if (BuildConfig.DEBUG_TOOLS) NetDebug.log("page finished: $pageUrl")
@@ -661,6 +670,16 @@ class WebViewActivity : AppCompatActivity() {
         // Portrait edge-to-edge follows the orientation.
         systemBars.paint()
         injectSafeAreaInsets()
+        if (backdropSettled) settleBackdrop()
+    }
+
+    /** Once the page shows, the WebView and the window behind it go back to
+     *  one plain opaque colour, the page backdrop's, instead of blending
+     *  every frame of the page over the window's gradient. */
+    private fun settleBackdrop() {
+        val color = getColor(R.color.app_backdrop)
+        webView.setBackgroundColor(color)
+        window.setBackgroundDrawable(ColorDrawable(color))
     }
 
     override fun onNewIntent(intent: Intent) {
