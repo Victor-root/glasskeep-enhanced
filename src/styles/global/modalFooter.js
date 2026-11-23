@@ -7,8 +7,9 @@ export const modalFooterCSS = `
    top corners and a grab handle (or, edge="top", drops from the top with
    rounded bottom corners, see the [data-edge="top"] rules below). Only transform (sheet) and
    opacity (backdrop) animate; it decelerates in and accelerates out. Lifted
-   above the soft keyboard through --keyboard-inset. Content is laid out with
-   the field / row bricks below, straight on the sheet's background. No drop
+   above the soft keyboard through --keyboard-inset while typing in it.
+   Content is laid out with the field / row bricks below, straight on the
+   sheet's background. No drop
    shadow: barely seen over the dimmed backdrop, its wide blur was the most
    expensive part of the sheet to paint, done piece by piece as the sheet
    slid in, which made phones drop frames while it opened. */
@@ -35,11 +36,11 @@ export const modalFooterCSS = `
   position: absolute;
   left: 0;
   right: 0;
-  bottom: var(--keyboard-inset);
-  max-height: calc(100dvh - var(--safe-top) - 32px - var(--keyboard-inset));
+  bottom: 0;
+  max-height: calc(100dvh - var(--safe-top) - 32px);
   display: flex;
   flex-direction: column;
-  padding-bottom: max(12px, calc(var(--safe-bottom) - var(--keyboard-inset)));
+  padding-bottom: max(12px, var(--safe-bottom));
   background: var(--gk-sheet-bg);
   color: #1f2937;
   border-radius: 28px 28px 0 0;
@@ -49,6 +50,15 @@ export const modalFooterCSS = `
 }
 html.dark .gk-sheet {
   color: #f3f4f6;
+}
+/* Lifted above the soft keyboard only while what is typed is in the sheet
+   (a tag, a name to share with). A sheet opened from the note's footer
+   while typing there rises from the bottom of the screen as the keyboard
+   goes down, instead of appearing on top of it and riding it down. */
+.gk-sheet:focus-within {
+  bottom: var(--keyboard-inset);
+  max-height: calc(100dvh - var(--safe-top) - 32px - var(--keyboard-inset));
+  padding-bottom: max(12px, calc(var(--safe-bottom) - var(--keyboard-inset)));
 }
 /* A sheet takes the open note's colour (or the header's): greys and accent
    tints made for neutral surfaces fade into it, pale ones on light pastels,
