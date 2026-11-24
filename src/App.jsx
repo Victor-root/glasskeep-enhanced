@@ -34,6 +34,7 @@ import QrScannerModal from "./components/auth/QrScannerModal.jsx";
 import FloatingCardsBackground from "./components/common/FloatingCardsBackground.jsx";
 import NoteModal from "./components/modal/NoteModal.jsx";
 import SecondaryNoteInstance from "./components/modal/SecondaryNoteInstance.jsx";
+import NoteWarmup from "./components/modal/NoteWarmup.jsx";
 import useModalState from "./hooks/useModalState.js";
 import useTouchScrollbars from "./hooks/useTouchScrollbars.js";
 import useNoteSaveState from "./hooks/useNoteSaveState.js";
@@ -1344,6 +1345,7 @@ export default function App() {
         }
       />
       {modal}
+      <NoteWarmup modal={modal} notes={notes} active={!open && !notesLoading && (isWebView || isMobileDevice)} />
 
       {sbsSecondaryId && (
         <SecondaryNoteInstance
