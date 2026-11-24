@@ -14,6 +14,7 @@ import NoteModalBody from "./NoteModalBody.jsx";
 import NoteEditedStamp from "./NoteEditedStamp.jsx";
 import useModalHistory from "../../hooks/useModalHistory.js";
 import useRootFlag from "../../hooks/useRootFlag.js";
+import { perfCapture } from "../../utils/perfDebug.js";
 import useNoteKeyboardLayout from "../../hooks/useNoteKeyboardLayout.js";
 import useNoteAttachments from "../../hooks/useNoteAttachments.js";
 import ModalAttachments from "./ModalAttachments.jsx";
@@ -431,6 +432,11 @@ export default function NoteModal({
   // animation started with it had mostly played before anything showed, the
   // page dimming at once and the note popping in.
   const scrimRef = React.useRef(null);
+  // Debug builds of the Android app: logs how smoothly the note opens and
+  // switches between reading and editing.
+  React.useLayoutEffect(() => {
+    if (open) perfCapture(`note ${viewMode ? "view" : "edit"}`);
+  }, [open, viewMode]);
   React.useLayoutEffect(() => {
     const scrim = scrimRef.current;
     if (!open || !scrim) return undefined;
