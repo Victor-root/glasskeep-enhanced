@@ -127,10 +127,15 @@ class SystemBars(
         if (!keyboardAnimating) keyboardInsetDp = ime / density.toDouble()
     }
 
+    private var lastInjected: String? = null
+
     /** The system-bar state the page lays itself out against: the insets, the
      *  keyboard height, and data-gk-edge-to-edge on <html> while the bars are
-     *  transparent. */
-    fun injectInsets(webView: WebView) {
+     *  transparent. Unchanged, it is not sent again unless [force]d (a new
+     *  document, the end of a keyboard slide): the system re-dispatches the
+     *  same insets whenever the bars change, an open note recolouring them for
+     *  one, and each dispatch woke the page's layout code for nothing. */
+    fun injectInsets(webView: WebView, force: Boolean = false) {
         val js = """
             (function(){
               var d = document.documentElement;
@@ -145,6 +150,8 @@ class SystemBars(
               window.dispatchEvent(new Event('gk-android-insets'));
             })();
         """.trimIndent()
+        if (!force && js == lastInjected) return
+        lastInjected = js
         webView.evaluateJavascript(js, null)
     }
 
@@ -175,7 +182,7 @@ class SystemBars(
     /** The slide is over: the page goes back to [injectInsets]'s resting state. */
     fun settleKeyboard(webView: WebView, targetPx: Int) {
         keyboardInsetDp = targetPx / activity.resources.displayMetrics.density.toDouble()
-        injectInsets(webView)
+        injectInsets(webView, force = true)
     }
 
     /** Lays the bar backgrounds over the system bars: the status bar along

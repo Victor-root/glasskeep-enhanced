@@ -247,11 +247,11 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     /** Hands the page its system-bar state (see SystemBars.injectInsets). */
-    private fun injectSafeAreaInsets() {
+    private fun injectSafeAreaInsets(force: Boolean = false) {
         // Skip injection if the WebView hasn't loaded any page yet: evaluating JS
         // before there's a document just queues a useless call.
         if (!this::webView.isInitialized) return
-        systemBars.injectInsets(webView)
+        systemBars.injectInsets(webView, force)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -549,7 +549,7 @@ class WebViewActivity : AppCompatActivity() {
                     // listener firing at the right moment relative to
                     // navigation — the page might mount on top of stale
                     // (or zero) values otherwise.
-                    injectSafeAreaInsets()
+                    injectSafeAreaInsets(force = true)
                 }
 
                 // A certificate Android does not trust is accepted when it is
@@ -616,7 +616,7 @@ class WebViewActivity : AppCompatActivity() {
                     )
                     // Page start can run before the new document exists, so the
                     // system-bar insets are pushed again now that the page has loaded.
-                    injectSafeAreaInsets()
+                    injectSafeAreaInsets(force = true)
                     // Watch <meta name="theme-color"> for status/nav bar sync
                     view.evaluateJavascript("""
                         (function(){
