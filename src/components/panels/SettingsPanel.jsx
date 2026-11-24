@@ -18,7 +18,7 @@ import useAndroidAppUpdate from "./useAndroidAppUpdate.js";
 import usePageScrollLock from "../../hooks/usePageScrollLock.js";
 import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
 
-export default function SettingsPanel({
+function SettingsPanel({
   open,
   onClose,
   dark,
@@ -462,3 +462,7 @@ export default function SettingsPanel({
     </>
   );
 }
+
+// Closed, the panel shows nothing: it skips the app's renders until it opens
+// again, when it renders with the current props.
+export default React.memo(SettingsPanel, (prev, next) => !prev.open && !next.open);

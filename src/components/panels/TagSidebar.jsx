@@ -10,7 +10,7 @@ export { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, R
 // Past this distance a touch is a scroll, not a long press.
 const LONG_PRESS_SLOP_PX = 10;
 
-export default function TagSidebar({
+function TagSidebar({
   open,
   onClose,
   tagsWithCounts,
@@ -262,3 +262,8 @@ export default function TagSidebar({
     </>
   );
 }
+
+// Closed as a drawer, the sidebar shows nothing: it skips the app's renders
+// until it opens again (or becomes permanent), when it renders with the
+// current props.
+export default React.memo(TagSidebar, (prev, next) => !prev.permanent && !next.permanent && !prev.open && !next.open);

@@ -7,6 +7,7 @@ import {
   isRichContent,
   emptyRichDoc,
   parseRichDoc,
+  serializeRichContent,
 } from "../../utils/richText.js";
 import { clipboardEditorProps } from "../../utils/richTextClipboard.js";
 import RichTextToolbar from "./RichTextToolbar.jsx";
@@ -197,6 +198,12 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     if (!editor) return;
     if (value == null) return;
     if (value === lastAppliedRef.current) return;
+    // The parent echoing back, as is, what the editor just emitted (every
+    // key typed): known without parsing and comparing the whole note.
+    if (lastEmittedRef.current && value === serializeRichContent(lastEmittedRef.current)) {
+      lastAppliedRef.current = value;
+      return;
+    }
     let incomingDoc;
     if (isRichContent(value)) {
       incomingDoc = parseRichDoc(value) || emptyRichDoc();

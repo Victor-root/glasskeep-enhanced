@@ -57,12 +57,19 @@ function wrapRichDoc(doc) {
 }
 
 /** Serialize an envelope (or doc) for storage in `notes.content`. */
+// One string per doc object: the editor's doc of each key typed is serialized
+// by the note, then compared with what comes back, without a second pass.
+const serialized = new WeakMap();
+
 export function serializeRichContent(docOrEnvelope) {
+  if (docOrEnvelope && serialized.has(docOrEnvelope)) return serialized.get(docOrEnvelope);
   const envelope =
     docOrEnvelope && docOrEnvelope.format === RICH_FORMAT_NAME
       ? docOrEnvelope
       : wrapRichDoc(docOrEnvelope || emptyRichDoc());
-  return JSON.stringify(envelope);
+  const text = JSON.stringify(envelope);
+  if (docOrEnvelope && typeof docOrEnvelope === "object") serialized.set(docOrEnvelope, text);
+  return text;
 }
 
 /**

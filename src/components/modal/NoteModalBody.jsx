@@ -100,10 +100,13 @@ export default function NoteModalBody({
   // Rendered HTML for view mode. Rich-format notes render through Tiptap's
   // generateHTML (also sanitized); legacy Markdown notes keep the old marked
   // pipeline so they look identical until the user edits and upgrades them.
+  // Only built in view mode: while editing, the body changes on every key and
+  // this HTML, rebuilt and sanitized each time, was never shown.
   const viewHtml = React.useMemo(() => {
+    if (!viewMode) return "";
     if (isRichContent(mBody)) return linkifyContactsHTML(contentToHTML(mBody));
     return linkifyContactsHTML(renderSafeMarkdown(mBody));
-  }, [mBody]);
+  }, [mBody, viewMode]);
 
   // Serialize a Tiptap doc from the editor back into the string shape that
   // mBody / autosave / sync expect. Centralised here so the two editor mount

@@ -19,7 +19,7 @@ import ServerPowerOverlay from "./ServerPowerOverlay.jsx";
 import { GRADIENT_BUTTON_CLASSES } from "../common/fieldClasses.js";
 import usePageScrollLock from "../../hooks/usePageScrollLock.js";
 
-export default function AdminPanel({
+function AdminPanel({
   open,
   onClose,
   dark,
@@ -341,3 +341,7 @@ export default function AdminPanel({
     </>
   );
 }
+
+// Closed, the panel shows nothing: it skips the app's renders until it opens
+// again, when it renders with the current props.
+export default React.memo(AdminPanel, (prev, next) => !prev.open && !next.open);
