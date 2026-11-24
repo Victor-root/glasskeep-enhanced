@@ -193,6 +193,8 @@ export default function NotesHeader({
   const mobileOnly = isLandscapeMobile ? "" : "sm:hidden";
   const desktopOnly = isLandscapeMobile ? "hidden" : "hidden sm:flex";
   const desktopOnlyInlineText = isLandscapeMobile ? "hidden" : "hidden sm:inline";
+  // Which of the two rows above shows, for what they each render twice.
+  const desktopRow = !isLandscapeMobile && windowWidth >= 640;
   // Drive the offline badge from the sync engine's real reachability, NOT
   // navigator.onLine. The latter is a stale `false` at cold start in the
   // Android WebView, which flashed the badge on every refresh while the engine
@@ -335,7 +337,7 @@ export default function NotesHeader({
             >
               {dark ? <SunIcon /> : <MoonIcon />}
             </button>
-            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} syncDropdownOpen={syncDropdownOpen} setSyncDropdownOpen={setSyncDropdownOpen} instanceLocked={instanceLocked} />
+            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} syncDropdownOpen={syncDropdownOpen} setSyncDropdownOpen={setSyncDropdownOpen} instanceLocked={instanceLocked} hidden={!desktopRow} />
             <button
               onClick={() => onStartMulti?.()}
               className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 gk-header-icon-btn ${dark ? "text-violet-400 hover:text-violet-300 focus:ring-violet-500" : "text-violet-600 hover:text-violet-700 focus:ring-violet-400"}`}
@@ -380,7 +382,7 @@ export default function NotesHeader({
               the row keeps the original looser spacing. */}
           <div className={`${mobileOnly} flex items-center ${qrQuickEnabled ? "gap-0" : "gap-1"}`}>
             {notificationBellMobile}
-            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} syncDropdownOpen={syncDropdownOpen} setSyncDropdownOpen={setSyncDropdownOpen} instanceLocked={instanceLocked} />
+            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} syncDropdownOpen={syncDropdownOpen} setSyncDropdownOpen={setSyncDropdownOpen} instanceLocked={instanceLocked} hidden={desktopRow} />
             {qrQuickEnabled && (
               <button
                 type="button"

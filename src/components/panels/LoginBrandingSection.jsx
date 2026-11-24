@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import useWindowSize from "../../hooks/useWindowSize.js";
 import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
 import { RowIcon } from "../common/SettingsAccordion.jsx";
@@ -114,7 +115,8 @@ export default function LoginBrandingSection({ dark, adminSettings, updateAdminS
   // (×1.75) — still much weaker than the raw value, just slightly more
   // visible than pure height-ratio scaling.
   const PREVIEW_H = 144;
-  const previewBlur = blur > 0 ? +(blur * (PREVIEW_H / (typeof window !== "undefined" ? window.innerHeight : 800)) * 1.75).toFixed(2) : 0;
+  const { windowHeight } = useWindowSize();
+  const previewBlur = blur > 0 ? +(blur * (PREVIEW_H / windowHeight) * 1.75).toFixed(2) : 0;
 
   // Slider rail: indigo→violet fill up to the current value, neutral
   // track after it (theme-aware).

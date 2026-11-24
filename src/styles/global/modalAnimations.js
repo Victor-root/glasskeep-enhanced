@@ -65,6 +65,9 @@ export const modalAnimationsCSS = `
 .note-modal-anim.closing { animation: noteModalOut 180ms ease-in  both; }
 .note-scrim-anim         { animation: scrimFadeIn  200ms ease-out both; }
 .note-scrim-anim.closing { animation: scrimFadeOut 180ms ease-in  both; }
+/* Held at their first keyframe until the note's first frame is out (NoteModal). */
+.note-scrim-anim[data-entrance-waiting],
+.note-scrim-anim[data-entrance-waiting] > .note-modal-anim { animation-play-state: paused; }
 
 /* Smooth content fade when toggling view/edit mode */
 @keyframes modalContentFade {

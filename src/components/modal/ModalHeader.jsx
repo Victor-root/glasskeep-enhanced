@@ -16,6 +16,11 @@ import { t } from "../../i18n";
  * Mobile: sticky bar is slim (icons only), title scrolls with content.
  */
 const MOBILE_TITLE_STYLE = { fontSize: "1.15rem", lineHeight: 1.3 };
+// Browsers that size a field to its content do it for the title; elsewhere
+// it is measured and resized after each change, a layout of the note each time.
+const FIELD_SIZING = typeof CSS !== "undefined" && !!CSS.supports?.("field-sizing", "content");
+const TITLE_FIELD_STYLE = FIELD_SIZING ? { fieldSizing: "content" } : undefined;
+const MOBILE_TITLE_FIELD_STYLE = { ...MOBILE_TITLE_STYLE, ...TITLE_FIELD_STYLE };
 
 export default function ModalHeader({
   dark,
@@ -114,7 +119,7 @@ export default function ModalHeader({
   }, []);
 
   useLayoutEffect(() => {
-    if (mobileTitleRef.current) {
+    if (!FIELD_SIZING && mobileTitleRef.current) {
       autoResizeTitle(mobileTitleRef.current);
     }
   }, [mTitle, viewMode, autoResizeTitle]);
@@ -162,7 +167,7 @@ export default function ModalHeader({
             <textarea
               ref={setTitleRef}
               className={`${titleLayout} bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden`}
-              style={isDesktop ? undefined : MOBILE_TITLE_STYLE}
+              style={isDesktop ? TITLE_FIELD_STYLE : MOBILE_TITLE_FIELD_STYLE}
               rows={1}
               value={mTitle}
               onChange={handleTitleChange}

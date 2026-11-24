@@ -10,6 +10,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import useWindowSize from "../../hooks/useWindowSize.js";
 import { useBranding } from "../../branding/BrandingContext.jsx";
 import { useNotifications } from "./NotificationProvider.jsx";
 import NotificationCard from "./NotificationCard.jsx";
@@ -39,7 +40,8 @@ export default function NotificationCenter({
   // letting the click fall through to whatever is behind the panel, so the
   // closing pointerdown hands its gesture to useSwallowClosingClick.
   const swallowClickOf = useSwallowClosingClick();
-  const isMobile = typeof window !== "undefined" && window.innerWidth < SHEET_BREAKPOINT_PX;
+  const { windowWidth } = useWindowSize();
+  const isMobile = windowWidth < SHEET_BREAKPOINT_PX;
 
   // Desktop panel: Escape and a tap outside close it (the mobile sheet has
   // its own backdrop and Escape handling).

@@ -38,6 +38,8 @@ export function currentThemeColor() {
 /** Update PWA status bar color by removing and re-creating the meta tag */
 export function setThemeColor(color) {
   const old = document.querySelector('meta[name="theme-color"]');
+  // Already that colour: nothing to repaint, nor to send the app.
+  if (old?.getAttribute("content") === color) return;
   if (old) old.remove();
   const meta = document.createElement("meta");
   meta.name = "theme-color";

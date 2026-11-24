@@ -139,6 +139,17 @@ export default function useNoteKeyboardLayout(enabled, scrollRef, footerRef) {
     const onSettled = () => {
       const keyboard = restingKeyboard();
       if (sliding && keyboard !== target) return;
+      // The app sends its insets again whenever the system bars change (an
+      // opening note recolours them) without the keyboard having moved: with
+      // the keyboard down there is nothing to place, and up, only a changed
+      // navigation bar can shift the footer.
+      if (!sliding && keyboard === target) {
+        if (!keyboard) return;
+        const before = navBar;
+        measureNavBar();
+        if (navBar !== before) place(keyboard);
+        return;
+      }
       measureNavBar();
       const top = scroller.scrollTop + textShift;
       sliding = false;

@@ -2,6 +2,7 @@
 // Cloud sync status icon with dropdown menu showing detailed sync state
 
 import React, { useState, useRef, useEffect } from "react";
+import useWindowSize from "../hooks/useWindowSize.js";
 import { t } from "../i18n";
 import { useSwallowClosingClick } from "../hooks/useSwallowClosingClick.js";
 import Sheet from "../components/common/Sheet.jsx";
@@ -167,7 +168,10 @@ function formatTimeAgo(ts) {
 
 // ─── Component ───
 
-export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdownOpen, setSyncDropdownOpen, instanceLocked = false }) {
+// `hidden`: this is the copy the current layout hides (NotesHeader renders one
+// for the desktop row and one for the phone row, sharing syncDropdownOpen):
+// only the visible one owns the panel.
+export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdownOpen, setSyncDropdownOpen, instanceLocked = false, hidden = false }) {
   const open = syncDropdownOpen;
   const setOpen = setSyncDropdownOpen;
   const [forceSyncing, setForceSyncing] = useState(false);
@@ -188,16 +192,14 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
     return () => clearInterval(id);
   }, [open]);
 
-  const isMobileSheet = typeof window !== "undefined" && window.innerWidth < SHEET_BREAKPOINT_PX;
-  // NotesHeader renders two of these icons (desktop and mobile clusters)
-  // sharing syncDropdownOpen; only the visible one owns the panel.
-  const isHiddenInstance = () => !!btnRef.current && btnRef.current.offsetParent === null;
+  const { windowWidth } = useWindowSize();
+  const isMobileSheet = windowWidth < SHEET_BREAKPOINT_PX;
 
   // Desktop popover: close on an outside tap/click. Pointerdown + swallow
   // keeps the follow-up click from reaching elements behind the panel. The
   // mobile sheet has its own backdrop.
   useEffect(() => {
-    if (!open || isMobileSheet || isHiddenInstance()) return undefined;
+    if (!open || isMobileSheet || hidden) return undefined;
     const onPointerDown = (e) => {
       if (menuRef.current && menuRef.current.contains(e.target)) return;
       if (btnRef.current && btnRef.current.contains(e.target)) return;
@@ -208,7 +210,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
     };
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
-  }, [open, isMobileSheet, setOpen, swallowClickOf]);
+  }, [open, isMobileSheet, hidden, setOpen, swallowClickOf]);
 
   if (!syncStatus) return null;
 
@@ -470,8 +472,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
         )}
       </button>
 
-      {/* eslint-disable-next-line react-hooks/refs -- reads the button's live layout to let only the visible instance render the panel */}
-      {open && !isMobileSheet && !isHiddenInstance() && (
+      {open && !isMobileSheet && !hidden && (
         <div
           ref={menuRef}
           className={`gk-sync-sheet absolute top-12 right-0 min-w-[280px] max-w-[340px] z-[1100] border rounded-lg overflow-hidden ${
@@ -482,8 +483,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
           {renderDetails(false)}
         </div>
       )}
-      {/* eslint-disable-next-line react-hooks/refs -- same check for the mobile sheet */}
-      {isMobileSheet && !isHiddenInstance() && (
+      {isMobileSheet && !hidden && (
         <Sheet edge="top" open={open} onClose={() => setOpen(false)} title={t("syncPanelTitle")} background="var(--gk-statusbar)">
           {renderDetails(true)}
         </Sheet>

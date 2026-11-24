@@ -242,7 +242,11 @@ export default function useModalState({ notes, currentUser, closeModalRef }) {
   // Lock body scroll on modal & image viewer (compensate scrollbar width to prevent layout shift)
   useEffect(() => {
     if (!open && !imgViewOpen) return;
-    const scrollbarW = window.innerWidth - document.documentElement.clientWidth;
+    // Touch screens draw scrollbars over the page: nothing to make up for,
+    // and measuring would lay the page out while the note opens.
+    const scrollbarW = window.matchMedia?.("(pointer: coarse)").matches
+      ? 0
+      : window.innerWidth - document.documentElement.clientWidth;
     const prevOverflow = document.body.style.overflow;
     const prevPaddingRight = document.body.style.paddingRight;
     document.body.style.overflow = "hidden";
@@ -329,26 +333,19 @@ export default function useModalState({ notes, currentUser, closeModalRef }) {
       // +1 fudge factor to avoid off-by-one on some browsers
       setModalScrollable(el.scrollHeight > el.clientHeight + 1);
     };
-    check();
 
-    // React to container size changes and window resizes
-    let ro;
-    if ("ResizeObserver" in window) {
-      ro = new ResizeObserver(check);
-      ro.observe(el);
+    // Checked as the body or its content change size (images loading,
+    // fonts...), and first as soon as it is laid out: the observer reports
+    // once layout is done, where measuring right away would lay the note out
+    // in the middle of its opening.
+    if (!("ResizeObserver" in window)) {
+      check();
+      return undefined;
     }
-    window.addEventListener("resize", check);
-
-    // Also recheck shortly after (images rendering, fonts, etc.)
-    const t1 = setTimeout(check, 50);
-    const t2 = setTimeout(check, 200);
-
-    return () => {
-      window.removeEventListener("resize", check);
-      clearTimeout(t1);
-      clearTimeout(t2);
-      ro?.disconnect();
-    };
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    for (const child of el.children) ro.observe(child);
+    return () => ro.disconnect();
   }, [open, mBody, mTitle, mItems.length, mImages.length, viewMode, mType]);
 
   /** Add copy buttons to code (view mode, text notes) */

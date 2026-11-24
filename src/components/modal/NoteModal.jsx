@@ -374,10 +374,9 @@ export default function NoteModal({
      the moment that modal closes, putting the note's color back. */
   React.useEffect(() => {
     if (collaborationModalOpen) return;
-    const pageColor = currentStatusBarColor();
     if (!open) {
       window.__noteModalOpen = false;
-      setThemeColor(pageColor);
+      setThemeColor(currentStatusBarColor());
       return;
     }
     window.__noteModalOpen = true;
@@ -427,6 +426,21 @@ export default function NoteModal({
   if (!open && cameIn) setCameIn(false);
   useRootFlag("data-gk-page-covered", mobileLayout && open && cameIn && !isModalClosing);
 
+  // Its entrance waits for its first frame: laying the note out and painting
+  // it the first time takes long (most of all on a cold start), and an
+  // animation started with it had mostly played before anything showed, the
+  // page dimming at once and the note popping in.
+  const scrimRef = React.useRef(null);
+  React.useLayoutEffect(() => {
+    const scrim = scrimRef.current;
+    if (!open || !scrim) return undefined;
+    scrim.setAttribute("data-entrance-waiting", "");
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => scrim.removeAttribute("data-entrance-waiting"));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
   /* Android navigation bar: on the mobile layout it sits right under the
      footer, so it takes the footer's own colour (its translucent tint over
      the note's background) rather than the note's; handed back to the
@@ -444,9 +458,17 @@ export default function NoteModal({
       navBarColoredRef.current = false;
       return;
     }
-    if (!footerRef.current) return;
-    setNavBarColor(compositeOver(getComputedStyle(footerRef.current).backgroundColor, modalBgFor(mColor, dark)));
-    navBarColoredRef.current = true;
+    if (!footerRef.current) return undefined;
+    // Read once the note's first frame is out: earlier, the footer's style
+    // would be worked out on the spot, in the middle of the note opening.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        if (!footerRef.current) return;
+        setNavBarColor(compositeOver(getComputedStyle(footerRef.current).backgroundColor, modalBgFor(mColor, dark)));
+        navBarColoredRef.current = true;
+      });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [open, mobileLayout, mColor, dark]);
 
   // Per-note AI side panel.
@@ -552,6 +574,7 @@ export default function NoteModal({
   return (
     <>
       <div
+        ref={scrimRef}
         className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 ${mobileLayout ? 'bg-black' : 'bg-black/40 max-sm:bg-black'} z-40 flex items-center justify-center ${noteAiSidebarLayout && noteAiAvailable ? 'gap-2' : ''} overscroll-contain`}
         data-split-mode={splitMode ? "true" : undefined}
         data-split-side={splitMode ? splitSide : undefined}
