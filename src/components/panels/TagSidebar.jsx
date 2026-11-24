@@ -22,6 +22,11 @@ function TagSidebar({
   width = 288,
   onResize,
 }) {
+  // On a touch screen, the drawer takes the Material 3 navigation drawer's
+  // look (gk-drawer--material in globalCSS); the permanent sidebar of wide
+  // screens keeps its own.
+  const [touch] = useState(() => !!window.matchMedia?.("(pointer: coarse)").matches);
+  const material = !permanent && touch;
   const isAllNotes = activeTag === null && activeTagFilters.length === 0;
   const isAllImages = activeTag === ALL_IMAGES;
 
@@ -84,28 +89,30 @@ function TagSidebar({
         />
       )}
       <aside
-        className={`gk-sidebar fixed top-0 left-0 z-40 h-full ${permanent ? (skipTransition ? "" : "transition-[translate,background-color] duration-200 ") : `gk-drawer${open ? " is-open" : ""} `}${permanent || open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`gk-sidebar fixed top-0 left-0 z-40 h-full ${permanent ? (skipTransition ? "" : "transition-[translate,background-color] duration-200 ") : `gk-drawer${material ? " gk-drawer--material" : ""}${open ? " is-open" : ""} `}${permanent || open ? "translate-x-0" : "-translate-x-full"}`}
         style={{
           // Visuals (background, border, glass shadow) live in the .gk-sidebar
           // CSS rule so they follow the chrome theme tokens; only layout here.
-          width: permanent ? `${width}px` : "288px",
+          width: permanent ? `${width}px` : material ? "min(calc(100vw - 56px), 320px)" : "288px",
           paddingTop: "var(--safe-top)",
           paddingBottom: "var(--safe-bottom)",
           paddingLeft: "var(--safe-left)",
         }}
         inert={!(permanent || open)}
       >
-        <div className="px-4 flex items-center justify-between h-[var(--gk-header-h,56px)] shrink-0">
-          <h3 className="text-lg font-semibold">{t("tags")}</h3>
-          <button
-            className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
-            onClick={onClose}
-            data-tooltip={t("close")}
-          >
-            <CloseIcon />
-          </button>
-        </div>
-        <nav className="gk-sidebar-body p-2 overflow-y-auto h-[calc(100%-var(--gk-header-h,56px))]">
+        {!material && (
+          <div className="px-4 flex items-center justify-between h-[var(--gk-header-h,56px)] shrink-0">
+            <h3 className="text-lg font-semibold">{t("tags")}</h3>
+            <button
+              className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
+              onClick={onClose}
+              data-tooltip={t("close")}
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        )}
+        <nav className={`gk-sidebar-body overflow-y-auto ${material ? "h-full" : "p-2 h-[calc(100%-var(--gk-header-h,56px))]"}`}>
           {/* Multi-tag filter indicator — at the top so it's impossible to miss */}
           {activeTagFilters.length > 1 && (
             <div
@@ -150,6 +157,7 @@ function TagSidebar({
               onSelect(null);
               if (!permanent) onClose();
             }}
+            data-icon="notes"
           ><NotesIcon />{t("notesAll")}</button>
 
           {/* All Images */}
@@ -159,6 +167,7 @@ function TagSidebar({
               onSelect(ALL_IMAGES);
               if (!permanent) onClose();
             }}
+            data-icon="images"
           ><ImagesIcon />{t("allImages")}</button>
 
           {/* Archived Notes */}
@@ -168,6 +177,7 @@ function TagSidebar({
               onSelect("ARCHIVED");
               if (!permanent) onClose();
             }}
+            data-icon="archive"
           ><ArchiveSidebarIcon />{t("archivedNotes")}</button>
 
           {/* Reminders — a filtered view over the regular notes (notes
@@ -178,6 +188,7 @@ function TagSidebar({
               onSelect(REMINDERS);
               if (!permanent) onClose();
             }}
+            data-icon="reminders"
           ><RemindersSidebarIcon />{t("remindersNotes")}</button>
 
           {/* Trash */}
@@ -187,7 +198,15 @@ function TagSidebar({
               onSelect("TRASHED");
               if (!permanent) onClose();
             }}
+            data-icon="trash"
           ><TrashSidebarIcon />{t("trashedNotes")}</button>
+
+          {material && (
+            <>
+              <div className="gk-drawer-divider" />
+              <div className="gk-drawer-subheader">{t("tags")}</div>
+            </>
+          )}
 
           {/* User tags */}
           {tagsWithCounts.map(({ tag, count }) => {
@@ -223,7 +242,7 @@ function TagSidebar({
             );
           })}
           {tagsWithCounts.length === 0 && (
-            <p className="text-sm text-gray-500 mt-2">{t("noTagsYet")}</p>
+            <p className="gk-drawer-empty text-sm text-gray-500 mt-2">{t("noTagsYet")}</p>
           )}
         </nav>
 

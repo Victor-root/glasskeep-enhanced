@@ -290,6 +290,73 @@ header.glass-card {
   font-weight: 600;
   box-shadow: 0 2px 10px -4px color-mix(in srgb, var(--gk-chrome-grad-to) 55%, transparent);
 }
+/* Touch screens: the tag drawer in Material 3's navigation drawer look
+   (TagSidebar, gk-drawer--material), in the app's colours: the sheets'
+   surface, round ended items, the brand gradient on the current one and
+   coloured icons for the fixed views. The permanent sidebar keeps its own. */
+.gk-sidebar.gk-drawer--material {
+  background: var(--gk-sheet-bg);
+  border-radius: 0 16px 16px 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+.gk-drawer--material .gk-sidebar-body {
+  border-right: none;
+  box-shadow: none;
+  padding: 8px 0;
+}
+.gk-drawer--material .gk-side-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 24px);
+  min-height: 56px;
+  margin: 0 12px;
+  padding: 0 24px 0 16px;
+  border-radius: 9999px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+.gk-drawer--material .gk-side-item > span:first-child { gap: 12px; }
+.gk-drawer--material .gk-side-item svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.gk-drawer--material .gk-side-item:not(.gk-side-item--active):active {
+  background-color: var(--gk-chrome-hover);
+}
+.gk-drawer--material .gk-side-item--active {
+  font-weight: 500;
+  box-shadow: none;
+}
+.gk-drawer--material .gk-side-item:not(.gk-side-item--active):not([data-icon]) svg { opacity: 0.7; }
+.gk-drawer--material .gk-side-item:not(.gk-side-item--active)[data-icon="notes"] svg { color: #5c6bc0; }
+.gk-drawer--material .gk-side-item:not(.gk-side-item--active)[data-icon="images"] svg { color: #d81b60; }
+.gk-drawer--material .gk-side-item:not(.gk-side-item--active)[data-icon="archive"] svg { color: #00897b; }
+.gk-drawer--material .gk-side-item:not(.gk-side-item--active)[data-icon="reminders"] svg { color: #fb8c00; }
+.gk-drawer--material .gk-side-item:not(.gk-side-item--active)[data-icon="trash"] svg { color: #e53935; }
+html.dark .gk-drawer--material .gk-side-item:not(.gk-side-item--active)[data-icon="notes"] svg { color: #9fa8da; }
+html.dark .gk-drawer--material .gk-side-item:not(.gk-side-item--active)[data-icon="images"] svg { color: #f48fb1; }
+html.dark .gk-drawer--material .gk-side-item:not(.gk-side-item--active)[data-icon="archive"] svg { color: #80cbc4; }
+html.dark .gk-drawer--material .gk-side-item:not(.gk-side-item--active)[data-icon="reminders"] svg { color: #ffcc80; }
+html.dark .gk-drawer--material .gk-side-item:not(.gk-side-item--active)[data-icon="trash"] svg { color: #ef9a9a; }
+.gk-drawer-divider {
+  height: 1px;
+  margin: 8px 28px;
+  background: currentColor;
+  opacity: 0.12;
+}
+.gk-drawer-subheader {
+  padding: 16px 28px 8px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  opacity: 0.7;
+}
+.gk-drawer--material .gk-drawer-empty { padding: 0 28px; }
 /* ───────── Sign-in and notes screens coming and going ─────────
    utils/screenTransitions.js sets data-gk-screen on <html>. The sign-in
    card comes in once what it shows is known (data-ready); on a first
